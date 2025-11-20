@@ -1,0 +1,101 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { ScheduleEntry, Student } from '../types';
+import * as api from '../api';
+import { useAppContext } from '../contexts/AppContext';
+
+// Re-using the styles from School Admin's schedule
+const subjectColors: { [key: string]: string } = {
+    'الرياضيات': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-700',
+    'العلوم': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 border-green-200 dark:border-green-700',
+    'اللغة الإنجليزية': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 border-red-200 dark:border-red-700',
+    'الدراسات الاجتماعية': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700',
+    'اللغة العربية': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700',
+    'التربية الفنية': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 border-purple-200 dark:border-purple-700',
+    'default': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600',
+};
+
+const timeSlots = ["08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00"];
+const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+const dayTranslations: { [key: string]: string } = {
+    Sunday: 'الأحد', Monday: 'الاثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس',
+};
+
+const ParentSchedule: React.FC = () => {
+    const { currentUser: user } = useAppContext();
+    const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
+    const [student, setStudent] = useState<Student | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user?.parentId) {
+            setLoading(false);
+            return;
+        }
+        api.getStudentAndScheduleByParentId(user.parentId)
+            .then(data => {
+                setStudent(data.student);
+                setSchedule(data.schedule);
+            })
+            .catch(err => console.error("Failed to fetch schedule data", err))
+            .finally(() => setLoading(false));
+    }, [user?.parentId]);
+    
+    const scheduleData = useMemo(() => {
+        const grid: { [key: string]: { [key: string]: ScheduleEntry } } = {};
+        schedule.forEach(entry => {
+            if (!grid[entry.timeSlot]) grid[entry.timeSlot] = {};
+            grid[entry.timeSlot][entry.day] = entry;
+        });
+        return grid;
+    }, [schedule]);
+
+    if (loading) {
+        return <div className="text-center p-8">جاري تحميل الجدول الدراسي...</div>;
+    }
+
+    if (!student || schedule.length === 0) {
+        return <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-md">لا يوجد جدول دراسي متاح حاليًا.</div>;
+    }
+
+    return (
+        <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md overflow-x-auto">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+                الجدول الدراسي للطالب: {student.name}
+            </h3>
+            {loading ? <div className="text-center py-8">جاري تحميل الجدول...</div> : (
+                <div className="grid grid-cols-6 min-w-[900px]">
+                    <div className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">الوقت</div>
+                    {days.map(day => (
+                        <div key={day} className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">
+                            {dayTranslations[day]}
+                        </div>
+                    ))}
+
+                    {timeSlots.map(timeSlot => (
+                        <React.Fragment key={timeSlot}>
+                            <div className="font-semibold text-center p-3 border-l border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-400 flex items-center justify-center">
+                                {timeSlot}
+                            </div>
+                            {days.map(day => {
+                                const entry = scheduleData[timeSlot]?.[day];
+                                const colorClass = entry ? (subjectColors[entry.subject] || subjectColors.default) : '';
+                                return (
+                                    <div key={`${timeSlot}-${day}`} className={`p-2 border-b border-l border-gray-200 dark:border-gray-600 ${entry ? colorClass : ''}`}>
+                                        {entry && (
+                                            <div className="text-center">
+                                                <p className="font-bold text-sm">{entry.subject}</p>
+                                                <p className="text-xs">{entry.teacherName}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </React.Fragment>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default ParentSchedule;

@@ -1,0 +1,5 @@
+{
+  "name": "School CRM",
+  "description": "A Super Admin dashboard for managing schools, subscriptions, and plans for a multi-tenant school CRM system. This provides an overview of key metrics and school management functionalities.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,188 @@
+import React, { Suspense } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { useAppContext } from './contexts/AppContext';
+import { User, UserRole } from './types';
+import ToastContainer from './components/ToastContainer';
+
+// Lazy load pages and layouts for better performance
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const SuperAdminLayout = React.lazy(() => import('./layouts/SuperAdminLayout'));
+const SchoolAdminLayout = React.lazy(() => import('./layouts/SchoolAdminLayout'));
+const TeacherLayout = React.lazy(() => import('./layouts/TeacherLayout'));
+const ParentLayout = React.lazy(() => import('./layouts/ParentLayout'));
+
+// Super Admin Pages
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const SchoolsList = React.lazy(() => import('./pages/SchoolsList'));
+const SubscriptionsList = React.lazy(() => import('./pages/SubscriptionsList'));
+const Billing = React.lazy(() => import('./pages/Billing'));
+const FeatureManagement = React.lazy(() => import('./pages/FeatureManagement'));
+const ContentManagement = React.lazy(() => import('./pages/ContentManagement'));
+const UsageLimits = React.lazy(() => import('./pages/UsageLimits'));
+const RolesList = React.lazy(() => import('./pages/RolesList'));
+const LicenseManagement = React.lazy(() => import('./pages/LicenseManagement'));
+const UserProfile = React.lazy(() => import('./pages/UserProfile'));
+const SchoolAdminsList = React.lazy(() => import('./pages/SchoolAdminsList'));
+const SuperAdminTeamManagement = React.lazy(() => import('./pages/SuperAdminTeamManagement'));
+
+// School Admin Pages
+const SchoolDashboard = React.lazy(() => import('./pages/SchoolDashboard'));
+const StudentsList = React.lazy(() => import('./pages/StudentsList'));
+const StudentProfile = React.lazy(() => import('./pages/StudentProfile'));
+const TeachersList = React.lazy(() => import('./pages/TeachersList'));
+const TeacherProfile = React.lazy(() => import('./pages/TeacherProfile'));
+const ParentsList = React.lazy(() => import('./pages/ParentsList'));
+const StaffManagement = React.lazy(() => import('./pages/StaffManagement'));
+const ClassesList = React.lazy(() => import('./pages/ClassesList'));
+const Transportation = React.lazy(() => import('./pages/Transportation'));
+const Attendance = React.lazy(() => import('./pages/Attendance'));
+const Schedule = React.lazy(() => import('./pages/Schedule'));
+const Calendar = React.lazy(() => import('./pages/Calendar'));
+const Grades = React.lazy(() => import('./pages/Grades'));
+const Messaging = React.lazy(() => import('./pages/Messaging'));
+const Finance = React.lazy(() => import('./pages/Finance'));
+const Reports = React.lazy(() => import('./pages/Reports'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const ModulesPage = React.lazy(() => import('./pages/ModulesPage'));
+
+// Teacher Pages
+const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
+const TeacherMyClasses = React.lazy(() => import('./pages/TeacherMyClasses'));
+const TeacherSchedule = React.lazy(() => import('./pages/TeacherSchedule'));
+const TeacherAssignments = React.lazy(() => import('./pages/TeacherAssignments'));
+const TeacherAttendance = React.lazy(() => import('./pages/TeacherAttendance'));
+const TeacherGrades = React.lazy(() => import('./pages/TeacherGrades'));
+const TeacherFinance = React.lazy(() => import('./pages/TeacherFinance'));
+
+// Parent Pages
+const ParentDashboard = React.lazy(() => import('./pages/ParentDashboard'));
+const ParentGrades = React.lazy(() => import('./pages/ParentGrades'));
+const ParentAttendance = React.lazy(() => import('./pages/ParentAttendance'));
+const ParentFinance = React.lazy(() => import('./pages/ParentFinance'));
+const ParentSchedule = React.lazy(() => import('./pages/ParentSchedule'));
+const ParentRequests = React.lazy(() => import('./pages/ParentRequests'));
+const ParentTransportation = React.lazy(() => import('./pages/ParentTransportation'));
+
+
+// Helper to determine the home route based on user role
+const getHomeRouteForUser = (role: UserRole) => {
+  switch (role) {
+    case UserRole.SuperAdmin:
+    case UserRole.SuperAdminFinancial:
+    case UserRole.SuperAdminTechnical:
+    case UserRole.SuperAdminSupervisor:
+      return '/superadmin';
+    case UserRole.SchoolAdmin: return '/school';
+    case UserRole.Teacher: return '/teacher';
+    case UserRole.Parent: return '/parent';
+    default: return '/';
+  }
+};
+
+const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }) => {
+    const { currentUser } = useAppContext();
+    
+    if (!currentUser) {
+        return <Navigate to="/login" replace />;
+    }
+
+    if (currentUser.passwordMustChange && window.location.pathname !== '/profile') {
+        return <Navigate to="/profile" replace />;
+    }
+
+    // Check if user has access to superadmin area (all superadmin roles)
+    const superAdminRoles = [UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor];
+    const userHasSuperAdminAccess = superAdminRoles.includes(currentUser.role);
+    const routeRequiresSuperAdmin = allowedRoles.some(role => superAdminRoles.includes(role));
+    
+    if (routeRequiresSuperAdmin && userHasSuperAdminAccess) {
+        return <Outlet />;
+    }
+
+    if (!allowedRoles.includes(currentUser.role)) {
+        return <Navigate to={getHomeRouteForUser(currentUser.role)} replace />;
+    }
+
+    return <Outlet />;
+};
+
+
+const App: React.FC = () => {
+  const { currentUser } = useAppContext();
+
+  return (
+    <>
+      <ToastContainer />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الصفحة...</div>}>
+        <Routes>
+          <Route path="/" element={!currentUser ? <LandingPage /> : <Navigate to={getHomeRouteForUser(currentUser.role)} replace />} />
+          <Route path="/login" element={!currentUser ? <LoginPage mode="default" /> : <Navigate to={getHomeRouteForUser(currentUser.role)} replace />} />
+          <Route path="/superadmin/login" element={!currentUser ? <LoginPage mode="superadmin" /> : <Navigate to={getHomeRouteForUser(currentUser.role)} replace />} />
+
+          {/* Super Admin Routes */}
+          <Route element={<ProtectedRoute allowedRoles={[UserRole.SuperAdmin]} />}>
+            <Route path="/superadmin" element={<SuperAdminLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="schools" element={<SchoolsList />} />
+              <Route path="school-admins" element={<SchoolAdminsList />} />
+              <Route path="team" element={<SuperAdminTeamManagement />} />
+              <Route path="subscriptions" element={<SubscriptionsList />} />
+              <Route path="billing" element={<Billing />} />
+              <Route path="modules" element={<FeatureManagement />} />
+              <Route path="content" element={<ContentManagement />} />
+              <Route path="usage_limits" element={<UsageLimits />} />
+              <Route path="permissions" element={<RolesList />} />
+              <Route path="license" element={<LicenseManagement />} />
+              <Route path="profile" element={<UserProfile />} />
+            </Route>
+            {/* SuperAdmin managing a specific school */}
+            <Route path="/manage/school/:schoolId/*" element={<SchoolAdminLayout isSuperAdminView />} />
+          </Route>
+
+          {/* School Admin Routes */}
+          <Route element={<ProtectedRoute allowedRoles={[UserRole.SchoolAdmin]} />}>
+            <Route path="/school/*" element={<SchoolAdminLayout />} />
+          </Route>
+          
+          {/* Teacher Routes */}
+          <Route element={<ProtectedRoute allowedRoles={[UserRole.Teacher]} />}>
+            <Route path="/teacher" element={<TeacherLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<TeacherDashboard />} />
+                <Route path="my_classes" element={<TeacherMyClasses />} />
+                <Route path="schedule" element={<TeacherSchedule />} />
+                <Route path="assignments" element={<TeacherAssignments />} />
+                <Route path="attendance" element={<TeacherAttendance />} />
+                <Route path="grades" element={<TeacherGrades />} />
+                <Route path="finance" element={<TeacherFinance />} />
+                <Route path="messaging" element={<Messaging />} />
+                <Route path="profile" element={<UserProfile />} />
+            </Route>
+          </Route>
+
+          {/* Parent Routes */}
+          <Route element={<ProtectedRoute allowedRoles={[UserRole.Parent]} />}>
+             <Route path="/parent" element={<ParentLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<ParentDashboard />} />
+                <Route path="grades" element={<ParentGrades />} />
+                <Route path="attendance" element={<ParentAttendance />} />
+                <Route path="finance" element={<ParentFinance />} />
+                <Route path="schedule" element={<ParentSchedule />} />
+                <Route path="requests" element={<ParentRequests />} />
+                <Route path="messaging" element={<Messaging />} />
+                <Route path="transportation" element={<ParentTransportation />} />
+                <Route path="profile" element={<UserProfile />} />
+             </Route>
+          </Route>
+          
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
+};
+
+export default App;

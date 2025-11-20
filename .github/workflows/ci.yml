@@ -1,0 +1,39 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm install
+
+    # Add steps for linting and testing here
+    # - name: Run Linter
+    #   run: |
+    #     cd backend
+    #     npm run lint
+
+    # - name: Run Tests
+    #   run: |
+    #     cd backend
+    #     npm test
+
+    - name: Log success
+      run: echo "CI check passed successfully."

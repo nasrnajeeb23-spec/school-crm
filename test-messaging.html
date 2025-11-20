@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Messaging Component</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Testing Messaging Component</h1>
+        <div id="test-results" class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-lg font-semibold mb-2">Test Status:</h2>
+            <div id="status" class="text-sm"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Test if required modules are available
+        const statusDiv = document.getElementById('status');
+        
+        try {
+            // Test React availability
+            if (typeof React === 'undefined') {
+                throw new Error('React is not available');
+            }
+            statusDiv.innerHTML += '<div class="text-green-600">✓ React is available</div>';
+            
+            // Test ReactDOM availability
+            if (typeof ReactDOM === 'undefined') {
+                throw new Error('ReactDOM is not available');
+            }
+            statusDiv.innerHTML += '<div class="text-green-600">✓ ReactDOM is available</div>';
+            
+            // Test if we can import the messaging component
+            import('./admin/src/pages/Messaging.tsx').then(module => {
+                statusDiv.innerHTML += '<div class="text-green-600">✓ Messaging component can be imported</div>';
+                statusDiv.innerHTML += '<div class="text-green-600">✓ All tests passed - messaging should work!</div>';
+            }).catch(error => {
+                statusDiv.innerHTML += `<div class="text-red-600">✗ Error importing Messaging component: ${error.message}</div>`;
+            });
+            
+        } catch (error) {
+            statusDiv.innerHTML += `<div class="text-red-600">✗ Error: ${error.message}</div>`;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+import { User, School, ParentRequest } from './types';
+
+const API_BASE_URL = 'http://localhost:5000/api';
+
+let memoryToken: string | null = null;
+
+async function getToken() {
+  try {
+    const SecureStore = (await import('expo-secure-store')).default;
+    const t = await SecureStore.getItemAsync('auth_token');
+    return t || memoryToken;
+  } catch {
+    return memoryToken;
+  }
+}
+
+async function setToken(token: string) {
+  memoryToken = token;
+  try {
+    const SecureStore = (await import('expo-secure-store')).default;
+    await SecureStore.setItemAsync('auth_token', token);
+  } catch {}
+}
+
+const authHeaders = async () => {
+  const token = await getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+export const login = async (email: string, password: string, _schoolId: number): Promise<User | null> => {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (data?.token) await setToken(data.token);
+    return data?.user || null;
+  } catch {
+    return null;
+  }
+};
+
+export const logout = async () => {
+  memoryToken = null;
+  try { const SecureStore = (await import('expo-secure-store')).default; await SecureStore.deleteItemAsync('auth_token'); } catch {}
+};
+
+export const getSchools = async (): Promise<School[]> => {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/schools`);
+    if (!resp.ok) throw new Error('failed');
+    const data = await resp.json();
+    return data.map(({ id, name }: any) => ({ id, name }));
+  } catch {
+    return [];
+  }
+};
+
+export const getParentDashboardData = async (parentId: string) => {
+  try {
+    const headers = await authHeaders();
+    const resp = await fetch(`${API_BASE_URL}/parent/${parentId}/dashboard`, { headers });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
+};
+
+export const getStudentAndScheduleByParentId = async (parentId: string) => {
+  const data = await getParentDashboardData(parentId);
+  if (!data) return { student: null, schedule: [] };
+  return { student: data.student, schedule: data.schedule || [] };
+};
+
+export const getParentRequests = async (_parentId: string): Promise<ParentRequest[]> => {
+  return [];
+};
+
+export const submitParentRequest = async (_parentId: string, _requestData: Omit<ParentRequest, 'id' | 'submissionDate' | 'status'>): Promise<ParentRequest> => {
+  throw new Error('Not implemented');
+};
+
+export const getParentTransportationDetails = async (parentId: string) => {
+  try {
+    const headers = await authHeaders();
+    const resp = await fetch(`${API_BASE_URL}/transportation/parent/${parentId}`, { headers });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
+};
+
+export const getStudentAssignments = async (_studentId: string) => {
+  return [];
+};
+
+export const getSubmissionForAssignment = async (_studentId: string, _assignmentId: string) => {
+  return { id: '', assignmentId: '', studentId: '', studentName: '', submissionDate: null, status: 'لم يسلم' as any };
+};
+
+export const submitAssignment = async (_submissionId: string) => {
+  throw new Error('Not implemented');
+};

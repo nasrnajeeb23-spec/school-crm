@@ -1,0 +1,106 @@
+import React, { useState, useEffect } from 'react';
+import * as api from '../api';
+import { SchoolSettings } from '../types';
+import { useToast } from '../contexts/ToastContext';
+
+interface SettingsProps {
+    schoolId: number;
+}
+
+const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
+  const [settings, setSettings] = useState<SchoolSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    setLoading(true);
+    api.getSchoolSettings(schoolId).then(data => {
+      setSettings(data);
+    }).catch(err => {
+        console.error("Failed to load settings:", err);
+    }).finally(() => {
+        setLoading(false);
+    });
+  }, [schoolId]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSettings(prev => prev ? { ...prev, [name]: value } : null);
+  };
+  
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setSettings(prev => prev ? { ...prev, notifications: { ...prev.notifications, [name]: checked } } : null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settings) return;
+    setSaving(true);
+    try {
+        await api.updateSchoolSettings(schoolId, settings);
+        addToast('تم حفظ الإعدادات بنجاح!', 'success');
+    } catch(err) {
+        console.error("Failed to save settings:", err);
+        addToast('فشل حفظ الإعدادات.', 'error');
+    } finally {
+        setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center p-8">جاري تحميل الإعدادات...</div>;
+  }
+
+  if (!settings) {
+    return <div className="text-center p-8">لا يمكن تحميل الإعدادات.</div>;
+  }
+
+  const inputStyle = "mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700";
+
+  return (
+    <div className="mt-6 space-y-6">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+        <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">الإعدادات العامة للمدرسة</h3>
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label htmlFor="schoolName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم المدرسة</label>
+                    <input type="text" name="schoolName" id="schoolName" value={settings.schoolName} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                 <div>
+                    <label htmlFor="schoolAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300">عنوان المدرسة</label>
+                    <input type="text" name="schoolAddress" id="schoolAddress" value={settings.schoolAddress} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div>
+                    <label htmlFor="academicYearStart" className="block text-sm font-medium text-gray-700 dark:text-gray-300">بداية العام الدراسي</label>
+                    <input type="date" name="academicYearStart" id="academicYearStart" value={settings.academicYearStart} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                 <div>
+                    <label htmlFor="academicYearEnd" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نهاية العام الدراسي</label>
+                    <input type="date" name="academicYearEnd" id="academicYearEnd" value={settings.academicYearEnd} onChange={handleInputChange} className={inputStyle} />
+                </div>
+            </div>
+            
+            <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                 <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">إعدادات الإشعارات</h4>
+                 <div className="flex flex-col sm:flex-row gap-6">
+                    <label className="flex items-center space-x-3 rtl:space-x-reverse"><input type="checkbox" name="email" checked={settings.notifications.email} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">إشعارات البريد الإلكتروني</span></label>
+                    <label className="flex items-center space-x-3 rtl:space-x-reverse"><input type="checkbox" name="sms" checked={settings.notifications.sms} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">رسائل نصية (SMS)</span></label>
+                    <label className="flex items-center space-x-3 rtl:space-x-reverse"><input type="checkbox" name="push" checked={settings.notifications.push} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">إشعارات التطبيق</span></label>
+                 </div>
+            </div>
+
+            <div className="flex justify-end pt-6">
+                <button type="submit" disabled={saving} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:bg-teal-400">
+                    {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+                </button>
+            </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default Settings;
