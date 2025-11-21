@@ -40,3 +40,6 @@ temp/
 **/*.pem
 **/*.key
 **/*.crt
+**/google-service-account-key.json
+mobile-parent/google-service-account-key.json
+mobile-teacher/google-service-account-key.json

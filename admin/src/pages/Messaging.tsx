@@ -73,24 +73,24 @@ const Messaging: React.FC = () => {
 
     const handleCreateConversation = async () => {
         if (!selectedTargetId) return;
-        
         try {
-            // Simulate creating conversation
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const newConversation: Conversation = {
-                id: `conv_${Date.now()}`,
-                title: `محادثة جديدة مع ${targetRole === 'TEACHER' ? 'معلم' : 'ولي أمر'}`,
-                participantName: 'مستخدم جديد',
-                participantId: selectedTargetId,
-                participantRole: targetRole,
-                lastMessage: '',
-                lastMessageAt: new Date().toISOString(),
-                unreadCount: 0,
+            const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+            const schoolId = schoolIdStr ? Number(schoolIdStr) : 1;
+            const title = `محادثة جديدة مع ${targetRole === 'TEACHER' ? 'معلم' : 'ولي أمر'}`;
+            const payload: any = { title, schoolId };
+            if (targetRole === 'TEACHER') payload.teacherId = selectedTargetId;
+            if (targetRole === 'PARENT') payload.parentId = selectedTargetId;
+            const created = await api.createConversation(payload);
+            const newConversation: any = {
+                id: created.id,
                 type: ConversationType.Direct,
-                roomId: `room_${Date.now()}`
+                participantName: created.title,
+                participantAvatar: '',
+                lastMessage: '',
+                timestamp: new Date().toISOString(),
+                unreadCount: 0,
+                title: created.title,
             };
-
             setConversations(prev => [newConversation, ...prev]);
             setIsCreateModalOpen(false);
             setSelectedTargetId('');

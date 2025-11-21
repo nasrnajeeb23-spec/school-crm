@@ -1245,33 +1245,43 @@ export const generateSelfHostedPackage = async (moduleIds: ModuleId[]): Promise<
         return null;
     }
 };
-export const getConversations = async (): Promise<Array<{ id: string; roomId: string; title: string }>> => {
-    console.warn("Using mocked getConversations API");
-    await networkDelay(300);
-    return MOCK_CONVERSATIONS.map(c => ({ id: c.id, roomId: c.roomId, title: c.title }));
+export const getConversations = async (): Promise<Conversation[]> => {
+    try {
+        const resp = await fetch(`${API_BASE_URL}/messaging/conversations`, { headers: { ...authHeaders() } });
+        if (!resp.ok) throw new Error('Failed');
+        const data = await resp.json();
+        return (data || []).map((c: any) => ({
+            id: c.id,
+            type: ConversationType.Direct,
+            participantName: c.title,
+            participantAvatar: '',
+            lastMessage: '',
+            timestamp: new Date().toISOString(),
+            unreadCount: 0,
+            title: c.title,
+        } as any as Conversation));
+    } catch {
+        return MOCK_CONVERSATIONS.map(c => ({
+            ...c,
+            title: c.participantName,
+        } as any as Conversation));
+    }
 };
 
-export const getMessages = async (conversationId: string): Promise<Array<{ id: string; text: string; senderId: string; senderRole: string; timestamp: string }>> => {
-    console.warn("Using mocked getMessages API");
+export const getMessages = async (conversationId: string): Promise<Message[]> => {
     try {
-        // Find the conversation in our mock data
-        const conversation = MOCK_CONVERSATIONS.find(c => c.id === conversationId);
-        if (!conversation) {
-            await networkDelay(200);
-            return [];
-        }
-        
-        // Return the messages for this conversation
-        await networkDelay(300);
-        return conversation.messages.map(m => ({
+        const resp = await fetch(`${API_BASE_URL}/messaging/conversations/${conversationId}/messages`, { headers: { ...authHeaders() } });
+        if (!resp.ok) throw new Error('Failed');
+        const data = await resp.json();
+        return (data || []).map((m: any) => ({
             id: m.id,
             text: m.text,
-            senderId: m.senderId,
-            senderRole: m.senderRole,
-            timestamp: m.timestamp
+            senderId: 'other',
+            timestamp: typeof m.timestamp === 'string' ? m.timestamp : new Date(m.timestamp).toISOString(),
         }));
     } catch {
-        return [];
+        const list = MOCK_MESSAGES[conversationId] || [];
+        return list.map(m => ({ id: m.id, text: m.text, senderId: 'other', timestamp: m.timestamp }));
     }
 };
 
