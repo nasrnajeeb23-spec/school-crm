@@ -28,7 +28,7 @@ services:
     env: static
     rootDir: admin
     buildCommand: npm run build
-    staticPublishPath: ../dist
+    staticPublishPath: dist
     autoDeploy: true
     envVars:
       - key: REACT_APP_API_URL

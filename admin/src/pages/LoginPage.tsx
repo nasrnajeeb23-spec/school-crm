@@ -377,31 +377,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
               </div>
             )}
             
-            {/* أزرار اختبار سريع للتجربة */}
-            {!showMfa && (
-              <div className="mt-4 space-y-2">
-                <p className="text-center text-sm text-gray-500">بيانات تجريبية للاختبار:</p>
-                {isSuperAdminLogin ? (
-                  <button 
-                    type="button"
-                    onClick={() => { setEmail('super@admin.com'); setPassword('password'); }}
-                    className="w-full py-2 px-3 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border"
-                  >
-                    دخول المدير العام
-                  </button>
-                ) : (
-                  <>
-                    <button 
-                      type="button"
-                      onClick={() => { setEmail('admin@school.com'); setPassword('password'); if (!isSuperAdminLogin) setSelectedSchool('1'); }}
-                      className="w-full py-2 px-3 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border"
-                    >
-                      دخول مدير المدرسة
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+
           </form>
           
           {/* Security footer for SuperAdmin */}
