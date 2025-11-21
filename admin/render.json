@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm run build",
+  "outputDir": "../dist",
+  "installCommand": "npm ci",
+  "buildFilter": "admin/**",
+  "headers": {
+    "/**": {
+      "Cache-Control": "public, max-age=3600"
+    }
+  }
+}

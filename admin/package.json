@@ -5,7 +5,8 @@
   "scripts": {
     "start": "echo \"Serving static files. Use a live server or Docker for development.\"",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npx esbuild src/index.tsx --bundle --format=esm --target=es2020 --external:react --external:react-dom --external:react-router --external:react-router-dom --outdir=../dist/assets --sourcemap"
+    "build": "npx esbuild src/index.tsx --bundle --format=esm --target=es2020 --external:react --external:react-dom --external:react-router --external:react-router-dom --outdir=../dist/assets --sourcemap",
+    "build:prod": "npm run build && echo 'Build completed for production'"
   },
   "author": "",
   "license": "MIT"

@@ -22,6 +22,20 @@ services:
         fromDatabase:
           name: schoolcrm-db
           property: connectionString
+  
+  - type: web
+    name: school-crm-admin
+    env: static
+    rootDir: admin
+    buildCommand: npm run build
+    staticPublishPath: ../dist
+    autoDeploy: true
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://school-crschool-crm-backendm.onrender.com/api
+      - key: REACT_APP_ENVIRONMENT
+        value: production
+
 databases:
   - name: schoolcrm-db
     plan: free

@@ -398,13 +398,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                     >
                       دخول مدير المدرسة
                     </button>
-                    <button 
-                      type="button"
-                      onClick={() => { setEmail('parent@school.com'); setPassword('password'); if (!isSuperAdminLogin) setSelectedSchool('1'); }}
-                      className="w-full py-2 px-3 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border"
-                    >
-                      دخول ولي الأمر
-                    </button>
                   </>
                 )}
               </div>
