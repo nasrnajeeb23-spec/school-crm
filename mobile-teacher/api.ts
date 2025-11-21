@@ -1,6 +1,6 @@
 import { User, School } from './types';
 
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'http://localhost:5000/api';
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 let memoryToken: string | null = null;
 
