@@ -331,7 +331,8 @@ console.log('Starting server on port', PORT);
 // Connect to database and start server
 async function syncDatabase(){
   const isProd = process.env.NODE_ENV === 'production';
-  const opts = isProd ? {} : { force: true };
+  // Force sync to fix schema issues - REMOVE THIS AFTER FIRST SUCCESSFUL DEPLOY
+  const opts = { force: true };
   await sequelize.sync(opts);
 }
 syncDatabase()
