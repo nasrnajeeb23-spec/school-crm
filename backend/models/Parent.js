@@ -3,8 +3,9 @@ const sequelize = require('../config/db');
 
 const Parent = sequelize.define('Parent', {
   id: {
-    type: DataTypes.STRING,
+    type: DataTypes.INTEGER,
     primaryKey: true,
+    autoIncrement: true,
   },
   name: {
     type: DataTypes.STRING,
