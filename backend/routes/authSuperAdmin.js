@@ -311,7 +311,7 @@ router.post('/login', [
 // @route   POST /api/auth/superadmin/verify-mfa
 // @desc    Verify MFA code for SuperAdmin
 // @access  Public (with temp token)
-router.post('/superadmin/verify-mfa', [
+router.post('/verify-mfa', [
   body('tempToken').isString(),
   body('mfaCode').isString().isLength({ min: 6, max: 6 }),
   body('ipAddress').optional().isIP(),

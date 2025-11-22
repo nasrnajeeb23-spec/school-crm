@@ -103,7 +103,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
     if (isSuperAdminLogin) {
       // Use enhanced SuperAdmin authentication
       try {
-        const loginIdentifier = username || email;
+        const loginIdentifier = email;
         const result = await api.superAdminLogin(loginIdentifier, password);
         
         if (result.requiresMfa) {
@@ -145,7 +145,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
       if (result.success) {
         localStorage.removeItem('superadmin_login_attempts');
         localStorage.removeItem('superadmin_lock_time');
-        await login(username || email, password);
+        await login(email, password);
       } else {
         addToast('رمز المصادقة غير صحيح', 'error');
       }
@@ -284,22 +284,26 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                 )}
                 {isSuperAdminLogin ? (
                   <div>
-                    <label htmlFor="username" className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">اسم المستخدم أو البريد الإلكتروني</label>
+                    <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">البريد الإلكتروني</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><EmailIcon className="h-5 w-5 text-gray-400" /></div>
                       <input 
-                        id="username" 
-                        name="username" 
-                        type="text" 
-                        autoComplete="username"
+                        id="email" 
+                        name="email" 
+                        type="email" 
+                        autoComplete="email"
                         required 
-                        value={username} 
-                        onChange={(e) => setUsername(e.target.value)} 
+                        value={email} 
+                        onChange={(e) => setEmail(e.target.value)} 
                         className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                        placeholder="أدخل اسم المستخدم أو البريد الإلكتروني"
+                        placeholder="أدخل بريدك الإلكتروني"
                       />
                     </div>
-                    {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
+                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                    {!errors.email && email && !/\S+@\S+\.\S+/.test(email) && (
+                      <p className="text-red-500 text-xs mt-1">صيغة البريد الإلكتروني غير صحيحة.</p>
+                    )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">هذا الحقل يقبل البريد الإلكتروني فقط.</p>
                   </div>
                 ) : (
                   <div>
@@ -350,7 +354,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
             <div className="pt-2">
               <button 
                 type="submit" 
-                disabled={isLoading} 
+                disabled={
+                  isLoading ||
+                  (isSuperAdminLogin && !/\S+@\S+\.\S+/.test(email)) ||
+                  (showMfa && mfaCode.length !== 6)
+                } 
                 className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed ${
                   isSuperAdminLogin 
                     ? 'bg-indigo-700 hover:bg-indigo-800 focus:ring-indigo-500 disabled:bg-indigo-400' 

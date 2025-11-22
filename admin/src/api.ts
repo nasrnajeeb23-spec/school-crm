@@ -7,7 +7,7 @@ import {
 } from './types';
 
 // 🔗 الاتصال بالـ Backend الحقيقي على Render
-const API_BASE_URL = 'https://school-crschool-crm-backendm.onrender.com/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://school-crm-backend.onrender.com/api';
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -39,12 +39,23 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
 
 // ==================== Authentication APIs ====================
 
-export const login = async (email: string, password: string, schoolId?: number): Promise<{ token: string; user: User }> => {
-    const response = await apiCall('/auth/login', {
+export const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<User> => {
+    const field = emailOrUsername.includes('@') ? { email: emailOrUsername } : { username: emailOrUsername };
+    const response: any = await apiCall('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password, schoolId }),
+        body: JSON.stringify({ ...field, password, schoolId }),
     });
-    return response;
+    const token = response?.token;
+    const user = response?.user || {};
+    if (typeof window !== 'undefined' && token) {
+        localStorage.setItem('auth_token', token);
+    }
+    const mapRole = (r: string) => {
+        const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+        const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
+        return m[key] || key;
+    };
+    return { ...user, role: mapRole(user.role) } as User;
 };
 
 export const logout = async (): Promise<void> => {
@@ -53,6 +64,16 @@ export const logout = async (): Promise<void> => {
 
 export const getCurrentUser = async (): Promise<User> => {
     return await apiCall('/auth/me', { method: 'GET' });
+};
+
+export const superAdminLogin = async (email: string, password: string): Promise<any> => {
+    const payload = { email, password, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown', timestamp: Date.now() };
+    return await apiCall('/auth/superadmin/login', { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const verifySuperAdminMfa = async (tempToken: string, mfaCode: string): Promise<any> => {
+  const payload = { tempToken, mfaCode, timestamp: Date.now() };
+  return await apiCall('/auth/superadmin/verify-mfa', { method: 'POST', body: JSON.stringify(payload) });
 };
 
 // ==================== School APIs ====================
@@ -306,4 +327,6 @@ export default {
     updateLandingPageContent,
     getBankAccounts,
     submitPaymentProof,
+    superAdminLogin,
+    verifySuperAdminMfa,
 }
