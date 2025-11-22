@@ -72,6 +72,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newUser = await api.submitTrialRequest(data);
     if (newUser) {
         setCurrentUser(newUser);
+        if (newUser.schoolId) {
+          try { localStorage.setItem('current_school_id', String(newUser.schoolId)); } catch {}
+        }
         addToast(`أهلاً بك ${newUser.name}! تم إنشاء حسابك التجريبي بنجاح.`, 'success');
         return true;
     } else {

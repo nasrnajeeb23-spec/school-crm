@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User } = require('../models');
+const { User, School, Plan, Subscription } = require('../models');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -66,6 +66,42 @@ router.post('/login', validate([
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
+  }
+});
+
+router.post('/trial-signup', validate([
+  { name: 'schoolName', required: true, type: 'string' },
+  { name: 'adminName', required: true, type: 'string' },
+  { name: 'adminEmail', required: true, type: 'string' },
+  { name: 'adminPassword', required: true, type: 'string', minLength: 6 },
+]), async (req, res) => {
+  try {
+    const { schoolName, adminName, adminEmail, adminPassword } = req.body;
+
+    const exists = await User.findOne({ where: { email: adminEmail } });
+    if (exists) return res.status(400).json({ msg: 'Email already in use' });
+
+    const school = await School.create({ name: schoolName, contactEmail: adminEmail });
+
+    let plan = await Plan.findOne({ where: { recommended: true } });
+    if (!plan) plan = await Plan.findOne();
+    const renewal = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await Subscription.create({ schoolId: school.id, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
+
+    const hashed = await bcrypt.hash(adminPassword, 10);
+    const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, permissions: ['VIEW_DASHBOARD'] });
+
+    const payload = { id: user.id, role: user.role, schoolId: user.schoolId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
+    const refreshSecret = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
+
+    const data = user.toJSON();
+    delete data.password;
+    return res.status(201).json({ token, refreshToken, user: data });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 

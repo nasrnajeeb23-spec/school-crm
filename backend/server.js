@@ -18,6 +18,7 @@ const DailyRotate = require('winston-daily-rotate-file');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const usersRoutes = require('./routes/users');
 const schoolsRoutes = require('./routes/schools');
 const plansRoutes = require('./routes/plans');
 const paymentsRoutes = require('./routes/payments');
@@ -177,6 +178,7 @@ app.locals.allowedModules = allowedModules;
 // API Routes
 const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/auth/superadmin', authSuperAdminRoutes);
 app.use('/api/schools', schoolsRoutes);
 app.use('/api/plans', plansRoutes);

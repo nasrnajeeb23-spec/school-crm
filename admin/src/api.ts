@@ -86,6 +86,10 @@ export const getSchool = async (id: number): Promise<School> => {
     return await apiCall(`/schools/${id}`, { method: 'GET' });
 };
 
+export const getSchoolById = async (id: number): Promise<School> => {
+    return await getSchool(id);
+};
+
 export const createSchool = async (schoolData: NewSchoolData): Promise<School> => {
     return await apiCall('/schools', {
         method: 'POST',
@@ -195,6 +199,19 @@ export const getInvoices = async (schoolId: number): Promise<Invoice[]> => {
     return await apiCall(`/schools/${schoolId}/invoices`, { method: 'GET' });
 };
 
+export const getSchoolInvoices = async (schoolId: number): Promise<Invoice[]> => {
+    return await getInvoices(schoolId);
+};
+
+export const getStudentDistribution = async (schoolId: number): Promise<{ name: string, value: number }[]> => {
+    try {
+        const data = await apiCall(`/schools/${schoolId}/stats/student-distribution`, { method: 'GET' });
+        return data;
+    } catch {
+        return [];
+    }
+};
+
 export const createInvoice = async (invoiceData: NewInvoiceData): Promise<Invoice> => {
     return await apiCall('/invoices', {
         method: 'POST',
@@ -286,6 +303,48 @@ export const submitPaymentProof = async (submission: Omit<PaymentProofSubmission
     });
 };
 
+export const getSchoolModules = async (schoolId: number): Promise<SchoolModuleSubscription[]> => {
+    try {
+        const data = await apiCall(`/schools/${schoolId}/modules`, { method: 'GET' });
+        return data;
+    } catch {
+        return [];
+    }
+};
+
+export const getActionItems = async (): Promise<ActionItem[]> => {
+    try {
+        const data = await apiCall('/superadmin/action-items', { method: 'GET' });
+        return data;
+    } catch {
+        return [];
+    }
+};
+
+// ==================== Trial Signup APIs ====================
+
+export const submitTrialRequest = async (data: NewTrialRequestData): Promise<User | null> => {
+    const response: any = await apiCall('/auth/trial-signup', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+    const token = response?.token;
+    if (typeof window !== 'undefined' && token) {
+        localStorage.setItem('auth_token', token);
+    }
+    return response?.user || null;
+};
+
+// ==================== User Profile APIs ====================
+
+export const updateCurrentUser = async (userId: string, data: UpdatableUserData): Promise<User | null> => {
+    const response: any = await apiCall(`/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+    return response?.user || null;
+};
+
 // تصدير جميع الدوال
 export default {
     login,
@@ -293,6 +352,7 @@ export default {
     getCurrentUser,
     getSchools,
     getSchool,
+    getSchoolById,
     createSchool,
     updateSchool,
     getStudents,
@@ -311,6 +371,7 @@ export default {
     updateSchoolStaff,
     deleteSchoolStaff,
     getInvoices,
+    getSchoolInvoices,
     createInvoice,
     getSuperAdminTeamMembers,
     getSchoolsList,
@@ -329,4 +390,8 @@ export default {
     submitPaymentProof,
     superAdminLogin,
     verifySuperAdminMfa,
+    submitTrialRequest,
+    getStudentDistribution,
+    getSchoolModules,
+    getActionItems,
 }
