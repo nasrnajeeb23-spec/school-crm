@@ -144,6 +144,30 @@ export const createClass = async (classData: NewClassData): Promise<Class> => {
     });
 };
 
+// ==================== Staff APIs ====================
+
+export const getSchoolStaff = async (schoolId: number): Promise<User[]> => {
+    return await apiCall(`/school/${schoolId}/staff`, { method: 'GET' });
+};
+
+export const addSchoolStaff = async (schoolId: number, staffData: NewStaffData): Promise<User> => {
+    return await apiCall(`/school/${schoolId}/staff`, {
+        method: 'POST',
+        body: JSON.stringify(staffData),
+    });
+};
+
+export const updateSchoolStaff = async (schoolId: number, userId: number | string, staffData: Partial<NewStaffData>): Promise<User> => {
+    return await apiCall(`/school/${schoolId}/staff/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify(staffData),
+    });
+};
+
+export const deleteSchoolStaff = async (schoolId: number, userId: number | string): Promise<void> => {
+    await apiCall(`/school/${schoolId}/staff/${userId}`, { method: 'DELETE' });
+};
+
 // ==================== Finance APIs ====================
 
 export const getInvoices = async (schoolId: number): Promise<Invoice[]> => {
@@ -261,6 +285,10 @@ export default {
     updateTeacher,
     getClasses,
     createClass,
+    getSchoolStaff,
+    addSchoolStaff,
+    updateSchoolStaff,
+    deleteSchoolStaff,
     getInvoices,
     createInvoice,
     getSuperAdminTeamMembers,
