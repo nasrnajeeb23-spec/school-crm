@@ -23,7 +23,7 @@ const getClientIP = () => {
     return '127.0.0.1'; // Mock IP for demo purposes
 };
 
-const API_BASE_URL = (typeof window !== 'undefined' && window.localStorage && localStorage.getItem('api_base')) ? String(localStorage.getItem('api_base'))! : 'http://127.0.0.1:5002/api';
+const API_BASE_URL = 'https://school-crm-backend.onrender.com/api';
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
