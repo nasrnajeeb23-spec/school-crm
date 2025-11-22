@@ -6,8 +6,8 @@ const Conversation = sequelize.define('Conversation', {
   roomId: { type: DataTypes.STRING, allowNull: false, unique: true },
   title: { type: DataTypes.STRING, allowNull: false },
   schoolId: { type: DataTypes.INTEGER, allowNull: false },
-  teacherId: { type: DataTypes.STRING, allowNull: true },
-  parentId: { type: DataTypes.STRING, allowNull: true },
+  teacherId: { type: DataTypes.INTEGER, allowNull: true },
+  parentId: { type: DataTypes.INTEGER, allowNull: true },
 });
 
 module.exports = Conversation;
