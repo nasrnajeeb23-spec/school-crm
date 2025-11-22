@@ -331,9 +331,26 @@ console.log('Starting server on port', PORT);
 // Connect to database and start server
 async function syncDatabase(){
   const isProd = process.env.NODE_ENV === 'production';
-  // Force sync to fix schema issues - REMOVE THIS AFTER FIRST SUCCESSFUL DEPLOY
-  const opts = { force: true };
-  await sequelize.sync(opts);
+  // Sync database without force to preserve data
+  const opts = { force: false };
+  
+  // Sync models in correct order to avoid foreign key constraint issues
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message } = require('./models');
+  
+  // Sync independent tables first
+  await School.sync(opts);
+  await Plan.sync(opts);
+  await BusOperator.sync(opts);
+  await Parent.sync(opts);
+  await Student.sync(opts);
+  await Teacher.sync(opts);
+  
+  // Then sync dependent tables
+  await Subscription.sync(opts);
+  await Route.sync(opts);
+  await User.sync(opts);
+  await Conversation.sync(opts);
+  await Message.sync(opts);
 }
 syncDatabase()
   .then(async () => {
