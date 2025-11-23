@@ -7,7 +7,7 @@ import {
 } from './types';
 
 // 🔗 الاتصال بالـ Backend الحقيقي على Render
-const API_BASE_URL = 'https://school-crm-backend.onrender.com/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -506,6 +506,106 @@ export const getUsersByRole = async (role: 'TEACHER' | 'PARENT'): Promise<any[]>
     return await apiCall(`/users/by-role${q}`, { method: 'GET' });
 };
 
+// ==================== Missing API Functions ====================
+
+export const getAvailableModules = async (): Promise<Module[]> => {
+    return await apiCall('/modules', { method: 'GET' });
+};
+
+export const generateSelfHostedPackage = async (moduleIds: ModuleId[]): Promise<string> => {
+    const response: any = await apiCall('/superadmin/self-hosted/package', {
+        method: 'POST',
+        body: JSON.stringify({ moduleIds }),
+    });
+    return response?.downloadUrl || '';
+};
+
+export const submitAdRequest = async (data: NewAdRequestData): Promise<void> => {
+    await apiCall('/ads/request', { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const submitBusOperatorApplication = async (data: NewBusOperatorApplication): Promise<void> => {
+    await apiCall('/transportation/operator/application', { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getTeacherDetails = async (teacherId: string): Promise<Teacher> => {
+    return await apiCall(`/teachers/${teacherId}/details`, { method: 'GET' });
+};
+
+export const getAllGrades = async (schoolId: number): Promise<StudentGrades[]> => {
+    return await apiCall(`/school/${schoolId}/grades/all`, { method: 'GET' });
+};
+
+export const getDashboardStats = async (): Promise<any> => {
+    const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+    const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
+    return await apiCall(`/dashboard/stats${schoolId ? `?schoolId=${schoolId}` : ''}`, { method: 'GET' });
+};
+
+export const addSchool = async (data: NewSchoolData): Promise<School> => {
+    return await createSchool(data);
+};
+
+export const getPricingConfig = async (): Promise<PricingConfig> => {
+    return await apiCall('/pricing/config', { method: 'GET' });
+};
+
+export const updatePricingConfig = async (config: PricingConfig): Promise<PricingConfig> => {
+    return await apiCall('/pricing/config', { method: 'PUT', body: JSON.stringify(config) });
+};
+
+export const updateModule = async (moduleData: Module): Promise<Module> => {
+    return await apiCall(`/modules/${moduleData.id}`, { method: 'PUT', body: JSON.stringify(moduleData) });
+};
+
+export const getRoles = async (): Promise<Role[]> => {
+    return await apiCall('/roles', { method: 'GET' });
+};
+
+export const generateLicenseKey = async (payload: { schoolId: number; modules: ModuleId[] }): Promise<string> => {
+    const response: any = await apiCall('/superadmin/license/generate', { method: 'POST', body: JSON.stringify(payload) });
+    return response?.licenseKey || '';
+};
+
+export const deleteUser = async (userId: string | number): Promise<void> => {
+    await apiCall(`/users/${userId}`, { method: 'DELETE' });
+};
+
+export const createSuperAdminTeamMember = async (memberData: any): Promise<User> => {
+    return await apiCall('/superadmin/team', { method: 'POST', body: JSON.stringify(memberData) });
+};
+
+export const updateSuperAdminTeamMember = async (memberId: string | number, memberData: any): Promise<User> => {
+    return await apiCall(`/superadmin/team/${memberId}`, { method: 'PUT', body: JSON.stringify(memberData) });
+};
+
+export const deleteSuperAdminTeamMember = async (memberId: string | number): Promise<void> => {
+    await apiCall(`/superadmin/team/${memberId}`, { method: 'DELETE' });
+};
+
+export const getAssignmentsForClass = async (classId: string): Promise<Assignment[]> => {
+    return await apiCall(`/school/class/${classId}/assignments`, { method: 'GET' });
+};
+
+export const getSubmissionsForAssignment = async (assignmentId: string): Promise<Submission[]> => {
+    return await apiCall(`/assignments/${assignmentId}/submissions`, { method: 'GET' });
+};
+
+export const createAssignment = async (data: NewAssignmentData): Promise<Assignment> => {
+    return await apiCall('/assignments', { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const gradeSubmission = async (submissionId: string, grade: number, feedback?: string): Promise<Submission> => {
+    return await apiCall(`/submissions/${submissionId}/grade`, { 
+        method: 'PUT', 
+        body: JSON.stringify({ grade, feedback }) 
+    });
+};
+
+export const getStudentAndScheduleByParentId = async (parentId: string): Promise<{ student: Student; schedule: ScheduleEntry[] }> => {
+    return await apiCall(`/parent/${parentId}/student-schedule`, { method: 'GET' });
+};
+
 // تصدير جميع الدوال
 export default {
     login,
@@ -550,6 +650,10 @@ export default {
     getRevenueData,
     getSubscriptions,
     getPlans,
+    getAvailableModules,
+    generateSelfHostedPackage,
+    submitAdRequest,
+    submitBusOperatorApplication,
     getSchoolSettings,
     updateSchoolSettings,
     getReports,

@@ -10,18 +10,20 @@
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
-    "autoprefixer": "^10.4.22",
     "esbuild": "^0.19.12",
-    "postcss": "^8.5.6",
     "prop-types": "^15.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-is": "^18.3.1",
     "react-router": "^6.25.1",
     "react-router-dom": "^6.25.1",
-    "recharts": "^3.4.1",
-    "tailwindcss": "^4.1.17"
+    "recharts": "^3.4.1"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17"
+  }
 }

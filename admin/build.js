@@ -3,7 +3,7 @@ const { build } = require('esbuild');
 const { execSync } = require('child_process');
 
 // Get environment variables
-const apiUrl = process.env.REACT_APP_API_URL || 'https://school-crm-backend.onrender.com/api';
+const apiUrl = process.env.REACT_APP_API_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
 const environment = process.env.REACT_APP_ENVIRONMENT || 'production';
 
 console.log('Building with API URL:', apiUrl);

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API Configuration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>اختبار إعدادات API</h1>
+    <div id="results"></div>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+
+        function testApiConfiguration() {
+            addResult('بدء اختبار إعدادات API...', 'info');
+
+            // Test 1: Check localStorage
+            try {
+                const apiBase = localStorage.getItem('api_base');
+                addResult(`localStorage api_base: ${apiBase || 'غير موجود'}`, apiBase ? 'success' : 'error');
+            } catch (e) {
+                addResult(`خطأ في localStorage: ${e.message}`, 'error');
+            }
+
+            // Test 2: Check if we're in production
+            const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+            addResult(`وضع الإنتاج: ${isProduction ? 'نعم' : 'لا'}`, isProduction ? 'success' : 'info');
+
+            // Test 3: Check hostname
+            addResult(`اسم المضيف: ${window.location.hostname}`, 'info');
+
+            // Test 4: Test API endpoint
+            const testEndpoint = 'https://school-crm-backend.onrender.com/api/auth/health';
+            
+            fetch(testEndpoint, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                addResult(`API استجابة: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                return response.json();
+            })
+            .then(data => {
+                addResult(`API البيانات: ${JSON.stringify(data)}`, 'success');
+            })
+            .catch(error => {
+                addResult(`API خطأ: ${error.message}`, 'error');
+            });
+
+            // Test 5: Check for console errors
+            const originalConsoleError = console.error;
+            console.error = function(...args) {
+                addResult(`خطأ في وحدة التحكم: ${args.join(' ')}`, 'error');
+                originalConsoleError.apply(console, args);
+            };
+
+            addResult('تم اكتمال الاختبارات الأساسية', 'success');
+        }
+
+        // Run tests when page loads
+        window.addEventListener('load', testApiConfiguration);
+    </script>
+</body>
+</html>
