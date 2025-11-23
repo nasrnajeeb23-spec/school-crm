@@ -63,6 +63,17 @@ build({
       fs.copyFileSync(rootCss, rootDestCss);
       console.log('Root CSS file copied successfully.');
     }
+    
+    // Copy the _redirects file for SPA routing
+    const redirectsSrc = path.join(__dirname, 'public/_redirects');
+    const redirectsDest = path.join(__dirname, '../dist/_redirects');
+    
+    if (fs.existsSync(redirectsSrc)) {
+      fs.copyFileSync(redirectsSrc, redirectsDest);
+      console.log('_redirects file copied successfully.');
+    } else {
+      console.log('No _redirects file found to copy.');
+    }
   } catch (e) {
     console.error('CSS copy failed:', e.message);
   }

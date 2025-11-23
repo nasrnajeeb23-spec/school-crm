@@ -3,7 +3,7 @@ import { Routes, Route, useParams, useNavigate, useLocation, Navigate } from 're
 import SchoolSidebar from '../components/SchoolSidebar';
 import Header from '../components/Header';
 import { School, Student, Teacher, InvoiceStatus, ActionItem, User, ModuleId, SchoolSettings, Permission } from '../types';
-import { SCHOOL_ROLE_PERMISSIONS } from '../constants';
+
 import { BackIcon, BellIcon } from '../components/icons';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationDropdown from '../components/NotificationDropdown';
@@ -63,7 +63,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   const [activeModules, setActiveModules] = useState<ModuleId[]>([]);
   
   const effectiveSchoolId = isSuperAdminView ? parseInt(urlSchoolId || '0') : currentUser?.schoolId;
-  const userRolePermissions = currentUser?.schoolRole ? SCHOOL_ROLE_PERMISSIONS[currentUser.schoolRole] : Object.values(Permission);
+  const userRolePermissions = currentUser?.schoolRole ? [] : Object.values(Permission);
 
   const hasPermission = (permission: Permission) => {
     if (isSuperAdminView) return true; // Super admin has all permissions
