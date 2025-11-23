@@ -7,6 +7,20 @@ const { Op } = require('sequelize');
 const { validate } = require('../middleware/validate');
 const { requireModule } = require('../middleware/modules');
 
+// @route   GET api/schools/:id
+// @desc    Get school by ID
+// @access  Private (SchoolAdmin, SuperAdmin)
+router.get('/schools/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+  try {
+    const school = await School.findByPk(req.params.id);
+    if (!school) return res.status(404).json({ msg: 'School not found' });
+    res.json(school);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/school/:schoolId/students
 // @desc    Get all students for a specific school
 // @access  Private (SchoolAdmin)

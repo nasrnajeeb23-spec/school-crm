@@ -33,6 +33,13 @@ build({
   treeShaking: true
 }).then(() => {
   console.log('Build completed successfully!');
+  try {
+    console.log('Running Tailwind CSS build...');
+    execSync('npx tailwindcss -i ./src/index.css -o ../dist/assets/index.css --minify -c tailwind.config.js', { stdio: 'inherit', cwd: __dirname });
+    console.log('Tailwind CSS build completed.');
+  } catch (e) {
+    console.error('Tailwind build failed:', e.message);
+  }
 }).catch((error) => {
   console.error('Build failed:', error);
   process.exit(1);

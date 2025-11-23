@@ -9,17 +9,19 @@
     "build:prod": "npm run build && echo 'Build completed for production'"
   },
   "dependencies": {
+    "@google/genai": "^1.30.0",
+    "autoprefixer": "^10.4.22",
+    "esbuild": "^0.19.12",
+    "postcss": "^8.5.6",
+    "prop-types": "^15.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-is": "^18.3.1",
     "react-router": "^6.25.1",
     "react-router-dom": "^6.25.1",
-    "react-is": "^18.3.1",
-    "prop-types": "^15.8.1",
     "recharts": "^3.4.1",
-    "@google/genai": "^1.30.0",
-    "esbuild": "^0.19.12"
+    "tailwindcss": "^4.1.17"
   },
-  "devDependencies": {},
   "author": "",
   "license": "MIT"
 }

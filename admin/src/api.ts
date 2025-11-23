@@ -7,7 +7,7 @@ import {
 } from './types';
 
 // 🔗 الاتصال بالـ Backend الحقيقي على Render
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://school-crm-backend.onrender.com/api';
+const API_BASE_URL = 'https://school-crm-backend.onrender.com/api';
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;

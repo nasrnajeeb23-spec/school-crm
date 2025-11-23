@@ -69,11 +69,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
   
   const trialSignup = async (data: NewTrialRequestData): Promise<boolean> => {
+    console.log('Starting trial signup with data:', data);
     const newUser = await api.submitTrialRequest(data);
+    console.log('Trial signup response:', newUser);
     if (newUser) {
         setCurrentUser(newUser);
         if (newUser.schoolId) {
-          try { localStorage.setItem('current_school_id', String(newUser.schoolId)); } catch {}
+          try { 
+            localStorage.setItem('current_school_id', String(newUser.schoolId)); 
+            console.log('School ID stored in localStorage:', newUser.schoolId);
+          } catch (error) {
+            console.error('Error storing school ID:', error);
+          }
         }
         addToast(`أهلاً بك ${newUser.name}! تم إنشاء حسابك التجريبي بنجاح.`, 'success');
         return true;
