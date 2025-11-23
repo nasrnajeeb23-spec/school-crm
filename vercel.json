@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
+      "src": "admin/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist"
@@ -11,15 +11,26 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "https://school-crschool-crm-backendm.onrender.com/api/$1"
+      "src": "/(.*)",
+      "dest": "/admin/dist/$1"
+    },
+    {
+      "src": "/superadmin/(.*)",
+      "dest": "/admin/dist/index.html"
+    },
+    {
+      "src": "/login",
+      "dest": "/admin/dist/index.html"
     },
     {
       "src": "/(.*)",
-      "dest": "/$1"
+      "dest": "/admin/dist/index.html"
     }
   ],
-  "env": {
-    "REACT_APP_API_URL": "https://school-crschool-crm-backendm.onrender.com/api"
-  }
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/admin/dist/index.html"
+    }
+  ]
 }

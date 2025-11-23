@@ -1,0 +1,21 @@
+{
+  "buildCommand": "cd admin && npm install && npm run build",
+  "startCommand": "echo 'Static site deployed'",
+  "rootDir": ".",
+  "staticPublishPath": "dist",
+  "spa": true,
+  "routes": [
+    {
+      "src": "/superadmin/(.*)",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/login",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

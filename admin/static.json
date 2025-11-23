@@ -1,18 +1,16 @@
-# Static Site Configuration for Render
-
-## Build Settings
-- Build Command: `npm run build`
-- Publish Directory: `../dist`
-- Environment: Static Site
-
-## Environment Variables
-- REACT_APP_API_URL: https://school-crm-backend.onrender.com/api
-- REACT_APP_ENVIRONMENT: production
-
-## Important Notes
-- This build uses a custom build.js script to properly handle environment variables
-- All API calls are configured to use the remote backend
-- CSS and JS assets are properly configured for MIME types
-
-## Deployment Trigger
-This file ensures proper static site configuration for Render.com deployment.
+{
+  "root": "../dist",
+  "routes": {
+    "/**": "index.html"
+  },
+  "headers": {
+    "/**": {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    },
+    "/assets/**": {
+      "Cache-Control": "public, max-age=31536000, immutable"
+    }
+  }
+}
