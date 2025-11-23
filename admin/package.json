@@ -16,11 +16,10 @@
     "react-is": "^18.3.1",
     "prop-types": "^15.8.1",
     "recharts": "^3.4.1",
-    "@google/genai": "^1.30.0"
-  },
-  "devDependencies": {
+    "@google/genai": "^1.30.0",
     "esbuild": "^0.19.12"
   },
+  "devDependencies": {},
   "author": "",
   "license": "MIT"
 }
