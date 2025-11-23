@@ -77,3 +77,21 @@ router.get('/:parentId/dashboard', verifyToken, requireRole('PARENT'), async (re
 });
 
 module.exports = router;
+
+// Parent requests
+router.get('/:parentId/requests', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    const rows = await Notification.findAll({ where: { parentId: req.params.parentId }, order: [['createdAt','DESC']] });
+    const statusMap = { 'Pending': 'قيد الانتظار', 'Approved': 'موافق عليه', 'Rejected': 'مرفوض' };
+    res.json(rows.map(r => ({ id: String(r.id), title: r.title || 'طلب', description: r.description || '', status: statusMap[r.status] || 'قيد الانتظار', createdAt: r.createdAt.toISOString().split('T')[0] })));
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:parentId/requests', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    const { title, description } = req.body || {};
+    if (!title) return res.status(400).json({ msg: 'title is required' });
+    const row = await Notification.create({ parentId: req.params.parentId, title, description: description || '', status: 'Pending' });
+    res.status(201).json({ id: String(row.id), title: row.title, description: row.description, status: 'قيد الانتظار', createdAt: row.createdAt.toISOString().split('T')[0] });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});

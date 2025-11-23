@@ -11,6 +11,7 @@ const Class = require('./Class');
 const Parent = require('./Parent');
 const SchoolSettings = require('./SchoolSettings');
 const SchoolEvent = require('./SchoolEvent');
+const Expense = require('./Expense');
 const Grade = require('./Grade');
 const Attendance = require('./Attendance');
 const Schedule = require('./Schedule');
@@ -87,6 +88,10 @@ SchoolSettings.belongsTo(School, { foreignKey: 'schoolId' });
 // School <-> SchoolEvent (One-to-Many)
 School.hasMany(SchoolEvent, { foreignKey: 'schoolId' });
 SchoolEvent.belongsTo(School, { foreignKey: 'schoolId' });
+
+// School <-> Expense (One-to-Many)
+School.hasMany(Expense, { foreignKey: 'schoolId' });
+Expense.belongsTo(School, { foreignKey: 'schoolId' });
 
 // Teacher <-> Notification (One-to-Many)
 Teacher.hasMany(Notification, { foreignKey: 'teacherId' });
@@ -166,6 +171,7 @@ const db = {
   Parent,
   SchoolSettings,
   SchoolEvent,
+  Expense,
   Grade,
   Attendance,
   Schedule,

@@ -66,4 +66,50 @@ router.post('/upload', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', '
   } catch (e) { res.status(500).send('Server Error'); }
 });
 
+// Send a message within a conversation
+router.post('/send', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), async (req, res) => {
+  try {
+    const { conversationId, text, attachmentUrl, attachmentType, attachmentName } = req.body || {};
+    if (!conversationId || !text) return res.status(400).json({ msg: 'conversationId and text are required' });
+
+    const conv = await Conversation.findByPk(conversationId);
+    if (!conv) return res.status(404).json({ msg: 'Conversation not found' });
+
+    const roleMap = {
+      'SuperAdmin': 'SUPER_ADMIN',
+      'SchoolAdmin': 'SCHOOL_ADMIN',
+      'Teacher': 'TEACHER',
+      'Parent': 'PARENT'
+    };
+    const senderRole = roleMap[req.user.role] || 'SCHOOL_ADMIN';
+
+    const msg = await Message.create({
+      id: `msg_${Date.now()}`,
+      text: String(text),
+      senderId: String(req.user.id),
+      senderRole,
+      conversationId,
+      attachmentUrl: attachmentUrl || null,
+      attachmentType: attachmentType || null,
+      attachmentName: attachmentName || null,
+    });
+
+    try { await conv.update({ updatedAt: new Date() }); } catch {}
+
+    return res.status(201).json({
+      id: msg.id,
+      text: msg.text,
+      senderId: msg.senderId,
+      senderRole: msg.senderRole,
+      timestamp: msg.createdAt,
+      attachmentUrl: msg.attachmentUrl,
+      attachmentType: msg.attachmentType,
+      attachmentName: msg.attachmentName,
+    });
+  } catch (e) {
+    console.error(e.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;

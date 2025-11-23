@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const AnalyticsService = require('../services/AnalyticsService');
 const { verifyToken: auth } = require('../middleware/auth');
-const { body, validationResult } = require('express-validator');
+const { query, validationResult } = require('express-validator');
 
 // AI-Powered Analytics Routes
 router.get('/insights/at-risk-students', auth, async (req, res) => {
@@ -41,8 +41,8 @@ router.get('/insights/at-risk-students', auth, async (req, res) => {
 });
 
 router.get('/insights/academic-performance', auth, [
-  body('schoolId').optional().isInt({ min: 1 }).withMessage('Invalid school ID'),
-  body('timeRange').optional().isIn(['week', 'month', 'quarter', 'year']).withMessage('Invalid time range')
+  query('schoolId').optional().isInt({ min: 1 }).withMessage('Invalid school ID'),
+  query('timeRange').optional().isIn(['week', 'month', 'quarter', 'year']).withMessage('Invalid time range')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -250,9 +250,9 @@ router.get('/dashboard/overview', auth, async (req, res) => {
 });
 
 router.get('/reports/generate', auth, [
-  body('reportType').isIn(['academic', 'financial', 'operational', 'compliance', 'custom']).withMessage('Invalid report type'),
-  body('format').optional().isIn(['pdf', 'excel', 'csv']).withMessage('Invalid format'),
-  body('dateRange').optional().isObject().withMessage('Invalid date range')
+  query('reportType').isIn(['academic', 'financial', 'operational', 'compliance', 'custom']).withMessage('Invalid report type'),
+  query('format').optional().isIn(['pdf', 'excel', 'csv']).withMessage('Invalid format'),
+  query('dateRange').optional().isObject().withMessage('Invalid date range')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User } = require('../models');
+const { User, Teacher, Parent, Student } = require('../models');
 const { verifyToken } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
@@ -47,3 +47,24 @@ router.put('/:id', verifyToken, async (req, res) => {
 });
 
 module.exports = router;
+ 
+router.get('/by-role', verifyToken, async (req, res) => {
+  try {
+    const userRole = String(req.user.role || '').toUpperCase();
+    if (!['SCHOOLADMIN','SUPERADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
+    const role = String(req.query.role || '').toUpperCase();
+    const schoolId = req.query.schoolId ? Number(req.query.schoolId) : null;
+    if (!['TEACHER','PARENT'].includes(role)) return res.status(400).json({ msg: 'Invalid role' });
+    if (role === 'TEACHER') {
+      const rows = await Teacher.findAll({ where: schoolId ? { schoolId } : {}, order: [['name','ASC']] });
+      return res.json(rows.map(t => ({ id: String(t.id), name: t.name })));
+    } else {
+      const parents = await Parent.findAll({ order: [['name','ASC']] });
+      if (!schoolId) return res.json(parents.map(p => ({ id: String(p.id), name: p.name })));
+      const studentParents = await Student.findAll({ where: { schoolId }, attributes: ['parentId'] });
+      const parentIds = Array.from(new Set(studentParents.map(sp => sp.parentId).filter(Boolean)));
+      const filtered = parents.filter(p => parentIds.includes(p.id));
+      return res.json(filtered.map(p => ({ id: String(p.id), name: p.name })));
+    }
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});

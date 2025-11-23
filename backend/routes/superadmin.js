@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Subscription, Invoice, Payment, Plan, User } = require('../models');
+const { School, Subscription, Invoice, Payment, Plan, User, BusOperator } = require('../models');
 const { sequelize } = require('../models');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
@@ -238,5 +238,23 @@ function getDefaultPermissions(role) {
     };
     return defaultPermissions[role] || [];
 }
+
+ 
+
+router.get('/action-items', verifyToken, async (req, res) => {
+  try {
+    const role = String(req.user.role || '').toUpperCase();
+    const isSuper = ['SUPER_ADMIN','SUPER_ADMIN_FINANCIAL','SUPER_ADMIN_TECHNICAL','SUPER_ADMIN_SUPERVISOR'].includes(role);
+    const schoolId = isSuper ? Number(req.query.schoolId || 0) : Number(req.user.schoolId || 0);
+    const whereInv = schoolId ? { '$Student.schoolId$': schoolId } : {};
+    const invoices = await Invoice.findAll({ include: { model: require('../models').Student, attributes: [], where: schoolId ? { schoolId } : {} }, where: {}, limit: 50 });
+    const unpaid = invoices.filter(i => i.status === 'UNPAID');
+    const ops = await BusOperator.findAll({ where: schoolId ? { schoolId, status: 'Pending' } : { status: 'Pending' }, limit: 20 });
+    const items = [];
+    if (unpaid.length > 0) items.push({ id: 'act_inv_'+Date.now(), type: 'payment_verification', title: 'فواتير غير مدفوعة', description: `يوجد ${unpaid.length} فاتورة تحتاج متابعة`, date: new Date().toISOString(), isRead: false });
+    if (ops.length > 0) items.push({ id: 'act_drv_'+Date.now(), type: 'driver_application', title: 'طلبات سائقين قيد المراجعة', description: `يوجد ${ops.length} طلبات سائقين تنتظر الموافقة`, date: new Date().toISOString(), isRead: false });
+    res.json(items);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
 
 module.exports = router;

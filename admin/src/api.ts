@@ -107,7 +107,7 @@ export const updateSchool = async (id: number, schoolData: Partial<School>): Pro
 // ==================== Student APIs ====================
 
 export const getStudents = async (schoolId: number): Promise<Student[]> => {
-    return await apiCall(`/schools/${schoolId}/students`, { method: 'GET' });
+    return await apiCall(`/school/${schoolId}/students`, { method: 'GET' });
 };
 
 export const getStudent = async (id: string): Promise<Student> => {
@@ -135,7 +135,7 @@ export const deleteStudent = async (id: string): Promise<void> => {
 // ==================== Teacher APIs ====================
 
 export const getTeachers = async (schoolId: number): Promise<Teacher[]> => {
-    return await apiCall(`/schools/${schoolId}/teachers`, { method: 'GET' });
+    return await apiCall(`/school/${schoolId}/teachers`, { method: 'GET' });
 };
 
 export const getTeacher = async (id: string): Promise<Teacher> => {
@@ -159,7 +159,7 @@ export const updateTeacher = async (id: string, teacherData: UpdatableTeacherDat
 // ==================== Class APIs ====================
 
 export const getClasses = async (schoolId: number): Promise<Class[]> => {
-    return await apiCall(`/schools/${schoolId}/classes`, { method: 'GET' });
+    return await apiCall(`/school/${schoolId}/classes`, { method: 'GET' });
 };
 
 export const createClass = async (classData: NewClassData): Promise<Class> => {
@@ -213,10 +213,27 @@ export const getStudentDistribution = async (schoolId: number): Promise<{ name: 
 };
 
 export const createInvoice = async (invoiceData: NewInvoiceData): Promise<Invoice> => {
-    return await apiCall('/invoices', {
-        method: 'POST',
-        body: JSON.stringify(invoiceData),
-    });
+    const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+    const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
+    return await apiCall(`/school/${schoolId}/invoices`, { method: 'POST', body: JSON.stringify(invoiceData) });
+};
+
+export const addInvoice = async (schoolId: number, invoiceData: NewInvoiceData): Promise<Invoice> => {
+    return await apiCall(`/school/${schoolId}/invoices`, { method: 'POST', body: JSON.stringify(invoiceData) });
+};
+
+export const recordPayment = async (invoiceId: string, paymentData: PaymentData): Promise<Invoice> => {
+    const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+    const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
+    return await apiCall(`/school/${schoolId}/invoices/${invoiceId}/payments`, { method: 'POST', body: JSON.stringify(paymentData) });
+};
+
+export const getSchoolExpenses = async (schoolId: number): Promise<Expense[]> => {
+    return await apiCall(`/school/${schoolId}/expenses`, { method: 'GET' });
+};
+
+export const addSchoolExpense = async (schoolId: number, expenseData: NewExpenseData): Promise<Expense> => {
+    return await apiCall(`/school/${schoolId}/expenses`, { method: 'POST', body: JSON.stringify(expenseData) });
 };
 
 // ==================== SuperAdmin APIs ====================
@@ -244,11 +261,11 @@ export const getPlans = async (): Promise<Plan[]> => {
 // ==================== Settings APIs ====================
 
 export const getSchoolSettings = async (schoolId: number): Promise<SchoolSettings> => {
-    return await apiCall(`/schools/${schoolId}/settings`, { method: 'GET' });
+    return await apiCall(`/school/${schoolId}/settings`, { method: 'GET' });
 };
 
 export const updateSchoolSettings = async (schoolId: number, settings: Partial<SchoolSettings>): Promise<SchoolSettings> => {
-    return await apiCall(`/schools/${schoolId}/settings`, {
+    return await apiCall(`/school/${schoolId}/settings`, {
         method: 'PUT',
         body: JSON.stringify(settings),
     });
@@ -257,17 +274,24 @@ export const updateSchoolSettings = async (schoolId: number, settings: Partial<S
 // ==================== Reports APIs ====================
 
 export const getReports = async (schoolId: number, type: string): Promise<any> => {
-    return await apiCall(`/schools/${schoolId}/reports?type=${type}`, { method: 'GET' });
+    const reportType = encodeURIComponent(type);
+    return await apiCall(`/analytics/reports/generate?schoolId=${schoolId}&reportType=${reportType}`, { method: 'GET' });
 };
 
 // ==================== Messaging APIs ====================
 
-export const getConversations = async (userId: string): Promise<Conversation[]> => {
-    return await apiCall(`/messaging/conversations/${userId}`, { method: 'GET' });
+export const getConversations = async (userId?: string): Promise<Conversation[]> => {
+    const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+    const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
+    const query = schoolId ? `?schoolId=${schoolId}` : '';
+    if (userId) {
+        return await apiCall(`/messaging/conversations/${userId}`, { method: 'GET' });
+    }
+    return await apiCall(`/messaging/conversations${query}`, { method: 'GET' });
 };
 
 export const getMessages = async (conversationId: string): Promise<Message[]> => {
-    return await apiCall(`/messaging/messages/${conversationId}`, { method: 'GET' });
+    return await apiCall(`/messaging/conversations/${conversationId}/messages`, { method: 'GET' });
 };
 
 export const sendMessage = async (messageData: Partial<Message>): Promise<Message> => {
@@ -345,6 +369,143 @@ export const updateCurrentUser = async (userId: string, data: UpdatableUserData)
     return response?.user || null;
 };
 
+export const getSchoolStudents = async (schoolId: number): Promise<Student[]> => {
+    return await getStudents(schoolId);
+};
+
+export const addSchoolStudent = async (schoolId: number, data: NewStudentData): Promise<Student> => {
+    return await apiCall(`/school/${schoolId}/students`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getSchoolTeachers = async (schoolId: number): Promise<Teacher[]> => {
+    return await getTeachers(schoolId);
+};
+
+export const addSchoolTeacher = async (schoolId: number, data: NewTeacherData): Promise<Teacher> => {
+    return await apiCall(`/school/${schoolId}/teachers`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getSchoolClasses = async (schoolId: number): Promise<Class[]> => {
+    return await getClasses(schoolId);
+};
+
+export const updateClassRoster = async (update: ClassRosterUpdate): Promise<Class> => {
+    return await apiCall(`/school/${update.schoolId}/classes/${update.classId}/roster`, { method: 'PUT', body: JSON.stringify({ studentIds: update.studentIds }) });
+};
+
+export const addClass = async (schoolId: number, data: NewClassData): Promise<Class> => {
+    return await apiCall(`/school/${schoolId}/classes`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getSchoolParents = async (schoolId: number): Promise<Parent[]> => {
+    return await apiCall(`/school/${schoolId}/parents`, { method: 'GET' });
+};
+
+export const getSchoolEvents = async (schoolId: number): Promise<SchoolEvent[]> => {
+    return await apiCall(`/school/${schoolId}/events`, { method: 'GET' });
+};
+
+export const getTeacherClasses = async (teacherId: string): Promise<Class[]> => {
+    return await apiCall(`/teacher/${teacherId}/classes`, { method: 'GET' });
+};
+
+export const getClassStudents = async (classId: string): Promise<Student[]> => {
+    return await apiCall(`/school/class/${classId}/students`, { method: 'GET' });
+};
+
+export const getAttendance = async (classId: string, date: string): Promise<AttendanceRecord[]> => {
+    return await apiCall(`/school/class/${classId}/attendance?date=${encodeURIComponent(date)}`, { method: 'GET' });
+};
+
+export const saveAttendance = async (classId: string, date: string, records: AttendanceRecord[]): Promise<{ ok: boolean }> => {
+    return await apiCall(`/school/class/${classId}/attendance`, { method: 'POST', body: JSON.stringify({ date, records }) });
+};
+
+export const getGrades = async (classId: string, subject: string): Promise<StudentGrades[]> => {
+    return await apiCall(`/school/class/${classId}/grades?subject=${encodeURIComponent(subject)}`, { method: 'GET' });
+};
+
+export const saveGrades = async (entries: StudentGrades[]): Promise<{ ok: boolean }> => {
+    const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+    const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
+    return await apiCall(`/school/${schoolId}/grades`, { method: 'POST', body: JSON.stringify({ entries }) });
+};
+
+export const getTeacherSchedule = async (teacherId: string): Promise<ScheduleEntry[]> => {
+    return await apiCall(`/teacher/${teacherId}/schedule`, { method: 'GET' });
+};
+
+export const getSchedule = async (classId: string): Promise<ScheduleEntry[]> => {
+    return await apiCall(`/school/class/${classId}/schedule`, { method: 'GET' });
+};
+
+export const getParentDashboardData = async (parentId: string): Promise<any> => {
+    return await apiCall(`/parent/${parentId}/dashboard`, { method: 'GET' });
+};
+
+export const getParentRequests = async (parentId: string): Promise<any[]> => {
+    return await apiCall(`/parent/${parentId}/requests`, { method: 'GET' });
+};
+
+export const submitParentRequest = async (parentId: string, data: any): Promise<any> => {
+    return await apiCall(`/parent/${parentId}/requests`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getParentTransportationDetails = async (parentId: string): Promise<any> => {
+    return await apiCall(`/transportation/parent/${parentId}`, { method: 'GET' });
+};
+
+export const getParentActionItems = async (): Promise<ActionItem[]> => {
+    return await apiCall('/parent/action-items', { method: 'GET' });
+};
+
+export const getTeacherActionItems = async (): Promise<ActionItem[]> => {
+    return await apiCall('/teacher/action-items', { method: 'GET' });
+};
+
+export const getStudentDetails = async (schoolId: number, studentId: string): Promise<{ grades: StudentGrades[], attendance: AttendanceRecord[], invoices: Invoice[], notes: StudentNote[], documents: StudentDocument[] }> => {
+    return await apiCall(`/school/${schoolId}/student/${studentId}/details`, { method: 'GET' });
+};
+
+export const getTeacherDashboardData = async (teacherId: string): Promise<any> => {
+    return await apiCall(`/teacher/${teacherId}/dashboard`, { method: 'GET' });
+};
+
+export const getTeacherSalarySlips = async (teacherId: string): Promise<TeacherSalarySlip[]> => {
+    try { return await apiCall(`/teacher/${teacherId}/salary-slips`, { method: 'GET' }); } catch { return []; }
+};
+
+export const getBusOperators = async (schoolId: number): Promise<BusOperator[]> => {
+    return await apiCall(`/transportation/${schoolId}/operators`, { method: 'GET' });
+};
+
+export const approveBusOperator = async (operatorId: string): Promise<void> => {
+    await apiCall(`/transportation/operator/${operatorId}/approve`, { method: 'PUT' });
+};
+
+export const getRoutes = async (schoolId: number): Promise<Route[]> => {
+    return await apiCall(`/transportation/${schoolId}/routes`, { method: 'GET' });
+};
+
+export const addRoute = async (schoolId: number, data: any): Promise<Route> => {
+    return await apiCall(`/transportation/${schoolId}/routes`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const updateRouteStudents = async (schoolId: number, routeId: string, studentIds: string[]): Promise<Route> => {
+    return await apiCall(`/transportation/${schoolId}/routes/${routeId}/students`, { method: 'PUT', body: JSON.stringify({ studentIds }) });
+};
+
+export const createConversation = async (payload: any): Promise<any> => {
+    return await apiCall('/messaging/conversations', { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const getUsersByRole = async (role: 'TEACHER' | 'PARENT'): Promise<any[]> => {
+    const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+    const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
+    const q = schoolId ? `?role=${role}&schoolId=${schoolId}` : `?role=${role}`;
+    return await apiCall(`/users/by-role${q}`, { method: 'GET' });
+};
+
 // تصدير جميع الدوال
 export default {
     login,
@@ -356,15 +517,22 @@ export default {
     createSchool,
     updateSchool,
     getStudents,
+    getSchoolStudents,
+    addSchoolStudent,
     getStudent,
     createStudent,
     updateStudent,
     deleteStudent,
     getTeachers,
+    getSchoolTeachers,
+    addSchoolTeacher,
     getTeacher,
     createTeacher,
     updateTeacher,
     getClasses,
+    getSchoolClasses,
+    updateClassRoster,
+    addClass,
     createClass,
     getSchoolStaff,
     addSchoolStaff,
@@ -372,6 +540,10 @@ export default {
     deleteSchoolStaff,
     getInvoices,
     getSchoolInvoices,
+    addInvoice,
+    recordPayment,
+    getSchoolExpenses,
+    addSchoolExpense,
     createInvoice,
     getSuperAdminTeamMembers,
     getSchoolsList,
@@ -382,6 +554,8 @@ export default {
     updateSchoolSettings,
     getReports,
     getConversations,
+    createConversation,
+    getUsersByRole,
     getMessages,
     sendMessage,
     getLandingPageContent,
@@ -394,4 +568,28 @@ export default {
     getStudentDistribution,
     getSchoolModules,
     getActionItems,
+    getSchoolParents,
+    getSchoolEvents,
+    getTeacherClasses,
+    getClassStudents,
+    getAttendance,
+    saveAttendance,
+    getGrades,
+    saveGrades,
+    getTeacherSchedule,
+    getSchedule,
+    getParentDashboardData,
+    getParentRequests,
+    submitParentRequest,
+    getParentTransportationDetails,
+    getParentActionItems,
+    getTeacherActionItems,
+    getStudentDetails,
+    getTeacherDashboardData,
+    getTeacherSalarySlips,
+    getBusOperators,
+    approveBusOperator,
+    getRoutes,
+    addRoute,
+    updateRouteStudents,
 }

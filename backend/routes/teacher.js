@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Teacher, Class, Schedule, Notification } = require('../models');
+const { Teacher, Class, Schedule, Notification, Grade } = require('../models');
 const { Op } = require('sequelize');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
@@ -68,4 +68,42 @@ router.get('/:teacherId/dashboard', verifyToken, requireRole('TEACHER'), async (
     }
 });
 
+// Teacher classes
+router.get('/:teacherId/classes', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
+    const classes = await Class.findAll({ where: { homeroomTeacherId: teacherId }, order: [['name','ASC']] });
+    res.json(classes.map(c => ({ ...c.toJSON(), subjects: ['الرياضيات', 'العلوم', 'اللغة الإنجليزية'] })));
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+// Teacher schedule
+router.get('/:teacherId/schedule', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Schedule.findAll({ where: { teacherId }, order: [['day','ASC'],['timeSlot','ASC']] });
+    res.json(rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: '', day: r.day, startTime: r.timeSlot.split(' - ')[0], endTime: r.timeSlot.split(' - ')[1] || r.timeSlot, subject: r.subject, teacher: '' })));
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+// Teacher action items
+router.get('/action-items', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const countGrades = await Grade.count({ where: { teacherId: req.user.teacherId } });
+    const items = [];
+    if (countGrades > 0) items.push({ id: 't_act_'+Date.now(), type: 'task', title: 'مراجعة الدرجات', description: `توجد ${countGrades} سجلات درجات للمراجعة`, date: new Date().toISOString(), isRead: false });
+    res.json(items);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
 module.exports = router;
+ 
+// Salary slips placeholder (no model yet)
+router.get('/:teacherId/salary-slips', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    if (String(req.user.teacherId) !== String(req.params.teacherId)) return res.status(403).json({ msg: 'Access denied' });
+    res.json([]);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, School, Plan, Subscription } = require('../models');
+const { User, School, Plan, Subscription, SchoolSettings } = require('../models');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -82,6 +82,7 @@ router.post('/trial-signup', validate([
     if (exists) return res.status(400).json({ msg: 'Email already in use' });
 
     const school = await School.create({ name: schoolName, contactEmail: adminEmail });
+    await SchoolSettings.create({ schoolId: school.id, schoolName, schoolAddress: '', academicYearStart: new Date().toISOString().split('T')[0], academicYearEnd: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notifications: JSON.stringify({ email: true, sms: false, push: true }) });
 
     let plan = await Plan.findOne({ where: { recommended: true } });
     if (!plan) plan = await Plan.findOne();
@@ -89,7 +90,7 @@ router.post('/trial-signup', validate([
     await Subscription.create({ schoolId: school.id, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
 
     const hashed = await bcrypt.hash(adminPassword, 10);
-    const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, permissions: ['VIEW_DASHBOARD'] });
+    const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_ATTENDANCE','MANAGE_GRADES','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES'] });
 
     const payload = { id: user.id, role: user.role, schoolId: user.schoolId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });

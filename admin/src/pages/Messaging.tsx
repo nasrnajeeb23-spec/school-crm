@@ -42,25 +42,13 @@ const Messaging: React.FC = () => {
     // Define other functions
     const handleSendMessage = async () => {
         if (!newMessage.trim() || !selectedConversationId) return;
-        
         setIsSending(true);
         try {
-            // Simulate sending message
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const newMsg: Message = {
-                id: `msg_${Date.now()}`,
-                text: newMessage,
-                senderId: 'current_user',
-                senderRole: 'USER',
-                timestamp: new Date().toISOString()
-            };
-
+            const sent = await api.sendMessage({ conversationId: selectedConversationId, text: newMessage });
             setMessages(prev => ({
                 ...prev,
-                [selectedConversationId]: [...(prev[selectedConversationId] || []), newMsg]
+                [selectedConversationId]: [...(prev[selectedConversationId] || []), sent]
             }));
-            
             setNewMessage('');
             addToast('تم إرسال الرسالة', 'success');
         } catch (error) {

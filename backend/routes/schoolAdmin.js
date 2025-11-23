@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, StudentNote, StudentDocument, User } = require('../models');
+const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
@@ -309,6 +309,90 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+router.get('/class/:classId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+  try {
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const students = await Student.findAll({ where: { schoolId: cls.schoolId, grade: cls.gradeLevel }, order: [['name','ASC']] });
+    const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
+    res.json(students.map(s => ({ ...s.toJSON(), status: statusMap[s.status] || s.status })));
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ msg: 'date is required' });
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Attendance.findAll({ where: { classId: cls.id, date }, order: [['studentId','ASC']] });
+    const statusMap = { 'Present': 'حاضر', 'Absent': 'غائب', 'Late': 'متأخر', 'Excused': 'بعذر' };
+    res.json(rows.map(r => ({ studentId: r.studentId, date: r.date, status: statusMap[r.status] || r.status })));
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+  try {
+    const { date, records } = req.body || {};
+    if (!date || !Array.isArray(records)) return res.status(400).json({ msg: 'date and records are required' });
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const rev = { 'حاضر': 'Present', 'غائب': 'Absent', 'متأخر': 'Late', 'بعذر': 'Excused' };
+    for (const rec of records) {
+      const status = rev[rec.status] || rec.status;
+      const existing = await Attendance.findOne({ where: { classId: cls.id, studentId: rec.studentId, date } });
+      if (existing) { existing.status = status; await existing.save(); }
+      else { await Attendance.create({ classId: cls.id, studentId: rec.studentId, date, status }); }
+    }
+    res.json({ ok: true });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/class/:classId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+  try {
+    const { subject } = req.query;
+    if (!subject) return res.status(400).json({ msg: 'subject is required' });
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Grade.findAll({ where: { classId: cls.id, subject }, order: [['studentId','ASC']] });
+    res.json(rows.map(r => ({ classId: String(cls.id), subject: r.subject, studentId: r.studentId, studentName: '', grades: { homework: r.homework, quiz: r.quiz, midterm: r.midterm, final: r.final } })));
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:schoolId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { entries } = req.body || {};
+    if (!Array.isArray(entries) || entries.length === 0) return res.status(400).json({ msg: 'entries must be non-empty array' });
+    for (const e of entries) {
+      const existing = await Grade.findOne({ where: { studentId: e.studentId, classId: e.classId, subject: e.subject } });
+      if (existing) {
+        existing.homework = e.grades.homework;
+        existing.quiz = e.grades.quiz;
+        existing.midterm = e.grades.midterm;
+        existing.final = e.grades.final;
+        await existing.save();
+      } else {
+        await Grade.create({ studentId: e.studentId, classId: e.classId, subject: e.subject, homework: e.grades.homework, quiz: e.grades.quiz, midterm: e.grades.midterm, final: e.grades.final });
+      }
+    }
+    res.json({ ok: true });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+  try {
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Schedule.findAll({ where: { classId: cls.id }, order: [['day','ASC'],['timeSlot','ASC']] });
+    res.json(rows.map(r => ({ id: String(r.id), classId: String(cls.id), className: cls.name, day: r.day, startTime: r.timeSlot.split(' - ')[0], endTime: r.timeSlot.split(' - ')[1] || r.timeSlot, subject: r.subject, teacher: '' })));
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
 // @route   GET api/school/:schoolId/parents
 // @desc    Get all parents for a specific school
 // @access  Private (SchoolAdmin)
@@ -505,6 +589,24 @@ router.get('/:schoolId/events', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
     });
     const eventTypeMap = { 'Meeting': 'اجتماع', 'Activity': 'نشاط', 'Exam': 'اختبار', 'Holiday': 'عطلة' };
     res.json(events.map(e => ({...e.toJSON(), eventType: eventTypeMap[e.eventType] || e.eventType })));
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { Expense } = require('../models');
+    const rows = await Expense.findAll({ where: { schoolId: Number(req.params.schoolId) }, order: [['date','DESC']] });
+    res.json(rows.map(e => ({ id: String(e.id), date: e.date, description: e.description, category: e.category, amount: parseFloat(e.amount) })));
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { Expense } = require('../models');
+    const { date, description, category, amount } = req.body || {};
+    if (!date || !description || !category || amount === undefined) return res.status(400).json({ msg: 'Invalid payload' });
+    const exp = await Expense.create({ schoolId: Number(req.params.schoolId), date, description, category, amount });
+    res.status(201).json({ id: String(exp.id), date: exp.date, description: exp.description, category: exp.category, amount: parseFloat(exp.amount) });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 

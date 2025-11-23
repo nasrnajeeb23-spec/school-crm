@@ -121,14 +121,14 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
       <SchoolSidebar 
         permissions={userRolePermissions} 
         activeModules={activeModules}
-        schoolName={settings?.schoolName}
+        schoolName={settings?.schoolName || school.name}
         schoolLogoUrl={settings?.schoolLogoUrl as string}
         isSuperAdminView={isSuperAdminView}
       />
       <main className="pr-16 md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
-                <Header title={getHeaderTitle()} schoolName={settings?.schoolName} />
+                <Header title={getHeaderTitle()} schoolName={settings?.schoolName || school.name} />
                 <div className="flex items-center gap-4">
                     {isSuperAdminView && (
                         <button onClick={() => navigate('/superadmin/schools')} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">

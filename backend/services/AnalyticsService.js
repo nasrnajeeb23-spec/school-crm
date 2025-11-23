@@ -148,18 +148,21 @@ class AnalyticsService {
     
     try {
       const payments = await Payment.findAll({
-        where: { 
-          schoolId,
-          date: {
+        include: [{
+          model: require('../models/Invoice'),
+          include: [{ model: require('../models/Student'), where: { schoolId }, attributes: ['id'] }]
+        }],
+        where: {
+          paymentDate: {
             [Op.between]: [startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000), endDate || new Date()]
           }
         },
-        order: [['date', 'ASC']]
+        order: [['paymentDate', 'ASC']]
       });
 
       const monthlyRevenue = this.groupPaymentsByMonth(payments);
       const paymentMethods = this.groupByPaymentMethod(payments);
-      const overdueAnalysis = this.analyzeOverduePayments(payments);
+      const overdueAnalysis = await this.analyzeOverduePaymentsBySchool(schoolId, startDate, endDate);
       
       let predictions = null;
       if (includePredictions && monthlyRevenue.length >= 6) {
@@ -182,6 +185,92 @@ class AnalyticsService {
       throw new Error(`Failed to analyze financial trends: ${error.message}`);
     }
   }
+
+  async analyzeAcademicPerformance(schoolId, timeRange = 'month') {
+    const now = new Date();
+    const rangeMap = { week: 7, month: 30, quarter: 90, year: 365 };
+    const days = rangeMap[timeRange] || 30;
+    const startDate = new Date(Date.now() - days*24*60*60*1000);
+    const trends = await this.analyzeAcademicTrends(schoolId, { startDate, endDate: now });
+    const averageGrade = trends.summary.averageGrade || 0;
+    const gradeDistribution = trends.insights.gradeDistribution || [];
+    const improvementTrend = trends.insights.overallTrend || 0;
+    const topPerformers = trends.insights.topPerformers || [];
+    const needsAttention = trends.insights.strugglingStudents || [];
+    return { averageGrade, gradeDistribution, improvementTrend, topPerformers, needsAttention };
+  }
+
+  async generateAutomatedInsights(schoolId, options = {}) {
+    const res = await this.generateInsights(schoolId, options);
+    return res.insights;
+  }
+
+  async getDashboardOverview(schoolId) {
+    const [studentCount, teacherCount, attendanceRows, gradeRows, payments] = await Promise.all([
+      require('../models/Student').count({ where: { schoolId } }),
+      require('../models/Teacher').count({ where: { schoolId } }),
+      require('../models/Attendance').findAll({ include: [{ model: require('../models/Class'), attributes: [] }], where: { date: { [Op.between]: [new Date(Date.now()-30*24*60*60*1000), new Date()] } } }),
+      require('../models/Grade').findAll({ include: [{ model: require('../models/Student'), where: { schoolId }, attributes: [] }], where: { date: { [Op.between]: [new Date(Date.now()-30*24*60*60*1000), new Date()] } } }),
+      Payment.findAll({ include: [{ model: require('../models/Invoice'), include: [{ model: require('../models/Student'), where: { schoolId }, attributes: [] }] }], where: { paymentDate: { [Op.between]: [new Date(Date.now()-365*24*60*60*1000), new Date()] } } })
+    ]);
+    const attendanceRate = attendanceRows.length ? (attendanceRows.filter(a => a.status === 'Present').length / attendanceRows.length) : 1;
+    const averageGrade = gradeRows.length ? (gradeRows.reduce((s,g)=>s+(g.grade||0),0)/gradeRows.length) : 0;
+    const financialHealth = payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
+    return {
+      totalStudents: studentCount,
+      totalTeachers: teacherCount,
+      attendanceRate,
+      averageGrade,
+      financialHealth,
+      operationalEfficiency: Math.min(1, attendanceRate * 0.5 + (averageGrade/100) * 0.5),
+      studentGrowth: [],
+      academicImprovement: [],
+      financialStability: []
+    };
+  }
+
+  async predictEnrollmentTrends(schoolId, months = 6) {
+    const Student = require('../models/Student');
+    const rows = await Student.findAll({ where: { schoolId }, order: [['registrationDate','ASC']] });
+    const byMonth = {};
+    rows.forEach(r=>{ const m = new Date(r.registrationDate).toISOString().slice(0,7); byMonth[m]=(byMonth[m]||0)+1; });
+    const series = Object.keys(byMonth).sort().map((m,i)=>({ x: i, y: byMonth[m] }));
+    const lr = series.length ? linearRegression(series.map(p=>[p.x,p.y])) : { m: 0, b: series.length?series[0].y:0 };
+    const predictions = Array.from({length: months}).map((_,i)=>({ monthIndex: i+1, expectedEnrollments: Math.max(0, Math.round(lr.m*(series.length+i)+lr.b)) }));
+    return { predictions, factors: ['Seasonality','Marketing','Retention'], recommendations: ['Boost outreach','Offer early enrollment discounts'] };
+  }
+
+  async getSystemAlerts(schoolId, severity = 'all') {
+    const Invoice = require('../models/Invoice');
+    const Student = require('../models/Student');
+    const overdue = await Invoice.count({ include: [{ model: Student, where: { schoolId } }], where: { status: 'OVERDUE' } });
+    const alerts = [];
+    if (overdue > 0) alerts.push({ id: 'al_'+Date.now(), severity: 'critical', acknowledged: false, message: `There are ${overdue} overdue invoices` });
+    return severity==='all' ? alerts : alerts.filter(a=>a.severity===severity);
+  }
+
+  // --- Helpers for financial analysis ---
+  groupPaymentsByMonth(payments){
+    const map={};
+    payments.forEach(p=>{ const m = new Date(p.paymentDate).toISOString().slice(0,7); map[m]=(map[m]||0)+parseFloat(p.amount); });
+    return Object.keys(map).sort().map(m=>({ month:m, amount: map[m] }));
+  }
+  groupByPaymentMethod(payments){
+    const map={};
+    payments.forEach(p=>{ const k=p.paymentMethod||'Unknown'; map[k]=(map[k]||0)+parseFloat(p.amount); });
+    return Object.keys(map).map(k=>({ method:k, total: map[k] }));
+  }
+  async analyzeOverduePaymentsBySchool(schoolId, startDate, endDate){
+    const Invoice = require('../models/Invoice');
+    const Student = require('../models/Student');
+    const rows = await Invoice.findAll({ include: [{ model: Student, where: { schoolId } }], where: { dueDate: { [Op.between]: [startDate || new Date(Date.now()-365*24*60*60*1000), endDate || new Date()] }, status: 'OVERDUE' } });
+    const amount = rows.reduce((s,r)=>s+parseFloat(r.amount),0);
+    return { overdueCount: rows.length, overdueAmount: amount };
+  }
+  calculateAverageMonthlyRevenue(monthly){ if (!monthly.length) return 0; return monthly.reduce((s,m)=>s+m.amount,0)/monthly.length; }
+  calculateRevenueGrowthRate(monthly){ if (monthly.length<2) return 0; const first=monthly[0].amount; const last=monthly[monthly.length-1].amount; return (last-first)/(first||1); }
+  calculateCollectionRate(payments){ const total=payments.reduce((s,p)=>s+parseFloat(p.amount||0),0); return total>0?1:0; }
+  predictRevenue(monthly){ const series = monthly.map((m,i)=>({x:i,y:m.amount})); const lr = series.length ? linearRegression(series.map(p=>[p.x,p.y])) : { m:0,b:0 }; return Array.from({length:3}).map((_,i)=>({ monthIndex: monthly.length+i+1, expectedRevenue: Math.max(0, Math.round(lr.m*(monthly.length+i)+lr.b)) })); }
 
   /**
    * Teacher performance analytics
@@ -281,6 +370,30 @@ class AnalyticsService {
     } catch (error) {
       throw new Error(`Failed to generate insights: ${error.message}`);
     }
+  }
+
+  /**
+   * Generate a consolidated report for the requested type
+   */
+  async generateReport(schoolId, reportType = 'operational', format = 'pdf', dateRange = {}) {
+    const range = {
+      startDate: dateRange?.startDate || new Date(Date.now() - 30*24*60*60*1000),
+      endDate: dateRange?.endDate || new Date()
+    };
+    let payload;
+    if (reportType === 'academic') {
+      payload = await this.analyzeAcademicTrends(schoolId, range);
+    } else if (reportType === 'financial') {
+      payload = await this.analyzeFinancialTrends(schoolId, range);
+    } else if (reportType === 'teacher') {
+      payload = await this.analyzeTeacherPerformance(schoolId, range);
+    } else {
+      const insights = await this.generateInsights(schoolId, range);
+      payload = insights;
+    }
+    const downloadUrl = `/downloads/${reportType}-report-${schoolId}-${Date.now()}.${format === 'excel' ? 'xlsx' : (format === 'csv' ? 'csv' : 'pdf')}`;
+    const expiresAt = new Date(Date.now() + 24*60*60*1000);
+    return { downloadUrl, expiresAt, payload, reportType, format };
   }
 
   // Helper methods
