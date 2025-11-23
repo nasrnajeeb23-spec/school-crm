@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd admin && npm install && npm run build",
-  "startCommand": "cd admin && npm start",
-  "rootDir": "admin"
+  "buildCommand": "npm install && npm run build",
+  "startCommand": "npm start",
+  "rootDir": "."
 }

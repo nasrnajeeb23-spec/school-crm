@@ -34,11 +34,37 @@ build({
 }).then(() => {
   console.log('Build completed successfully!');
   try {
-    console.log('Running Tailwind CSS build...');
-    execSync('npx tailwindcss -i ./src/index.css -o ../dist/assets/index.css --minify -c tailwind.config.js', { stdio: 'inherit', cwd: __dirname });
-    console.log('Tailwind CSS build completed.');
+    console.log('Copying CSS file...');
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Ensure dist/assets directory exists
+    const distDir = path.join(__dirname, '../dist/assets');
+    if (!fs.existsSync(distDir)) {
+      fs.mkdirSync(distDir, { recursive: true });
+    }
+    
+    // Copy the CSS file
+    const srcCss = path.join(__dirname, 'src/index.css');
+    const destCss = path.join(distDir, 'index.css');
+    
+    if (fs.existsSync(srcCss)) {
+      fs.copyFileSync(srcCss, destCss);
+      console.log('CSS file copied successfully.');
+    } else {
+      console.log('No CSS file found to copy.');
+    }
+    
+    // Copy the main CSS file from root if it exists
+    const rootCss = path.join(__dirname, '../index.css');
+    const rootDestCss = path.join(distDir, 'index.css');
+    
+    if (fs.existsSync(rootCss)) {
+      fs.copyFileSync(rootCss, rootDestCss);
+      console.log('Root CSS file copied successfully.');
+    }
   } catch (e) {
-    console.error('Tailwind build failed:', e.message);
+    console.error('CSS copy failed:', e.message);
   }
 }).catch((error) => {
   console.error('Build failed:', error);

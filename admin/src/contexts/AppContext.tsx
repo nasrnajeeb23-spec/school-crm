@@ -73,6 +73,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newUser = await api.submitTrialRequest(data);
     console.log('Trial signup response:', newUser);
     if (newUser) {
+        console.log('Setting current user with school ID:', newUser.schoolId);
         setCurrentUser(newUser);
         if (newUser.schoolId) {
           try { 
@@ -81,6 +82,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           } catch (error) {
             console.error('Error storing school ID:', error);
           }
+        } else {
+          console.warn('No school ID found in new user data:', newUser);
         }
         addToast(`أهلاً بك ${newUser.name}! تم إنشاء حسابك التجريبي بنجاح.`, 'success');
         return true;

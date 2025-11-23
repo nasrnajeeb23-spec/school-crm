@@ -77,7 +77,11 @@ const LandingPage: React.FC = () => {
   
   const handleTrialSubmit = async (data: NewTrialRequestData): Promise<boolean> => {
     const success = await trialSignup(data);
-    if (success) setIsTrialModalOpen(false);
+    if (success) {
+      setIsTrialModalOpen(false);
+      // Redirect to school dashboard after successful trial signup
+      navigate('/school');
+    }
     return success;
   };
 

@@ -75,6 +75,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   
   useEffect(() => {
     if (effectiveSchoolId) {
+        console.log('Loading school data for school ID:', effectiveSchoolId);
         setLoading(true);
         Promise.all([
             api.getSchoolById(effectiveSchoolId),
@@ -82,11 +83,17 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
             api.getSchoolModules(effectiveSchoolId),
             api.getSchoolSettings(effectiveSchoolId)
         ]).then(([schoolData, actionItemsData, schoolModulesData, settingsData]) => {
+            console.log('School data loaded:', schoolData);
             setSchool(schoolData);
             setActionItems(actionItemsData);
             setActiveModules(schoolModulesData.map(sm => sm.moduleId));
             setSettings(settingsData);
-        }).catch(err => console.error("Failed to fetch school data", err)).finally(() => setLoading(false));
+        }).catch(err => {
+            console.error("Failed to fetch school data", err);
+            console.error('School ID that failed:', effectiveSchoolId);
+        }).finally(() => setLoading(false));
+    } else {
+        console.log('No effective school ID available. Current user:', currentUser);
     }
   }, [effectiveSchoolId]);
 
