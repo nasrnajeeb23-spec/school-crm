@@ -1,224 +1,55 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>اختبار React - Test React</title>
-    <style>
-        body { 
-            font-family: 'Cairo', sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-        }
-        .test-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 500px;
-        }
-        .status {
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 0.5rem;
-            font-weight: bold;
-        }
-        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
-        .btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            font-size: 1rem;
-            margin: 0.5rem;
-            transition: background 0.3s;
-        }
-        .btn:hover { background: #5a6fd8; }
-        .btn-success { background: #28a745; }
-        .btn-success:hover { background: #218838; }
-    </style>
+    <title>React Test</title>
 </head>
 <body>
-    <div class="test-container">
-        <h1>🚀 اختبار نظام School CRM</h1>
-        <p>هذا الاختبار للتحقق من عمل جميع وظائف المنصة</p>
+    <div id="test-root"></div>
+    
+    <script type="module">
+        // Test if React is loading properly
+        console.log('Testing React loading...');
         
-        <div id="status-container">
-            <div class="status warning">⏳ جاري التحقق من حالة النظام...</div>
-        </div>
-        
-        <div id="test-buttons">
-            <button class="btn" onclick="testBackendConnection()">🔄 اختبار الاتصال بالخادم</button>
-            <button class="btn" onclick="testPages()">📱 اختبار الصفحات</button>
-            <button class="btn" onclick="testAPIs()">🔌 اختبار واجهات API</button>
-            <button class="btn btn-success" onclick="runAllTests()">⚡ اختبار شامل</button>
-        </div>
-        
-        <div id="test-results" style="margin-top: 2rem; text-align: right;"></div>
-    </div>
-
-    <script>
-        let testResults = [];
-        
-        function updateStatus(message, type = 'warning') {
-            const statusContainer = document.getElementById('status-container');
-            statusContainer.innerHTML = `<div class="status ${type}">${message}</div>`;
-        }
-        
-        function addTestResult(test, result, details = '') {
-            testResults.push({ test, result, details, time: new Date().toLocaleTimeString('ar-SA') });
-            displayResults();
-        }
-        
-        function displayResults() {
-            const resultsContainer = document.getElementById('test-results');
-            if (testResults.length === 0) {
-                resultsContainer.innerHTML = '<p>لا توجد نتائج اختبار بعد...</p>';
-                return;
-            }
-            
-            let html = '<h3>📊 نتائج الاختبارات:</h3>';
-            testResults.forEach(result => {
-                const statusIcon = result.result === 'success' ? '✅' : result.result === 'error' ? '❌' : '⚠️';
-                html += `
-                    <div style="margin: 0.5rem 0; padding: 0.5rem; background: #f8f9fa; border-radius: 0.5rem;">
-                        <strong>${statusIcon} ${result.test}</strong>
-                        <small style="color: #6c757d; display: block;">${result.time}</small>
-                        ${result.details ? `<div style="margin-top: 0.5rem; font-size: 0.9rem;">${result.details}</div>` : ''}
-                    </div>
-                `;
-            });
-            resultsContainer.innerHTML = html;
-        }
-        
-        async function testBackendConnection() {
-            updateStatus('🔄 جاري اختبار الاتصال بالخادم الخلفي...', 'warning');
-            
-            try {
-                // Test backend connection
-                const response = await fetch('http://localhost:5003/api/health', {
-                    method: 'GET',
-                    timeout: 5000
-                });
-                
+        // Check if the built files are accessible
+        fetch('/assets/index.js')
+            .then(response => {
                 if (response.ok) {
-                    const data = await response.json();
-                    updateStatus('✅ تم الاتصال بنجاح بالخادم الخلفي', 'success');
-                    addTestResult('اتصال الخادم الخلفي', 'success', 'الخادم يعمل بشكل طبيعي');
+                    console.log('✅ index.js loaded successfully');
                 } else {
-                    updateStatus('⚠️ الخادم يستجيب لكن هناك مشكلة', 'error');
-                    addTestResult('اتصال الخادم الخلفي', 'error', `استجابة غير متوقعة: ${response.status}`);
+                    console.error('❌ index.js failed to load:', response.status);
                 }
-            } catch (error) {
-                updateStatus('❌ فشل الاتصال بالخادم الخلفي', 'error');
-                addTestResult('اتصال الخادم الخلفي', 'error', error.message);
-            }
-        }
-        
-        function testPages() {
-            updateStatus('📱 جاري اختبار تحميل الصفحات...', 'warning');
-            
-            const pages = [
-                { name: 'الصفحة الرئيسية', url: '/' },
-                { name: 'صفحة الدخول العامة', url: '/login' },
-                { name: 'دخول المدير العام', url: '/login/superadmin' },
-                { name: 'لوحة تحكم المدير', url: '/superadmin/dashboard' },
-                { name: 'لوحة تحكم المدرسة', url: '/school/dashboard' }
-            ];
-            
-            pages.forEach(page => {
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = `http://localhost:3001${page.url}`;
-                
-                iframe.onload = () => {
-                    addTestResult(`صفحة: ${page.name}`, 'success', 'تم التحميل بنجاح');
-                    document.body.removeChild(iframe);
-                };
-                
-                iframe.onerror = () => {
-                    addTestResult(`صفحة: ${page.name}`, 'error', 'فشل تحميل الصفحة');
-                    document.body.removeChild(iframe);
-                };
-                
-                document.body.appendChild(iframe);
+            })
+            .catch(error => {
+                console.error('❌ index.js fetch error:', error);
             });
             
-            updateStatus('✅ تم بدء اختبار الصفحات، تحقق من النتائج أدناه', 'success');
+        // Test React import
+        try {
+            import('/assets/index.js').then(module => {
+                console.log('✅ React module loaded:', module);
+            }).catch(error => {
+                console.error('❌ React module loading failed:', error);
+            });
+        } catch (error) {
+            console.error('❌ React import error:', error);
         }
         
-        async function testAPIs() {
-            updateStatus('🔌 جاري اختبار واجهات API...', 'warning');
-            
-            const apis = [
-                { name: 'المدارس', endpoint: '/api/schools' },
-                { name: 'المستخدمين', endpoint: '/api/users' },
-                { name: 'الطلاب', endpoint: '/api/students' },
-                { name: 'المعلمين', endpoint: '/api/teachers' }
-            ];
-            
-            for (const api of apis) {
-                try {
-                    const response = await fetch(`http://localhost:5003${api.endpoint}`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        addTestResult(`API: ${api.name}`, 'success', 'واجهة API تعمل بشكل طبيعي');
-                    } else {
-                        addTestResult(`API: ${api.name}`, 'error', `خطأ في الاستجابة: ${response.status}`);
-                    }
-                } catch (error) {
-                    addTestResult(`API: ${api.name}`, 'error', error.message);
-                }
+        // Check if React is available globally
+        setTimeout(() => {
+            if (window.React) {
+                console.log('✅ React available globally');
+            } else {
+                console.error('❌ React not available globally');
             }
             
-            updateStatus('✅ تم اختبار واجهات API', 'success');
-        }
-        
-        function runAllTests() {
-            testResults = [];
-            document.getElementById('test-results').innerHTML = '';
-            
-            updateStatus('🚀 بدء الاختبار الشامل لجميع وظائف المنصة...', 'warning');
-            
-            setTimeout(() => testBackendConnection(), 1000);
-            setTimeout(() => testPages(), 2000);
-            setTimeout(() => testAPIs(), 3000);
-            
-            setTimeout(() => {
-                updateStatus('✅ تم اكتمال الاختبار الشامل! تحقق من النتائج أدناه', 'success');
-                
-                const successCount = testResults.filter(r => r.result === 'success').length;
-                const errorCount = testResults.filter(r => r.result === 'error').length;
-                
-                addTestResult('📊 ملخص الاختبار', 'success', `
-                    ✅ ناجح: ${successCount} اختبار<br>
-                    ❌ فاشل: ${errorCount} اختبار<br>
-                    📈 نسبة النجاح: ${Math.round((successCount / testResults.length) * 100)}%
-                `);
-            }, 5000);
-        }
-        
-        // Auto-test on page load
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                updateStatus('🟢 الصفحة محملة بنجاح، جاهز للاختبار', 'success');
-                addTestResult('تحميل الصفحة', 'success', 'تم تحميل واجهة الاختبار بنجاح');
-            }, 1000);
-        });
+            if (window.ReactDOM) {
+                console.log('✅ ReactDOM available globally');
+            } else {
+                console.error('❌ ReactDOM not available globally');
+            }
+        }, 2000);
     </script>
 </body>
 </html>

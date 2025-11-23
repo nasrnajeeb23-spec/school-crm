@@ -12,12 +12,12 @@
     "@google/genai": "^1.30.0",
     "esbuild": "^0.19.12",
     "prop-types": "^15.8.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-is": "^18.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-is": "^18.2.0",
     "react-router": "^6.25.1",
     "react-router-dom": "^6.25.1",
-    "recharts": "^3.4.1"
+    "recharts": "^2.8.0"
   },
   "author": "",
   "license": "MIT",
