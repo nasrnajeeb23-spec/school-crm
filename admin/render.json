@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "outputDir": "../dist",
+  "outputDir": "dist",
   "installCommand": "npm ci",
   "buildFilter": "admin/**",
   "headers": {

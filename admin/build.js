@@ -15,7 +15,7 @@ build({
   bundle: true,
   format: 'esm',
   target: 'es2020',
-  outdir: '../dist/assets',
+  outdir: 'dist/assets',
   sourcemap: true,
   define: {
     'process.env.REACT_APP_API_URL': JSON.stringify(apiUrl),
@@ -39,7 +39,7 @@ build({
     const path = require('path');
     
     // Ensure dist/assets directory exists
-    const distDir = path.join(__dirname, '../dist/assets');
+    const distDir = path.join(__dirname, 'dist/assets');
     if (!fs.existsSync(distDir)) {
       fs.mkdirSync(distDir, { recursive: true });
     }
@@ -66,7 +66,7 @@ build({
     
     // Copy the _redirects file for SPA routing
     const redirectsSrc = path.join(__dirname, 'public/_redirects');
-    const redirectsDest = path.join(__dirname, '../dist/_redirects');
+    const redirectsDest = path.join(__dirname, 'dist/_redirects');
     
     if (fs.existsSync(redirectsSrc)) {
       fs.copyFileSync(redirectsSrc, redirectsDest);
@@ -74,6 +74,30 @@ build({
     } else {
       console.log('No _redirects file found to copy.');
     }
+
+    // Generate index.html with Tailwind CDN for styling
+    const htmlPath = path.join(__dirname, 'dist/index.html');
+    const htmlContent = [
+      '<!DOCTYPE html>',
+      '<html lang="ar" dir="rtl">',
+      '<head>',
+      '<meta charset="UTF-8">',
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+      '<title>SchoolSaaS - نظام إدارة المدارس</title>',
+      '<link rel="preconnect" href="https://fonts.googleapis.com">',
+      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+      '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
+      '<script src="https://cdn.tailwindcss.com"></script>',
+      '</head>',
+      '<body class="bg-gray-100 dark:bg-gray-900">',
+      '<div id="root"></div>',
+      '<script type="module" src="/assets/index.js"></script>',
+      '<link rel="stylesheet" href="/assets/index.css">',
+      '</body>',
+      '</html>'
+    ].join('');
+    fs.writeFileSync(htmlPath, htmlContent, 'utf8');
+    console.log('index.html generated successfully.');
   } catch (e) {
     console.error('CSS copy failed:', e.message);
   }
