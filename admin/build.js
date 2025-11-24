@@ -89,6 +89,7 @@ build({
       '<link rel="preconnect" href="https://fonts.googleapis.com">',
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
+      '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
       useCdn ? '<script src="https://cdn.tailwindcss.com"></script>' : '',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
@@ -143,6 +144,10 @@ build({
       fs.copyFileSync(redirectsDest, rootRedirects);
       console.log('Root _redirects copied successfully.');
     }
+
+    const faviconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#4f46e5"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="34" fill="#fff">S</text></svg>';
+    fs.writeFileSync(path.join(__dirname, 'dist/favicon.svg'), faviconSvg, 'utf8');
+    fs.writeFileSync(path.join(rootDist, 'favicon.svg'), faviconSvg, 'utf8');
   } catch (e) {
     console.error('CSS copy failed:', e.message);
   }

@@ -27,7 +27,7 @@ services:
     name: school-crm-admin
     env: static
     rootDir: .
-    buildCommand: cd admin && npm install && npm run build
+    buildCommand: cd admin && npm ci --include=dev && npm run build
     staticPublishPath: ./dist
     autoDeploy: true
     headers:
