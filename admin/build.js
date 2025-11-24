@@ -54,17 +54,25 @@ build({
         '.bin',
         process.platform === 'win32' ? 'tailwindcss.cmd' : 'tailwindcss'
       );
-      execSync(`"${tailwindBin}" -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit' });
+      const envOpts = { ...process.env, NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=1024' };
+      execSync(`"${tailwindBin}" -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
       console.log('Tailwind CSS built successfully.');
     } catch (err) {
-      console.warn('Tailwind build failed, falling back to raw CSS copy:', err?.message || err);
-      const srcCss = path.join(__dirname, 'src/index.css');
-      const destCss = path.join(distDir, 'index.css');
-      if (fs.existsSync(srcCss)) {
-        fs.copyFileSync(srcCss, destCss);
-        console.log('Raw CSS copied successfully.');
+      console.warn('Tailwind CLI build failed, trying npx fallback:', err?.message || err);
+      try {
+        const envOpts = { ...process.env, NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=1024' };
+        execSync(`npx tailwindcss -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
+        console.log('Tailwind CSS built successfully via npx.');
+      } catch (err2) {
+        console.warn('Tailwind build failed, falling back to raw CSS copy:', err2?.message || err2);
+        const srcCss = path.join(__dirname, 'src/index.css');
+        const destCss = path.join(distDir, 'index.css');
+        if (fs.existsSync(srcCss)) {
+          fs.copyFileSync(srcCss, destCss);
+          console.log('Raw CSS copied successfully.');
+        }
+        useCdn = true;
       }
-      useCdn = true;
     }
     
     // Copy the _redirects file for SPA routing
