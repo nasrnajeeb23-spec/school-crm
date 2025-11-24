@@ -20,6 +20,7 @@ build({
   define: {
     'process.env.REACT_APP_API_URL': JSON.stringify(apiUrl),
     'process.env.REACT_APP_ENVIRONMENT': JSON.stringify(environment),
+    'process.env.REACT_APP_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || ''),
     'process.env.NODE_ENV': JSON.stringify(environment)
   },
   loader: {
@@ -90,7 +91,6 @@ build({
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
       '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
-      useCdn ? '<script src="https://cdn.tailwindcss.com"></script>' : '',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
@@ -101,6 +101,24 @@ build({
     ].join('');
     fs.writeFileSync(htmlPath, htmlContent, 'utf8');
     console.log('index.html generated successfully.');
+
+    const notFoundPath = path.join(__dirname, 'dist/404.html');
+    const notFoundContent = [
+      '<!DOCTYPE html>',
+      '<html lang="ar" dir="rtl">',
+      '<head>',
+      '<meta charset="UTF-8">',
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+      '<meta http-equiv="refresh" content="0; url=/">',
+      '<title>إعادة التوجيه</title>',
+      '</head>',
+      '<body>',
+      '<script>try{var p=location.pathname+location.search+location.hash; if(!location.hash){location.replace("/#"+p);}else{location.replace("/"+location.hash);} }catch(e){ location.replace("/"); }</script>',
+      '</body>',
+      '</html>'
+    ].join('');
+    fs.writeFileSync(notFoundPath, notFoundContent, 'utf8');
+    console.log('404.html generated successfully.');
 
     // Mirror build output to repository root's dist for Render publish
     const rootDist = path.join(__dirname, '../dist');
@@ -115,6 +133,7 @@ build({
 
     // Copy index.html to root dist
     fs.writeFileSync(rootIndexHtml, htmlContent, 'utf8');
+    fs.writeFileSync(path.join(rootDist, '404.html'), notFoundContent, 'utf8');
 
     // Ensure root/assets exists
     if (!fs.existsSync(rootAssets)) {

@@ -51,6 +51,8 @@ services:
         value: production
       - key: NODE_ENV
         value: production
+      - key: REACT_APP_HASH_ROUTER
+        value: true
 
 databases:
   - name: schoolcrm-db

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import { AppProvider } from './contexts/AppContext';
 import App from './App';
@@ -21,16 +21,27 @@ if (typeof window !== 'undefined') {
 
 const container = document.getElementById('root');
 if (container) {
+  const useHash = (process.env.REACT_APP_HASH_ROUTER === 'true');
   const root = ReactDOM.createRoot(container);
   root.render(
     <React.StrictMode>
-      <BrowserRouter>
-        <ToastProvider>
-          <AppProvider>
-            <App />
-          </AppProvider>
-        </ToastProvider>
-      </BrowserRouter>
+      {useHash ? (
+        <HashRouter>
+          <ToastProvider>
+            <AppProvider>
+              <App />
+            </AppProvider>
+          </ToastProvider>
+        </HashRouter>
+      ) : (
+        <BrowserRouter>
+          <ToastProvider>
+            <AppProvider>
+              <App />
+            </AppProvider>
+          </ToastProvider>
+        </BrowserRouter>
+      )}
     </React.StrictMode>
   );
 }

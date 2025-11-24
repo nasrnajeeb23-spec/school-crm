@@ -101,6 +101,7 @@ const LandingPage: React.FC = () => {
               <a href="#contact" onClick={(e) => handleNavClick(e, 'contact')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">تواصل معنا</a>
             </nav>
             <div className="flex items-center gap-4">
+                <button onClick={() => navigate('/superadmin/login')} className="px-5 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all">بوابة المدير العام</button>
                 <button onClick={() => navigate('/login')} className="px-5 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-all">تسجيل الدخول</button>
                 <button onClick={() => setIsTrialModalOpen(true)} className="hidden sm:inline-flex px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">ابدأ تجربتك المجانية</button>
             </div>
