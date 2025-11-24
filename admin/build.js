@@ -64,10 +64,14 @@ build({
         execSync(`npx tailwindcss -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
         console.log('Tailwind CSS built successfully via npx.');
       } catch (err2) {
-        console.warn('Tailwind build failed, falling back to raw CSS copy:', err2?.message || err2);
+        console.warn('Tailwind build failed, falling back to production CSS copy:', err2?.message || err2);
+        const rootCss = path.join(__dirname, '../index.css');
         const srcCss = path.join(__dirname, 'src/index.css');
         const destCss = path.join(distDir, 'index.css');
-        if (fs.existsSync(srcCss)) {
+        if (fs.existsSync(rootCss)) {
+          fs.copyFileSync(rootCss, destCss);
+          console.log('Production CSS copied successfully.');
+        } else if (fs.existsSync(srcCss)) {
           fs.copyFileSync(srcCss, destCss);
           console.log('Raw CSS copied successfully.');
         }
@@ -99,6 +103,7 @@ build({
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
       '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
+      useCdn ? '<script src="https://cdn.tailwindcss.com"></script>' : '',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
