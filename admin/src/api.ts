@@ -304,7 +304,28 @@ export const sendMessage = async (messageData: Partial<Message>): Promise<Messag
 // ==================== Landing Page APIs ====================
 
 export const getLandingPageContent = async (): Promise<LandingPageContent> => {
-    return await apiCall('/content/landing', { method: 'GET' });
+    try {
+        return await apiCall('/content/landing', { method: 'GET' });
+    } catch {
+        return {
+            hero: { title: 'منصة SchoolSaaS', subtitle: 'حل شامل لإدارة المدارس' },
+            features: {
+                title: 'الميزات',
+                subtitle: 'أدوات متقدمة للإدارة والتعليم',
+                items: [
+                    { id: 'f1', title: 'الطلاب', description: 'إدارة الطلاب والحضور والدرجات' },
+                    { id: 'f2', title: 'المالية', description: 'فواتير ومدفوعات وتقارير مالية' },
+                    { id: 'f4', title: 'التواصل', description: 'مراسلات داخلية فعالة' }
+                ]
+            },
+            ads: {
+                title: 'عروض',
+                slides: [
+                    { id: 'ad1', title: 'تجربة مجانية', description: 'ابدأ تجربتك الآن', ctaText: 'ابدأ', link: '/#contact', imageUrl: '' }
+                ]
+            }
+        };
+    }
 };
 
 export const updateLandingPageContent = async (content: Partial<LandingPageContent>): Promise<LandingPageContent> => {

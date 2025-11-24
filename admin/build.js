@@ -53,7 +53,7 @@ build({
         '.bin',
         process.platform === 'win32' ? 'tailwindcss.cmd' : 'tailwindcss'
       );
-      execSync(`"${tailwindBin}" -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit' });
+      execSync(`"${tailwindBin}" -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit' });
       console.log('Tailwind CSS built successfully.');
     } catch (err) {
       console.warn('Tailwind build failed, falling back to raw CSS copy:', err?.message || err);
