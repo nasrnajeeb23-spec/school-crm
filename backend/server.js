@@ -39,8 +39,9 @@ const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 const server = http.createServer(app);
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,https://school-crm-admin.onrender.com';
+const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001';
 const allowedOrigins = allowedOrigin.split(',').map(o => o.trim());
+allowedOrigins.push('https://school-crm-admin.onrender.com');
 if (process.env.FRONTEND_URL) {
   try { allowedOrigins.push(process.env.FRONTEND_URL.trim()); } catch {}
 }
