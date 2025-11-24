@@ -36,13 +36,13 @@ services:
         value: no-cache, no-store, must-revalidate
     routes:
       - type: rewrite
-        source: /superadmin/*
+        source: /superadmin/**
         destination: /index.html
       - type: rewrite
         source: /login
         destination: /index.html
       - type: rewrite
-        source: /*
+        source: /**
         destination: /index.html
     envVars:
       - key: REACT_APP_API_URL

@@ -149,28 +149,24 @@ build({
     fs.writeFileSync(path.join(__dirname, 'dist/favicon.svg'), faviconSvg, 'utf8');
     fs.writeFileSync(path.join(rootDist, 'favicon.svg'), faviconSvg, 'utf8');
 
-    // Generate static.json for Render SPA rewrites
+    // Generate static.json for Render SPA rewrites (Render format)
     const staticJson = {
-      routes: {
-        '/superadmin/*': 'index.html',
-        '/login': 'index.html',
-        '/teacher/*': 'index.html',
-        '/school/*': 'index.html',
-        '/parent/*': 'index.html',
-        '/**': 'index.html'
-      },
-      headers: {
-        '/**': {
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        },
-        '/assets/**': {
-          'Cache-Control': 'public, max-age=31536000, immutable'
-        }
-      }
+      routes: [
+        { type: 'rewrite', source: '/superadmin/**', destination: '/index.html' },
+        { type: 'rewrite', source: '/login', destination: '/index.html' },
+        { type: 'rewrite', source: '/teacher/**', destination: '/index.html' },
+        { type: 'rewrite', source: '/school/**', destination: '/index.html' },
+        { type: 'rewrite', source: '/parent/**', destination: '/index.html' },
+        { type: 'rewrite', source: '/**', destination: '/index.html' }
+      ],
+      headers: [
+        { path: '/*', name: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+        { path: '/assets/*', name: 'Cache-Control', value: 'public, max-age=31536000, immutable' }
+      ]
     };
     fs.writeFileSync(path.join(__dirname, 'dist/static.json'), JSON.stringify(staticJson, null, 2), 'utf8');
     fs.writeFileSync(path.join(rootDist, 'static.json'), JSON.stringify(staticJson, null, 2), 'utf8');
-    console.log('static.json generated for SPA rewrites.');
+    console.log('static.json generated for SPA rewrites (Render format).');
   } catch (e) {
     console.error('CSS copy failed:', e.message);
   }
