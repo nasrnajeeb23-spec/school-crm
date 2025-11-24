@@ -98,6 +98,49 @@ build({
     ].join('');
     fs.writeFileSync(htmlPath, htmlContent, 'utf8');
     console.log('index.html generated successfully.');
+
+    // Mirror build output to repository root's dist for Render publish
+    const rootDist = path.join(__dirname, '../dist');
+    const adminAssets = path.join(__dirname, 'dist/assets');
+    const rootAssets = path.join(rootDist, 'assets');
+    const rootRedirects = path.join(rootDist, '_redirects');
+    const rootIndexHtml = path.join(rootDist, 'index.html');
+
+    if (!fs.existsSync(rootDist)) {
+      fs.mkdirSync(rootDist, { recursive: true });
+    }
+
+    // Copy index.html to root dist
+    fs.writeFileSync(rootIndexHtml, htmlContent, 'utf8');
+
+    // Ensure root/assets exists
+    if (!fs.existsSync(rootAssets)) {
+      fs.mkdirSync(rootAssets, { recursive: true });
+    }
+
+    // Copy all assets from admin/dist/assets to root/dist/assets
+    if (fs.existsSync(adminAssets)) {
+      const copyRecursive = (src, dest) => {
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+        for (const entry of entries) {
+          const s = path.join(src, entry.name);
+          const d = path.join(dest, entry.name);
+          if (entry.isDirectory()) copyRecursive(s, d);
+          else fs.copyFileSync(s, d);
+        }
+      };
+      copyRecursive(adminAssets, rootAssets);
+      console.log('Root dist assets synchronized successfully.');
+    } else {
+      console.warn('Admin assets directory not found; skipping root assets sync.');
+    }
+
+    // Copy _redirects to root dist
+    if (fs.existsSync(redirectsDest)) {
+      fs.copyFileSync(redirectsDest, rootRedirects);
+      console.log('Root _redirects copied successfully.');
+    }
   } catch (e) {
     console.error('CSS copy failed:', e.message);
   }
