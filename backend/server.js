@@ -39,7 +39,7 @@ const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 const server = http.createServer(app);
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001';
+const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,https://school-crm-admin.onrender.com';
 const allowedOrigins = allowedOrigin.split(',').map(o => o.trim());
 if (process.env.FRONTEND_URL) {
   try { allowedOrigins.push(process.env.FRONTEND_URL.trim()); } catch {}
@@ -196,6 +196,36 @@ app.use('/api/messaging', messagingRoutes);
 app.use('/api/auth/enterprise', authEnterpriseRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/uploads', express.static(require('path').join(__dirname, '..', 'uploads')));
+
+// Public content endpoints for landing page
+app.get('/api/content/landing', (req, res) => {
+  res.json({
+    hero: {
+      title: 'منصة SchoolSaaS لإدارة المدارس باحترافية',
+      subtitle: 'حل شامل لتبسيط إدارة الطلاب والمعلمين والمالية والتواصل في مدرسة واحدة'
+    },
+    features: {
+      title: 'أهم الميزات',
+      subtitle: 'ميزات عملية تُسهّل عمل الإدارة والمعلمين وأولياء الأمور',
+      items: [
+        { id: 'f1', title: 'إدارة الطلاب', description: 'ملفات الطلاب، الحضور، الدرجات، والأنشطة في مكان واحد' },
+        { id: 'f2', title: 'إدارة مالية', description: 'فواتير، مدفوعات، وإيرادات مع تقارير مفصلة' },
+        { id: 'f3', title: 'نظام الدرجات', description: 'إدخال الدرجات، استخراج التقارير، ومتابعة الأداء' },
+        { id: 'f4', title: 'الرسائل والتواصل', description: 'تواصل داخلي بين الإدارة والمعلمين وأولياء الأمور' },
+        { id: 'f5', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات لاتخاذ قرارات أفضل' },
+        { id: 'f6', title: 'الصلاحيات والأذونات', description: 'صلاحيات دقيقة لكل دور داخل المدرسة' }
+      ]
+    },
+    ads: {
+      title: 'عروض وخدمات إضافية',
+      slides: [
+        { id: 'ad1', title: 'باقات مرنة للمدارس', description: 'اختر الخطة التي تناسب حجم مدرستك واحتياجاتك', ctaText: 'شاهد الباقات', link: '/#pricing', imageUrl: 'https://images.unsplash.com/photo-1554931545-5b453faafe36?w=1200&q=80&auto=format&fit=crop' },
+        { id: 'ad2', title: 'تجربة مجانية', description: 'جرّب المنصة مجاناً وابدأ إدارة مدرستك اليوم', ctaText: 'ابدأ الآن', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1523580846011-df4f04b29464?w=1200&q=80&auto=format&fit=crop' },
+        { id: 'ad3', title: 'حل مستضاف ذاتياً', description: 'امتلك نسخة خاصة من النظام داخل مؤسستك', ctaText: 'اطلب عرض سعر', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80&auto=format&fit=crop' }
+      ]
+    }
+  });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {

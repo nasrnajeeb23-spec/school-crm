@@ -34,7 +34,7 @@ build({
 }).then(() => {
   console.log('Build completed successfully!');
   try {
-    console.log('Copying CSS file...');
+    console.log('Building Tailwind CSS...');
     const fs = require('fs');
     const path = require('path');
     
@@ -44,24 +44,26 @@ build({
       fs.mkdirSync(distDir, { recursive: true });
     }
     
-    // Copy the CSS file
-    const srcCss = path.join(__dirname, 'src/index.css');
-    const destCss = path.join(distDir, 'index.css');
-    
-    if (fs.existsSync(srcCss)) {
-      fs.copyFileSync(srcCss, destCss);
-      console.log('CSS file copied successfully.');
-    } else {
-      console.log('No CSS file found to copy.');
-    }
-    
-    // Copy the main CSS file from root if it exists
-    const rootCss = path.join(__dirname, '../index.css');
-    const rootDestCss = path.join(distDir, 'index.css');
-    
-    if (fs.existsSync(rootCss)) {
-      fs.copyFileSync(rootCss, rootDestCss);
-      console.log('Root CSS file copied successfully.');
+    // Compile Tailwind CSS for production using local binary (Windows compatible)
+    let useCdn = false;
+    try {
+      const tailwindBin = path.join(
+        __dirname,
+        'node_modules',
+        '.bin',
+        process.platform === 'win32' ? 'tailwindcss.cmd' : 'tailwindcss'
+      );
+      execSync(`"${tailwindBin}" -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit' });
+      console.log('Tailwind CSS built successfully.');
+    } catch (err) {
+      console.warn('Tailwind build failed, falling back to raw CSS copy:', err?.message || err);
+      const srcCss = path.join(__dirname, 'src/index.css');
+      const destCss = path.join(distDir, 'index.css');
+      if (fs.existsSync(srcCss)) {
+        fs.copyFileSync(srcCss, destCss);
+        console.log('Raw CSS copied successfully.');
+      }
+      useCdn = true;
     }
     
     // Copy the _redirects file for SPA routing
@@ -75,7 +77,7 @@ build({
       console.log('No _redirects file found to copy.');
     }
 
-    // Generate index.html with Tailwind CDN for styling
+    // Generate index.html linking compiled CSS (no Tailwind CDN in production)
     const htmlPath = path.join(__dirname, 'dist/index.html');
     const htmlContent = [
       '<!DOCTYPE html>',
@@ -87,7 +89,7 @@ build({
       '<link rel="preconnect" href="https://fonts.googleapis.com">',
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
-      '<script src="https://cdn.tailwindcss.com"></script>',
+      useCdn ? '<script src="https://cdn.tailwindcss.com"></script>' : '',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
