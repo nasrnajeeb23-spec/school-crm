@@ -148,6 +148,29 @@ build({
     const faviconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#4f46e5"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="34" fill="#fff">S</text></svg>';
     fs.writeFileSync(path.join(__dirname, 'dist/favicon.svg'), faviconSvg, 'utf8');
     fs.writeFileSync(path.join(rootDist, 'favicon.svg'), faviconSvg, 'utf8');
+
+    // Generate static.json for Render SPA rewrites
+    const staticJson = {
+      routes: {
+        '/superadmin/*': 'index.html',
+        '/login': 'index.html',
+        '/teacher/*': 'index.html',
+        '/school/*': 'index.html',
+        '/parent/*': 'index.html',
+        '/**': 'index.html'
+      },
+      headers: {
+        '/**': {
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        '/assets/**': {
+          'Cache-Control': 'public, max-age=31536000, immutable'
+        }
+      }
+    };
+    fs.writeFileSync(path.join(__dirname, 'dist/static.json'), JSON.stringify(staticJson, null, 2), 'utf8');
+    fs.writeFileSync(path.join(rootDist, 'static.json'), JSON.stringify(staticJson, null, 2), 'utf8');
+    console.log('static.json generated for SPA rewrites.');
   } catch (e) {
     console.error('CSS copy failed:', e.message);
   }
