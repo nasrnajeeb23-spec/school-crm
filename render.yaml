@@ -54,7 +54,7 @@ services:
       - key: REACT_APP_HASH_ROUTER
         value: true
       - key: NODE_OPTIONS
-        value: --max-old-space-size=1024
+        value: --max-old-space-size=1536
 
 databases:
   - name: schoolcrm-db
