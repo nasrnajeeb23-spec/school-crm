@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatsCard from '../components/StatsCard';
 import { StudentsIcon, UsersIcon, AttendanceIcon, PastDueIcon } from '../components/icons';
-import { School, InvoiceStatus } from '../types';
+import { School, InvoiceStatus, AttendanceStatus, Class } from '../types';
 import * as api from '../api';
 import UpcomingEvents from '../components/UpcomingEvents';
 import StatsCardSkeleton from '../components/StatsCardSkeleton';
@@ -25,6 +25,7 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
     const [overdueInvoices, setOverdueInvoices] = useState(0);
     const [distributionData, setDistributionData] = useState<DistributionData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [attendancePercent, setAttendancePercent] = useState<string>('—%');
     const navigate = useNavigate();
     const { addToast } = useToast();
 
@@ -32,12 +33,23 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                 const [invoicesData, studentDistributionData] = await Promise.all([
+                 const [invoicesData, studentDistributionData, classes] = await Promise.all([
                     api.getSchoolInvoices(school.id),
                     api.getStudentDistribution(school.id),
+                    api.getSchoolClasses(school.id),
                 ]);
                 setOverdueInvoices(invoicesData.filter(inv => inv.status === InvoiceStatus.Overdue).length);
                 setDistributionData(studentDistributionData);
+                const today = new Date().toISOString().split('T')[0];
+                let total = 0;
+                let present = 0;
+                for (const cls of classes as Class[]) {
+                    const records = await api.getAttendance(cls.id, today);
+                    total += records.length;
+                    present += records.filter(r => r.status === AttendanceStatus.Present || r.status === 'Present').length;
+                }
+                const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+                setAttendancePercent(`${pct}%`);
             } catch (error) {
                 console.error("Failed to fetch dashboard data:", error);
                 addToast("فشل تحميل بيانات لوحة التحكم.", 'error');
@@ -94,7 +106,7 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
                 <StatsCard 
                     icon={AttendanceIcon} 
                     title="الحضور اليومي" 
-                    value="94%"
+                    value={attendancePercent}
                     description={`آخر تحديث: ${new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`}
                     onClick={() => navigate('attendance')}
                 />
