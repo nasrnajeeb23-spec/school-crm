@@ -435,6 +435,14 @@ export const getSchoolParents = async (schoolId: number): Promise<Parent[]> => {
     return await apiCall(`/school/${schoolId}/parents`, { method: 'GET' });
 };
 
+export const upsertSchoolParent = async (schoolId: number, data: NewParentData): Promise<Parent> => {
+    return await apiCall(`/school/${schoolId}/parents`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const inviteParent = async (parentId: string): Promise<void> => {
+    await apiCall('/auth/parent/invite', { method: 'POST', body: JSON.stringify({ parentId }) });
+};
+
 export const getSchoolEvents = async (schoolId: number): Promise<SchoolEvent[]> => {
     return await apiCall(`/school/${schoolId}/events`, { method: 'GET' });
 };

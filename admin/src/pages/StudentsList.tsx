@@ -48,6 +48,25 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
         setStudents(prevStudents => [newStudent, ...prevStudents]);
         setIsModalOpen(false);
         addToast(`تم إضافة الطالب "${newStudent.name}" بنجاح.`, 'success');
+
+        try {
+          const parent = await api.upsertSchoolParent(schoolId, {
+            name: studentData.parentName,
+            email: studentData.parentEmail,
+            phone: studentData.parentPhone,
+            studentId: newStudent.id,
+          });
+          try {
+            await api.inviteParent(parent.id);
+            addToast(`تم ربط ولي الأمر "${parent.name}" ودعوته عبر البريد.`, 'info');
+          } catch (inviteErr) {
+            console.warn('Parent invite failed:', inviteErr);
+            addToast('تم ربط ولي الأمر، تعذر إرسال الدعوة الآن.', 'warning');
+          }
+        } catch (parentErr) {
+          console.warn('Parent upsert failed:', parentErr);
+          addToast('تم إضافة الطالب، تعذر ربط ولي الأمر تلقائياً.', 'warning');
+        }
     } catch (error) {
         console.error("Failed to add student:", error);
         addToast("فشل إضافة الطالب. الرجاء المحاولة مرة أخرى.", 'error');

@@ -12,6 +12,16 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
     grade: '',
     parentName: '',
     dateOfBirth: '',
+    gender: 'ذكر',
+    nationalId: '',
+    parentPhone: '',
+    parentEmail: '',
+    address: '',
+    city: '',
+    admissionDate: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    medicalNotes: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof NewStudentData, string>>>({});
@@ -24,7 +34,15 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
       [name]: (name === 'name' && !value.trim()) ? 'اسم الطالب مطلوب.' :
               (name === 'grade' && !value.trim()) ? 'الصف الدراسي مطلوب.' :
               (name === 'parentName' && !value.trim()) ? 'اسم ولي الأمر مطلوب.' :
-              (name === 'dateOfBirth' && !value) ? 'تاريخ الميلاد مطلوب.' : undefined
+              (name === 'dateOfBirth' && !value) ? 'تاريخ الميلاد مطلوب.' :
+              (name === 'nationalId' && !value.trim()) ? 'الرقم الوطني مطلوب.' :
+              (name === 'parentPhone' && !value.trim()) ? 'هاتف ولي الأمر مطلوب.' :
+              (name === 'parentEmail' && (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) ? 'بريد ولي الأمر غير صالح.' :
+              (name === 'address' && !value.trim()) ? 'العنوان مطلوب.' :
+              (name === 'city' && !value.trim()) ? 'المدينة مطلوبة.' :
+              (name === 'admissionDate' && !value) ? 'تاريخ القبول مطلوب.' :
+              (name === 'emergencyContactName' && !value.trim()) ? 'اسم جهة الطوارئ مطلوب.' :
+              (name === 'emergencyContactPhone' && !value.trim()) ? 'هاتف جهة الطوارئ مطلوب.' : undefined
     }));
   };
   
@@ -34,6 +52,14 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
     if (!studentData.grade.trim()) newErrors.grade = "الصف الدراسي مطلوب.";
     if (!studentData.parentName.trim()) newErrors.parentName = "اسم ولي الأمر مطلوب.";
     if (!studentData.dateOfBirth) newErrors.dateOfBirth = "تاريخ الميلاد مطلوب.";
+    if (!studentData.nationalId.trim()) newErrors.nationalId = "الرقم الوطني مطلوب.";
+    if (!studentData.parentPhone.trim()) newErrors.parentPhone = "هاتف ولي الأمر مطلوب.";
+    if (!studentData.parentEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentData.parentEmail)) newErrors.parentEmail = "بريد ولي الأمر غير صالح.";
+    if (!studentData.address.trim()) newErrors.address = "العنوان مطلوب.";
+    if (!studentData.city.trim()) newErrors.city = "المدينة مطلوبة.";
+    if (!studentData.admissionDate) newErrors.admissionDate = "تاريخ القبول مطلوب.";
+    if (!studentData.emergencyContactName.trim()) newErrors.emergencyContactName = "اسم جهة الطوارئ مطلوب.";
+    if (!studentData.emergencyContactPhone.trim()) newErrors.emergencyContactPhone = "هاتف جهة الطوارئ مطلوب.";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -59,7 +85,7 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">إضافة طالب جديد</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الاسم الكامل</label>
             <input type="text" name="name" id="name" value={studentData.name} onChange={handleChange} required className={inputStyle} />
@@ -77,10 +103,71 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
               {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
             </div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الجنس</label>
+              <select name="gender" id="gender" value={studentData.gender} onChange={handleChange} className={inputStyle}>
+                <option value="ذكر">ذكر</option>
+                <option value="أنثى">أنثى</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الرقم الوطني</label>
+              <input type="text" name="nationalId" id="nationalId" value={studentData.nationalId} onChange={handleChange} required className={inputStyle} />
+              {errors.nationalId && <p className="text-red-500 text-xs mt-1">{errors.nationalId}</p>}
+            </div>
+          </div>
           <div>
             <label htmlFor="parentName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم ولي الأمر</label>
             <input type="text" name="parentName" id="parentName" value={studentData.parentName} onChange={handleChange} required className={inputStyle} />
             {errors.parentName && <p className="text-red-500 text-xs mt-1">{errors.parentName}</p>}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="parentPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">هاتف ولي الأمر</label>
+              <input type="tel" name="parentPhone" id="parentPhone" value={studentData.parentPhone} onChange={handleChange} required className={inputStyle} />
+              {errors.parentPhone && <p className="text-red-500 text-xs mt-1">{errors.parentPhone}</p>}
+            </div>
+            <div>
+              <label htmlFor="parentEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">بريد ولي الأمر</label>
+              <input type="email" name="parentEmail" id="parentEmail" value={studentData.parentEmail} onChange={handleChange} required className={inputStyle} />
+              {errors.parentEmail && <p className="text-red-500 text-xs mt-1">{errors.parentEmail}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300">العنوان</label>
+              <input type="text" name="address" id="address" value={studentData.address} onChange={handleChange} required className={inputStyle} />
+              {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
+            </div>
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المدينة</label>
+              <input type="text" name="city" id="city" value={studentData.city} onChange={handleChange} required className={inputStyle} />
+              {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="admissionDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">تاريخ القبول</label>
+              <input type="date" name="admissionDate" id="admissionDate" value={studentData.admissionDate} onChange={handleChange} required className={inputStyle} />
+              {errors.admissionDate && <p className="text-red-500 text-xs mt-1">{errors.admissionDate}</p>}
+            </div>
+            <div>
+              <label htmlFor="medicalNotes" className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملاحظات طبية (اختياري)</label>
+              <input type="text" name="medicalNotes" id="medicalNotes" value={studentData.medicalNotes || ''} onChange={handleChange} className={inputStyle} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم جهة الطوارئ</label>
+              <input type="text" name="emergencyContactName" id="emergencyContactName" value={studentData.emergencyContactName} onChange={handleChange} required className={inputStyle} />
+              {errors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{errors.emergencyContactName}</p>}
+            </div>
+            <div>
+              <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">هاتف جهة الطوارئ</label>
+              <input type="tel" name="emergencyContactPhone" id="emergencyContactPhone" value={studentData.emergencyContactPhone} onChange={handleChange} required className={inputStyle} />
+              {errors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{errors.emergencyContactPhone}</p>}
+            </div>
           </div>
           <div className="flex justify-end gap-4 pt-4">
             <button

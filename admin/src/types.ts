@@ -354,6 +354,16 @@ export interface NewStudentData {
     grade: string;
     parentName: string;
     dateOfBirth: string;
+    gender: 'ذكر' | 'أنثى';
+    nationalId: string;
+    parentPhone: string;
+    parentEmail: string;
+    address: string;
+    city: string;
+    admissionDate: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    medicalNotes?: string;
 }
 
 export interface UpdatableStudentData {
@@ -506,6 +516,13 @@ export interface Parent {
     email: string;
     phone: string;
     status: ParentAccountStatus;
+    studentId: string;
+}
+
+export interface NewParentData {
+    name: string;
+    email: string;
+    phone: string;
     studentId: string;
 }
 
