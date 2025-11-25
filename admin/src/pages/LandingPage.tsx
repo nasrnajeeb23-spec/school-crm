@@ -96,7 +96,7 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center"><LogoIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" /><span className="ml-3 text-2xl font-bold">SchoolSaaS</span></div>
-            <nav className="hidden md:flex items-center space-x-8 rtl:space-x-reverse">
+            <nav className="flex items-center space-x-4 sm:space-x-8 rtl:space-x-reverse text-sm sm:text-base">
               <a href="#features" onClick={(e) => handleNavClick(e, 'features')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الميزات</a>
               <a href="#pricing" onClick={(e) => handleNavClick(e, 'pricing')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الأسعار</a>
               <a href="#contact" onClick={(e) => handleNavClick(e, 'contact')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">تواصل معنا</a>
@@ -116,7 +116,7 @@ const LandingPage: React.FC = () => {
       </header>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700">
+        <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700 z-50">
           <div className="container mx-auto px-4 py-3 flex flex-col gap-3">
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
