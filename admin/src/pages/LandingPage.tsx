@@ -121,6 +121,7 @@ const LandingPage: React.FC = () => {
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
             <a href="#contact" onClick={(e) => { handleNavClick(e, 'contact'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a>
+            <button onClick={() => { navigate('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
             <button onClick={() => { setIsTrialModalOpen(true); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">ابدأ تجربتك المجانية</button>
           </div>
         </div>
