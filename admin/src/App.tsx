@@ -87,8 +87,11 @@ const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }
         return <Navigate to="/login" replace />;
     }
 
-    if (currentUser.passwordMustChange && window.location.pathname !== '/profile') {
-        return <Navigate to="/profile" replace />;
+    if (currentUser.passwordMustChange) {
+        const profileRoute = `${getHomeRouteForUser(currentUser.role)}/profile`;
+        if (window.location.pathname !== profileRoute) {
+            return <Navigate to={profileRoute} replace />;
+        }
     }
 
     // Check if user has access to superadmin area (all superadmin roles)
