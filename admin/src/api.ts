@@ -451,6 +451,10 @@ export const addClass = async (schoolId: number, data: NewClassData): Promise<Cl
     return await apiCall(`/school/${schoolId}/classes`, { method: 'POST', body: JSON.stringify(data) });
 };
 
+export const initDefaultClasses = async (schoolId: number): Promise<{ createdCount: number }> => {
+    return await apiCall(`/school/${schoolId}/classes/init`, { method: 'POST' });
+};
+
 export const getSchoolParents = async (schoolId: number): Promise<Parent[]> => {
     return await apiCall(`/school/${schoolId}/parents`, { method: 'GET' });
 };

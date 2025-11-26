@@ -371,7 +371,7 @@ async function syncDatabase(){
   const opts = { force: false };
   
   // Sync models in correct order to avoid foreign key constraint issues
-  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings } = require('./models');
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class } = require('./models');
   
   // Sync independent tables first
   await School.sync(opts);
@@ -381,6 +381,7 @@ async function syncDatabase(){
   await Parent.sync(opts);
   await Student.sync(opts);
   await Teacher.sync(opts);
+  await Class.sync({ alter: true });
   
   // Then sync dependent tables
   await Subscription.sync(opts);

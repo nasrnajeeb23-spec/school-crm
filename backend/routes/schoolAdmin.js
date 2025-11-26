@@ -321,9 +321,10 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   { name: 'gradeLevel', required: true, type: 'string' },
   { name: 'homeroomTeacherId', required: true, type: 'string' },
   { name: 'subjects', required: true },
+  { name: 'capacity', required: false, type: 'number' },
 ]), async (req, res) => {
   try {
-    const { name, gradeLevel, homeroomTeacherId, subjects } = req.body;
+    const { name, gradeLevel, homeroomTeacherId, subjects, capacity } = req.body;
     if (!name || !gradeLevel || !homeroomTeacherId || !Array.isArray(subjects)) {
       return res.status(400).json({ msg: 'Missing required fields' });
     }
@@ -335,10 +336,37 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       gradeLevel,
       homeroomTeacherName: teacher.name,
       studentCount: 0,
+      capacity: typeof capacity === 'number' ? capacity : 30,
       schoolId: parseInt(req.params.schoolId, 10),
       homeroomTeacherId: homeroomTeacherId,
     });
     res.status(201).json({ ...newClass.toJSON(), subjects });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:schoolId/classes/init', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const settings = await SchoolSettings.findOne({ where: { schoolId } });
+    const stages = (settings && Array.isArray(settings.availableStages) && settings.availableStages.length > 0) ? settings.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
+    const map = {
+      "رياض أطفال": ["رياض أطفال"],
+      "ابتدائي": ["الصف الأول","الصف الثاني","الصف الثالث","الصف الرابع","الصف الخامس","الصف السادس"],
+      "إعدادي": ["أول إعدادي","ثاني إعدادي","ثالث إعدادي"],
+      "ثانوي": ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
+    };
+    const created = [];
+    for (const stage of stages) {
+      const grades = map[stage] || [];
+      for (const g of grades) {
+        const exists = await Class.findOne({ where: { schoolId, gradeLevel: g } });
+        if (!exists) {
+          const cls = await Class.create({ id: `cls_${Date.now()}_${Math.floor(Math.random()*1000)}`, name: 'الشعبة أ', gradeLevel: g, homeroomTeacherName: 'غير محدد', studentCount: 0, capacity: 30, schoolId, homeroomTeacherId: null });
+          created.push(cls.toJSON());
+        }
+      }
+    }
+    res.status(201).json({ createdCount: created.length, created });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -610,12 +638,14 @@ router.get('/:schoolId/settings', verifyToken, async (req, res) => {
         schoolAddress: school?.address || '',
         academicYearStart: start,
         academicYearEnd: end,
-        notifications: { email: true, sms: false, push: true }
+        notifications: { email: true, sms: false, push: true },
+        availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
       });
     }
     res.json({
         ...settings.toJSON(),
         notifications: typeof settings.notifications === 'string' ? JSON.parse(settings.notifications) : settings.notifications,
+        availableStages: Array.isArray(settings.availableStages) ? settings.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
     });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
@@ -627,7 +657,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   try {
     const { 
       schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
-      genderType, levelType, ownershipType, workingHoursStart, workingHoursEnd,
+      genderType, levelType, ownershipType, availableStages, workingHoursStart, workingHoursEnd,
       academicYearStart, academicYearEnd, notifications 
     } = req.body;
     const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
@@ -642,6 +672,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     settings.genderType = genderType;
     settings.levelType = levelType;
     settings.ownershipType = ownershipType;
+    settings.availableStages = Array.isArray(availableStages) ? availableStages : settings.availableStages;
     settings.workingHoursStart = workingHoursStart;
     settings.workingHoursEnd = workingHoursEnd;
     settings.academicYearStart = academicYearStart;

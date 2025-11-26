@@ -242,6 +242,7 @@ export interface SchoolSettings {
     genderType?: string; // بنين/بنات/مختلط
     levelType?: string; // أساسي/ثانوي
     ownershipType?: string; // أهلي/حكومي
+    availableStages?: string[];
     workingHoursStart?: string; // HH:MM
     workingHoursEnd?: string; // HH:MM
     academicYearStart: string; // YYYY-MM-DD
@@ -418,6 +419,7 @@ export interface Class {
   gradeLevel: string;
   homeroomTeacherName: string;
   studentCount: number;
+  capacity?: number;
   subjects: string[];
 }
 
@@ -425,6 +427,7 @@ export interface NewClassData {
   name: string;
   gradeLevel: string;
   homeroomTeacherId: string;
+  capacity?: number;
   subjects: string[];
 }
 

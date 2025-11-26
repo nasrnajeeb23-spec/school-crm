@@ -1,23 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
 import { NewClassData, Teacher } from '../types';
+import { useAppContext } from '../contexts/AppContext';
 
 interface AddClassModalProps {
   schoolId: number;
   onClose: () => void;
   onSave: (data: NewClassData) => Promise<void>;
+  defaultStage?: string;
+  defaultGrade?: string;
 }
 
-const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave }) => {
+const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave, defaultStage, defaultGrade }) => {
   const [formData, setFormData] = useState({
     name: '',
-    gradeLevel: '',
+    stage: defaultStage || '',
+    gradeLevel: defaultGrade || '',
+    capacity: 30,
     homeroomTeacherId: '',
     subjects: ''
   });
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const { schoolSettings } = useAppContext();
+
+  const stageGradeMap: Record<string, string[]> = {
+    'رياض أطفال': ['رياض أطفال'],
+    'ابتدائي': ['الصف الأول','الصف الثاني','الصف الثالث','الصف الرابع','الصف الخامس','الصف السادس'],
+    'إعدادي': ['أول إعدادي','ثاني إعدادي','ثالث إعدادي'],
+    'ثانوي': ['أول ثانوي','ثاني ثانوي','ثالث ثانوي'],
+  };
+  const availableStages = useMemo(() => (schoolSettings?.availableStages && schoolSettings.availableStages.length > 0) ? schoolSettings.availableStages : Object.keys(stageGradeMap), [schoolSettings]);
+  const availableGrades = useMemo(() => formData.stage ? (stageGradeMap[formData.stage] || []) : [], [formData.stage]);
+
+  useEffect(() => {
+    if (defaultStage) setFormData(prev => ({ ...prev, stage: defaultStage }));
+    if (defaultGrade) setFormData(prev => ({ ...prev, gradeLevel: defaultGrade }));
+  }, [defaultStage, defaultGrade]);
 
   useEffect(() => {
     api.getSchoolTeachers(schoolId).then(data => {
@@ -42,6 +62,7 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
       name: formData.name,
       gradeLevel: formData.gradeLevel,
       homeroomTeacherId: formData.homeroomTeacherId,
+      capacity: formData.capacity,
       subjects: subjectsArray
     });
     // The parent component will close the modal on success, so we don't necessarily need to set isSaving to false.
@@ -60,8 +81,22 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="gradeLevel" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المستوى الدراسي</label>
-              <input type="text" name="gradeLevel" id="gradeLevel" value={formData.gradeLevel} onChange={handleChange} required className={inputStyle} />
+              <label htmlFor="stage" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المرحلة الدراسية</label>
+              <select name="stage" id="stage" value={formData.stage} onChange={(e) => setFormData(prev => ({ ...prev, stage: e.target.value, gradeLevel: '' }))} required className={inputStyle}>
+                <option value="" disabled>اختر المرحلة...</option>
+                {availableStages.map(s => (<option key={s} value={s}>{s}</option>))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="gradeLevel" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الصف الدراسي</label>
+              <select name="gradeLevel" id="gradeLevel" value={formData.gradeLevel} onChange={handleChange} required className={inputStyle} disabled={!formData.stage}>
+                <option value="" disabled>اختر الصف...</option>
+                {availableGrades.map(g => (<option key={g} value={g}>{g}</option>))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="capacity" className="block text-sm font-medium text-gray-700 dark:text-gray-300">سعة الفصل</label>
+              <input type="number" min={10} max={200} name="capacity" id="capacity" value={formData.capacity} onChange={handleChange} required className={inputStyle} />
             </div>
             <div>
               <label htmlFor="homeroomTeacherId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المعلم المسؤول</label>

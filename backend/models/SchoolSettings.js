@@ -43,6 +43,10 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  availableStages: {
+    type: DataTypes.JSON, // ["رياض أطفال","ابتدائي","إعدادي","ثانوي"]
+    allowNull: true,
+  },
   workingHoursStart: {
     type: DataTypes.STRING,
     allowNull: true,

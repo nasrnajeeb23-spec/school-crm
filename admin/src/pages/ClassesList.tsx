@@ -1,12 +1,13 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Class, ClassRosterUpdate, NewClassData } from '../types';
 import * as api from '../api';
 import { UsersIcon, StudentsIcon, ClassesIcon as BookIcon, PlusIcon, ClassesIcon } from '../components/icons';
 import EditClassRosterModal from '../components/EditClassRosterModal';
 import AddClassModal from '../components/AddClassModal';
 import { useToast } from '../contexts/ToastContext';
+import { useAppContext } from '../contexts/AppContext';
 import EmptyState from '../components/EmptyState';
 import SkeletonLoader from '../components/SkeletonLoader';
 
@@ -20,6 +21,18 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { addToast } = useToast();
+  const { schoolSettings } = useAppContext();
+  const [addDefaults, setAddDefaults] = useState<{ stage?: string; grade?: string } | null>(null);
+  const [stageFilter, setStageFilter] = useState<string>('');
+  const [gradeFilterUI, setGradeFilterUI] = useState<string>('');
+  const stageGradeMap: Record<string, string[]> = {
+    'رياض أطفال': ['رياض أطفال'],
+    'ابتدائي': ['الصف الأول','الصف الثاني','الصف الثالث','الصف الرابع','الصف الخامس','الصف السادس'],
+    'إعدادي': ['أول إعدادي','ثاني إعدادي','ثالث إعدادي'],
+    'ثانوي': ['أول ثانوي','ثاني ثانوي','ثالث ثانوي'],
+  };
+  const availableStages = useMemo(() => (schoolSettings?.availableStages && schoolSettings.availableStages.length > 0) ? schoolSettings.availableStages : Object.keys(stageGradeMap), [schoolSettings]);
+  const gradesForStage = useMemo(() => stageFilter ? (stageGradeMap[stageFilter] || []) : [], [stageFilter]);
 
   useEffect(() => {
     fetchClasses();
@@ -35,6 +48,17 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
     }).finally(() => {
         setLoading(false);
     });
+  };
+
+  const handleInitStructure = async () => {
+    try {
+      const result = await api.initDefaultClasses(schoolId);
+      addToast(`تم إنشاء الهيكل الافتراضي (${result.createdCount}).`, 'success');
+      fetchClasses();
+    } catch (err) {
+      console.error('Failed to init structure:', err);
+      addToast('فشل إنشاء الهيكل الافتراضي.', 'error');
+    }
   };
 
   const handleUpdateRoster = async (update: ClassRosterUpdate) => {
@@ -61,6 +85,25 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
     }
   };
 
+  const inferStageFromGrade = (grade: string): string => {
+    if (grade === 'رياض أطفال') return 'رياض أطفال';
+    if (['الصف الأول','الصف الثاني','الصف الثالث','الصف الرابع','الصف الخامس','الصف السادس'].includes(grade)) return 'ابتدائي';
+    if (['أول إعدادي','ثاني إعدادي','ثالث إعدادي'].includes(grade)) return 'إعدادي';
+    if (['أول ثانوي','ثاني ثانوي','ثالث ثانوي'].includes(grade)) return 'ثانوي';
+    return '';
+  };
+
+  const openAddSectionForGrade = (grade: string) => {
+    setAddDefaults({ stage: inferStageFromGrade(grade), grade });
+    setIsAddModalOpen(true);
+  };
+
+  const classesFiltered = useMemo(() => {
+    return classes
+      .filter(c => !stageFilter || inferStageFromGrade(c.gradeLevel) === stageFilter)
+      .filter(c => !gradeFilterUI || c.gradeLevel === gradeFilterUI);
+  }, [classes, stageFilter, gradeFilterUI]);
+
   const ClassSkeleton = () => (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-4 animate-pulse">
         <SkeletonLoader className="h-6 w-3/4" />
@@ -79,7 +122,13 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
   return (
     <>
       <div className="mt-6 space-y-6">
-        <div className="flex justify-end">
+        <div className="flex justify-between">
+          <button 
+            onClick={handleInitStructure}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            إنشاء الهيكل الافتراضي
+          </button>
           <button 
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
@@ -105,8 +154,21 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                 />
             </div>
         ) : (
+          <>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <div className="flex flex-wrap gap-4 items-center">
+              <select value={stageFilter} onChange={e => { setStageFilter(e.target.value); setGradeFilterUI(''); }} className="w-full md:w-48 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                <option value="">اختر المرحلة...</option>
+                {availableStages.map(s => (<option key={s} value={s}>{s}</option>))}
+              </select>
+              <select value={gradeFilterUI} onChange={e => setGradeFilterUI(e.target.value)} className="w-full md:w-48 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500" disabled={!stageFilter}>
+                <option value="">اختر الصف...</option>
+                {gradesForStage.map(g => (<option key={g} value={g}>{g}</option>))}
+              </select>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {classes.map((cls) => (
+            {classesFiltered.map((cls) => (
               <div key={cls.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex flex-col border border-gray-200 dark:border-gray-700 transform hover:-translate-y-1 transition-transform duration-300">
                 <div className="flex-grow">
                   <h3 className="text-xl font-bold text-teal-600 dark:text-teal-400">{cls.name}</h3>
@@ -123,8 +185,15 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                       <strong>عدد الطلاب:</strong>
                       <span className="mr-2">{cls.studentCount}</span>
                     </div>
+                    {typeof cls.capacity === 'number' && (
+                      <div className="flex items-center text-gray-700 dark:text-gray-300">
+                        <span className="h-5 w-5 ml-2 text-gray-400">📦</span>
+                        <strong>السعة:</strong>
+                        <span className="mr-2">{cls.capacity}</span>
+                      </div>
+                    )}
                   </div>
-
+                  
                   <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                     <h4 className="font-semibold flex items-center text-gray-700 dark:text-gray-300 mb-2">
                         <BookIcon className="h-5 w-5 ml-2 text-gray-400" />
@@ -144,13 +213,14 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                   <button onClick={() => setEditingClass(cls)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline text-sm">
                     إدارة الطلاب
                   </button>
-                  <button className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline text-sm">
-                    تعديل
+                  <button className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline text-sm" onClick={() => openAddSectionForGrade(cls.gradeLevel)}>
+                    إضافة شعبة لهذا الصف
                   </button>
                 </div>
               </div>
             ))}
           </div>
+          </>
         )}
       </div>
       {editingClass && (
@@ -166,6 +236,8 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
             schoolId={schoolId}
             onClose={() => setIsAddModalOpen(false)}
             onSave={handleAddClass}
+            defaultStage={addDefaults?.stage}
+            defaultGrade={addDefaults?.grade}
         />
       )}
     </>

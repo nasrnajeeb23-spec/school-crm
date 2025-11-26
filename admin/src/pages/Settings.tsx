@@ -47,6 +47,18 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     }
   };
 
+  const allStages = ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
+  const stages = settings?.availableStages && settings.availableStages.length > 0 ? settings.availableStages : allStages;
+  const handleStageToggle = (stage: string) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const current = prev.availableStages && prev.availableStages.length > 0 ? prev.availableStages : [];
+      const exists = current.includes(stage);
+      const next = exists ? current.filter(s => s !== stage) : [...current, stage];
+      return { ...prev, availableStages: next };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settings) return;
@@ -119,6 +131,17 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                         <option value="أساسي">أساسي</option>
                         <option value="ثانوي">ثانوي</option>
                     </select>
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">المراحل الدراسية المتاحة</label>
+                    <div className="mt-2 flex flex-wrap gap-4">
+                        {allStages.map(stage => (
+                          <label key={stage} className="flex items-center space-x-2 rtl:space-x-reverse">
+                            <input type="checkbox" checked={stages.includes(stage)} onChange={() => handleStageToggle(stage)} className="form-checkbox h-5 w-5 text-teal-600" />
+                            <span className="text-gray-700 dark:text-gray-300">{stage}</span>
+                          </label>
+                        ))}
+                    </div>
                 </div>
                 <div>
                     <label htmlFor="ownershipType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نوع الملكية</label>
