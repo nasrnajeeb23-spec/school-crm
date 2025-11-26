@@ -82,15 +82,30 @@ router.post('/', (req, res) => {
 router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
     const schoolId = Number(req.params.id);
-    const allowed = req.app?.locals?.allowedModules || [];
+    const allowedGlobal = req.app?.locals?.allowedModules || [];
+    const catalog = req.app?.locals?.modulesCatalog || [];
+    const catalogIds = catalog.map(m => m.id);
     const settings = await SchoolSettings.findOne({ where: { schoolId } });
-    const active = Array.isArray(settings?.activeModules) && settings.activeModules.length > 0 ? settings.activeModules : allowed;
-    const list = active.map(m => ({ schoolId, moduleId: m }));
+    const sub = await Subscription.findOne({ where: { schoolId } });
+    const now = new Date();
+    let active = Array.isArray(settings?.activeModules) && settings.activeModules.length > 0 ? settings.activeModules : allowedGlobal;
+    if (sub && String(sub.status).toUpperCase() === 'TRIAL') {
+      const expiry = sub.endDate || sub.renewalDate;
+      if (!expiry || now <= new Date(expiry)) {
+        active = catalogIds; // كل الوحدات خلال التجربة
+      } else {
+        active = []; // انتهت التجربة: لا وحدات فعّالة
+      }
+    } else {
+      // فلترة حسب الترخيص العالمي
+      active = (active || []).filter(m => allowedGlobal.includes(m));
+    }
+    const list = (active || []).map(m => ({ schoolId, moduleId: m }));
     res.json(list);
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.put('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
+router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
     const schoolId = Number(req.params.id);
     const moduleIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds : [];

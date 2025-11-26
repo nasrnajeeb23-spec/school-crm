@@ -514,6 +514,26 @@ syncDatabase()
     } catch (e) {
       console.warn('Seeding skipped or failed:', e?.message || e);
     }
+    try {
+      const { SchoolSettings, Subscription } = require('./models');
+      const settingsRows = await SchoolSettings.findAll();
+      let updatedCount = 0;
+      for (const s of settingsRows) {
+        const sub = await Subscription.findOne({ where: { schoolId: s.schoolId } });
+        if (!sub || String(sub.status).toUpperCase() !== 'TRIAL') continue;
+        const now = new Date();
+        const expiry = sub.endDate || sub.renewalDate;
+        if (expiry && now > new Date(expiry)) continue; // لا تعديل بعد انتهاء التجربة
+        const active = Array.isArray(s.activeModules) ? s.activeModules : [];
+        const nextSet = new Set([ ...active, ...((req.app?.locals?.modulesCatalog || []).map(m => m.id)) ]);
+        const next = Array.from(nextSet);
+        const changed = JSON.stringify(active) !== JSON.stringify(next);
+        if (changed) { s.activeModules = next; await s.save(); updatedCount++; }
+      }
+      console.log('Trial module sync complete. Updated schools:', updatedCount);
+    } catch (e) {
+      console.warn('Trial module sync failed:', e?.message || e);
+    }
     io.on('connection', (socket) => {
       try {
         const token = socket.handshake?.auth?.token;

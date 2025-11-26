@@ -4,6 +4,7 @@ import { School, Module, ModuleId, PaymentProofSubmission, PaymentMethod } from 
 import { useToast } from '../contexts/ToastContext';
 import { CheckIcon } from '../components/icons';
 import PaymentProofModal from '../components/PaymentProofModal';
+import { useAppContext } from '../contexts/AppContext';
 
 interface ModulesPageProps {
     school: School;
@@ -15,6 +16,8 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const [loading, setLoading] = useState(true);
     const [moduleToActivate, setModuleToActivate] = useState<Module | null>(null);
     const { addToast } = useToast();
+    const { currentUser } = useAppContext();
+    const canManageModules = String(currentUser?.role || '') === 'SuperAdmin';
 
     const fetchData = () => {
         setLoading(true);
@@ -49,6 +52,10 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     };
 
     const handleToggleModule = async (module: Module, enable: boolean) => {
+        if (!canManageModules) {
+            addToast('هذه العملية تتطلب موافقة المدير العام للمنصة.', 'error');
+            return;
+        }
         try {
             const next = new Set(activeModuleIds);
             if (enable) next.add(module.id); else next.delete(module.id);
@@ -147,19 +154,32 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                 </div>
                                 <div className="mt-4 text-center">
                                     {activeModuleIds.has(module.id) ? (
-                                        <button
-                                            onClick={() => handleToggleModule(module, false)}
-                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                        >
-                                            تعطيل
-                                        </button>
+                                        canManageModules ? (
+                                            <button
+                                                onClick={() => handleToggleModule(module, false)}
+                                                className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                            >
+                                                تعطيل
+                                            </button>
+                                        ) : (
+                                            <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center justify-center">
+                                                <CheckIcon className="w-5 h-5 ml-2" />
+                                                مفعلة
+                                            </div>
+                                        )
                                     ) : (
-                                        <button
-                                            onClick={() => handleToggleModule(module, true)}
-                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-                                        >
-                                            تفعيل
-                                        </button>
+                                        canManageModules ? (
+                                            <button
+                                                onClick={() => handleToggleModule(module, true)}
+                                                className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                                            >
+                                                تفعيل
+                                            </button>
+                                        ) : (
+                                            <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                                                يتطلب موافقة المدير العام
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             </div>

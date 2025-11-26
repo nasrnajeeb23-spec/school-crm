@@ -115,7 +115,15 @@ router.post('/trial-signup', validate([
     if (exists) return res.status(400).json({ msg: 'Email already in use' });
 
     const school = await School.create({ name: schoolName, contactEmail: adminEmail });
-    await SchoolSettings.create({ schoolId: school.id, schoolName, schoolAddress: '', academicYearStart: new Date().toISOString().split('T')[0], academicYearEnd: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notifications: JSON.stringify({ email: true, sms: false, push: true }) });
+    await SchoolSettings.create({
+      schoolId: school.id,
+      schoolName,
+      schoolAddress: '',
+      academicYearStart: new Date().toISOString().split('T')[0],
+      academicYearEnd: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      notifications: JSON.stringify({ email: true, sms: false, push: true }),
+      activeModules: ['student_management','academic_management','parent_portal','teacher_portal','teacher_app','finance','transportation']
+    });
 
     let plan = await Plan.findOne({ where: { recommended: true } });
     if (!plan) plan = await Plan.findOne();
