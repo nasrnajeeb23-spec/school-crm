@@ -731,6 +731,30 @@ router.post('/:schoolId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+router.get('/:schoolId/grades/all', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const rows = await Grade.findAll({
+      include: [
+        { model: Class, attributes: ['id'], where: { schoolId } },
+        { model: Student, attributes: ['name'] }
+      ],
+      order: [["subject","ASC"],["studentId","ASC"]]
+    });
+    const result = rows.map(r => {
+      const j = r.toJSON();
+      return {
+        classId: String(j.classId),
+        subject: j.subject,
+        studentId: j.studentId,
+        studentName: j.Student ? j.Student.name : '',
+        grades: { homework: j.homework, quiz: j.quiz, midterm: j.midterm, final: j.final }
+      };
+    });
+    res.json(result);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
 router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
   try {
     const cls = await Class.findByPk(req.params.classId);
