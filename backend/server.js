@@ -228,6 +228,72 @@ app.get('/api/content/landing', (req, res) => {
   });
 });
 
+// Modules catalog and pricing config (in-memory)
+const modulesCatalog = [
+  { id: 'student_management', name: 'إدارة الطلاب', description: 'ملفات الطلاب والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
+  { id: 'academic_management', name: 'الإدارة الأكاديمية', description: 'الجدول والمواد الدراسية وتنظيم الفصول.', monthlyPrice: 0, isEnabled: true, isCore: true },
+  { id: 'parent_portal', name: 'بوابة ولي الأمر', description: 'وصول أولياء الأمور لمتابعة الحضور والدرجات والرسائل.', monthlyPrice: 0, isEnabled: true, isCore: true },
+  { id: 'teacher_portal', name: 'بوابة المعلم', description: 'واجهة ويب للمعلم لإدارة الجدول والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
+  { id: 'teacher_app', name: 'تطبيق المعلم', description: 'تطبيق الجوال للمعلم مع إشعارات فورية.', monthlyPrice: 0, isEnabled: true, isCore: true },
+  { id: 'finance', name: 'المالية', description: 'فواتير ورسوم وتقارير مالية متقدمة.', monthlyPrice: 49, oneTimePrice: 0, isEnabled: true, isCore: false },
+  { id: 'transportation', name: 'النقل المدرسي', description: 'إدارة الحافلات والمسارات والطلاب المنقولين.', monthlyPrice: 29, oneTimePrice: 0, isEnabled: true, isCore: false },
+  { id: 'advanced_reports', name: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات مخصصة.', monthlyPrice: 39, oneTimePrice: 0, isEnabled: true, isCore: false },
+];
+app.locals.modulesCatalog = modulesCatalog;
+app.locals.pricingConfig = { pricePerStudent: 1.5 };
+
+// List available modules
+app.get('/api/modules', (req, res) => {
+  try {
+    const list = (req.app?.locals?.modulesCatalog || modulesCatalog).map(m => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      monthlyPrice: m.monthlyPrice,
+      oneTimePrice: m.oneTimePrice || 0,
+      isEnabled: m.isEnabled !== false,
+      isCore: !!m.isCore,
+    }));
+    res.json(list);
+  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Update a module (SuperAdmin only)
+app.put('/api/modules/:id', verifyToken, requireRole('SUPER_ADMIN'), (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    const catalog = req.app?.locals?.modulesCatalog || modulesCatalog;
+    const idx = catalog.findIndex(m => String(m.id) === id);
+    if (idx === -1) return res.status(404).json({ msg: 'Module not found' });
+    const m = catalog[idx];
+    const { name, description, monthlyPrice, oneTimePrice, isEnabled } = req.body || {};
+    if (name !== undefined) m.name = name;
+    if (description !== undefined) m.description = description;
+    if (monthlyPrice !== undefined) m.monthlyPrice = Number(monthlyPrice) || 0;
+    if (oneTimePrice !== undefined) m.oneTimePrice = Number(oneTimePrice) || 0;
+    if (isEnabled !== undefined) m.isEnabled = !!isEnabled;
+    catalog[idx] = m;
+    req.app.locals.modulesCatalog = catalog;
+    res.json(m);
+  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Pricing config endpoints (SuperAdmin manages, public read)
+app.get('/api/pricing/config', (req, res) => {
+  try {
+    const cfg = req.app?.locals?.pricingConfig || { pricePerStudent: 1.5 };
+    res.json(cfg);
+  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+});
+app.put('/api/pricing/config', verifyToken, requireRole('SUPER_ADMIN'), (req, res) => {
+  try {
+    const cfg = req.app?.locals?.pricingConfig || { pricePerStudent: 1.5 };
+    const next = { ...cfg, pricePerStudent: Number(req.body?.pricePerStudent) || cfg.pricePerStudent };
+    req.app.locals.pricingConfig = next;
+    res.json(next);
+  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 
