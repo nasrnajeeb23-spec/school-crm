@@ -46,7 +46,7 @@ services:
         destination: /index.html
     envVars:
       - key: REACT_APP_API_URL
-        value: https://school-crm-backend.onrender.com/api
+        value: https://school-crschool-crm-backendm.onrender.com/api
       - key: REACT_APP_ENVIRONMENT
         value: production
       - key: NODE_ENV
