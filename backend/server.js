@@ -375,7 +375,7 @@ async function syncDatabase(){
   
   // Sync independent tables first
   await School.sync(opts);
-  await SchoolSettings.sync(opts);
+  await SchoolSettings.sync({ alter: true });
   await Plan.sync(opts);
   await BusOperator.sync(opts);
   await Parent.sync(opts);

@@ -610,7 +610,7 @@ router.get('/:schoolId/settings', verifyToken, async (req, res) => {
         schoolAddress: school?.address || '',
         academicYearStart: start,
         academicYearEnd: end,
-        notifications: JSON.stringify({ email: true, sms: false, push: true })
+        notifications: { email: true, sms: false, push: true }
       });
     }
     res.json({
