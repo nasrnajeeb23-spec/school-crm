@@ -585,8 +585,23 @@ router.get('/:schoolId/student/:studentId/details', verifyToken, requireRole('SC
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
-    if (!settings) return res.status(404).json({ msg: 'Settings not found' });
+    const schoolId = Number(req.params.schoolId);
+    let settings = await SchoolSettings.findOne({ where: { schoolId } });
+    if (!settings) {
+      const { School } = require('../models');
+      const school = await School.findByPk(schoolId);
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 8, 1).toISOString().split('T')[0];
+      const end = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
+      settings = await SchoolSettings.create({
+        schoolId,
+        schoolName: school?.name || 'مدرستي',
+        schoolAddress: school?.address || '',
+        academicYearStart: start,
+        academicYearEnd: end,
+        notifications: JSON.stringify({ email: true, sms: false, push: true })
+      });
+    }
     res.json({
         ...settings.toJSON(),
         notifications: typeof settings.notifications === 'string' ? JSON.parse(settings.notifications) : settings.notifications,

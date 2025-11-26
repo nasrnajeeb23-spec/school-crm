@@ -62,7 +62,8 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   const notificationRef = useRef<HTMLDivElement>(null);
   const [activeModules, setActiveModules] = useState<ModuleId[]>([]);
   
-  const effectiveSchoolId = isSuperAdminView ? parseInt(urlSchoolId || '0') : currentUser?.schoolId;
+  const storedId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('current_school_id') || '0') : 0;
+  const effectiveSchoolId = isSuperAdminView ? parseInt(urlSchoolId || '0') : (currentUser?.schoolId || storedId);
   const userRolePermissions = Object.values(Permission);
 
   const hasPermission = (permission: Permission) => {
@@ -75,25 +76,37 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   
   useEffect(() => {
     if (effectiveSchoolId) {
-        console.log('Loading school data for school ID:', effectiveSchoolId);
         setLoading(true);
-        Promise.all([
+        Promise.allSettled([
             api.getSchoolById(effectiveSchoolId),
             api.getActionItems(),
             api.getSchoolModules(effectiveSchoolId),
             api.getSchoolSettings(effectiveSchoolId)
-        ]).then(([schoolData, actionItemsData, schoolModulesData, settingsData]) => {
-            console.log('School data loaded:', schoolData);
-            setSchool(schoolData);
-            setActionItems(actionItemsData);
-            setActiveModules(schoolModulesData.map(sm => sm.moduleId));
-            setSettings(settingsData);
+        ]).then(results => {
+            const [schoolRes, actionsRes, modulesRes, settingsRes] = results;
+            if (schoolRes.status === 'fulfilled') {
+              setSchool(schoolRes.value);
+            }
+            if (actionsRes.status === 'fulfilled') {
+              setActionItems(actionsRes.value);
+            }
+            if (modulesRes.status === 'fulfilled') {
+              try { setActiveModules(modulesRes.value.map((sm: any) => sm.moduleId)); } catch { setActiveModules([]); }
+            } else { setActiveModules([]); }
+            if (settingsRes.status === 'fulfilled') {
+              setSettings(settingsRes.value);
+            } else if (schoolRes.status === 'fulfilled') {
+              setSettings({
+                 schoolName: schoolRes.value.name,
+                 schoolAddress: schoolRes.value.address || '',
+                 academicYearStart: '',
+                 academicYearEnd: '',
+                 notifications: { email: true, sms: false, push: true },
+              } as any);
+            }
         }).catch(err => {
-            console.error("Failed to fetch school data", err);
-            console.error('School ID that failed:', effectiveSchoolId);
+            console.error('School data load error:', err);
         }).finally(() => setLoading(false));
-    } else {
-        console.log('No effective school ID available. Current user:', currentUser);
     }
   }, [effectiveSchoolId]);
 
