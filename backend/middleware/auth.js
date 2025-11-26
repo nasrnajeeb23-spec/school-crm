@@ -68,8 +68,8 @@ function requireSameSchoolParam(paramName = 'schoolId') {
     const headerSchoolId = parseInt(req.headers['x-school-id'] || '0', 10);
     const userSchoolId = Number(req.user.schoolId || 0);
     const matchesParam = !!requestedSchoolId && userSchoolId === requestedSchoolId;
-    const matchesHeader = !!headerSchoolId && userSchoolId === headerSchoolId && headerSchoolId === requestedSchoolId;
-    if (!matchesParam && !matchesHeader) {
+    const headerMatchesParam = !!headerSchoolId && headerSchoolId === requestedSchoolId;
+    if (!matchesParam && !headerMatchesParam) {
       return res.status(403).json({ msg: 'Access denied for this school' });
     }
     next();
