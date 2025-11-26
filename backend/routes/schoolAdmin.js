@@ -230,7 +230,7 @@ router.put('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_AD
 router.get('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const users = await User.findAll({ where: { schoolId: req.params.schoolId, role: 'SchoolAdmin' }, order: [['createdAt', 'DESC']] });
-    res.json(users.map(u => ({ id: u.id, name: u.name, email: u.email, username: u.username, role: u.role, schoolId: u.schoolId, schoolRole: u.schoolRole })));
+    res.json(users.map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, username: u.username, role: u.role, schoolId: u.schoolId, schoolRole: u.schoolRole })));
   } catch (err) { res.status(500).send('Server Error'); }
 });
 
@@ -238,9 +238,10 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
   { name: 'name', required: true, type: 'string', minLength: 2 },
   { name: 'email', required: true, type: 'string' },
   { name: 'role', required: true, type: 'string' },
+  { name: 'phone', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
-    const { name, email, role } = req.body;
+    const { name, email, role, phone } = req.body;
     const exists = await User.findOne({ where: { [Op.or]: [{ email }, { username: email.split('@')[0] }] } });
     if (exists) return res.status(400).json({ message: 'Email or username already exists' });
     function genPwd(){
@@ -252,12 +253,14 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
     const plain = genPwd();
     const pwd = await bcrypt.hash(plain, 10);
     const permissionsMap = {
-      'مسؤول تسجيل': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_PARENTS'],
-      'مسؤول مالي': ['VIEW_DASHBOARD', 'MANAGE_FINANCE'],
-      'منسق أكاديمي': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES'],
-      'مدير': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION']
+      'مسؤول تسجيل': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_PARENTS', 'MANAGE_ATTENDANCE'],
+      'مسؤول مالي': ['VIEW_DASHBOARD', 'MANAGE_FINANCE', 'MANAGE_REPORTS'],
+      'منسق أكاديمي': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
+      'سكرتير': ['VIEW_DASHBOARD', 'MANAGE_SCHEDULE', 'MANAGE_CALENDAR', 'MANAGE_MESSAGING'],
+      'مشرف': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
+      'مدير': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES', 'MANAGE_STAFF']
     };
-    const user = await User.create({ name, email, username: email.split('@')[0], password: pwd, role: 'SchoolAdmin', schoolId: parseInt(req.params.schoolId, 10), schoolRole: role, permissions: permissionsMap[role] || ['VIEW_DASHBOARD'], passwordMustChange: true, tokenVersion: 0 });
+    const user = await User.create({ name, email, phone, username: email.split('@')[0], password: pwd, role: 'SchoolAdmin', schoolId: parseInt(req.params.schoolId, 10), schoolRole: role, permissions: permissionsMap[role] || ['VIEW_DASHBOARD'], passwordMustChange: true, tokenVersion: 0 });
     const { password: _, ...data } = user.toJSON();
     res.status(201).json({ id: data.id, name: data.name, email: data.email, username: data.username, role: data.role, schoolId: data.schoolId, schoolRole: data.schoolRole, tempPassword: plain });
   } catch (err) { console.error(err); res.status(500).json({ msg: String(err?.message || err) }); }
@@ -267,7 +270,7 @@ router.put('/:schoolId/staff/:userId', verifyToken, requireRole('SCHOOL_ADMIN', 
   try {
     const staff = await User.findOne({ where: { id: req.params.userId, schoolId: req.params.schoolId, role: 'SchoolAdmin' } });
     if (!staff) return res.status(404).json({ message: 'Staff not found' });
-    const { name, email, role } = req.body || {};
+    const { name, email, role, phone } = req.body || {};
     if (email && email !== staff.email) {
       const dupe = await User.findOne({ where: { email, id: { [Op.ne]: staff.id } } });
       if (dupe) return res.status(400).json({ message: 'Email already in use' });
@@ -277,13 +280,16 @@ router.put('/:schoolId/staff/:userId', verifyToken, requireRole('SCHOOL_ADMIN', 
       staff.username = dupeUser ? `${uname}_${Date.now()}` : uname;
     }
     if (name) staff.name = name;
+    if (phone) staff.phone = phone;
     if (role) {
       staff.schoolRole = role;
       const permissionsMap = {
         'مسؤول تسجيل': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_PARENTS', 'MANAGE_ATTENDANCE'],
         'مسؤول مالي': ['VIEW_DASHBOARD', 'MANAGE_FINANCE', 'MANAGE_REPORTS'],
         'منسق أكاديمي': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
-        'مدير': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES']
+        'سكرتير': ['VIEW_DASHBOARD', 'MANAGE_SCHEDULE', 'MANAGE_CALENDAR', 'MANAGE_MESSAGING'],
+        'مشرف': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
+        'مدير': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES', 'MANAGE_STAFF']
       };
       staff.permissions = permissionsMap[role] || ['VIEW_DASHBOARD'];
     }
@@ -296,6 +302,7 @@ router.delete('/:schoolId/staff/:userId', verifyToken, requireRole('SCHOOL_ADMIN
   try {
     const staff = await User.findOne({ where: { id: req.params.userId, schoolId: req.params.schoolId, role: 'SchoolAdmin' } });
     if (!staff) return res.status(404).json({ message: 'Staff not found' });
+    if (String(staff.schoolRole || '') === 'مدير') return res.status(400).json({ message: 'Cannot delete Admin role staff' });
     if (req.user.id === staff.id) return res.status(400).json({ message: 'Cannot delete current user' });
     await staff.destroy();
     return res.json({ message: 'Deleted' });

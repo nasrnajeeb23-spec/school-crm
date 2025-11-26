@@ -13,6 +13,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ onClose, onSave, initialD
     name: initialData?.name || '',
     email: initialData?.email || '',
     role: (initialData?.role as SchoolRole) || SchoolRole.Registrar,
+    phone: (initialData as any)?.phone || '',
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -42,6 +43,10 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ onClose, onSave, initialD
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</label>
             <input type="email" name="email" id="email" value={formData.email} onChange={handleChange} required className={inputStyle} />
+          </div>
+          <div>
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الهاتف</label>
+            <input type="tel" name="phone" id="phone" value={formData.phone || ''} onChange={handleChange} className={inputStyle} />
           </div>
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الدور</label>

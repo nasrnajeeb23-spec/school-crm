@@ -55,6 +55,8 @@ export enum SchoolRole {
     Registrar = 'مسؤول تسجيل',
     Accountant = 'مسؤول مالي',
     AcademicCoordinator = 'منسق أكاديمي',
+    Secretary = 'سكرتير',
+    Supervisor = 'مشرف',
 }
 
 export enum Permission {
@@ -292,6 +294,7 @@ export interface NewStaffData {
     name: string;
     email: string;
     role: SchoolRole;
+    phone?: string;
 }
 
 

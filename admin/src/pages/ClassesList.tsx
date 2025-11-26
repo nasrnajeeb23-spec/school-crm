@@ -118,6 +118,17 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
     </div>
   );
 
+  const gradeSummaries = useMemo(() => {
+    const acc: Record<string, { count: number; capacity: number }> = {};
+    for (const c of classes) {
+      const grade = c.gradeLevel;
+      if (stageFilter && inferStageFromGrade(grade) !== stageFilter) continue;
+      if (!acc[grade]) acc[grade] = { count: 0, capacity: 0 };
+      acc[grade].count += 1;
+      acc[grade].capacity += typeof c.capacity === 'number' ? c.capacity : 0;
+    }
+    return Object.entries(acc).map(([grade, v]) => ({ grade, ...v }));
+  }, [classes, stageFilter]);
 
   return (
     <>
@@ -155,6 +166,27 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
             </div>
         ) : (
           <>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 overflow-x-auto">
+            <div className="flex gap-4 min-w-max">
+              {gradeSummaries.map(item => (
+                <div key={item.grade} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center gap-4">
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">الصف</div>
+                    <div className="text-base font-semibold text-gray-800 dark:text-white">{item.grade}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">عدد الشعب</div>
+                    <div className="text-base font-semibold text-gray-800 dark:text-white">{item.count}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">السعة الإجمالية</div>
+                    <div className="text-base font-semibold text-gray-800 dark:text-white">{item.capacity}</div>
+                  </div>
+                  <button onClick={() => openAddSectionForGrade(item.grade)} className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm">إضافة شعبة</button>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
             <div className="flex flex-wrap gap-4 items-center">
               <select value={stageFilter} onChange={e => { setStageFilter(e.target.value); setGradeFilterUI(''); }} className="w-full md:w-48 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">

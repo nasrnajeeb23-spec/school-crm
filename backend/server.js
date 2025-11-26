@@ -386,7 +386,7 @@ async function syncDatabase(){
   // Then sync dependent tables
   await Subscription.sync(opts);
   await Route.sync(opts);
-  await User.sync(opts);
+  await User.sync({ alter: true });
   await Conversation.sync(opts);
   await Message.sync(opts);
   await Expense.sync(opts);
