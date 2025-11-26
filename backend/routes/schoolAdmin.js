@@ -19,12 +19,17 @@ async function enforceActiveSubscription(req, res, next) {
       const renewal = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       sub = await Subscription.create({ schoolId, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
     }
-    const now = new Date();
-    const renewal = sub.renewalDate ? new Date(sub.renewalDate) : null;
-    const status = String(sub.status || '').toUpperCase();
-    const trialExpired = status === 'TRIAL' && renewal && renewal.getTime() < now.getTime();
-    const blocked = status === 'CANCELED' || status === 'PAST_DUE' || trialExpired;
+  const now = new Date();
+  const renewal = sub.renewalDate ? new Date(sub.renewalDate) : null;
+  const status = String(sub.status || '').toUpperCase();
+  const trialExpired = status === 'TRIAL' && renewal && renewal.getTime() < now.getTime();
+  const blocked = status === 'CANCELED' || status === 'PAST_DUE' || trialExpired;
     if (blocked) {
+      // Allow reading settings so المدير يستطيع رؤية وضبط المعلومات حتى في حالة الحظر
+      const pathStr = (req.path || '').toLowerCase();
+      if (req.method === 'GET' && pathStr.includes('/settings')) {
+        return next();
+      }
       return res.status(402).json({ msg: 'انتهت النسخة التجريبية أو الاشتراك غير فعال. الرجاء دفع الرسوم لتفعيل المنصة.' });
     }
     next();
@@ -34,7 +39,7 @@ async function enforceActiveSubscription(req, res, next) {
   }
 }
 
-router.use('/:schoolId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), enforceActiveSubscription);
+// Note: Do not apply global enforcement to avoid blocking benign GETs.
 
 // @route   GET api/schools/:id
 // @desc    Get school by ID
@@ -589,7 +594,7 @@ router.get('/:schoolId/student/:studentId/details', verifyToken, requireRole('SC
 // @route   GET api/school/:schoolId/settings
 // @desc    Get settings for a specific school
 // @access  Private (SchoolAdmin)
-router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/settings', verifyToken, async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
     let settings = await SchoolSettings.findOne({ where: { schoolId } });
@@ -618,7 +623,7 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 // @route   PUT api/school/:schoolId/settings
 // @desc    Update settings for a specific school
 // @access  Private (SchoolAdmin)
-router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), enforceActiveSubscription, async (req, res) => {
   try {
     const { 
       schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
