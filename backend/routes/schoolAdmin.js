@@ -657,6 +657,46 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+router.put('/:schoolId/classes/:classId/details', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), validate([
+  { name: 'name', required: false, type: 'string' },
+  { name: 'capacity', required: false, type: 'number' },
+  { name: 'homeroomTeacherId', required: false, type: 'string' }
+]), async (req, res) => {
+  try {
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const { name, capacity, homeroomTeacherId } = req.body || {};
+    if (typeof name === 'string' && name.trim()) cls.name = name.trim();
+    if (typeof capacity === 'number' && capacity > 0) cls.capacity = capacity;
+    if (homeroomTeacherId !== undefined && homeroomTeacherId !== null && String(homeroomTeacherId).trim()) {
+      const tId = Number(homeroomTeacherId);
+      const teacher = await Teacher.findByPk(tId);
+      if (!teacher || Number(teacher.schoolId) !== Number(cls.schoolId)) return res.status(400).json({ msg: 'Invalid homeroom teacher' });
+      cls.homeroomTeacherId = tId;
+      cls.homeroomTeacherName = teacher.name;
+    }
+    await cls.save();
+    res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.delete('/:schoolId/classes/:classId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const schedCount = await Schedule.count({ where: { classId: cls.id } });
+    const attCount = await Attendance.count({ where: { classId: cls.id } });
+    const gradeCount = await Grade.count({ where: { classId: cls.id } });
+    if (schedCount > 0 || attCount > 0 || gradeCount > 0) {
+      return res.status(409).json({ msg: 'Cannot delete class with dependent records', dependencies: { schedules: schedCount, attendance: attCount, grades: gradeCount } });
+    }
+    await Class.destroy({ where: { id: cls.id } });
+    res.json({ deleted: true });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
 router.put('/:schoolId/classes/:classId/subjects', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const { subjects } = req.body || {};

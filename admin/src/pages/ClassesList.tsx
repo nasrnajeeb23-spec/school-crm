@@ -10,6 +10,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useAppContext } from '../contexts/AppContext';
 import EmptyState from '../components/EmptyState';
 import SkeletonLoader from '../components/SkeletonLoader';
+import { Teacher } from '../types';
 
 interface ClassesListProps {
   schoolId: number;
@@ -25,6 +26,11 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
   const [addDefaults, setAddDefaults] = useState<{ stage?: string; grade?: string } | null>(null);
   const [stageFilter, setStageFilter] = useState<string>('');
   const [gradeFilterUI, setGradeFilterUI] = useState<string>('');
+  const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCapacity, setEditCapacity] = useState<number>(30);
+  const [editTeacherId, setEditTeacherId] = useState<string>('');
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const stageGradeMap: Record<string, string[]> = {
     'رياض أطفال': ['رياض أطفال'],
     'ابتدائي': ['الصف الأول','الصف الثاني','الصف الثالث','الصف الرابع','الصف الخامس','الصف السادس'],
@@ -36,6 +42,10 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
 
   useEffect(() => {
     fetchClasses();
+  }, [schoolId]);
+
+  useEffect(() => {
+    api.getSchoolTeachers(schoolId).then(setTeachers).catch(()=>{});
   }, [schoolId]);
 
   const fetchClasses = () => {
@@ -82,6 +92,46 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
     } catch (error) {
         console.error("Failed to add class:", error);
         addToast("فشل إضافة الفصل.", 'error');
+    }
+  };
+
+  const beginEditDetails = (cls: Class) => {
+    setEditingDetailsId(cls.id);
+    setEditName(cls.name);
+    setEditCapacity(typeof cls.capacity === 'number' ? cls.capacity : 30);
+    setEditTeacherId('');
+  };
+
+  const saveEditDetails = async () => {
+    if (!editingDetailsId) return;
+    try {
+      const updated = await api.updateClassDetails(schoolId, editingDetailsId, { name: editName, capacity: editCapacity, homeroomTeacherId: editTeacherId });
+      setClasses(prev => prev.map(c => c.id === updated.id ? updated : c));
+      setEditingDetailsId(null);
+      addToast('تم تحديث بيانات الفصل بنجاح.', 'success');
+    } catch (e: any) {
+      addToast('فشل تحديث بيانات الفصل.', 'error');
+    }
+  };
+
+  const cancelEditDetails = () => {
+    setEditingDetailsId(null);
+  };
+
+  const handleDeleteClass = async (cls: Class) => {
+    try {
+      const resp = await api.deleteClass(schoolId, cls.id);
+      if (resp?.deleted) {
+        setClasses(prev => prev.filter(c => c.id !== cls.id));
+        addToast('تم حذف الفصل بنجاح.', 'success');
+      }
+    } catch (e: any) {
+      const deps = e?.data?.dependencies || {};
+      if (e?.status === 409) {
+        addToast(`تعذر حذف الفصل لوجود سجلات مرتبطة (حصص: ${deps.schedules||0}، حضور: ${deps.attendance||0}، درجات: ${deps.grades||0}).`, 'warning');
+      } else {
+        addToast('فشل حذف الفصل.', 'error');
+      }
     }
   };
 
@@ -203,14 +253,31 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
             {classesFiltered.map((cls) => (
               <div key={cls.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex flex-col border border-gray-200 dark:border-gray-700 transform hover:-translate-y-1 transition-transform duration-300">
                 <div className="flex-grow">
-                  <h3 className="text-xl font-bold text-teal-600 dark:text-teal-400">{cls.name}</h3>
+                  {editingDetailsId === cls.id ? (
+                    <div className="space-y-2">
+                      <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700" />
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm">السعة:</label>
+                        <input type="number" min={10} max={200} value={editCapacity} onChange={e => setEditCapacity(parseInt(e.target.value||'30'))} className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700" />
+                      </div>
+                    </div>
+                  ) : (
+                    <h3 className="text-xl font-bold text-teal-600 dark:text-teal-400">{cls.name}</h3>
+                  )}
                   <p className="text-sm text-gray-500 dark:text-gray-400">{cls.gradeLevel}</p>
                   
                   <div className="mt-4 space-y-3 text-sm">
                     <div className="flex items-center text-gray-700 dark:text-gray-300">
                       <UsersIcon className="h-5 w-5 ml-2 text-gray-400" />
                       <strong>المعلم المسؤول:</strong>
-                      <span className="mr-2">{cls.homeroomTeacherName}</span>
+                      {editingDetailsId === cls.id ? (
+                        <select value={editTeacherId} onChange={e => setEditTeacherId(e.target.value)} className="mr-2 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                          <option value="">اختر المعلم...</option>
+                          {teachers.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                        </select>
+                      ) : (
+                        <span className="mr-2">{cls.homeroomTeacherName}</span>
+                      )}
                     </div>
                     <div className="flex items-center text-gray-700 dark:text-gray-300">
                       <StudentsIcon className="h-5 w-5 ml-2 text-gray-400" />
@@ -221,7 +288,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                       <div className="flex items-center text-gray-700 dark:text-gray-300">
                         <span className="h-5 w-5 ml-2 text-gray-400">📦</span>
                         <strong>السعة:</strong>
-                        <span className="mr-2">{cls.capacity}</span>
+                        <span className="mr-2">{editingDetailsId === cls.id ? editCapacity : cls.capacity}</span>
                       </div>
                     )}
                   </div>
@@ -245,9 +312,20 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                   <button onClick={() => setEditingClass(cls)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline text-sm">
                     إدارة الطلاب
                   </button>
-                  <button className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline text-sm" onClick={() => openAddSectionForGrade(cls.gradeLevel)}>
-                    إضافة شعبة لهذا الصف
-                  </button>
+                  {editingDetailsId === cls.id ? (
+                    <>
+                      <button onClick={saveEditDetails} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline text-sm">حفظ بيانات الفصل</button>
+                      <button onClick={cancelEditDetails} className="font-medium text-gray-600 dark:text-gray-400 hover:underline text-sm">إلغاء</button>
+                    </>
+                  ) : (
+                    <button className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline text-sm" onClick={() => openAddSectionForGrade(cls.gradeLevel)}>
+                      إضافة شعبة لهذا الصف
+                    </button>
+                  )}
+                  {editingDetailsId === cls.id ? null : (
+                    <button onClick={() => beginEditDetails(cls)} className="font-medium text-teal-700 dark:text-teal-400 hover:underline text-sm">تحرير الفصل</button>
+                  )}
+                  <button onClick={() => handleDeleteClass(cls)} className="font-medium text-red-600 dark:text-red-500 hover:underline text-sm">حذف الفصل</button>
                 </div>
               </div>
             ))}

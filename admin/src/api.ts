@@ -544,6 +544,14 @@ export const initDefaultClasses = async (schoolId: number): Promise<{ createdCou
     return await apiCall(`/school/${schoolId}/classes/init`, { method: 'POST' });
 };
 
+export const updateClassDetails = async (schoolId: number, classId: string, data: { name?: string; capacity?: number; homeroomTeacherId?: string | number }): Promise<Class> => {
+    return await apiCall(`/school/${schoolId}/classes/${classId}/details`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
+export const deleteClass = async (schoolId: number, classId: string): Promise<{ deleted: boolean }> => {
+    return await apiCall(`/school/${schoolId}/classes/${classId}`, { method: 'DELETE' });
+};
+
 export const getSchoolParents = async (schoolId: number): Promise<Parent[]> => {
     return await apiCall(`/school/${schoolId}/parents`, { method: 'GET' });
 };
