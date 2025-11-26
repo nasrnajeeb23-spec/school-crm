@@ -42,9 +42,34 @@ router.post('/login', validate([
 
     try {
       if (user.role === 'PARENT') {
-        const allowed = req.app?.locals?.allowedModules || [];
-        if (!allowed.includes('parent_portal')) {
-          return res.status(403).json({ msg: 'وحدة بوابة ولي الأمر غير مفعلة حالياً.' });
+        const allowedGlobal = req.app?.locals?.allowedModules || [];
+        let active = allowedGlobal;
+        try {
+          if (user.schoolId) {
+            const settings = await SchoolSettings.findOne({ where: { schoolId: user.schoolId } });
+            if (Array.isArray(settings?.activeModules) && (settings.activeModules || []).length > 0) {
+              active = settings.activeModules;
+            }
+          }
+        } catch {}
+        if (!active.includes('parent_portal')) {
+          return res.status(403).json({ msg: 'وحدة بوابة ولي الأمر غير مفعلة لهذه المدرسة.' });
+        }
+      }
+      if (user.role === 'TEACHER') {
+        const allowedGlobal = req.app?.locals?.allowedModules || [];
+        let active = allowedGlobal;
+        try {
+          if (user.schoolId) {
+            const settings = await SchoolSettings.findOne({ where: { schoolId: user.schoolId } });
+            if (Array.isArray(settings?.activeModules) && (settings.activeModules || []).length > 0) {
+              active = settings.activeModules;
+            }
+          }
+        } catch {}
+        const teacherAccessEnabled = active.includes('teacher_portal') || active.includes('teacher_app');
+        if (!teacherAccessEnabled) {
+          return res.status(403).json({ msg: 'وحدات دخول المعلم غير مفعّلة لهذه المدرسة.' });
         }
       }
     } catch {}

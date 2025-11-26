@@ -48,6 +48,18 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         }
     };
 
+    const handleToggleModule = async (module: Module, enable: boolean) => {
+        try {
+            const next = new Set(activeModuleIds);
+            if (enable) next.add(module.id); else next.delete(module.id);
+            const updated = await api.updateSchoolModules(school.id, Array.from(next));
+            setActiveModuleIds(new Set(updated.map(m => m.moduleId)));
+            addToast(enable ? 'تم تفعيل الوحدة.' : 'تم تعطيل الوحدة.', 'success');
+        } catch (e) {
+            addToast('فشل تحديث حالة الوحدة.', 'error');
+        }
+    };
+
     const { baseCost, modulesCost, totalCost } = useMemo(() => {
         const pricing = { pricePerStudent: 1.5 }; // This should come from API in a real app
         const baseCost = school.students * pricing.pricePerStudent;
@@ -61,6 +73,18 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     if (loading) {
         return <p className="text-center p-8">جاري تحميل الوحدات...</p>;
     }
+
+    const coreFallback: Module[] = [
+        { id: ModuleId.TeacherPortal, name: 'بوابة المعلم', description: 'واجهة ويب للمعلم لإدارة الجدول والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
+        { id: ModuleId.TeacherApp, name: 'تطبيق المعلم', description: 'تطبيق الجوال للمعلم بنفس وظائف البوابة مع إشعارات.', monthlyPrice: 0, isEnabled: true, isCore: true },
+    ];
+    const hasTeacherPortal = availableModules.some(m => m.id === ModuleId.TeacherPortal);
+    const hasTeacherApp = availableModules.some(m => m.id === ModuleId.TeacherApp);
+    const coreModules = [
+        ...availableModules.filter(m => m.isEnabled && m.isCore),
+        ...(!hasTeacherPortal ? [coreFallback[0]] : []),
+        ...(!hasTeacherApp ? [coreFallback[1]] : []),
+    ];
 
     return (
         <>
@@ -104,6 +128,37 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                             className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
                                         >
                                             طلب تفعيل (+${module.monthlyPrice}/شهرياً)
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الوحدات الأساسية</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {coreModules.map(module => (
+                            <div key={module.id} className="border dark:border-gray-700 rounded-lg p-6 flex flex-col justify-between">
+                                <div>
+                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white">{module.name}</h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
+                                </div>
+                                <div className="mt-4 text-center">
+                                    {activeModuleIds.has(module.id) ? (
+                                        <button
+                                            onClick={() => handleToggleModule(module, false)}
+                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                        >
+                                            تعطيل
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleToggleModule(module, true)}
+                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                                        >
+                                            تفعيل
                                         </button>
                                     )}
                                 </div>

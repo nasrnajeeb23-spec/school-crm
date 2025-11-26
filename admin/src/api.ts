@@ -390,6 +390,13 @@ export const getSchoolModules = async (schoolId: number): Promise<SchoolModuleSu
     }
 };
 
+export const updateSchoolModules = async (schoolId: number, moduleIds: string[]): Promise<SchoolModuleSubscription[]> => {
+    const data = await apiCall(`/schools/${schoolId}/modules`, { method: 'PUT', body: JSON.stringify({ moduleIds }) });
+    const modules: SchoolModuleSubscription[] = Array.isArray(data) ? data : [];
+    const hasParent = modules.some(m => m.moduleId === ModuleId.ParentPortal);
+    return hasParent ? modules : [...modules, { schoolId, moduleId: ModuleId.ParentPortal }];
+};
+
 export const getActionItems = async (): Promise<ActionItem[]> => {
     try {
         const data = await apiCall('/superadmin/action-items', { method: 'GET' });

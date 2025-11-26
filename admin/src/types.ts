@@ -85,6 +85,8 @@ export enum ModuleId {
     Transportation = 'transportation',
     AdvancedReports = 'advanced_reports',
     ParentPortal = 'parent_portal',
+    TeacherPortal = 'teacher_portal',
+    TeacherApp = 'teacher_app',
 }
 
 
@@ -618,6 +620,10 @@ export interface UpdatableUserData {
     phone?: string;
     currentPassword?: string;
     newPassword?: string;
+    mobilePushToken?: string;
+    appPlatform?: 'ios' | 'android';
+    appVersion?: string;
+    deviceId?: string;
 }
 
 // --- Transportation Types ---

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Subscription, Plan, Student, Invoice } = require('../models');
+const { School, Subscription, Plan, Student, Invoice, SchoolSettings } = require('../models');
 const { sequelize } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const { requireModule } = require('../middleware/modules');
@@ -79,10 +79,26 @@ router.post('/', (req, res) => {
   res.json({ msg: 'Add school placeholder' });
 });
 
-router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), (req, res) => {
+router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
+    const schoolId = Number(req.params.id);
     const allowed = req.app?.locals?.allowedModules || [];
-    const list = allowed.map(m => ({ schoolId: Number(req.params.id), moduleId: m }));
+    const settings = await SchoolSettings.findOne({ where: { schoolId } });
+    const active = Array.isArray(settings?.activeModules) && settings.activeModules.length > 0 ? settings.activeModules : allowed;
+    const list = active.map(m => ({ schoolId, moduleId: m }));
+    res.json(list);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.id);
+    const moduleIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds : [];
+    const settings = await SchoolSettings.findOrCreate({ where: { schoolId }, defaults: { schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } } });
+    const settingsInstance = Array.isArray(settings) ? settings[0] : settings;
+    settingsInstance.activeModules = moduleIds;
+    await settingsInstance.save();
+    const list = moduleIds.map(m => ({ schoolId, moduleId: m }));
     res.json(list);
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });

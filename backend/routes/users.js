@@ -22,9 +22,13 @@ router.put('/:id', verifyToken, async (req, res) => {
     const user = await User.findByPk(id);
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    const { name, phone, currentPassword, newPassword } = req.body || {};
+    const { name, phone, currentPassword, newPassword, mobilePushToken, appPlatform, appVersion, deviceId } = req.body || {};
     if (name !== undefined) user.name = name;
     if (phone !== undefined) user.phone = phone;
+    if (mobilePushToken !== undefined) user.mobilePushToken = mobilePushToken;
+    if (appPlatform !== undefined) user.appPlatform = appPlatform;
+    if (appVersion !== undefined) user.appVersion = appVersion;
+    if (deviceId !== undefined) user.deviceId = deviceId;
 
     if (newPassword) {
       const ok = await bcrypt.compare(currentPassword || '', user.password);

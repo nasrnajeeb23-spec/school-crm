@@ -32,6 +32,22 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  mobilePushToken: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  appPlatform: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  appVersion: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  deviceId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   role: {
     type: DataTypes.ENUM('SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor', 'SchoolAdmin', 'Teacher', 'Parent'),
     allowNull: false,
