@@ -1,11 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User } = require('../models');
+const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { validate } = require('../middleware/validate');
 const { requireModule } = require('../middleware/modules');
+
+async function enforceActiveSubscription(req, res, next) {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    if (!schoolId) return res.status(400).json({ msg: 'Invalid schoolId' });
+    const sub = await Subscription.findOne({ where: { schoolId } });
+    if (!sub) return res.status(402).json({ msg: 'لا يوجد اشتراك للمدرسة. الرجاء الدفع لتفعيل النظام.' });
+    const now = new Date();
+    const renewal = sub.renewalDate ? new Date(sub.renewalDate) : null;
+    const status = String(sub.status || '').toUpperCase();
+    const trialExpired = status === 'TRIAL' && renewal && renewal.getTime() < now.getTime();
+    const blocked = status === 'CANCELED' || status === 'PAST_DUE' || trialExpired;
+    if (blocked) {
+      return res.status(402).json({ msg: 'انتهت النسخة التجريبية أو الاشتراك غير فعال. الرجاء دفع الرسوم لتفعيل المنصة.' });
+    }
+    next();
+  } catch (e) {
+    console.error('Subscription enforcement failed:', e);
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+}
+
+router.use('/:schoolId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), enforceActiveSubscription);
 
 // @route   GET api/schools/:id
 // @desc    Get school by ID
@@ -576,12 +599,25 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 // @access  Private (SchoolAdmin)
 router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const { schoolName, schoolAddress, academicYearStart, academicYearEnd, notifications } = req.body;
+    const { 
+      schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
+      genderType, levelType, ownershipType, workingHoursStart, workingHoursEnd,
+      academicYearStart, academicYearEnd, notifications 
+    } = req.body;
     const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
     if (!settings) return res.status(404).json({ msg: 'Settings not found' });
 
     settings.schoolName = schoolName;
     settings.schoolAddress = schoolAddress;
+    settings.schoolLogoUrl = schoolLogoUrl || settings.schoolLogoUrl;
+    settings.contactPhone = contactPhone;
+    settings.contactEmail = contactEmail;
+    settings.geoLocation = geoLocation;
+    settings.genderType = genderType;
+    settings.levelType = levelType;
+    settings.ownershipType = ownershipType;
+    settings.workingHoursStart = workingHoursStart;
+    settings.workingHoursEnd = workingHoursEnd;
     settings.academicYearStart = academicYearStart;
     settings.academicYearEnd = academicYearEnd;
     settings.notifications = notifications;
@@ -624,5 +660,36 @@ router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+router.post('/:schoolId/logo', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const path = require('path');
+    const fse = require('fs-extra');
+    const multer = require('multer');
+
+    const storage = multer.diskStorage({
+      destination: function (req, file, cb) {
+        const target = path.join(__dirname, '..', 'uploads', 'school-logos');
+        fse.ensureDirSync(target);
+        cb(null, target);
+      },
+      filename: function (req, file, cb) {
+        const ext = path.extname(file.originalname).toLowerCase();
+        const safeName = `logo_${req.params.schoolId}_${Date.now()}${ext}`;
+        cb(null, safeName);
+      }
+    });
+
+    const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }).single('logo');
+    upload(req, res, async function (err) {
+      if (err) return res.status(400).json({ msg: 'Upload failed' });
+      const file = req.file;
+      if (!file) return res.status(400).json({ msg: 'No file uploaded' });
+      const publicUrl = `/uploads/school-logos/${file.filename}`;
+      const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
+      if (settings) { settings.schoolLogoUrl = publicUrl; await settings.save(); }
+      return res.status(201).json({ url: publicUrl });
+    });
+  } catch (e) { console.error(e); return res.status(500).json({ msg: 'Server Error' }); }
+});
 
 module.exports = router;

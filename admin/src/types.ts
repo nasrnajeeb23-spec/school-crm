@@ -236,6 +236,14 @@ export interface SchoolSettings {
     schoolName: string;
     schoolAddress: string;
     schoolLogoUrl?: string | File;
+    contactPhone?: string;
+    contactEmail?: string;
+    geoLocation?: string;
+    genderType?: string; // بنين/بنات/مختلط
+    levelType?: string; // أساسي/ثانوي
+    ownershipType?: string; // أهلي/حكومي
+    workingHoursStart?: string; // HH:MM
+    workingHoursEnd?: string; // HH:MM
     academicYearStart: string; // YYYY-MM-DD
     academicYearEnd: string; // YYYY-MM-DD
     notifications: {
@@ -355,7 +363,7 @@ export interface NewStudentData {
     parentName: string;
     dateOfBirth: string;
     gender: 'ذكر' | 'أنثى';
-    nationalId: string;
+    nationalId?: string;
     parentPhone: string;
     parentEmail: string;
     address: string;

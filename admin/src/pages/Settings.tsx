@@ -34,6 +34,19 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     setSettings(prev => prev ? { ...prev, notifications: { ...prev.notifications, [name]: checked } } : null);
   };
 
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = await api.uploadSchoolLogo(schoolId, file);
+      setSettings(prev => prev ? { ...prev, schoolLogoUrl: url } : null);
+      addToast('تم رفع شعار المدرسة بنجاح.', 'success');
+    } catch (err) {
+      console.error('Failed to upload logo:', err);
+      addToast('فشل رفع شعار المدرسة.', 'error');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settings) return;
@@ -72,6 +85,61 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                  <div>
                     <label htmlFor="schoolAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300">عنوان المدرسة</label>
                     <input type="text" name="schoolAddress" id="schoolAddress" value={settings.schoolAddress} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div>
+                    <label htmlFor="schoolLogo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">شعار المدرسة</label>
+                    <input type="file" id="schoolLogo" accept="image/*" onChange={handleLogoChange} className="mt-1 block w-full" />
+                    {settings.schoolLogoUrl && <img src={settings.schoolLogoUrl as string} alt="School Logo" className="mt-2 w-16 h-16 rounded" />}
+                </div>
+                <div>
+                    <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">هاتف التواصل</label>
+                    <input type="tel" name="contactPhone" id="contactPhone" value={settings.contactPhone || ''} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div>
+                    <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</label>
+                    <input type="email" name="contactEmail" id="contactEmail" value={settings.contactEmail || ''} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div>
+                    <label htmlFor="geoLocation" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الموقع الجغرافي</label>
+                    <input type="text" name="geoLocation" id="geoLocation" value={settings.geoLocation || ''} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div>
+                    <label htmlFor="genderType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نوع المدرسة (بنين/بنات/مختلط)</label>
+                    <select name="genderType" id="genderType" value={settings.genderType || ''} onChange={(e) => setSettings(prev => prev ? { ...prev, genderType: e.target.value } : null)} className={inputStyle}>
+                        <option value="">اختر النوع...</option>
+                        <option value="بنين">بنين</option>
+                        <option value="بنات">بنات</option>
+                        <option value="مختلط">مختلط</option>
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="levelType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">مرحلة المدرسة</label>
+                    <select name="levelType" id="levelType" value={settings.levelType || ''} onChange={(e) => setSettings(prev => prev ? { ...prev, levelType: e.target.value } : null)} className={inputStyle}>
+                        <option value="">اختر المرحلة...</option>
+                        <option value="أساسي">أساسي</option>
+                        <option value="ثانوي">ثانوي</option>
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="ownershipType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نوع الملكية</label>
+                    <select name="ownershipType" id="ownershipType" value={settings.ownershipType || ''} onChange={(e) => setSettings(prev => prev ? { ...prev, ownershipType: e.target.value } : null)} className={inputStyle}>
+                        <option value="">اختر النوع...</option>
+                        <option value="حكومي">حكومي</option>
+                        <option value="أهلي">أهلي</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">أوقات الدوام</label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="workingHoursStart" className="block text-xs text-gray-500 dark:text-gray-400">من</label>
+                            <input type="time" name="workingHoursStart" id="workingHoursStart" value={settings.workingHoursStart || ''} onChange={handleInputChange} className={inputStyle} />
+                        </div>
+                        <div>
+                            <label htmlFor="workingHoursEnd" className="block text-xs text-gray-500 dark:text-gray-400">إلى</label>
+                            <input type="time" name="workingHoursEnd" id="workingHoursEnd" value={settings.workingHoursEnd || ''} onChange={handleInputChange} className={inputStyle} />
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label htmlFor="academicYearStart" className="block text-sm font-medium text-gray-700 dark:text-gray-300">بداية العام الدراسي</label>

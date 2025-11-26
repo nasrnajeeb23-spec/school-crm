@@ -40,7 +40,15 @@ router.post('/login', validate([
       return res.status(401).json({ msg: 'Invalid credentials' });
     }
 
-    // Update last login
+    try {
+      if (user.role === 'PARENT') {
+        const allowed = req.app?.locals?.allowedModules || [];
+        if (!allowed.includes('parent_portal')) {
+          return res.status(403).json({ msg: 'وحدة بوابة ولي الأمر غير مفعلة حالياً.' });
+        }
+      }
+    } catch {}
+
     user.lastLogin = new Date();
     user.lastLoginAt = new Date();
     await user.save();

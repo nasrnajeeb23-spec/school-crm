@@ -170,7 +170,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="grades" element={<ProtectedPage permission={Permission.MANAGE_GRADES}><Grades schoolId={school.id} /></ProtectedPage>} />
                     <Route path="messaging" element={<ProtectedPage permission={Permission.MANAGE_MESSAGING}><Messaging /></ProtectedPage>} />
                     <Route path="finance" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><Finance schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="reports" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><Reports /></ProtectedPage>} />
+                    <Route path="reports" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><Reports schoolSettings={settings} /></ProtectedPage>} />
                     <Route path="settings" element={<ProtectedPage permission={Permission.MANAGE_SETTINGS}><Settings schoolId={school.id} /></ProtectedPage>} />
                     <Route path="profile" element={<UserProfile />} />
                     <Route path="modules" element={<ProtectedPage permission={Permission.MANAGE_MODULES}><ModulesPage school={school} /></ProtectedPage>} />

@@ -1,29 +1,35 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts';
 import * as api from '../api';
-import { Student, StudentGrades } from '../types';
+import { Student, StudentGrades, SchoolSettings } from '../types';
+import BrandableCard from '../components/BrandableCard';
+import { useAppContext } from '../contexts/AppContext';
 import { DownloadIcon } from '../components/icons';
 
 const COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4'];
 
-const Reports: React.FC = () => {
+interface ReportsProps { schoolSettings: SchoolSettings | null }
+const Reports: React.FC<ReportsProps> = ({ schoolSettings }) => {
     const [students, setStudents] = useState<Student[]>([]);
     const [grades, setGrades] = useState<StudentGrades[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const { currentUser } = useAppContext();
+    const schoolId = currentUser?.schoolId || 0;
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             const [studentsData, gradesData] = await Promise.all([
-                api.getStudents(),
-                api.getAllGrades(),
+                api.getStudents(schoolId),
+                api.getAllGrades(schoolId),
             ]);
             setStudents(studentsData);
             setGrades(gradesData);
             setLoading(false);
         };
         fetchData();
-    }, []);
+    }, [schoolId]);
 
     const studentDistribution = useMemo(() => {
         const counts = students.reduce((acc, student) => {
@@ -80,7 +86,7 @@ const Reports: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-96">
+                <BrandableCard schoolSettings={schoolSettings} className="h-96">
                     <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-4">توزيع الطلاب حسب الصف</h3>
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -93,8 +99,8 @@ const Reports: React.FC = () => {
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-96">
+                </BrandableCard>
+                <BrandableCard schoolSettings={schoolSettings} className="h-96">
                     <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-4">متوسط الأداء الأكاديمي حسب المادة</h3>
                      <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={academicPerformance} layout="vertical" margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
@@ -105,9 +111,9 @@ const Reports: React.FC = () => {
                              <Bar dataKey="average" name="متوسط الدرجة" fill="#14b8a6" barSize={20} />
                         </BarChart>
                     </ResponsiveContainer>
-                </div>
+                </BrandableCard>
             </div>
-             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-96">
+             <BrandableCard schoolSettings={schoolSettings} className="h-96">
                     <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-4">معدلات الحضور الأسبوعية</h3>
                     <ResponsiveContainer width="100%" height="100%">
                        <LineChart data={attendanceTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
@@ -119,7 +125,7 @@ const Reports: React.FC = () => {
                             <Line type="monotone" dataKey="غائب" stroke="#ef4444" strokeWidth={2} />
                         </LineChart>
                     </ResponsiveContainer>
-                </div>
+                </BrandableCard>
         </div>
     );
 };

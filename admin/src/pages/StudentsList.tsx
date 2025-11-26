@@ -42,12 +42,24 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
     });
   }, [schoolId, addToast]);
   
-  const handleAddStudent = async (studentData: NewStudentData) => {
+  const handleAddStudent = async (studentData: NewStudentData, selectedClassId?: string) => {
     try {
         const newStudent = await api.addSchoolStudent(schoolId, studentData);
         setStudents(prevStudents => [newStudent, ...prevStudents]);
         setIsModalOpen(false);
         addToast(`تم إضافة الطالب "${newStudent.name}" بنجاح.`, 'success');
+
+        if (selectedClassId) {
+          try {
+            const existing = await api.getClassStudents(selectedClassId);
+            const ids = [...existing.map(s => s.id), newStudent.id];
+            await api.updateClassRoster({ schoolId, classId: selectedClassId, studentIds: ids });
+            addToast('تم إضافة الطالب إلى كشف الفصل المحدد.', 'success');
+          } catch (rosterErr) {
+            console.warn('Roster update failed:', rosterErr);
+            addToast('تم إضافة الطالب، تعذر إضافته إلى كشف الفصل تلقائياً.', 'warning');
+          }
+        }
 
         try {
           const parent = await api.upsertSchoolParent(schoolId, {
@@ -157,6 +169,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
         <StudentFormModal
           onClose={() => setIsModalOpen(false)}
           onSave={handleAddStudent}
+          schoolId={schoolId}
         />
       )}
     </>

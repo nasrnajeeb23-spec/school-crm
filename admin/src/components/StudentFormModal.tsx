@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { NewStudentData } from '../types';
+import React, { useState, useEffect } from 'react';
+import { NewStudentData, Class } from '../types';
+import * as api from '../api';
 
 interface StudentFormModalProps {
   onClose: () => void;
-  onSave: (studentData: NewStudentData) => Promise<void>;
+  onSave: (studentData: NewStudentData, selectedClassId?: string) => Promise<void>;
+  schoolId?: number;
 }
 
-const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) => {
+const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, schoolId }) => {
   const [studentData, setStudentData] = useState<NewStudentData>({
     name: '',
     grade: '',
@@ -25,6 +27,15 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
   });
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof NewStudentData, string>>>({});
+  const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+
+  useEffect(() => {
+    if (!schoolId) return;
+    api.getSchoolClasses(schoolId)
+      .then(setAvailableClasses)
+      .catch(() => setAvailableClasses([]));
+  }, [schoolId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -35,7 +46,6 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
               (name === 'grade' && !value.trim()) ? 'الصف الدراسي مطلوب.' :
               (name === 'parentName' && !value.trim()) ? 'اسم ولي الأمر مطلوب.' :
               (name === 'dateOfBirth' && !value) ? 'تاريخ الميلاد مطلوب.' :
-              (name === 'nationalId' && !value.trim()) ? 'الرقم الوطني مطلوب.' :
               (name === 'parentPhone' && !value.trim()) ? 'هاتف ولي الأمر مطلوب.' :
               (name === 'parentEmail' && (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) ? 'بريد ولي الأمر غير صالح.' :
               (name === 'address' && !value.trim()) ? 'العنوان مطلوب.' :
@@ -52,7 +62,6 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
     if (!studentData.grade.trim()) newErrors.grade = "الصف الدراسي مطلوب.";
     if (!studentData.parentName.trim()) newErrors.parentName = "اسم ولي الأمر مطلوب.";
     if (!studentData.dateOfBirth) newErrors.dateOfBirth = "تاريخ الميلاد مطلوب.";
-    if (!studentData.nationalId.trim()) newErrors.nationalId = "الرقم الوطني مطلوب.";
     if (!studentData.parentPhone.trim()) newErrors.parentPhone = "هاتف ولي الأمر مطلوب.";
     if (!studentData.parentEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentData.parentEmail)) newErrors.parentEmail = "بريد ولي الأمر غير صالح.";
     if (!studentData.address.trim()) newErrors.address = "العنوان مطلوب.";
@@ -69,7 +78,7 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
     if (!validate()) return;
     
     setIsSaving(true);
-    await onSave(studentData);
+    await onSave(studentData, selectedClassId || undefined);
     setIsSaving(false);
   };
 
@@ -81,11 +90,11 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6 m-4 modal-content-scale-up"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl p-6 m-4 max-h-[90vh] flex flex-col modal-content-scale-up"
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">إضافة طالب جديد</h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto pr-2 space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الاسم الكامل</label>
             <input type="text" name="name" id="name" value={studentData.name} onChange={handleChange} required className={inputStyle} />
@@ -93,8 +102,24 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="grade" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الصف الدراسي</label>
-              <input type="text" name="grade" id="grade" value={studentData.grade} onChange={handleChange} required className={inputStyle} />
+              <label htmlFor="grade" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اختيار الفصل</label>
+              {availableClasses.length > 0 ? (
+                <select name="grade" id="grade" value={selectedClassId} onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedClassId(id);
+                  const cls = availableClasses.find(c => c.id === id);
+                  const name = cls ? cls.name : '';
+                  setStudentData(prev => ({ ...prev, grade: name }));
+                  setErrors(prev => ({ ...prev, grade: !name ? 'الصف الدراسي مطلوب.' : undefined }));
+                }} required className={inputStyle}>
+                  <option value="" disabled>اختر الفصل...</option>
+                  {availableClasses.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" name="grade" id="grade" value={studentData.grade} onChange={handleChange} required className={inputStyle} />
+              )}
               {errors.grade && <p className="text-red-500 text-xs mt-1">{errors.grade}</p>}
             </div>
             <div>
@@ -112,8 +137,8 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave }) 
               </select>
             </div>
             <div>
-              <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الرقم الوطني</label>
-              <input type="text" name="nationalId" id="nationalId" value={studentData.nationalId} onChange={handleChange} required className={inputStyle} />
+              <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الرقم الوطني (اختياري)</label>
+              <input type="text" name="nationalId" id="nationalId" value={studentData.nationalId} onChange={handleChange} className={inputStyle} />
               {errors.nationalId && <p className="text-red-500 text-xs mt-1">{errors.nationalId}</p>}
             </div>
           </div>

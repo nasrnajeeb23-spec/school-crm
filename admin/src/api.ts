@@ -284,6 +284,21 @@ export const updateSchoolSettings = async (schoolId: number, settings: Partial<S
     });
 };
 
+export const uploadSchoolLogo = async (schoolId: number, file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('logo', file);
+    const response = await fetch(`${API_BASE_URL}/school/${schoolId}/logo`, {
+        method: 'POST',
+        headers: {
+            ...authHeaders(),
+        },
+        body: fd,
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    return data?.url as string;
+};
+
 // ==================== Reports APIs ====================
 
 export const getReports = async (schoolId: number, type: string): Promise<any> => {
@@ -364,9 +379,11 @@ export const submitPaymentProof = async (submission: Omit<PaymentProofSubmission
 export const getSchoolModules = async (schoolId: number): Promise<SchoolModuleSubscription[]> => {
     try {
         const data = await apiCall(`/schools/${schoolId}/modules`, { method: 'GET' });
-        return data;
+        const modules: SchoolModuleSubscription[] = Array.isArray(data) ? data : [];
+        const hasParent = modules.some(m => m.moduleId === ModuleId.ParentPortal);
+        return hasParent ? modules : [...modules, { schoolId, moduleId: ModuleId.ParentPortal }];
     } catch {
-        return [];
+        return [{ schoolId, moduleId: ModuleId.ParentPortal }];
     }
 };
 

@@ -156,7 +156,7 @@ app.use(languageMiddleware);
 
 // License enforcement setup
 const { verifyLicenseKey } = require('./utils/license');
-const coreModules = ['student_management', 'academic_management'];
+const coreModules = ['student_management', 'academic_management', 'parent_portal'];
 const licenseKey = process.env.LICENSE_KEY || null;
 let allowedModules = [...coreModules];
 if (licenseKey) {
@@ -371,10 +371,11 @@ async function syncDatabase(){
   const opts = { force: false };
   
   // Sync models in correct order to avoid foreign key constraint issues
-  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense } = require('./models');
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings } = require('./models');
   
   // Sync independent tables first
   await School.sync(opts);
+  await SchoolSettings.sync(opts);
   await Plan.sync(opts);
   await BusOperator.sync(opts);
   await Parent.sync(opts);
