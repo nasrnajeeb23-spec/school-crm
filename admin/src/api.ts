@@ -11,7 +11,10 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || (typeof window !== 'undefi
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const schoolId = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
+    const base: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    if (schoolId) base['x-school-id'] = String(schoolId);
+    return base;
 };
 
 // دالة مساعدة للاتصال بالـ API

@@ -11,8 +11,14 @@ async function enforceActiveSubscription(req, res, next) {
   try {
     const schoolId = Number(req.params.schoolId);
     if (!schoolId) return res.status(400).json({ msg: 'Invalid schoolId' });
-    const sub = await Subscription.findOne({ where: { schoolId } });
-    if (!sub) return res.status(402).json({ msg: 'لا يوجد اشتراك للمدرسة. الرجاء الدفع لتفعيل النظام.' });
+    let sub = await Subscription.findOne({ where: { schoolId } });
+    if (!sub) {
+      const { Plan } = require('../models');
+      let plan = await Plan.findOne({ where: { recommended: true } });
+      if (!plan) plan = await Plan.findOne();
+      const renewal = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      sub = await Subscription.create({ schoolId, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
+    }
     const now = new Date();
     const renewal = sub.renewalDate ? new Date(sub.renewalDate) : null;
     const status = String(sub.status || '').toUpperCase();
