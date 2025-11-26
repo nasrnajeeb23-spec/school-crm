@@ -580,8 +580,7 @@ router.delete('/:schoolId/staff/:userId', verifyToken, requireRole('SCHOOL_ADMIN
 router.get('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const classes = await Class.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']] });
-    // This model has no enums to map, but keeping structure consistent
-    res.json(classes.map(c => ({...c.toJSON(), subjects: ['الرياضيات', 'العلوم', 'اللغة الإنجليزية']}))); // Adding mock subjects for now
+    res.json(classes.map(c => ({ ...c.toJSON(), subjects: Array.isArray(c.subjects) ? c.subjects : [] })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -611,8 +610,9 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       capacity: typeof capacity === 'number' ? capacity : 30,
       schoolId: parseInt(req.params.schoolId, 10),
       homeroomTeacherId: Number(homeroomTeacherId),
+      subjects: subjects,
     });
-    res.status(201).json({ ...newClass.toJSON(), subjects });
+    res.status(201).json({ ...newClass.toJSON(), subjects: Array.isArray(newClass.subjects) ? newClass.subjects : [] });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -653,7 +653,138 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     cls.studentCount = studentIds.length;
     await cls.save();
-    res.json({ ...cls.toJSON(), subjects: ['الرياضيات', 'العلوم', 'اللغة الإنجليزية'] });
+    res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/:schoolId/classes/:classId/subjects', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { subjects } = req.body || {};
+    if (!Array.isArray(subjects)) return res.status(400).json({ msg: 'subjects must be an array' });
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    cls.subjects = subjects.filter(s => typeof s === 'string' && s.trim().length > 0);
+    await cls.save();
+    res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/:schoolId/classes/:classId/subject-teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const payload = req.body || {};
+    if (typeof payload !== 'object' || Array.isArray(payload)) return res.status(400).json({ msg: 'Invalid payload' });
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const map = {};
+    for (const [subject, teacherId] of Object.entries(payload)) {
+      if (typeof subject !== 'string' || !subject.trim()) continue;
+      const tId = Number(teacherId);
+      if (!tId) continue;
+      const teacher = await Teacher.findByPk(tId);
+      if (!teacher || Number(teacher.schoolId) !== Number(cls.schoolId)) return res.status(400).json({ msg: `Invalid teacher for subject ${subject}` });
+      map[subject] = tId;
+    }
+    cls.subjectTeacherMap = map;
+    await cls.save();
+    res.json({ ...cls.toJSON(), subjectTeacherMap: cls.subjectTeacherMap || {} });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+  try {
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Schedule.findAll({ where: { classId: cls.id }, include: [{ model: Teacher, attributes: ['name'] }], order: [['day','ASC'],['timeSlot','ASC']] });
+    const list = rows.map(r => ({ id: String(r.id), classId: String(cls.id), day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' }));
+    res.json(list);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { entries } = req.body || {};
+    if (!Array.isArray(entries)) return res.status(400).json({ msg: 'entries must be an array' });
+    const cls = await Class.findByPk(req.params.classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const validDays = new Set(['Sunday','Monday','Tuesday','Wednesday','Thursday']);
+    function parseSlot(s) {
+      try {
+        const parts = String(s).split('-');
+        const a = (parts[0] || '').trim();
+        const b = (parts[1] || '').trim();
+        const toMin = (hm) => { const t = String(hm).split(':'); const h = Number(t[0]); const m = Number(t[1]); return h*60 + m; };
+        const start = toMin(a);
+        const end = toMin(b);
+        return { start, end, ok: Number.isFinite(start) && Number.isFinite(end) && start < end };
+      } catch { return { start: 0, end: 0, ok: false }; }
+    }
+    const normalized = [];
+    const teacherIds = new Set();
+    const daysSet = new Set();
+    const map = cls.subjectTeacherMap || {};
+    for (const e of entries) {
+      const day = String(e.day || '');
+      const timeSlot = String(e.timeSlot || '');
+      const subject = String(e.subject || '');
+      if (!validDays.has(day)) continue;
+      const ps = parseSlot(timeSlot);
+      if (!ps.ok) continue;
+      if (Array.isArray(cls.subjects) && cls.subjects.length > 0 && !cls.subjects.includes(subject)) {
+        normalized.push({ invalidSubject: true, day, timeSlot, subject });
+        continue;
+      }
+      const tId = map[subject] ? Number(map[subject]) : null;
+      normalized.push({ day, timeSlot, subject, start: ps.start, end: ps.end, teacherId: tId || null });
+      if (tId) { teacherIds.add(tId); daysSet.add(day); }
+    }
+    const conflicts = [];
+    const byTeacherDay = {};
+    for (const n of normalized) {
+      if (!n.teacherId) continue;
+      const key = `${n.teacherId}:${n.day}`;
+      if (!byTeacherDay[key]) byTeacherDay[key] = [];
+      for (const prev of byTeacherDay[key]) {
+        if (n.start < prev.end && prev.start < n.end) {
+          conflicts.push({ type: 'batch', teacherId: n.teacherId, day: n.day, timeSlot: n.timeSlot, otherTimeSlot: prev.timeSlot, subject: n.subject });
+        }
+      }
+      byTeacherDay[key].push(n);
+    }
+    if (teacherIds.size > 0) {
+      const existing = await Schedule.findAll({ where: { teacherId: { [Op.in]: Array.from(teacherIds) }, day: { [Op.in]: Array.from(daysSet) } }, include: [{ model: Class, attributes: ['id','name'] }] });
+      for (const n of normalized) {
+        if (!n.teacherId) continue;
+        for (const r of existing) {
+          if (Number(r.teacherId) !== Number(n.teacherId)) continue;
+          if (r.day !== n.day) continue;
+          const ps2 = parseSlot(r.timeSlot);
+          if (!ps2.ok) continue;
+          if (n.start < ps2.end && ps2.start < n.end && String(r.classId) !== String(cls.id)) {
+            conflicts.push({ type: 'teacher', teacherId: n.teacherId, day: n.day, timeSlot: n.timeSlot, existingTimeSlot: r.timeSlot, conflictWithClassId: String(r.classId), conflictWithClassName: r.Class ? r.Class.name : '' });
+          }
+        }
+      }
+    }
+    if (conflicts.length > 0) {
+      const ids = Array.from(teacherIds);
+      const tMap = {};
+      if (ids.length > 0) {
+        const ts = await Teacher.findAll({ where: { id: { [Op.in]: ids } } });
+        for (const t of ts) tMap[String(t.id)] = t.name;
+      }
+      return res.status(409).json({ msg: 'Conflicts detected', conflicts: conflicts.map(c => ({ ...c, teacherName: tMap[String(c.teacherId)] || '' })) });
+    }
+    await Schedule.destroy({ where: { classId: cls.id } });
+    const created = [];
+    for (const n of normalized) {
+      const row = await Schedule.create({ day: n.day, timeSlot: n.timeSlot, subject: n.subject, classId: cls.id, teacherId: n.teacherId || null });
+      created.push({ id: String(row.id), day: n.day, timeSlot: n.timeSlot, subject: n.subject });
+    }
+    res.status(201).json({ createdCount: created.length, entries: created });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 

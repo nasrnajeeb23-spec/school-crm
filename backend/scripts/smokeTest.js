@@ -67,6 +67,27 @@ async function run(){
   const payInv = await req('POST',`/api/school/1/invoices/${invId}/payments`, { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ amount: 500, paymentDate: '2025-11-20', paymentMethod: 'CASH', notes: '' }));
   if (!payInv.ok) throw new Error('pay invoice failed');
 
+  const classesRes = await req('GET','/api/school/1/classes', { Authorization: 'Bearer ' + newAccess });
+  const classes = classesRes.ok ? JSON.parse(classesRes.body) : [];
+  let classId = classes[0] ? classes[0].id : null;
+  const t1 = await req('POST','/api/school/1/teachers', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: 'معلم جدول', subject: 'الرياضيات', phone: '0501112222' }));
+  if (!t1.ok) throw new Error('create teacher failed');
+  const tData = JSON.parse(t1.body);
+  const tid = tData.id;
+  if (!classId) {
+    const crtClass = await req('POST','/api/school/1/classes', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: 'فصل اختبار', gradeLevel: 'الصف الأول', homeroomTeacherId: String(tid), capacity: 30, subjects: ['الرياضيات'] }));
+    if (!crtClass.ok) throw new Error('create class failed');
+    classId = JSON.parse(crtClass.body).id;
+  } else {
+    await req('PUT',`/api/school/1/classes/${classId}/subjects`, { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ subjects: ['الرياضيات'] }));
+  }
+  await req('PUT',`/api/school/1/classes/${classId}/subject-teachers`, { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ 'الرياضيات': tid }));
+  const bodySched = { entries: [ { day: 'Sunday', timeSlot: '08:00 - 09:00', subject: 'الرياضيات' }, { day: 'Sunday', timeSlot: '08:30 - 09:30', subject: 'الرياضيات' } ] };
+  const saveSched = await req('POST',`/api/school/class/${classId}/schedule`, { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify(bodySched));
+  if (saveSched.ok) throw new Error('schedule conflict expected');
+  const conflictBody = JSON.parse(saveSched.body);
+  if (!Array.isArray(conflictBody.conflicts) || conflictBody.conflicts.length === 0) throw new Error('no conflicts reported');
+
   console.log('ok');
 }
 

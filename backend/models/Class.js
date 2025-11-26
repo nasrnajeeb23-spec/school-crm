@@ -27,6 +27,16 @@ const Class = sequelize.define('Class', {
     allowNull: false,
     defaultValue: 30,
   },
+  subjects: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+  },
+  subjectTeacherMap: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: {},
+  },
   // Foreign keys schoolId, homeroomTeacherId are added via association
 });
 

@@ -532,6 +532,14 @@ export const addClass = async (schoolId: number, data: NewClassData): Promise<Cl
     return await apiCall(`/school/${schoolId}/classes`, { method: 'POST', body: JSON.stringify(data) });
 };
 
+export const updateClassSubjects = async (schoolId: number, classId: string, subjects: string[]): Promise<Class> => {
+    return await apiCall(`/school/${schoolId}/classes/${classId}/subjects`, { method: 'PUT', body: JSON.stringify({ subjects }) });
+};
+
+export const updateSubjectTeacherMap = async (schoolId: number, classId: string, mapping: Record<string, string | number>): Promise<Class> => {
+    return await apiCall(`/school/${schoolId}/classes/${classId}/subject-teachers`, { method: 'PUT', body: JSON.stringify(mapping) });
+};
+
 export const initDefaultClasses = async (schoolId: number): Promise<{ createdCount: number }> => {
     return await apiCall(`/school/${schoolId}/classes/init`, { method: 'POST' });
 };
@@ -584,6 +592,26 @@ export const getTeacherSchedule = async (teacherId: string | number): Promise<Sc
 
 export const getSchedule = async (classId: string): Promise<ScheduleEntry[]> => {
     return await apiCall(`/school/class/${classId}/schedule`, { method: 'GET' });
+};
+
+export const saveClassSchedule = async (classId: string, entries: { day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday'; timeSlot: string; subject: string; }[]): Promise<{ createdCount: number; entries: any[] }> => {
+    const response = await fetch(`${API_BASE_URL}/school/class/${classId}/schedule`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+        },
+        body: JSON.stringify({ entries })
+    });
+    if (!response.ok) {
+        let data: any = null;
+        try { data = await response.json(); } catch {}
+        const error: any = new Error(`HTTP error! status: ${response.status}`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+    }
+    return await response.json();
 };
 
 export const getParentDashboardData = async (parentId: string): Promise<any> => {

@@ -439,6 +439,7 @@ export interface Class {
   studentCount: number;
   capacity?: number;
   subjects: string[];
+  subjectTeacherMap?: Record<string, string | number>;
 }
 
 export interface NewClassData {
