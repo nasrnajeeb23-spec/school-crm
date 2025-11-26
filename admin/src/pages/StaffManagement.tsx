@@ -193,6 +193,9 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                   <th scope="col" className="px-6 py-3">البريد الإلكتروني</th>
                   <th scope="col" className="px-6 py-3">الدور</th>
                   <th scope="col" className="px-6 py-3">رقم الهاتف</th>
+                  <th scope="col" className="px-6 py-3">القسم</th>
+                  <th scope="col" className="px-6 py-3">الحالة</th>
+                  <th scope="col" className="px-6 py-3">الحساب البنكي</th>
                   <th scope="col" className="px-6 py-3">إجراءات</th>
                 </tr>
               </thead>
@@ -209,6 +212,13 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                       )}
                     </td>
                     <td className="px-6 py-4" dir="ltr">{(member as any).phone || '—'}</td>
+                    <td className="px-6 py-4">{(member as any).department || '—'}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${((member as any).isActive ?? true) ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+                        {((member as any).isActive ?? true) ? 'نشط' : 'غير نشط'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4" dir="ltr">{(member as any).bankAccount || '—'}</td>
                     <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">
                       <button onClick={() => { setEditing(member); setIsModalOpen(true); }} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">تعديل</button>
                       <button onClick={() => handleDeleteStaff(member)} disabled={member.schoolRole === SchoolRole.Admin} className="font-medium text-red-600 dark:text-red-500 hover:underline disabled:text-red-300 disabled:cursor-not-allowed">حذف</button>
@@ -225,7 +235,7 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
         <AddStaffModal 
             onClose={() => { setIsModalOpen(false); setEditing(null); }}
             onSave={editing ? handleEditStaff : handleAddStaff}
-            initialData={editing ? { name: editing.name, email: editing.email, role: editing.schoolRole as any, phone: (editing as any).phone } : undefined}
+            initialData={editing ? { name: editing.name, email: editing.email, role: editing.schoolRole as any, phone: (editing as any).phone, department: (editing as any).department, bankAccount: (editing as any).bankAccount, isActive: (editing as any).isActive } : undefined}
             title={editing ? "تعديل موظف" : "إضافة موظف"}
         />
       )}

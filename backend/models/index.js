@@ -18,12 +18,16 @@ const Schedule = require('./Schedule');
 const StudentNote = require('./StudentNote');
 const StudentDocument = require('./StudentDocument');
 const Notification = require('./Notification');
+const SalaryStructure = require('./SalaryStructure');
+const SalarySlip = require('./SalarySlip');
 const BusOperator = require('./BusOperator');
 const Route = require('./Route');
 const RouteStudent = require('./RouteStudent');
 const Conversation = require('./Conversation');
 const Message = require('./Message');
 const AuditLog = require('./AuditLog');
+const StaffAttendance = require('./StaffAttendance');
+const TeacherAttendance = require('./TeacherAttendance');
 
 
 // Define associations
@@ -178,12 +182,36 @@ const db = {
   StudentNote,
   StudentDocument,
   Notification,
+  SalaryStructure,
+  SalarySlip,
   BusOperator,
   Route,
   RouteStudent,
   Conversation,
   Message,
   AuditLog,
+  StaffAttendance,
+  TeacherAttendance,
 };
 
 module.exports = db;
+// School <-> SalaryStructure (One-to-Many)
+School.hasMany(SalaryStructure, { foreignKey: 'schoolId' });
+SalaryStructure.belongsTo(School, { foreignKey: 'schoolId' });
+
+// School <-> SalarySlip (One-to-Many)
+School.hasMany(SalarySlip, { foreignKey: 'schoolId' });
+SalarySlip.belongsTo(School, { foreignKey: 'schoolId' });
+
+// User/Teacher <-> SalarySlip (One-to-Many via personId)
+// School <-> StaffAttendance (One-to-Many)
+School.hasMany(StaffAttendance, { foreignKey: 'schoolId' });
+StaffAttendance.belongsTo(School, { foreignKey: 'schoolId' });
+User.hasMany(StaffAttendance, { foreignKey: 'userId' });
+StaffAttendance.belongsTo(User, { foreignKey: 'userId' });
+
+// School <-> TeacherAttendance (One-to-Many)
+School.hasMany(TeacherAttendance, { foreignKey: 'schoolId' });
+TeacherAttendance.belongsTo(School, { foreignKey: 'schoolId' });
+Teacher.hasMany(TeacherAttendance, { foreignKey: 'teacherId' });
+TeacherAttendance.belongsTo(Teacher, { foreignKey: 'teacherId' });

@@ -203,6 +203,80 @@ export const deleteSchoolStaff = async (schoolId: number, userId: number | strin
     await apiCall(`/school/${schoolId}/staff/${userId}`, { method: 'DELETE' });
 };
 
+// ==================== Payroll APIs ====================
+
+export interface SalaryStructurePayload {
+    id?: string;
+    name: string;
+    type: 'Fixed' | 'Hourly' | 'PartTime' | 'PerLesson';
+    baseAmount?: number;
+    hourlyRate?: number;
+    lessonRate?: number;
+    allowances?: { name: string; amount: number; }[];
+    deductions?: { name: string; amount: number; }[];
+    appliesTo?: 'staff' | 'teacher';
+    isDefault?: boolean;
+    absencePenaltyPerDay?: number;
+    latePenaltyPerMinute?: number;
+    overtimeRatePerMinute?: number;
+}
+
+export const getSalaryStructures = async (schoolId: number): Promise<SalaryStructurePayload[]> => {
+    return await apiCall(`/school/${schoolId}/salary-structures`, { method: 'GET' });
+};
+
+export const createSalaryStructure = async (schoolId: number, payload: SalaryStructurePayload): Promise<SalaryStructurePayload> => {
+    return await apiCall(`/school/${schoolId}/salary-structures`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const updateSalaryStructure = async (schoolId: number, id: string, payload: Partial<SalaryStructurePayload>): Promise<SalaryStructurePayload> => {
+    return await apiCall(`/school/${schoolId}/salary-structures/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+export const deleteSalaryStructure = async (schoolId: number, id: string): Promise<void> => {
+    await apiCall(`/school/${schoolId}/salary-structures/${id}`, { method: 'DELETE' });
+};
+
+export const assignSalaryStructureToStaff = async (schoolId: number, userId: string | number, salaryStructureId: string): Promise<{ id: string | number; salaryStructureId: string; }> => {
+    return await apiCall(`/school/${schoolId}/staff/${userId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
+};
+
+export const assignSalaryStructureToTeacher = async (schoolId: number, teacherId: string, salaryStructureId: string): Promise<{ id: string; salaryStructureId: string; }> => {
+    return await apiCall(`/school/${schoolId}/teachers/${teacherId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
+};
+
+export const processPayrollForMonth = async (schoolId: number, month: string): Promise<{ createdCount: number; }> => {
+    return await apiCall(`/school/${schoolId}/payroll/process?month=${encodeURIComponent(month)}`, { method: 'POST' });
+};
+
+export const getSalarySlipsForSchool = async (schoolId: number, month?: string): Promise<any[]> => {
+    const q = month ? `?month=${encodeURIComponent(month)}` : '';
+    return await apiCall(`/school/${schoolId}/payroll/salary-slips${q}`, { method: 'GET' });
+};
+
+export const approveSalarySlip = async (schoolId: number, slipId: string): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/payroll/salary-slips/${slipId}/approve`, { method: 'PUT' });
+};
+
+export const submitPayrollReceipt = async (schoolId: number, slipId: string, data: { receiptNumber?: string; receiptDate?: string; receivedBy?: string; attachment?: File | null; }): Promise<any> => {
+    const form = new FormData();
+    if (data.receiptNumber) form.append('receiptNumber', data.receiptNumber);
+    if (data.receiptDate) form.append('receiptDate', data.receiptDate);
+    if (data.receivedBy) form.append('receivedBy', data.receivedBy);
+    if (data.attachment) form.append('attachment', data.attachment);
+    const res = await fetch(`${API_BASE_URL}/school/${schoolId}/payroll/salary-slips/${slipId}/receipt`, { method: 'POST', headers: buildHeaders(false), body: form });
+    if (!res.ok) throw new Error('Failed to upload receipt');
+    return await res.json();
+};
+
+export const createStaffAttendance = async (schoolId: number, payload: { userId: number | string; date: string; checkIn?: string; checkOut?: string; hoursWorked?: number; status?: 'Present' | 'Absent' | 'Late'; overtimeMinutes?: number; lateMinutes?: number; }): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/staff-attendance`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const createTeacherAttendance = async (schoolId: number, payload: { teacherId: string; date: string; checkIn?: string; checkOut?: string; hoursWorked?: number; status?: 'Present' | 'Absent' | 'Late'; overtimeMinutes?: number; lateMinutes?: number; }): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/teacher-attendance`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
 // ==================== Finance APIs ====================
 
 export const getInvoices = async (schoolId: number): Promise<Invoice[]> => {
@@ -545,7 +619,25 @@ export const getTeacherDashboardData = async (teacherId: string): Promise<any> =
 };
 
 export const getTeacherSalarySlips = async (teacherId: string): Promise<TeacherSalarySlip[]> => {
-    try { return await apiCall(`/teacher/${teacherId}/salary-slips`, { method: 'GET' }); } catch { return []; }
+    try {
+        const raw: any[] = await apiCall(`/teacher/${teacherId}/salary-slips`, { method: 'GET' });
+        return raw.map((r: any) => {
+            const [yStr, mStr] = String(r.month || '').split('-');
+            const year = Number(yStr || new Date().getFullYear());
+            const monthName = (() => {
+                const m = Number(mStr || 1);
+                const arMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+                return arMonths[(m - 1 + 12) % 12];
+            })();
+            const gross = Number(r.baseAmount || 0) + Number(r.allowancesTotal || 0);
+            const net = Number(r.netAmount || gross - Number(r.deductionsTotal || 0));
+            const bonuses: SalaryComponent[] = Array.isArray(r.allowances) ? r.allowances.map((a: any) => ({ description: a.name || a.description || 'علاوة', amount: Number(a.amount || 0), type: 'bonus' })) : [];
+            const deductions: SalaryComponent[] = Array.isArray(r.deductions) ? r.deductions.map((d: any) => ({ description: d.name || d.description || 'خصم', amount: Number(d.amount || 0), type: 'deduction' })) : [];
+            const statusRaw = String(r.status || '').toUpperCase();
+            const status = statusRaw === 'APPROVED' || statusRaw === 'PAID' ? 'Paid' : 'Pending';
+            return { id: r.id, month: monthName, year, issueDate: `${r.month}-01`, grossSalary: gross, netSalary: net, bonuses, deductions, status } as TeacherSalarySlip;
+        });
+    } catch { return []; }
 };
 
 export const getBusOperators = async (schoolId: number): Promise<BusOperator[]> => {

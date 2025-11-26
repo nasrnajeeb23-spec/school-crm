@@ -249,6 +249,7 @@ export interface SchoolSettings {
     availableStages?: string[];
     workingHoursStart?: string; // HH:MM
     workingHoursEnd?: string; // HH:MM
+    workingDays?: string[]; // e.g. ['Sunday','Monday','Tuesday','Wednesday','Thursday']
     academicYearStart: string; // YYYY-MM-DD
     academicYearEnd: string; // YYYY-MM-DD
     notifications: {
@@ -290,6 +291,9 @@ export interface User {
   username?: string;
   passwordMustChange?: boolean;
   tokenVersion?: number;
+  isActive?: boolean;
+  department?: string;
+  bankAccount?: string;
 }
 
 export interface NewStaffData {
@@ -297,6 +301,9 @@ export interface NewStaffData {
     email: string;
     role: SchoolRole;
     phone?: string;
+    department?: string;
+    bankAccount?: string;
+    isActive?: boolean;
 }
 
 
@@ -403,12 +410,16 @@ export interface Teacher {
     phone: string;
     status: TeacherStatus;
     joinDate: string;
+    department?: string;
+    bankAccount?: string;
 }
 
 export interface NewTeacherData {
     name: string;
     subject: string;
     phone: string;
+    department?: string;
+    bankAccount?: string;
 }
 
 export interface UpdatableTeacherData {
@@ -416,6 +427,8 @@ export interface UpdatableTeacherData {
     subject: string;
     phone: string;
     status: TeacherStatus;
+    department?: string;
+    bankAccount?: string;
 }
 
 export interface Class {

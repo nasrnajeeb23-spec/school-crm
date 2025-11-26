@@ -59,6 +59,19 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   };
 
+  const allDays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const arDays: Record<string, string> = { Sunday: 'الأحد', Monday: 'الاثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس', Friday: 'الجمعة', Saturday: 'السبت' };
+  const workingDays = settings?.workingDays && settings.workingDays.length > 0 ? settings.workingDays : ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+  const handleDayToggle = (day: string) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const current = prev.workingDays && prev.workingDays.length > 0 ? prev.workingDays : [];
+      const exists = current.includes(day);
+      const next = exists ? current.filter(d => d !== day) : [...current, day];
+      return { ...prev, workingDays: next };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settings) return;
@@ -162,6 +175,17 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                             <label htmlFor="workingHoursEnd" className="block text-xs text-gray-500 dark:text-gray-400">إلى</label>
                             <input type="time" name="workingHoursEnd" id="workingHoursEnd" value={settings.workingHoursEnd || ''} onChange={handleInputChange} className={inputStyle} />
                         </div>
+                    </div>
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">أيام العمل</label>
+                    <div className="mt-2 flex flex-wrap gap-4">
+                        {allDays.map(day => (
+                          <label key={day} className="flex items-center space-x-2 rtl:space-x-reverse">
+                            <input type="checkbox" checked={workingDays.includes(day)} onChange={() => handleDayToggle(day)} className="form-checkbox h-5 w-5 text-teal-600" />
+                            <span className="text-gray-700 dark:text-gray-300">{arDays[day]}</span>
+                          </label>
+                        ))}
                     </div>
                 </div>
                 <div>

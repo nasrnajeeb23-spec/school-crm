@@ -14,12 +14,19 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ onClose, onSave, initialD
     email: initialData?.email || '',
     role: (initialData?.role as SchoolRole) || SchoolRole.Registrar,
     phone: (initialData as any)?.phone || '',
+    department: (initialData as any)?.department || '',
+    bankAccount: (initialData as any)?.bankAccount || '',
+    isActive: (initialData as any)?.isActive ?? true,
   });
   const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'isActive') {
+      setFormData(prev => ({ ...prev, isActive: value === 'true' }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,6 +56,14 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ onClose, onSave, initialD
             <input type="tel" name="phone" id="phone" value={formData.phone || ''} onChange={handleChange} className={inputStyle} />
           </div>
           <div>
+            <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">القسم</label>
+            <input type="text" name="department" id="department" value={formData.department || ''} onChange={handleChange} className={inputStyle} />
+          </div>
+          <div>
+            <label htmlFor="bankAccount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الحساب/البنك (اختياري)</label>
+            <input type="text" name="bankAccount" id="bankAccount" value={formData.bankAccount || ''} onChange={handleChange} className={inputStyle} />
+          </div>
+          <div>
             <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الدور</label>
             <select name="role" id="role" value={formData.role} onChange={handleChange} className={inputStyle}>
               {Object.values(SchoolRole)
@@ -56,6 +71,13 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ onClose, onSave, initialD
                 .map(role => (
                   <option key={role} value={role}>{role}</option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="isActive" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الحالة</label>
+            <select name="isActive" id="isActive" value={String(formData.isActive ?? true)} onChange={handleChange} className={inputStyle}>
+              <option value="true">نشط</option>
+              <option value="false">غير نشط</option>
             </select>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">سيتم إنشاء حساب للموظف بكلمة مرور مؤقتة "password"، ويجب عليه تغييرها عند أول تسجيل دخول.</p>

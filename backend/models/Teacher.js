@@ -15,9 +15,21 @@ const Teacher = sequelize.define('Teacher', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  department: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   phone: {
     type: DataTypes.STRING,
     allowNull: false,
+  },
+  bankAccount: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  salaryStructureId: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   status: {
     type: DataTypes.ENUM('Active', 'OnLeave'),

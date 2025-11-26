@@ -11,6 +11,8 @@ const TeacherFormModal: React.FC<TeacherFormModalProps> = ({ onClose, onSave }) 
     name: '',
     subject: '',
     phone: '',
+    department: '',
+    bankAccount: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof NewTeacherData, string>>>({});
@@ -70,6 +72,16 @@ const TeacherFormModal: React.FC<TeacherFormModalProps> = ({ onClose, onSave }) 
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الهاتف</label>
               <input type="tel" name="phone" id="phone" value={teacherData.phone} onChange={handleChange} required className={inputStyle} />
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">القسم</label>
+              <input type="text" name="department" id="department" value={teacherData.department || ''} onChange={handleChange} className={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="bankAccount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الحساب/البنك (اختياري)</label>
+              <input type="text" name="bankAccount" id="bankAccount" value={teacherData.bankAccount || ''} onChange={handleChange} className={inputStyle} />
             </div>
           </div>
           <div className="flex justify-end gap-4 pt-4">

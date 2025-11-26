@@ -32,6 +32,18 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  department: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  bankAccount: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  salaryStructureId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   mobilePushToken: {
     type: DataTypes.STRING,
     allowNull: true,

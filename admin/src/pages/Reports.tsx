@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts';
 import * as api from '../api';
-import { Student, StudentGrades, SchoolSettings } from '../types';
+import { Student, StudentGrades, SchoolSettings, Teacher } from '../types';
 import BrandableCard from '../components/BrandableCard';
 import { useAppContext } from '../contexts/AppContext';
 import { DownloadIcon } from '../components/icons';
@@ -13,6 +13,9 @@ const Reports: React.FC<ReportsProps> = ({ schoolSettings }) => {
     const [students, setStudents] = useState<Student[]>([]);
     const [grades, setGrades] = useState<StudentGrades[]>([]);
     const [loading, setLoading] = useState(true);
+    const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
+    const [salarySlips, setSalarySlips] = useState<any[]>([]);
 
     const { currentUser } = useAppContext();
     const schoolId = currentUser?.schoolId || 0;
@@ -20,16 +23,20 @@ const Reports: React.FC<ReportsProps> = ({ schoolSettings }) => {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            const [studentsData, gradesData] = await Promise.all([
+            const [studentsData, gradesData, teachersData, slipsData] = await Promise.all([
                 api.getStudents(schoolId),
                 api.getAllGrades(schoolId),
+                api.getSchoolTeachers(schoolId),
+                api.getSalarySlipsForSchool(schoolId, month),
             ]);
             setStudents(studentsData);
             setGrades(gradesData);
+            setTeachers(teachersData);
+            setSalarySlips(slipsData);
             setLoading(false);
         };
         fetchData();
-    }, [schoolId]);
+    }, [schoolId, month]);
 
     const studentDistribution = useMemo(() => {
         const counts = students.reduce((acc, student) => {
@@ -62,6 +69,56 @@ const Reports: React.FC<ReportsProps> = ({ schoolSettings }) => {
         { day: 'الأربعاء', حاضر: 29, غائب: 1 },
         { day: 'الخميس', حاضر: 26, غائب: 4 },
     ];
+
+    const teacherPayrollImpact = useMemo(() => {
+        const slips = Array.isArray(salarySlips) ? salarySlips.filter(s => s.personType === 'teacher') : [];
+        const getName = (id: string) => {
+            const t = teachers.find(x => String(x.id) === String(id));
+            return t ? t.name : id;
+        };
+        return slips.map(slip => {
+            const absenceDeduction = (Array.isArray(slip.deductions) ? slip.deductions : []).filter((d: any) => String(d.name).includes('غياب')).reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+            const lateDeduction = (Array.isArray(slip.deductions) ? slip.deductions : []).filter((d: any) => String(d.name).includes('تأخير')).reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+            const overtimeAllowance = (Array.isArray(slip.allowances) ? slip.allowances : []).filter((a: any) => String(a.name).includes('ساعات إضافية')).reduce((sum: number, a: any) => sum + Number(a.amount || 0), 0);
+            return {
+                teacherName: getName(String(slip.personId)),
+                month: slip.month,
+                baseAmount: Number(slip.baseAmount || 0),
+                allowancesTotal: Number(slip.allowancesTotal || 0),
+                deductionsTotal: Number(slip.deductionsTotal || 0),
+                netAmount: Number(slip.netAmount || 0),
+                absenceDeduction,
+                lateDeduction,
+                overtimeAllowance,
+            };
+        });
+    }, [salarySlips, teachers]);
+
+    const exportTeacherPayrollCSV = () => {
+        const headers = ['المعلم','الشهر','الأساسي','البدلات','الخصومات','الصافي','خصم الغياب','خصم التأخير','علاوة الإضافي'];
+        const rows = teacherPayrollImpact.map(r => [r.teacherName, r.month, r.baseAmount, r.allowancesTotal, r.deductionsTotal, r.netAmount, r.absenceDeduction, r.lateDeduction, r.overtimeAllowance]);
+        const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `تقارير-رواتب-المعلمين-${month}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const exportTeacherPayrollPDF = () => {
+        const w = window.open('', '_blank');
+        if (!w) return;
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>تقارير الرواتب</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:right}th{background:#f3f4f6}</style></head><body><h3>تأثير الحضور على رواتب المعلمين (${month})</h3><table><thead><tr><th>المعلم</th><th>الشهر</th><th>الأساسي</th><th>البدلات</th><th>الخصومات</th><th>الصافي</th><th>خصم الغياب</th><th>خصم التأخير</th><th>علاوة الإضافي</th></tr></thead><tbody>${teacherPayrollImpact.map(r => `<tr><td>${r.teacherName}</td><td>${r.month}</td><td>${r.baseAmount.toFixed(2)}</td><td>${r.allowancesTotal.toFixed(2)}</td><td>${r.deductionsTotal.toFixed(2)}</td><td>${r.netAmount.toFixed(2)}</td><td>${r.absenceDeduction.toFixed(2)}</td><td>${r.lateDeduction.toFixed(2)}</td><td>${r.overtimeAllowance.toFixed(2)}</td></tr>`).join('')}</tbody></table></body></html>`;
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        w.print();
+    };
 
     if (loading) {
         return <div className="text-center p-8">جاري تحميل التقارير...</div>;
@@ -100,6 +157,34 @@ const Reports: React.FC<ReportsProps> = ({ schoolSettings }) => {
                         </PieChart>
                     </ResponsiveContainer>
                 </BrandableCard>
+            <BrandableCard schoolSettings={schoolSettings}>
+                <div className="flex items-center justify-between mb-4"><h3 className="font-semibold text-lg text-gray-800 dark:text-white">تأثير الحضور على رواتب المعلمين (شهريًا)</h3></div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                    <button onClick={exportTeacherPayrollPDF} className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"><DownloadIcon className="h-4 w-4 ml-2" />تصدير PDF</button>
+                    <button onClick={exportTeacherPayrollCSV} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"><DownloadIcon className="h-4 w-4 ml-2" />تصدير CSV</button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th className="px-6 py-3">المعلم</th><th className="px-6 py-3">الشهر</th><th className="px-6 py-3">الأساسي</th><th className="px-6 py-3">البدلات</th><th className="px-6 py-3">الخصومات</th><th className="px-6 py-3">الصافي</th><th className="px-6 py-3">خصم الغياب</th><th className="px-6 py-3">خصم التأخير</th><th className="px-6 py-3">علاوة الإضافي</th></tr></thead>
+                        <tbody>
+                            {teacherPayrollImpact.map(r => (
+                                <tr key={`${r.teacherName}-${r.month}`} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{r.teacherName}</td>
+                                    <td className="px-6 py-4">{r.month}</td>
+                                    <td className="px-6 py-4">{r.baseAmount.toFixed(2)}</td>
+                                    <td className="px-6 py-4">{r.allowancesTotal.toFixed(2)}</td>
+                                    <td className="px-6 py-4">{r.deductionsTotal.toFixed(2)}</td>
+                                    <td className="px-6 py-4 font-semibold">{r.netAmount.toFixed(2)}</td>
+                                    <td className="px-6 py-4">{r.absenceDeduction.toFixed(2)}</td>
+                                    <td className="px-6 py-4">{r.lateDeduction.toFixed(2)}</td>
+                                    <td className="px-6 py-4">{r.overtimeAllowance.toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </BrandableCard>
                 <BrandableCard schoolSettings={schoolSettings} className="h-96">
                     <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-4">متوسط الأداء الأكاديمي حسب المادة</h3>
                      <ResponsiveContainer width="100%" height="100%">
