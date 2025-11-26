@@ -159,8 +159,8 @@ export const createTeacher = async (teacherData: NewTeacherData): Promise<Teache
     });
 };
 
-export const updateTeacher = async (id: string, teacherData: UpdatableTeacherData): Promise<Teacher> => {
-    return await apiCall(`/teachers/${id}`, {
+export const updateTeacher = async (schoolId: number, id: string | number, teacherData: UpdatableTeacherData): Promise<Teacher> => {
+    return await apiCall(`/school/${schoolId}/teachers/${id}`, {
         method: 'PUT',
         body: JSON.stringify(teacherData),
     });
@@ -241,7 +241,7 @@ export const assignSalaryStructureToStaff = async (schoolId: number, userId: str
     return await apiCall(`/school/${schoolId}/staff/${userId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
 };
 
-export const assignSalaryStructureToTeacher = async (schoolId: number, teacherId: string, salaryStructureId: string): Promise<{ id: string; salaryStructureId: string; }> => {
+export const assignSalaryStructureToTeacher = async (schoolId: number, teacherId: string | number, salaryStructureId: string): Promise<{ id: string | number; salaryStructureId: string; }> => {
     return await apiCall(`/school/${schoolId}/teachers/${teacherId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
 };
 
@@ -273,7 +273,7 @@ export const createStaffAttendance = async (schoolId: number, payload: { userId:
     return await apiCall(`/school/${schoolId}/staff-attendance`, { method: 'POST', body: JSON.stringify(payload) });
 };
 
-export const createTeacherAttendance = async (schoolId: number, payload: { teacherId: string; date: string; checkIn?: string; checkOut?: string; hoursWorked?: number; status?: 'Present' | 'Absent' | 'Late'; overtimeMinutes?: number; lateMinutes?: number; }): Promise<any> => {
+export const createTeacherAttendance = async (schoolId: number, payload: { teacherId: string | number; date: string; checkIn?: string; checkOut?: string; hoursWorked?: number; status?: 'Present' | 'Absent' | 'Late'; overtimeMinutes?: number; lateMinutes?: number; }): Promise<any> => {
     return await apiCall(`/school/${schoolId}/teacher-attendance`, { method: 'POST', body: JSON.stringify(payload) });
 };
 
@@ -552,7 +552,7 @@ export const getSchoolEvents = async (schoolId: number): Promise<SchoolEvent[]> 
     return await apiCall(`/school/${schoolId}/events`, { method: 'GET' });
 };
 
-export const getTeacherClasses = async (teacherId: string): Promise<Class[]> => {
+export const getTeacherClasses = async (teacherId: string | number): Promise<Class[]> => {
     return await apiCall(`/teacher/${teacherId}/classes`, { method: 'GET' });
 };
 
@@ -578,7 +578,7 @@ export const saveGrades = async (entries: StudentGrades[]): Promise<{ ok: boolea
     return await apiCall(`/school/${schoolId}/grades`, { method: 'POST', body: JSON.stringify({ entries }) });
 };
 
-export const getTeacherSchedule = async (teacherId: string): Promise<ScheduleEntry[]> => {
+export const getTeacherSchedule = async (teacherId: string | number): Promise<ScheduleEntry[]> => {
     return await apiCall(`/teacher/${teacherId}/schedule`, { method: 'GET' });
 };
 

@@ -14,15 +14,13 @@ router.get('/:teacherId/dashboard', verifyToken, requireRole('TEACHER'), async (
 
         const classesPromise = Class.findAll({
             where: {
-                // Find classes where this teacher is the homeroom teacher
-                // In a real app, this might be more complex (e.g., based on a junction table)
-                homeroomTeacherId: teacherId
+                homeroomTeacherId: Number(teacherId)
             }
         });
 
         const schedulePromise = Schedule.findAll({
             where: {
-                teacherId: teacherId,
+                teacherId: Number(teacherId),
                 day: today,
             },
             include: { model: Class, attributes: ['name'] },
@@ -31,7 +29,7 @@ router.get('/:teacherId/dashboard', verifyToken, requireRole('TEACHER'), async (
 
         const actionItemsPromise = Notification.findAll({
             where: {
-                teacherId: teacherId,
+                teacherId: Number(teacherId),
                 isRead: false
             },
             order: [['date', 'DESC']]
@@ -73,7 +71,7 @@ router.get('/:teacherId/classes', verifyToken, requireRole('TEACHER'), async (re
   try {
     const { teacherId } = req.params;
     if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
-    const classes = await Class.findAll({ where: { homeroomTeacherId: teacherId }, order: [['name','ASC']] });
+    const classes = await Class.findAll({ where: { homeroomTeacherId: Number(teacherId) }, order: [['name','ASC']] });
     res.json(classes.map(c => ({ ...c.toJSON(), subjects: ['الرياضيات', 'العلوم', 'اللغة الإنجليزية'] })));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
@@ -83,7 +81,7 @@ router.get('/:teacherId/schedule', verifyToken, requireRole('TEACHER'), async (r
   try {
     const { teacherId } = req.params;
     if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
-    const rows = await Schedule.findAll({ where: { teacherId }, order: [['day','ASC'],['timeSlot','ASC']] });
+    const rows = await Schedule.findAll({ where: { teacherId: Number(teacherId) }, order: [['day','ASC'],['timeSlot','ASC']] });
     res.json(rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: '', day: r.day, startTime: r.timeSlot.split(' - ')[0], endTime: r.timeSlot.split(' - ')[1] || r.timeSlot, subject: r.subject, teacher: '' })));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });

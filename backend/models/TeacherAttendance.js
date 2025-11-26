@@ -11,7 +11,7 @@ const TeacherAttendance = sequelize.define('TeacherAttendance', {
     allowNull: false,
   },
   teacherId: {
-    type: DataTypes.STRING,
+    type: DataTypes.INTEGER,
     allowNull: false,
   },
   date: {

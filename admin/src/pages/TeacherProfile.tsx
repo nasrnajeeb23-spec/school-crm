@@ -28,23 +28,25 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
   useEffect(() => {
     if (!teacherId) return;
     setLoading(true);
-    Promise.all([
-        // In real app, fetch teacher by ID. Here, we find from list.
-        api.getSchoolTeachers(schoolId).then(teachers => teachers.find(t => t.id === teacherId)),
-        api.getTeacherDetails(teacherId)
-    ]).then(([teacherData, detailsData]) => {
-      if (teacherData) setTeacher(teacherData);
-      setTeacherDetails(detailsData as { classes: Class[] });
-    }).catch(err => {
-      console.error("Failed to fetch teacher details:", err);
-      addToast("فشل تحميل بيانات المعلم.", "error");
-    }).finally(() => setLoading(false));
+    api.getSchoolTeachers(schoolId)
+      .then(list => list.find(t => String(t.id) === String(teacherId)))
+      .then(async (teacherData) => {
+        if (teacherData) setTeacher(teacherData);
+        const allClasses = await api.getClasses(schoolId);
+        const classes = allClasses.filter(c => String(c.homeroomTeacherName) === String(teacherData?.name));
+        setTeacherDetails({ classes } as { classes: Class[] });
+      })
+      .catch(err => {
+        console.error("Failed to fetch teacher details:", err);
+        addToast("فشل تحميل بيانات المعلم.", "error");
+      })
+      .finally(() => setLoading(false));
   }, [teacherId, schoolId, addToast]);
 
   const handleUpdateTeacher = async (data: UpdatableTeacherData) => {
     if (!teacher) return;
     try {
-        const updatedTeacher = await api.updateTeacher(teacher.id, data);
+        const updatedTeacher = await api.updateTeacher(schoolId, teacher.id, data);
         setTeacher(updatedTeacher);
         setIsEditModalOpen(false);
         addToast('تم تحديث بيانات المعلم بنجاح.', 'success');

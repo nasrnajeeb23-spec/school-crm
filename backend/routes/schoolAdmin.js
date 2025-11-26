@@ -234,7 +234,7 @@ router.put('/:schoolId/staff/:userId/salary-structure', verifyToken, requireRole
 // Assign salary structure to teacher
 router.put('/:schoolId/teachers/:teacherId/salary-structure', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const teacher = await Teacher.findOne({ where: { id: req.params.teacherId, schoolId: req.params.schoolId } });
+    const teacher = await Teacher.findOne({ where: { id: Number(req.params.teacherId), schoolId: Number(req.params.schoolId) } });
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
     const { salaryStructureId } = req.body || {};
     if (!salaryStructureId) return res.status(400).json({ msg: 'salaryStructureId required' });
@@ -359,7 +359,7 @@ router.get('/:schoolId/teacher-attendance', verifyToken, requireRole('SCHOOL_ADM
     const { date, teacherId } = req.query;
     const where = { schoolId: Number(req.params.schoolId) };
     if (date) where.date = String(date);
-    if (teacherId) where.teacherId = String(teacherId);
+    if (teacherId) where.teacherId = Number(teacherId);
     const rows = await TeacherAttendance.findAll({ where, order: [['date','DESC']] });
     res.json(rows.map(r => r.toJSON()));
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
@@ -369,7 +369,7 @@ router.post('/:schoolId/teacher-attendance', verifyToken, requireRole('SCHOOL_AD
     const { teacherId, date, checkIn, checkOut, hoursWorked, status, overtimeMinutes, lateMinutes } = req.body || {};
     if (!teacherId || !date) return res.status(400).json({ msg: 'teacherId and date required' });
     const id = 'teachatt_' + Date.now();
-    const row = await TeacherAttendance.create({ id, schoolId: Number(req.params.schoolId), teacherId: String(teacherId), date, checkIn: checkIn || null, checkOut: checkOut || null, hoursWorked: hoursWorked || null, status: status || 'Present', overtimeMinutes: overtimeMinutes || 0, lateMinutes: lateMinutes || 0 });
+    const row = await TeacherAttendance.create({ id, schoolId: Number(req.params.schoolId), teacherId: Number(teacherId), date, checkIn: checkIn || null, checkOut: checkOut || null, hoursWorked: hoursWorked || null, status: status || 'Present', overtimeMinutes: overtimeMinutes || 0, lateMinutes: lateMinutes || 0 });
     res.status(201).json(row.toJSON());
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
@@ -432,14 +432,13 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     }
 
     const newTeacher = await Teacher.create({
-      id: `tech_${Date.now()}`,
       name,
       subject,
       phone,
       department: department || null,
       bankAccount: bankAccount || null,
       schoolId: parseInt(schoolId),
-      status: 'Active', // Default status
+      status: 'Active',
       joinDate: new Date(),
     });
 
@@ -476,7 +475,7 @@ router.put('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_AD
     if (!name || !subject || !phone || !status) {
       return res.status(400).json({ msg: 'Missing required fields' });
     }
-    const teacher = await Teacher.findByPk(req.params.teacherId);
+    const teacher = await Teacher.findByPk(Number(req.params.teacherId));
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
     teacher.name = name;
     teacher.subject = subject;
@@ -601,7 +600,7 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     if (!name || !gradeLevel || !homeroomTeacherId || !Array.isArray(subjects)) {
       return res.status(400).json({ msg: 'Missing required fields' });
     }
-    const teacher = await Teacher.findByPk(homeroomTeacherId);
+    const teacher = await Teacher.findByPk(Number(homeroomTeacherId));
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
     const newClass = await Class.create({
       id: `cls_${Date.now()}`,
@@ -611,7 +610,7 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       studentCount: 0,
       capacity: typeof capacity === 'number' ? capacity : 30,
       schoolId: parseInt(req.params.schoolId, 10),
-      homeroomTeacherId: homeroomTeacherId,
+      homeroomTeacherId: Number(homeroomTeacherId),
     });
     res.status(201).json({ ...newClass.toJSON(), subjects });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
