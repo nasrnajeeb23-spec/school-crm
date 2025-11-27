@@ -91,7 +91,7 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
 ]), async (req, res) => {
   try {
     const { schoolId } = req.params;
-    const { name, grade, parentName, dateOfBirth } = req.body;
+    const { name, grade, parentName, dateOfBirth, address, city, homeLocation, lat, lng } = req.body;
 
     const school = await School.findByPk(schoolId);
     if (!school) {
@@ -108,6 +108,7 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
       status: 'Active', // Default status
       registrationDate: new Date(),
       profileImageUrl: `https://picsum.photos/seed/std_${Date.now()}/100/100`,
+      homeLocation: homeLocation || ((address || city || lat !== undefined || lng !== undefined) ? { address: address || '', city: city || '', ...(lat !== undefined ? { lat: Number(lat) } : {}), ...(lng !== undefined ? { lng: Number(lng) } : {}) } : null),
     });
 
     // Increment student count in the school

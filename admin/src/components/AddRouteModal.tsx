@@ -11,6 +11,7 @@ const AddRouteModal: React.FC<AddRouteModalProps> = ({ busOperators, onClose, on
     const [formData, setFormData] = useState({
         name: '',
         busOperatorId: busOperators.length > 0 ? busOperators[0].id : null,
+        departureTime: '',
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -45,6 +46,10 @@ const AddRouteModal: React.FC<AddRouteModalProps> = ({ busOperators, onClose, on
                                 <option key={op.id} value={op.id}>{op.name} ({op.busPlateNumber})</option>
                             ))}
                         </select>
+                    </div>
+                    <div>
+                        <label htmlFor="departureTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300">وقت الانطلاق (اختياري)</label>
+                        <input type="time" name="departureTime" id="departureTime" value={formData.departureTime} onChange={handleChange} className={inputStyle} />
                     </div>
                     <div className="flex justify-end gap-4 pt-4">
                         <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">إلغاء</button>

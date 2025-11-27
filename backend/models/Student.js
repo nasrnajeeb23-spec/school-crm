@@ -38,6 +38,10 @@ const Student = sequelize.define('Student', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  homeLocation: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   // Foreign keys schoolId, parentId are added via association
 }, {
   indexes: [

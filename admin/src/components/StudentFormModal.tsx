@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NewStudentData, Class } from '../types';
+import type { NewStudentData, Class } from '../types';
 import * as api from '../api';
 
 interface StudentFormModalProps {
@@ -9,7 +9,7 @@ interface StudentFormModalProps {
 }
 
 const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, schoolId }) => {
-  const [studentData, setStudentData] = useState<NewStudentData>({
+  const [studentData, setStudentData] = useState<NewStudentData({
     name: '',
     grade: '',
     parentName: '',
@@ -20,6 +20,8 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
     parentEmail: '',
     address: '',
     city: '',
+    lat: undefined,
+    lng: undefined,
     admissionDate: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
@@ -39,7 +41,7 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setStudentData(prev => ({ ...prev, [name]: value }));
+    setStudentData(prev => ({ ...prev, [name]: (name === 'lat' || name === 'lng') ? (value ? Number(value) : undefined) : value }));
     setErrors(prev => ({
       ...prev,
       [name]: (name === 'name' && !value.trim()) ? 'اسم الطالب مطلوب.' :
@@ -169,6 +171,16 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
               <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المدينة</label>
               <input type="text" name="city" id="city" value={studentData.city} onChange={handleChange} required className={inputStyle} />
               {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="lat" className="block text-sm font-medium text-gray-700 dark:text-gray-300">خط العرض (اختياري)</label>
+              <input type="number" step="any" name="lat" id="lat" value={studentData.lat ?? ''} onChange={handleChange} className={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="lng" className="block text-sm font-medium text-gray-700 dark:text-gray-300">خط الطول (اختياري)</label>
+              <input type="number" step="any" name="lng" id="lng" value={studentData.lng ?? ''} onChange={handleChange} className={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

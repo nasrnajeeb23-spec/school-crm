@@ -716,6 +716,18 @@ export const updateRouteStudents = async (schoolId: number, routeId: string, stu
     return await apiCall(`/transportation/${schoolId}/routes/${routeId}/students`, { method: 'PUT', body: JSON.stringify({ studentIds }) });
 };
 
+export const updateRouteConfig = async (schoolId: number, routeId: string, data: Partial<Route>): Promise<Route> => {
+    return await apiCall(`/transportation/${schoolId}/routes/${routeId}/config`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
+export const autoAssignRoutes = async (schoolId: number, options: { mode?: 'geo' | 'text'; fillToCapacity?: boolean; skipMissingLocation?: boolean } = {}): Promise<{ assigned: any[]; skipped: any[]; capacityMap: Record<string, any> }> => {
+    return await apiCall(`/transportation/${schoolId}/auto-assign`, { method: 'POST', body: JSON.stringify(options) });
+};
+
+export const autoAssignPreview = async (schoolId: number, options: { mode?: 'geo' | 'text'; fillToCapacity?: boolean; skipMissingLocation?: boolean } = {}): Promise<{ assigned: any[]; skipped: any[]; capacityMap: Record<string, any> }> => {
+    return await apiCall(`/transportation/${schoolId}/auto-assign/preview`, { method: 'POST', body: JSON.stringify(options) });
+};
+
 export const createConversation = async (payload: any): Promise<any> => {
     return await apiCall('/messaging/conversations', { method: 'POST', body: JSON.stringify(payload) });
 };

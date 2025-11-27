@@ -374,6 +374,7 @@ export interface Student {
     registrationDate: string;
     profileImageUrl: string;
     dateOfBirth: string;
+    homeLocation?: { address?: string; city?: string; lat?: number; lng?: number } | null;
 }
 
 export interface NewStudentData {
@@ -387,6 +388,8 @@ export interface NewStudentData {
     parentEmail: string;
     address: string;
     city: string;
+    lat?: number;
+    lng?: number;
     admissionDate: string;
     emergencyContactName: string;
     emergencyContactPhone: string;
@@ -692,6 +695,8 @@ export interface Route {
     id: string;
     name: string;
     busOperatorId: string | null;
+    departureTime?: string | null;
+    stops?: { name: string; time?: string; lat?: number; lng?: number }[];
     studentIds: string[];
 }
 

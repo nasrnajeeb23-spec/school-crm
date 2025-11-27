@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+declare const L: any;
 import { BusOperator, Route } from '../types';
 import * as api from '../api';
 import { BusIcon, UsersIcon } from '../components/icons';
@@ -10,6 +11,7 @@ const ParentTransportation: React.FC = () => {
     const [details, setDetails] = useState<{
         route: Route;
         operator: BusOperator | undefined;
+        nearestStop?: { name: string; lat?: number; lng?: number; time?: string; distanceKm?: number } | null;
     } | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -41,6 +43,19 @@ const ParentTransportation: React.FC = () => {
     }
 
     const { route, operator } = details;
+    const mapEl = useRef<HTMLDivElement | null>(null);
+    const mapInst = useRef<any>(null);
+    useEffect(() => {
+        const s = details?.nearestStop;
+        if (!s || typeof s.lat !== 'number' || typeof s.lng !== 'number') return;
+        if (!mapEl.current) return;
+        if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; }
+        const m = L.map(mapEl.current).setView([s.lat, s.lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(m);
+        L.marker([s.lat, s.lng]).addTo(m).bindPopup(s.name || 'نقطة توقف');
+        mapInst.current = m;
+        return () => { if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; } };
+    }, [details?.nearestStop?.lat, details?.nearestStop?.lng]);
 
     return (
         <div className="mt-6 space-y-6">
@@ -49,17 +64,15 @@ const ParentTransportation: React.FC = () => {
                     تتبع الحافلة - {route.name}
                 </h3>
                 <div className="relative h-64 md:h-80 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
-                    {/* This is a mock map image. In a real app, this would be an interactive map component. */}
-                    <img src="https://www.google.com/maps/d/u/0/thumbnail?mid=1_A-4a_x8sXAMJv23-CR22xYySPc&hl=en" alt="خريطة المسار" className="w-full h-full object-cover" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse">
-                         <BusIcon className="w-10 h-10 text-rose-500 drop-shadow-lg" />
-                         <span className="absolute top-0 right-0 -mr-2 -mt-2 flex h-5 w-5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-5 w-5 bg-rose-500"></span>
-                        </span>
-                    </div>
-                     <div className="absolute bottom-2 right-2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-md text-xs">
-                        آخر تحديث: الآن
+                    {details?.nearestStop?.lat && details?.nearestStop?.lng ? (
+                        <div ref={mapEl} className="w-full h-full" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-sm text-gray-600 dark:text-gray-300">لا تتوفر إحداثيات لعرض الخريطة</div>
+                    )}
+                    <div className="absolute bottom-2 right-2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-md text-xs">
+                        {details?.nearestStop ? (
+                            <span>أقرب نقطة: {details.nearestStop.name} {details.nearestStop.distanceKm ? `(${details.nearestStop.distanceKm} كم)` : ''}</span>
+                        ) : 'لا توجد نقطة قريبة'}
                     </div>
                 </div>
             </div>
@@ -71,6 +84,7 @@ const ParentTransportation: React.FC = () => {
                         <p><strong>رقم اللوحة:</strong> {operator.busPlateNumber}</p>
                         <p><strong>الموديل:</strong> {operator.busModel}</p>
                         <p><strong>السعة:</strong> {operator.busCapacity} مقعد</p>
+                        <p><strong>وقت الانطلاق:</strong> {route.departureTime || 'غير محدد'}</p>
                     </div>
                 </div>
                  <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
@@ -79,6 +93,23 @@ const ParentTransportation: React.FC = () => {
                         <p><strong>الاسم:</strong> {operator.name}</p>
                         <p><strong>رقم الهاتف:</strong> <a href={`tel:${operator.phone}`} className="text-teal-500 hover:underline" dir="ltr">{operator.phone}</a></p>
                     </div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md md:col-span-2">
+                    <h4 className="font-semibold text-lg mb-3">نقاط التوقف</h4>
+                    {Array.isArray(route.stops) && route.stops.length > 0 ? (
+                        <ul className="list-disc pr-6 space-y-1 text-sm">
+                            {route.stops.map((s, i) => (
+                                <li key={i} className="flex items-center justify-between">
+                                  <span>{s.name} {s.time ? `- ${s.time}` : ''}</span>
+                                  {(typeof s.lat === 'number' && typeof s.lng === 'number') && (
+                                    <a href={`https://maps.google.com/?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">فتح على الخريطة</a>
+                                  )}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">لا توجد نقاط توقف محددة.</p>
+                    )}
                 </div>
             </div>
         </div>
