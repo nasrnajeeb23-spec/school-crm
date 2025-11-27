@@ -7,7 +7,7 @@ import {
 } from './types';
 
 // 🔗 الاتصال بالـ Backend الحقيقي على Render
-const API_BASE_URL = process.env.REACT_APP_API_URL || (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') || 'https://school-crschool-crm-backendm.onrender.com/api';
+const API_BASE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;

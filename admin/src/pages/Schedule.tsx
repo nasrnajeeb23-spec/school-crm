@@ -181,7 +181,7 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
                             onChange={(e) => setSelectedClass(e.target.value)}
                             className="w-full md:w-80 pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
                         >
-                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {classes.map(c => <option key={c.id} value={c.id}>{`${c.gradeLevel} (${c.section || 'أ'})`}</option>)}
                         </select>
                     </div>
                 </div>

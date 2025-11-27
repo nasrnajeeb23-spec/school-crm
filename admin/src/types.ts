@@ -262,7 +262,17 @@ export interface SchoolSettings {
         email: boolean;
         sms: boolean;
         push: boolean;
-    }
+    };
+    admissionForm?: {
+        studentFields?: string[];
+        parentFields?: string[];
+        requiredDocuments?: string[];
+        registrationFee?: number;
+        consentFormRequired?: boolean;
+        consentFormText?: string;
+        autoGenerateRegistrationInvoice?: boolean;
+        registrationFeeDueDays?: number;
+    };
 }
 
 

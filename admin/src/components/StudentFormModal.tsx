@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { NewStudentData, Class } from '../types';
+import type { NewStudentData, Class, SchoolSettings } from '../types';
 import * as api from '../api';
 
 interface StudentFormModalProps {
@@ -31,12 +31,17 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
   const [errors, setErrors] = useState<Partial<Record<keyof NewStudentData, string>>>({});
   const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
+  const [consentAccepted, setConsentAccepted] = useState<boolean>(false);
 
   useEffect(() => {
     if (!schoolId) return;
     api.getSchoolClasses(schoolId)
       .then(setAvailableClasses)
       .catch(() => setAvailableClasses([]));
+    api.getSchoolSettings(schoolId)
+      .then(setSchoolSettings)
+      .catch(() => setSchoolSettings(null));
   }, [schoolId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -60,19 +65,22 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
   
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof NewStudentData, string>> = {};
-    if (!studentData.name.trim()) newErrors.name = "اسم الطالب مطلوب.";
+    if (showStudentField('الاسم الكامل') && !studentData.name.trim()) newErrors.name = "اسم الطالب مطلوب.";
     if (!studentData.grade.trim()) newErrors.grade = "الصف الدراسي مطلوب.";
-    if (!studentData.parentName.trim()) newErrors.parentName = "اسم ولي الأمر مطلوب.";
-    if (!studentData.dateOfBirth) newErrors.dateOfBirth = "تاريخ الميلاد مطلوب.";
-    if (!studentData.parentPhone.trim()) newErrors.parentPhone = "هاتف ولي الأمر مطلوب.";
-    if (!studentData.parentEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentData.parentEmail)) newErrors.parentEmail = "بريد ولي الأمر غير صالح.";
-    if (!studentData.address.trim()) newErrors.address = "العنوان مطلوب.";
-    if (!studentData.city.trim()) newErrors.city = "المدينة مطلوبة.";
-    if (!studentData.admissionDate) newErrors.admissionDate = "تاريخ القبول مطلوب.";
+    if (showStudentField('تاريخ الميلاد') && !studentData.dateOfBirth) newErrors.dateOfBirth = "تاريخ الميلاد مطلوب.";
+    if (showParentField('الاسم') && !studentData.parentName.trim()) newErrors.parentName = "اسم ولي الأمر مطلوب.";
+    if (showParentField('هاتف الاتصال') && !studentData.parentPhone.trim()) newErrors.parentPhone = "هاتف ولي الأمر مطلوب.";
+    if (showParentField('بريد الإلكتروني') && (!studentData.parentEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentData.parentEmail))) newErrors.parentEmail = "بريد ولي الأمر غير صالح.";
+    if (showStudentField('العنوان') && !studentData.address.trim()) newErrors.address = "العنوان مطلوب.";
+    if (showStudentField('المدينة') && !studentData.city.trim()) newErrors.city = "المدينة مطلوبة.";
+    if (showStudentField('تاريخ القبول') && !studentData.admissionDate) newErrors.admissionDate = "تاريخ القبول مطلوب.";
     if (!studentData.emergencyContactName.trim()) newErrors.emergencyContactName = "اسم جهة الطوارئ مطلوب.";
     if (!studentData.emergencyContactPhone.trim()) newErrors.emergencyContactPhone = "هاتف جهة الطوارئ مطلوب.";
+    if (schoolSettings?.admissionForm?.consentFormRequired && !consentAccepted) newErrors.name = (newErrors.name || '') + '';
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const ok = Object.keys(newErrors).length === 0;
+    if (schoolSettings?.admissionForm?.consentFormRequired && !consentAccepted) return false;
+    return ok;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,11 +105,13 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
       >
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">إضافة طالب جديد</h2>
         <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto pr-2 space-y-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الاسم الكامل</label>
-            <input type="text" name="name" id="name" value={studentData.name} onChange={handleChange} required className={inputStyle} />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-          </div>
+          {showStudentField('الاسم الكامل') && (
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الاسم الكامل</label>
+              <input type="text" name="name" id="name" value={studentData.name} onChange={handleChange} required className={inputStyle} />
+              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="grade" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اختيار الفصل</label>
@@ -124,54 +134,70 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
               )}
               {errors.grade && <p className="text-red-500 text-xs mt-1">{errors.grade}</p>}
             </div>
-            <div>
-              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 dark:text-gray-300">تاريخ الميلاد</label>
-              <input type="date" name="dateOfBirth" id="dateOfBirth" value={studentData.dateOfBirth} onChange={handleChange} required className={inputStyle} />
-              {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
-            </div>
+            {showStudentField('تاريخ الميلاد') && (
+              <div>
+                <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 dark:text-gray-300">تاريخ الميلاد</label>
+                <input type="date" name="dateOfBirth" id="dateOfBirth" value={studentData.dateOfBirth} onChange={handleChange} required className={inputStyle} />
+                {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الجنس</label>
-              <select name="gender" id="gender" value={studentData.gender} onChange={handleChange} className={inputStyle}>
-                <option value="ذكر">ذكر</option>
-                <option value="أنثى">أنثى</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الرقم الوطني (اختياري)</label>
-              <input type="text" name="nationalId" id="nationalId" value={studentData.nationalId} onChange={handleChange} className={inputStyle} />
-              {errors.nationalId && <p className="text-red-500 text-xs mt-1">{errors.nationalId}</p>}
-            </div>
+            {showStudentField('الجنس') && (
+              <div>
+                <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الجنس</label>
+                <select name="gender" id="gender" value={studentData.gender} onChange={handleChange} className={inputStyle}>
+                  <option value="ذكر">ذكر</option>
+                  <option value="أنثى">أنثى</option>
+                </select>
+              </div>
+            )}
+            {showStudentField('الرقم الوطني') && (
+              <div>
+                <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الرقم الوطني (اختياري)</label>
+                <input type="text" name="nationalId" id="nationalId" value={studentData.nationalId} onChange={handleChange} className={inputStyle} />
+                {errors.nationalId && <p className="text-red-500 text-xs mt-1">{errors.nationalId}</p>}
+              </div>
+            )}
           </div>
-          <div>
-            <label htmlFor="parentName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم ولي الأمر</label>
-            <input type="text" name="parentName" id="parentName" value={studentData.parentName} onChange={handleChange} required className={inputStyle} />
-            {errors.parentName && <p className="text-red-500 text-xs mt-1">{errors.parentName}</p>}
+          {showParentField('الاسم') && (
+            <div>
+              <label htmlFor="parentName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم ولي الأمر</label>
+              <input type="text" name="parentName" id="parentName" value={studentData.parentName} onChange={handleChange} required className={inputStyle} />
+              {errors.parentName && <p className="text-red-500 text-xs mt-1">{errors.parentName}</p>}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {showParentField('هاتف الاتصال') && (
+              <div>
+                <label htmlFor="parentPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">هاتف ولي الأمر</label>
+                <input type="tel" name="parentPhone" id="parentPhone" value={studentData.parentPhone} onChange={handleChange} required className={inputStyle} />
+                {errors.parentPhone && <p className="text-red-500 text-xs mt-1">{errors.parentPhone}</p>}
+              </div>
+            )}
+            {showParentField('بريد الإلكتروني') && (
+              <div>
+                <label htmlFor="parentEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">بريد ولي الأمر</label>
+                <input type="email" name="parentEmail" id="parentEmail" value={studentData.parentEmail} onChange={handleChange} required className={inputStyle} />
+                {errors.parentEmail && <p className="text-red-500 text-xs mt-1">{errors.parentEmail}</p>}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="parentPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">هاتف ولي الأمر</label>
-              <input type="tel" name="parentPhone" id="parentPhone" value={studentData.parentPhone} onChange={handleChange} required className={inputStyle} />
-              {errors.parentPhone && <p className="text-red-500 text-xs mt-1">{errors.parentPhone}</p>}
-            </div>
-            <div>
-              <label htmlFor="parentEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">بريد ولي الأمر</label>
-              <input type="email" name="parentEmail" id="parentEmail" value={studentData.parentEmail} onChange={handleChange} required className={inputStyle} />
-              {errors.parentEmail && <p className="text-red-500 text-xs mt-1">{errors.parentEmail}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300">العنوان</label>
-              <input type="text" name="address" id="address" value={studentData.address} onChange={handleChange} required className={inputStyle} />
-              {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
-            </div>
-            <div>
-              <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المدينة</label>
-              <input type="text" name="city" id="city" value={studentData.city} onChange={handleChange} required className={inputStyle} />
-              {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-            </div>
+            {showStudentField('العنوان') && (
+              <div>
+                <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300">العنوان</label>
+                <input type="text" name="address" id="address" value={studentData.address} onChange={handleChange} required className={inputStyle} />
+                {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
+              </div>
+            )}
+            {showStudentField('المدينة') && (
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المدينة</label>
+                <input type="text" name="city" id="city" value={studentData.city} onChange={handleChange} required className={inputStyle} />
+                {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -184,11 +210,13 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="admissionDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">تاريخ القبول</label>
-              <input type="date" name="admissionDate" id="admissionDate" value={studentData.admissionDate} onChange={handleChange} required className={inputStyle} />
-              {errors.admissionDate && <p className="text-red-500 text-xs mt-1">{errors.admissionDate}</p>}
-            </div>
+            {showStudentField('تاريخ القبول') && (
+              <div>
+                <label htmlFor="admissionDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">تاريخ القبول</label>
+                <input type="date" name="admissionDate" id="admissionDate" value={studentData.admissionDate} onChange={handleChange} required className={inputStyle} />
+                {errors.admissionDate && <p className="text-red-500 text-xs mt-1">{errors.admissionDate}</p>}
+              </div>
+            )}
             <div>
               <label htmlFor="medicalNotes" className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملاحظات طبية (اختياري)</label>
               <input type="text" name="medicalNotes" id="medicalNotes" value={studentData.medicalNotes || ''} onChange={handleChange} className={inputStyle} />
@@ -206,6 +234,27 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
               {errors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{errors.emergencyContactPhone}</p>}
             </div>
           </div>
+          {schoolSettings?.admissionForm?.consentFormRequired && (
+            <div className="space-y-2 pt-2">
+              <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-700 dark:text-gray-300">
+                {schoolSettings?.admissionForm?.consentFormText || 'يرجى قراءة شروط الموافقة بعناية قبل متابعة التسجيل.'}
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="consent" checked={consentAccepted} onChange={e => setConsentAccepted(e.target.checked)} className="form-checkbox h-5 w-5 text-teal-600" />
+                <label htmlFor="consent" className="text-sm text-gray-700 dark:text-gray-300">أوافق على نموذج الموافقة وسياسة التسجيل</label>
+              </div>
+            </div>
+          )}
+          {Array.isArray(schoolSettings?.admissionForm?.requiredDocuments) && schoolSettings!.admissionForm!.requiredDocuments!.length > 0 && (
+            <div className="mt-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-700 dark:text-gray-300">
+              <div className="font-medium mb-1">المرفقات المطلوبة:</div>
+              <ul className="list-disc pr-5 space-y-1">
+                {schoolSettings!.admissionForm!.requiredDocuments!.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex justify-end gap-4 pt-4">
             <button
               type="button"
@@ -229,3 +278,11 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
 };
 
 export default StudentFormModal;
+  const showStudentField = (label: string) => {
+    const arr = schoolSettings?.admissionForm?.studentFields;
+    return !arr || arr.includes(label);
+  };
+  const showParentField = (label: string) => {
+    const arr = schoolSettings?.admissionForm?.parentFields;
+    return !arr || arr.includes(label);
+  };

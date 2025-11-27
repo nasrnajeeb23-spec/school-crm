@@ -149,6 +149,16 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     }
   };
 
+  const handleAdmissionFieldToggle = (key: 'studentFields' | 'parentFields' | 'requiredDocuments', value: string) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const current = prev.admissionForm && Array.isArray((prev.admissionForm as any)[key]) ? (prev.admissionForm as any)[key] as string[] : [];
+      const exists = current.includes(value);
+      const next = exists ? current.filter(v => v !== value) : [...current, value];
+      return { ...prev, admissionForm: { ...prev.admissionForm, [key]: next } };
+    });
+  };
+
   if (loading) {
     return <div className="text-center p-8">جاري تحميل الإعدادات...</div>;
   }
@@ -319,7 +329,70 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                   </div>
                 </div>
             </div>
-            
+
+            <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">إعداد نماذج التسجيل</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">بيانات الطالب المطلوبة</label>
+                    <div className="mt-2 space-y-2">
+                      {['الاسم الكامل','تاريخ الميلاد','الجنس','الرقم الوطني','العنوان','المدينة','تاريخ القبول'].map((field, idx) => (
+                        <label key={idx} className="flex items-center space-x-2 rtl:space-x-reverse">
+                          <input type="checkbox" checked={settings.admissionForm?.studentFields?.includes(field) || false} onChange={() => handleAdmissionFieldToggle('studentFields', field)} className="form-checkbox h-5 w-5 text-teal-600" />
+                          <span className="text-gray-700 dark:text-gray-300">{field}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">بيانات ولي الأمر المطلوبة</label>
+                    <div className="mt-2 space-y-2">
+                      {['الاسم','هاتف الاتصال','بريد الإلكتروني','العلاقة بالطالب'].map((field, idx) => (
+                        <label key={idx} className="flex items-center space-x-2 rtl:space-x-reverse">
+                          <input type="checkbox" checked={settings.admissionForm?.parentFields?.includes(field) || false} onChange={() => handleAdmissionFieldToggle('parentFields', field)} className="form-checkbox h-5 w-5 text-teal-600" />
+                          <span className="text-gray-700 dark:text-gray-300">{field}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">المرفقات المطلوبة</label>
+                    <div className="mt-2 space-y-2">
+                      {['صورة شخصية','نسخة من شهادة الميلاد','نسخة من بطاقة الهوية','شهادة تحصيل'].map((doc, idx) => (
+                        <label key={idx} className="flex items-center space-x-2 rtl:space-x-reverse">
+                          <input type="checkbox" checked={settings.admissionForm?.requiredDocuments?.includes(doc) || false} onChange={() => handleAdmissionFieldToggle('requiredDocuments', doc)} className="form-checkbox h-5 w-5 text-teal-600" />
+                          <span className="text-gray-700 dark:text-gray-300">{doc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="registrationFee" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رسوم التسجيل (إن وجدت)</label>
+                    <input type="number" min="0" name="registrationFee" id="registrationFee" value={(settings.admissionForm?.registrationFee ?? 0).toString()} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, registrationFee: Number(e.target.value) } } : null)} className={inputStyle} />
+                  </div>
+                  <div>
+                    <label htmlFor="registrationFeeDueDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300">أيام حتى الاستحقاق</label>
+                    <input type="number" min="0" name="registrationFeeDueDays" id="registrationFeeDueDays" value={(settings.admissionForm?.registrationFeeDueDays ?? 7).toString()} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, registrationFeeDueDays: Number(e.target.value) } } : null)} className={inputStyle} />
+                  </div>
+                  <div>
+                    <label className="flex items-center space-x-2 rtl:space-x-reverse">
+                      <input type="checkbox" checked={settings.admissionForm?.autoGenerateRegistrationInvoice ?? true} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, autoGenerateRegistrationInvoice: e.target.checked } } : null)} className="form-checkbox h-5 w-5 text-teal-600" />
+                      <span className="text-gray-700 dark:text-gray-300">إنشاء فاتورة رسوم التسجيل تلقائياً</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="flex items-center space-x-2 rtl:space-x-reverse">
+                      <input type="checkbox" checked={settings.admissionForm?.consentFormRequired || false} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, consentFormRequired: e.target.checked } } : null)} className="form-checkbox h-5 w-5 text-teal-600" />
+                      <span className="text-gray-700 dark:text-gray-300">يتطلب نموذج موافقة</span>
+                    </label>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label htmlFor="consentFormText" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نص نموذج الموافقة</label>
+                    <textarea id="consentFormText" value={settings.admissionForm?.consentFormText || ''} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, consentFormText: e.target.value } } : null)} rows={3} className={inputStyle}></textarea>
+                  </div>
+                </div>
+            </div>
+
             <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">إعدادات الإشعارات</h4>
                  <div className="flex flex-col sm:flex-row gap-6">

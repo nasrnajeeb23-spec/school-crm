@@ -13,9 +13,9 @@ interface AddClassModalProps {
 
 const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave, defaultStage, defaultGrade }) => {
   const [formData, setFormData] = useState({
-    name: '',
     stage: defaultStage || '',
     gradeLevel: defaultGrade || '',
+    section: 'أ',
     capacity: 30,
     homeroomTeacherId: '',
     subjects: ''
@@ -58,12 +58,14 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
     e.preventDefault();
     setIsSaving(true);
     const subjectsArray = formData.subjects.split(',').map(s => s.trim()).filter(s => s);
+    const computedName = formData.gradeLevel ? `${formData.gradeLevel} (${formData.section || 'أ'})` : '';
     await onSave({
-      name: formData.name,
+      name: computedName,
       gradeLevel: formData.gradeLevel,
       homeroomTeacherId: formData.homeroomTeacherId,
       capacity: formData.capacity,
-      subjects: subjectsArray
+      subjects: subjectsArray,
+      section: formData.section
     });
     // The parent component will close the modal on success, so we don't necessarily need to set isSaving to false.
   };
@@ -75,10 +77,6 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6 m-4 modal-content-scale-up" onClick={e => e.stopPropagation()}>
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">إضافة فصل جديد</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم الفصل</label>
-            <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} required className={inputStyle} />
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="stage" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المرحلة الدراسية</label>
@@ -95,17 +93,30 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
               </select>
             </div>
             <div>
-              <label htmlFor="capacity" className="block text-sm font-medium text-gray-700 dark:text-gray-300">سعة الفصل</label>
-              <input type="number" min={10} max={200} name="capacity" id="capacity" value={formData.capacity} onChange={handleChange} required className={inputStyle} />
-            </div>
-            <div>
-              <label htmlFor="homeroomTeacherId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المعلم المسؤول</label>
-              <select name="homeroomTeacherId" id="homeroomTeacherId" value={formData.homeroomTeacherId} onChange={handleChange} disabled={loadingTeachers} className={inputStyle}>
-                {loadingTeachers ? <option>جاري تحميل المعلمين...</option> : teachers.map(teacher => (
-                  <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
-                ))}
+              <label htmlFor="section" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الشعبة</label>
+              <select name="section" id="section" value={formData.section} onChange={handleChange} required className={inputStyle}>
+                <option value="أ">أ</option>
+                <option value="ب">ب</option>
+                <option value="ج">ج</option>
+                <option value="د">د</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم الفصل (تلقائي)</label>
+            <input type="text" value={formData.gradeLevel ? `${formData.gradeLevel} (${formData.section || 'أ'})` : ''} readOnly className={inputStyle} />
+          </div>
+          <div>
+            <label htmlFor="capacity" className="block text-sm font-medium text-gray-700 dark:text-gray-300">سعة الفصل</label>
+            <input type="number" min={10} max={200} name="capacity" id="capacity" value={formData.capacity} onChange={handleChange} required className={inputStyle} />
+          </div>
+          <div>
+            <label htmlFor="homeroomTeacherId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المعلم المسؤول</label>
+            <select name="homeroomTeacherId" id="homeroomTeacherId" value={formData.homeroomTeacherId} onChange={handleChange} disabled={loadingTeachers} className={inputStyle}>
+              {loadingTeachers ? <option>جاري تحميل المعلمين...</option> : teachers.map(teacher => (
+                <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label htmlFor="subjects" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المواد الدراسية (افصل بينها بفاصلة)</label>

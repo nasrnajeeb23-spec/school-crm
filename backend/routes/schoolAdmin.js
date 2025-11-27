@@ -1156,6 +1156,7 @@ router.get('/:schoolId/settings', verifyToken, async (req, res) => {
         departureTime: obj.departureTime || (obj.workingHoursEnd || ''),
         terms: Array.isArray(obj.terms) ? obj.terms : [ { name: 'الفصل الأول', start: obj.academicYearStart, end: '' }, { name: 'الفصل الثاني', start: '', end: obj.academicYearEnd } ],
         holidays: Array.isArray(obj.holidays) ? obj.holidays : [],
+        admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : (obj.admissionForm || { studentFields: ['الاسم الكامل','تاريخ الميلاد','الجنس','الرقم الوطني','العنوان','المدينة'], parentFields: ['الاسم','هاتف الاتصال','بريد الإلكتروني'], requiredDocuments: [], registrationFee: 0, consentFormRequired: false, consentFormText: '', autoGenerateRegistrationInvoice: true, registrationFeeDueDays: 7 }),
     });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
@@ -1168,7 +1169,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const { 
       schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
       genderType, levelType, ownershipType, availableStages, workingHoursStart, workingHoursEnd, workingDays,
-      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays
+      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays, admissionForm
     } = req.body;
     const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
     if (!settings) return res.status(404).json({ msg: 'Settings not found' });
@@ -1195,6 +1196,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     if (attendanceMethods !== undefined) settings.attendanceMethods = Array.isArray(attendanceMethods) ? attendanceMethods : settings.attendanceMethods;
     if (terms !== undefined) settings.terms = Array.isArray(terms) ? terms : settings.terms;
     if (holidays !== undefined) settings.holidays = Array.isArray(holidays) ? holidays : settings.holidays;
+    if (admissionForm !== undefined) settings.admissionForm = admissionForm;
     
     await settings.save();
     const obj = settings.toJSON();
@@ -1206,6 +1208,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       attendanceMethods: Array.isArray(obj.attendanceMethods) ? obj.attendanceMethods : obj.attendanceMethods,
       terms: Array.isArray(obj.terms) ? obj.terms : obj.terms,
       holidays: Array.isArray(obj.holidays) ? obj.holidays : obj.holidays,
+      admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : obj.admissionForm,
     });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });

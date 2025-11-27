@@ -94,7 +94,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
         const newClass = await api.addClass(schoolId, data);
         setClasses(prev => [newClass, ...prev]);
         setIsAddModalOpen(false);
-        addToast(`تم إضافة فصل "${newClass.name}" بنجاح.`, 'success');
+        addToast(`تم إضافة فصل "${newClass.gradeLevel} (${newClass.section || 'أ'})" بنجاح.`, 'success');
     } catch (error) {
         console.error("Failed to add class:", error);
         addToast("فشل إضافة الفصل.", 'error');
@@ -103,7 +103,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
 
   const beginEditDetails = (cls: Class) => {
     setEditingDetailsId(cls.id);
-    setEditName(cls.name);
+    setEditName(`${cls.gradeLevel} (${cls.section || 'أ'})`);
     setEditCapacity(typeof cls.capacity === 'number' ? cls.capacity : 30);
     setEditTeacherId('');
   };
@@ -268,7 +268,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                       </div>
                     </div>
                   ) : (
-                    <h3 className="text-xl font-bold text-teal-600 dark:text-teal-400">{cls.name}</h3>
+                    <h3 className="text-xl font-bold text-teal-600 dark:text-teal-400">{cls.gradeLevel} ({cls.section || 'أ'})</h3>
                   )}
                   <p className="text-sm text-gray-500 dark:text-gray-400">{cls.gradeLevel}</p>
                   
