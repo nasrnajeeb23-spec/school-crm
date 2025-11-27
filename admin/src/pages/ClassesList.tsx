@@ -73,7 +73,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
 
   const handleUpdateRoster = async (update: ClassRosterUpdate) => {
     try {
-        const updatedClass = await api.updateClassRoster(update);
+        const updatedClass = await api.updateClassRoster({ ...update, schoolId });
         setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
         setEditingClass(null);
         addToast('تم تحديث قائمة الطلاب بنجاح.', 'success');

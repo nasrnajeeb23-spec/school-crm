@@ -453,6 +453,7 @@ export interface NewClassData {
 export interface ClassRosterUpdate {
     classId: string;
     studentIds: string[];
+    schoolId?: number;
 }
 
 export interface AttendanceRecord {
@@ -487,6 +488,7 @@ export interface StudentGrades {
 export interface ScheduleEntry {
   id: string;
   classId: string;
+  className?: string;
   day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday';
   timeSlot: string; // e.g., "08:00 - 09:00"
   subject: string;

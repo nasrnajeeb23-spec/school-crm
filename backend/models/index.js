@@ -130,6 +130,10 @@ StudentNote.belongsTo(Student, { foreignKey: 'studentId' });
 Student.hasMany(StudentDocument, { foreignKey: 'studentId' });
 StudentDocument.belongsTo(Student, { foreignKey: 'studentId' });
 
+// Class <-> Student (One-to-Many roster membership)
+Class.hasMany(Student, { foreignKey: 'classId' });
+Student.belongsTo(Class, { foreignKey: 'classId' });
+
 // Class <-> Schedule (One-to-Many)
 Class.hasMany(Schedule, { foreignKey: 'classId' });
 Schedule.belongsTo(Class, { foreignKey: 'classId' });

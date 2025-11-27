@@ -62,7 +62,7 @@ const TeacherSchedule: React.FC<TeacherScheduleProps> = () => {
                             const colorClass = entry ? (subjectColors[entry.subject] || subjectColors.default) : 'bg-white dark:bg-gray-800';
                             return (
                                 <div key={`${day}-${timeSlot}`} className={`p-2 border-b border-l border-gray-200 dark:border-gray-600 ${colorClass}`}>
-                                    {entry && (<div className="text-center"><p className="font-bold text-sm">{entry.subject}</p><p className="text-xs">{entry.classId}</p></div>)}
+                                    {entry && (<div className="text-center"><p className="font-bold text-sm">{entry.subject}</p><p className="text-xs">{entry.className || entry.classId}</p></div>)}
                                 </div>
                             );
                         })}

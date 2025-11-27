@@ -81,8 +81,8 @@ router.get('/:teacherId/schedule', verifyToken, requireRole('TEACHER'), async (r
   try {
     const { teacherId } = req.params;
     if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
-    const rows = await Schedule.findAll({ where: { teacherId: Number(teacherId) }, order: [['day','ASC'],['timeSlot','ASC']] });
-    res.json(rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: '', day: r.day, startTime: r.timeSlot.split(' - ')[0], endTime: r.timeSlot.split(' - ')[1] || r.timeSlot, subject: r.subject, teacher: '' })));
+    const rows = await Schedule.findAll({ where: { teacherId: Number(teacherId) }, include: [{ model: Class, attributes: ['name'] }, { model: Teacher, attributes: ['name'] }], order: [['day','ASC'],['timeSlot','ASC']] });
+    res.json(rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: r.Class ? r.Class.name : '', day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' })));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 

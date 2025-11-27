@@ -445,7 +445,7 @@ async function syncDatabase(){
   await Plan.sync(opts);
   await BusOperator.sync(opts);
   await Parent.sync(opts);
-  await Student.sync(opts);
+  await Student.sync({ alter: true });
   await Teacher.sync({ alter: true });
   await Class.sync({ alter: true });
   

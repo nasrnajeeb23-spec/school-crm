@@ -524,7 +524,7 @@ export const getSchoolClasses = async (schoolId: number): Promise<Class[]> => {
     return await getClasses(schoolId);
 };
 
-export const updateClassRoster = async (update: ClassRosterUpdate): Promise<Class> => {
+export const updateClassRoster = async (update: ClassRosterUpdate & { schoolId: number }): Promise<Class> => {
     return await apiCall(`/school/${update.schoolId}/classes/${update.classId}/roster`, { method: 'PUT', body: JSON.stringify({ studentIds: update.studentIds }) });
 };
 

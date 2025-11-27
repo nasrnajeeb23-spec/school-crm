@@ -651,7 +651,19 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
     if (!Array.isArray(studentIds)) return res.status(400).json({ msg: 'studentIds must be an array' });
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    cls.studentCount = studentIds.length;
+    const uniqueIds = Array.from(new Set(studentIds.map(id => String(id))));
+    const currentMembers = await Student.findAll({ where: { schoolId: cls.schoolId, classId: cls.id }, attributes: ['id'] });
+    const currentIds = new Set(currentMembers.map(s => String(s.id)));
+    const toAdd = uniqueIds.filter(id => !currentIds.has(id));
+    const toRemove = Array.from(currentIds).filter(id => !uniqueIds.includes(id));
+    if (toAdd.length > 0) {
+      await Student.update({ classId: cls.id }, { where: { id: { [Op.in]: toAdd }, schoolId: cls.schoolId } });
+    }
+    if (toRemove.length > 0) {
+      await Student.update({ classId: null }, { where: { id: { [Op.in]: toRemove }, schoolId: cls.schoolId } });
+    }
+    const newCount = await Student.count({ where: { schoolId: cls.schoolId, classId: cls.id } });
+    cls.studentCount = newCount;
     await cls.save();
     res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
@@ -833,7 +845,7 @@ router.get('/class/:classId/students', verifyToken, requireRole('SCHOOL_ADMIN', 
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
-    const students = await Student.findAll({ where: { schoolId: cls.schoolId, grade: cls.gradeLevel }, order: [['name','ASC']] });
+    const students = await Student.findAll({ where: { schoolId: cls.schoolId, classId: cls.id }, order: [['name','ASC']] });
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
     res.json(students.map(s => ({ ...s.toJSON(), status: statusMap[s.status] || s.status })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
@@ -860,6 +872,15 @@ router.post('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
     const rev = { 'حاضر': 'Present', 'غائب': 'Absent', 'متأخر': 'Late', 'بعذر': 'Excused' };
+    const ids = Array.from(new Set(records.map(r => String(r.studentId))));
+    const students = await Student.findAll({ where: { id: { [Op.in]: ids }, schoolId: cls.schoolId } });
+    const map = new Map(students.map(s => [String(s.id), s]));
+    const invalid = [];
+    for (const r of records) {
+      const s = map.get(String(r.studentId));
+      if (!s || String(s.classId || '') !== String(cls.id)) invalid.push({ studentId: r.studentId, reason: 'Student not in class' });
+    }
+    if (invalid.length > 0) return res.status(400).json({ msg: 'Invalid attendance records', invalid });
     for (const rec of records) {
       const status = rev[rec.status] || rec.status;
       const existing = await Attendance.findOne({ where: { classId: cls.id, studentId: rec.studentId, date } });
@@ -886,6 +907,15 @@ router.post('/:schoolId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER
   try {
     const { entries } = req.body || {};
     if (!Array.isArray(entries) || entries.length === 0) return res.status(400).json({ msg: 'entries must be non-empty array' });
+    const invalid = [];
+    for (const e of entries) {
+      const cls = await Class.findByPk(e.classId);
+      if (!cls || Number(cls.schoolId) !== Number(req.params.schoolId)) { invalid.push({ classId: e.classId, reason: 'Invalid class for school' }); continue; }
+      if (Array.isArray(cls.subjects) && cls.subjects.length > 0 && !cls.subjects.includes(e.subject)) { invalid.push({ classId: e.classId, subject: e.subject, reason: 'Subject not in class subjects' }); continue; }
+      const s = await Student.findByPk(e.studentId);
+      if (!s || Number(s.schoolId) !== Number(req.params.schoolId) || String(s.classId || '') !== String(cls.id)) { invalid.push({ studentId: e.studentId, classId: e.classId, reason: 'Student not in class' }); continue; }
+    }
+    if (invalid.length > 0) return res.status(400).json({ msg: 'Invalid grade entries', invalid });
     for (const e of entries) {
       const existing = await Grade.findOne({ where: { studentId: e.studentId, classId: e.classId, subject: e.subject } });
       if (existing) {
