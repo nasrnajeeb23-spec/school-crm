@@ -11,7 +11,7 @@ router.get('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     const ops = await BusOperator.findAll({ where: { schoolId: req.params.schoolId }, order: [['status','ASC']] });
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
     res.json(ops.map(o => ({ ...o.toJSON(), status: statusMap[o.status] || o.status })));
-  } catch (e) { res.status(500).send('Server Error'); }
+  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
 router.post('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), validate([
@@ -26,7 +26,7 @@ router.post('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
     const op = await BusOperator.create({ id: `op_${Date.now()}`, ...req.body, status: 'Pending', schoolId: parseInt(req.params.schoolId, 10) });
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
     res.status(201).json({ ...op.toJSON(), status: statusMap[op.status] });
-  } catch (e) { res.status(500).send('Server Error'); }
+  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
 router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
@@ -36,7 +36,7 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
     op.status = 'Approved';
     await op.save();
     res.json({ ...op.toJSON(), status: 'معتمد' });
-  } catch (e) { res.status(500).send('Server Error'); }
+  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
 // --- Routes ---
@@ -49,7 +49,7 @@ router.get('/:schoolId/routes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
       payload.push({ ...r.toJSON(), studentIds: rs.map(x => x.studentId) });
     }
     res.json(payload);
-  } catch (e) { res.status(500).send('Server Error'); }
+  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
 router.post('/:schoolId/routes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), validate([
@@ -59,7 +59,7 @@ router.post('/:schoolId/routes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER
   try {
     const route = await Route.create({ id: `rt_${Date.now()}`, name: req.body.name, schoolId: parseInt(req.params.schoolId, 10), busOperatorId: req.body.busOperatorId || null, departureTime: req.body.departureTime || null, stops: Array.isArray(req.body.stops) ? req.body.stops : [] });
     res.status(201).json({ ...route.toJSON(), studentIds: [] });
-  } catch (e) { res.status(500).send('Server Error'); }
+  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
 router.put('/:schoolId/routes/:routeId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), validate([
@@ -75,7 +75,7 @@ router.put('/:schoolId/routes/:routeId/students', verifyToken, requireRole('SCHO
       await RouteStudent.create({ routeId: route.id, studentId: sid });
     }
     res.json({ ...route.toJSON(), studentIds: ids });
-  } catch (e) { res.status(500).send('Server Error'); }
+  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
 // Update route configuration (stops/departureTime/operator)

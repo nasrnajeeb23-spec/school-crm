@@ -443,7 +443,7 @@ async function syncDatabase(){
   await School.sync(opts);
   await SchoolSettings.sync({ alter: true });
   await Plan.sync(opts);
-  await BusOperator.sync(opts);
+  await BusOperator.sync({ alter: true });
   await Parent.sync(opts);
   await Student.sync({ alter: true });
   await Teacher.sync({ alter: true });
@@ -451,7 +451,7 @@ async function syncDatabase(){
   
   // Then sync dependent tables
   await Subscription.sync(opts);
-  await Route.sync(opts);
+  await Route.sync({ alter: true });
   await User.sync({ alter: true });
   await Conversation.sync(opts);
   await Message.sync(opts);
