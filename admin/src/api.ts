@@ -30,7 +30,14 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            let bodyText = '';
+            let bodyJson: any = null;
+            try { bodyJson = await response.json(); } catch {
+              try { bodyText = await response.text(); } catch {}
+            }
+            const msg = bodyJson?.msg || bodyJson?.error || bodyText || '';
+            const statusText = response.statusText ? ` ${response.statusText}` : '';
+            throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
         }
 
         return await response.json();

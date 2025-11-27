@@ -102,7 +102,7 @@ const ParentTransportation: React.FC = () => {
                                 <li key={i} className="flex items-center justify-between">
                                   <span>{s.name} {s.time ? `- ${s.time}` : ''}</span>
                                   {(typeof s.lat === 'number' && typeof s.lng === 'number') && (
-                                    <a href={`https://maps.google.com/?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">فتح على الخريطة</a>
+                                    <a href={`https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lng}#map=15/${s.lat}/${s.lng}`} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">فتح على الخريطة</a>
                                   )}
                                 </li>
                             ))}
