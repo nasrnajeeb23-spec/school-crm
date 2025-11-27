@@ -49,7 +49,7 @@ const Attendance: React.FC<AttendanceProps> = ({ schoolId }) => {
             api.getClassStudents(selectedClass),
             api.getAttendance(selectedClass, selectedDate)
         ]).then(([students, attendanceData]) => {
-            const recordsMap = attendanceData ? new Map(attendanceData.records.map(r => [r.studentId, r.status])) : new Map();
+            const recordsMap = Array.isArray(attendanceData) ? new Map(attendanceData.map(r => [r.studentId, r.status])) : new Map();
             const fullRosterWithStatus = students.map(student => ({
                 studentId: student.id,
                 studentName: student.name,
