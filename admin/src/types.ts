@@ -449,6 +449,7 @@ export interface Class {
   capacity?: number;
   subjects: string[];
   subjectTeacherMap?: Record<string, string | number>;
+  section?: string;
 }
 
 export interface NewClassData {
@@ -457,6 +458,7 @@ export interface NewClassData {
   homeroomTeacherId: string;
   capacity?: number;
   subjects: string[];
+  section?: string;
 }
 
 export interface ClassRosterUpdate {

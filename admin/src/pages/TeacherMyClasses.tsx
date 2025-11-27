@@ -46,8 +46,8 @@ const TeacherMyClasses: React.FC = () => {
         <div className="flex-grow overflow-y-auto">
           {classes.map(cls => (
             <button key={cls.id} onClick={() => setSelectedClass(cls)} className={`w-full text-right p-4 rounded-lg mb-2 transition-colors duration-200 ${selectedClass?.id === cls.id ? 'bg-teal-100 dark:bg-teal-900/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
-              <p className={`font-bold ${selectedClass?.id === cls.id ? 'text-teal-700 dark:text-teal-300' : 'text-gray-800 dark:text-white'}`}>{cls.name}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{cls.gradeLevel}</p>
+              <p className={`font-bold ${selectedClass?.id === cls.id ? 'text-teal-700 dark:text-teal-300' : 'text-gray-800 dark:text-white'}`}>{cls.gradeLevel} ({cls.section || 'أ'})</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{cls.homeroomTeacherName}</p>
             </button>
           ))}
         </div>
@@ -56,7 +56,7 @@ const TeacherMyClasses: React.FC = () => {
       <div className="lg:w-2/3 bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex flex-col">
         {selectedClass ? (<>
             <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedClass.name}</h2>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedClass.gradeLevel} ({selectedClass.section || 'أ'})</h2>
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
                 <span className="flex items-center"><BookIcon className="w-4 h-4 ml-1" /> {selectedClass.gradeLevel}</span>
                 <span className="flex items-center"><UsersIcon className="w-4 h-4 ml-1" /> {selectedClass.studentCount} طالب</span>

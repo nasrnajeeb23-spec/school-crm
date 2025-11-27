@@ -594,9 +594,10 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   { name: 'homeroomTeacherId', required: true, type: 'string' },
   { name: 'subjects', required: true },
   { name: 'capacity', required: false, type: 'number' },
+  { name: 'section', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
-    const { name, gradeLevel, homeroomTeacherId, subjects, capacity } = req.body;
+    const { name, gradeLevel, homeroomTeacherId, subjects, capacity, section } = req.body;
     if (!name || !gradeLevel || !homeroomTeacherId || !Array.isArray(subjects)) {
       return res.status(400).json({ msg: 'Missing required fields' });
     }
@@ -612,6 +613,7 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       schoolId: parseInt(req.params.schoolId, 10),
       homeroomTeacherId: Number(homeroomTeacherId),
       subjects: subjects,
+      section: typeof section === 'string' ? section : 'أ',
     });
     res.status(201).json({ ...newClass.toJSON(), subjects: Array.isArray(newClass.subjects) ? newClass.subjects : [] });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
@@ -634,7 +636,7 @@ router.post('/:schoolId/classes/init', verifyToken, requireRole('SCHOOL_ADMIN', 
       for (const g of grades) {
         const exists = await Class.findOne({ where: { schoolId, gradeLevel: g } });
         if (!exists) {
-          const cls = await Class.create({ id: `cls_${Date.now()}_${Math.floor(Math.random()*1000)}`, name: 'الشعبة أ', gradeLevel: g, homeroomTeacherName: 'غير محدد', studentCount: 0, capacity: 30, schoolId, homeroomTeacherId: null });
+          const cls = await Class.create({ id: `cls_${Date.now()}_${Math.floor(Math.random()*1000)}`, name: g, section: 'أ', gradeLevel: g, homeroomTeacherName: 'غير محدد', studentCount: 0, capacity: 30, schoolId, homeroomTeacherId: null });
           created.push(cls.toJSON());
         }
       }
@@ -673,13 +675,14 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
 router.put('/:schoolId/classes/:classId/details', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), validate([
   { name: 'name', required: false, type: 'string' },
   { name: 'capacity', required: false, type: 'number' },
-  { name: 'homeroomTeacherId', required: false, type: 'string' }
+  { name: 'homeroomTeacherId', required: false, type: 'string' },
+  { name: 'section', required: false, type: 'string' }
 ]), async (req, res) => {
   try {
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
-    const { name, capacity, homeroomTeacherId } = req.body || {};
+    const { name, capacity, homeroomTeacherId, section } = req.body || {};
     if (typeof name === 'string' && name.trim()) cls.name = name.trim();
     if (typeof capacity === 'number' && capacity > 0) cls.capacity = capacity;
     if (homeroomTeacherId !== undefined && homeroomTeacherId !== null && String(homeroomTeacherId).trim()) {
@@ -689,6 +692,7 @@ router.put('/:schoolId/classes/:classId/details', verifyToken, requireRole('SCHO
       cls.homeroomTeacherId = tId;
       cls.homeroomTeacherName = teacher.name;
     }
+    if (typeof section === 'string' && section.trim()) cls.section = section.trim();
     await cls.save();
     res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
