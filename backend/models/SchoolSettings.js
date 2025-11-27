@@ -75,6 +75,30 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  lessonStartTime: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  lateThresholdMinutes: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  departureTime: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  attendanceMethods: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+  terms: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+  holidays: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   // schoolId FK is added via association
 });
 

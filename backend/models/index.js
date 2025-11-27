@@ -19,6 +19,7 @@ const StudentNote = require('./StudentNote');
 const StudentDocument = require('./StudentDocument');
 const Notification = require('./Notification');
 const SalaryStructure = require('./SalaryStructure');
+const FeeSetup = require('./FeeSetup');
 const SalarySlip = require('./SalarySlip');
 const BusOperator = require('./BusOperator');
 const Route = require('./Route');
@@ -196,12 +197,17 @@ const db = {
   AuditLog,
   StaffAttendance,
   TeacherAttendance,
+  FeeSetup,
 };
 
 module.exports = db;
 // School <-> SalaryStructure (One-to-Many)
 School.hasMany(SalaryStructure, { foreignKey: 'schoolId' });
 SalaryStructure.belongsTo(School, { foreignKey: 'schoolId' });
+
+// School <-> FeeSetup (One-to-Many)
+School.hasMany(FeeSetup, { foreignKey: 'schoolId' });
+FeeSetup.belongsTo(School, { foreignKey: 'schoolId' });
 
 // School <-> SalarySlip (One-to-Many)
 School.hasMany(SalarySlip, { foreignKey: 'schoolId' });

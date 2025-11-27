@@ -252,6 +252,12 @@ export interface SchoolSettings {
     workingDays?: string[]; // e.g. ['Sunday','Monday','Tuesday','Wednesday','Thursday']
     academicYearStart: string; // YYYY-MM-DD
     academicYearEnd: string; // YYYY-MM-DD
+    lessonStartTime?: string;
+    lateThresholdMinutes?: number;
+    departureTime?: string;
+    attendanceMethods?: ('QR'|'RFID'|'Manual')[];
+    terms?: { name: string; start: string; end: string; }[];
+    holidays?: { date: string; title: string; }[];
     notifications: {
         email: boolean;
         sms: boolean;
@@ -745,12 +751,31 @@ export interface NewAssignmentData {
 }
 
 export interface Submission {
-    id: string;
-    assignmentId: string;
-    studentId: string;
-    studentName: string;
-    submissionDate: string | null;
-    status: SubmissionStatus;
-    grade?: number;
-    feedback?: string;
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string;
+  submissionDate: string | null;
+  status: SubmissionStatus;
+  grade?: number;
+  feedback?: string;
+}
+
+export type PaymentPlanType = 'Monthly' | 'Termly' | 'Installments';
+
+export interface DiscountRule {
+  type: 'Sibling' | 'TopAchiever' | 'Orphan';
+  percentage: number;
+}
+
+export interface FeeSetup {
+  id: string;
+  stage: string;
+  tuitionFee: number;
+  bookFees: number;
+  uniformFees: number;
+  activityFees: number;
+  paymentPlanType: PaymentPlanType;
+  paymentPlanDetails?: any;
+  discounts: DiscountRule[];
 }

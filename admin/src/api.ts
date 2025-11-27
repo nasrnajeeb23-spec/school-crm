@@ -3,7 +3,7 @@
 
 import { 
     User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
-    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus
+    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup
 } from './types';
 
 // 🔗 الاتصال بالـ Backend الحقيقي على Render
@@ -280,7 +280,7 @@ export const createTeacherAttendance = async (schoolId: number, payload: { teach
 // ==================== Finance APIs ====================
 
 export const getInvoices = async (schoolId: number): Promise<Invoice[]> => {
-    return await apiCall(`/schools/${schoolId}/invoices`, { method: 'GET' });
+    return await apiCall(`/school/${schoolId}/invoices`, { method: 'GET' });
 };
 
 export const getSchoolInvoices = async (schoolId: number): Promise<Invoice[]> => {
@@ -318,6 +318,26 @@ export const getSchoolExpenses = async (schoolId: number): Promise<Expense[]> =>
 
 export const addSchoolExpense = async (schoolId: number, expenseData: NewExpenseData): Promise<Expense> => {
     return await apiCall(`/school/${schoolId}/expenses`, { method: 'POST', body: JSON.stringify(expenseData) });
+};
+
+export const getFeeSetups = async (schoolId: number): Promise<FeeSetup[]> => {
+    return await apiCall(`/school/${schoolId}/fees`, { method: 'GET' });
+};
+
+export const createFeeSetup = async (schoolId: number, payload: Partial<FeeSetup>): Promise<FeeSetup> => {
+    return await apiCall(`/school/${schoolId}/fees`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const updateFeeSetup = async (schoolId: number, id: string | number, payload: Partial<FeeSetup>): Promise<FeeSetup> => {
+    return await apiCall(`/school/${schoolId}/fees/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+export const deleteFeeSetup = async (schoolId: number, id: string | number): Promise<void> => {
+    await apiCall(`/school/${schoolId}/fees/${id}`, { method: 'DELETE' });
+};
+
+export const generateInvoicesFromFees = async (schoolId: number, payload: any): Promise<{ createdCount: number; invoices: any[]; }> => {
+    return await apiCall(`/school/${schoolId}/fees/invoices/generate`, { method: 'POST', body: JSON.stringify(payload) });
 };
 
 // ==================== SuperAdmin APIs ====================

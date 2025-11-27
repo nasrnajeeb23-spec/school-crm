@@ -72,6 +72,68 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   };
 
+  const attendanceMethods = settings?.attendanceMethods && settings.attendanceMethods.length > 0 ? settings.attendanceMethods : ['Manual'];
+  const handleAttendanceMethodToggle = (m: 'QR'|'RFID'|'Manual') => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const arr = prev.attendanceMethods && prev.attendanceMethods.length > 0 ? prev.attendanceMethods : [];
+      const exists = arr.includes(m);
+      const next = exists ? arr.filter(x => x !== m) : [...arr, m];
+      return { ...prev, attendanceMethods: next };
+    });
+  };
+
+  const terms = settings?.terms && settings.terms.length > 0 ? settings.terms : [ { name: 'الفصل الأول', start: settings!.academicYearStart, end: '' }, { name: 'الفصل الثاني', start: '', end: settings!.academicYearEnd } ];
+  const addTerm = () => {
+    setSettings(prev => prev ? { ...prev, terms: [ ...(prev.terms || []), { name: '', start: '', end: '' } ] } : null);
+  };
+  const updateTerm = (idx: number, field: 'name'|'start'|'end', value: string) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const arr = [...(prev.terms || [])];
+      const row = { ...(arr[idx] || { name: '', start: '', end: '' }) } as { name: string; start: string; end: string };
+      (row as any)[field] = value;
+      arr[idx] = row;
+      return { ...prev, terms: arr };
+    });
+  };
+  const removeTerm = (idx: number) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const arr = [...(prev.terms || [])];
+      arr.splice(idx, 1);
+      return { ...prev, terms: arr };
+    });
+  };
+
+  const holidays = settings?.holidays && settings.holidays.length > 0 ? settings.holidays : [];
+  const addHoliday = () => {
+    setSettings(prev => prev ? { ...prev, holidays: [ ...(prev.holidays || []), { date: '', title: '' } ] } : null);
+  };
+  const updateHoliday = (idx: number, field: 'date'|'title', value: string) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const arr = [...(prev.holidays || [])];
+      const row = { ...(arr[idx] || { date: '', title: '' }) } as { date: string; title: string };
+      (row as any)[field] = value;
+      arr[idx] = row;
+      return { ...prev, holidays: arr };
+    });
+  };
+  const removeHoliday = (idx: number) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const arr = [...(prev.holidays || [])];
+      arr.splice(idx, 1);
+      return { ...prev, holidays: arr };
+    });
+  };
+
+  const handleLateThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setSettings(prev => prev ? { ...prev, lateThresholdMinutes: value === '' ? undefined : Number(value) } : null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settings) return;
@@ -188,6 +250,34 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                         ))}
                     </div>
                 </div>
+                <div className="md:col-span-2">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">إعداد نظام الحضور</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label htmlFor="lessonStartTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300">وقت بدء الحصة</label>
+                      <input type="time" name="lessonStartTime" id="lessonStartTime" value={settings.lessonStartTime || ''} onChange={handleInputChange} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label htmlFor="lateThresholdMinutes" className="block text-sm font-medium text-gray-700 dark:text-gray-300">وقت التأخير (بالدقائق)</label>
+                      <input type="number" min="0" name="lateThresholdMinutes" id="lateThresholdMinutes" value={(settings.lateThresholdMinutes ?? 10).toString()} onChange={handleLateThresholdChange} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label htmlFor="departureTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300">وقت الانصراف</label>
+                      <input type="time" name="departureTime" id="departureTime" value={settings.departureTime || ''} onChange={handleInputChange} className={inputStyle} />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">طرق الحضور</label>
+                    <div className="mt-2 flex flex-wrap gap-4">
+                      {(['QR','RFID','Manual'] as ('QR'|'RFID'|'Manual')[]).map(m => (
+                        <label key={m} className="flex items-center space-x-2 rtl:space-x-reverse">
+                          <input type="checkbox" checked={attendanceMethods.includes(m)} onChange={() => handleAttendanceMethodToggle(m)} className="form-checkbox h-5 w-5 text-teal-600" />
+                          <span className="text-gray-700 dark:text-gray-300">{m === 'Manual' ? 'يدوي' : m}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
                 <div>
                     <label htmlFor="academicYearStart" className="block text-sm font-medium text-gray-700 dark:text-gray-300">بداية العام الدراسي</label>
                     <input type="date" name="academicYearStart" id="academicYearStart" value={settings.academicYearStart} onChange={handleInputChange} className={inputStyle} />
@@ -195,6 +285,38 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                  <div>
                     <label htmlFor="academicYearEnd" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نهاية العام الدراسي</label>
                     <input type="date" name="academicYearEnd" id="academicYearEnd" value={settings.academicYearEnd} onChange={handleInputChange} className={inputStyle} />
+                </div>
+                <div className="md:col-span-2">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">إعداد العام الدراسي والفصول</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">الفصول الدراسية</label>
+                      <div className="mt-2 space-y-3">
+                        {terms.map((t, idx) => (
+                          <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <input type="text" value={t.name} onChange={e => updateTerm(idx, 'name', e.target.value)} className={inputStyle} placeholder="اسم الفصل" />
+                            <input type="date" value={t.start} onChange={e => updateTerm(idx, 'start', e.target.value)} className={inputStyle} />
+                            <input type="date" value={t.end} onChange={e => updateTerm(idx, 'end', e.target.value)} className={inputStyle} />
+                            <button type="button" onClick={() => removeTerm(idx)} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">حذف</button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={addTerm} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">إضافة فصل</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">أيام الإجازات</label>
+                      <div className="mt-2 space-y-3">
+                        {holidays.map((h, idx) => (
+                          <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="date" value={h.date} onChange={e => updateHoliday(idx, 'date', e.target.value)} className={inputStyle} />
+                            <input type="text" value={h.title} onChange={e => updateHoliday(idx, 'title', e.target.value)} className={inputStyle} placeholder="عنوان الإجازة" />
+                            <button type="button" onClick={() => removeHoliday(idx)} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">حذف</button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={addHoliday} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">إضافة إجازة</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
             </div>
             

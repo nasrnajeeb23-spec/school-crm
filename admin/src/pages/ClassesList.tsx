@@ -31,6 +31,12 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
   const [editCapacity, setEditCapacity] = useState<number>(30);
   const [editTeacherId, setEditTeacherId] = useState<string>('');
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [genForClassId, setGenForClassId] = useState<string>('');
+  const [genDueDate, setGenDueDate] = useState<string>('');
+  const [genIncludeBooks, setGenIncludeBooks] = useState<boolean>(true);
+  const [genIncludeUniform, setGenIncludeUniform] = useState<boolean>(true);
+  const [genIncludeActivities, setGenIncludeActivities] = useState<boolean>(true);
+  const [genDiscounts, setGenDiscounts] = useState<string[]>([]);
   const stageGradeMap: Record<string, string[]> = {
     'رياض أطفال': ['رياض أطفال'],
     'ابتدائي': ['الصف الأول','الصف الثاني','الصف الثالث','الصف الرابع','الصف الخامس','الصف السادس'],
@@ -309,7 +315,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                 </div>
                 
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2 rtl:space-x-reverse">
-                  <button onClick={() => setEditingClass(cls)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline text-sm">
+                  <button onClick={() => setEditingClass(cls)} className="font-medium text-teal-600 dark:text-teال-500 hover:underline text-sm">
                     إدارة الطلاب
                   </button>
                   {editingDetailsId === cls.id ? (
@@ -326,7 +332,24 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                     <button onClick={() => beginEditDetails(cls)} className="font-medium text-teal-700 dark:text-teal-400 hover:underline text-sm">تحرير الفصل</button>
                   )}
                   <button onClick={() => handleDeleteClass(cls)} className="font-medium text-red-600 dark:text-red-500 hover:underline text-sm">حذف الفصل</button>
+                  <button onClick={() => { setGenForClassId(cls.id); setGenDueDate(''); setGenIncludeBooks(true); setGenIncludeUniform(true); setGenIncludeActivities(true); setGenDiscounts([]); }} className="font-medium text-teal-600 dark:text-teal-500 hover:underline text-sm">توليد فواتير</button>
                 </div>
+                {genForClassId === cls.id && (
+                  <div className="mt-4 p-4 border rounded-lg dark:border-gray-700">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <input type="date" value={genDueDate} onChange={e => setGenDueDate(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={genIncludeBooks} onChange={e => setGenIncludeBooks(e.target.checked)} /><span>تشمل الكتب</span></label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={genIncludeUniform} onChange={e => setGenIncludeUniform(e.target.checked)} /><span>يشمل الزي</span></label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={genIncludeActivities} onChange={e => setGenIncludeActivities(e.target.checked)} /><span>تشمل الأنشطة</span></label>
+                    </div>
+                    <div className="flex items-center gap-4 mb-4">
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={genDiscounts.includes('Sibling')} onChange={() => setGenDiscounts(p => p.includes('Sibling') ? p.filter(x=>x!=='Sibling') : [...p, 'Sibling'])} /><span>خصم أخوة</span></label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={genDiscounts.includes('TopAchiever')} onChange={() => setGenDiscounts(p => p.includes('TopAchiever') ? p.filter(x=>x!=='TopAchiever') : [...p, 'TopAchiever'])} /><span>خصم متفوق</span></label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={genDiscounts.includes('Orphan')} onChange={() => setGenDiscounts(p => p.includes('Orphan') ? p.filter(x=>x!=='Orphan') : [...p, 'Orphan'])} /><span>خصم يتيم</span></label>
+                    </div>
+                    <div className="flex items-center gap-2"><button onClick={async () => { if (!genDueDate) { addToast('حدد تاريخ الاستحقاق.', 'error'); return; } try { const studs = await api.getClassStudents(cls.id); const ids = studs.map(s => s.id); const res = await api.generateInvoicesFromFees(schoolId, { studentIds: ids, dueDate: genDueDate, include: { books: genIncludeBooks, uniform: genIncludeUniform, activities: genIncludeActivities }, defaultDiscounts: genDiscounts }); addToast(`تم إنشاء ${res.createdCount} فاتورة.`, 'success'); setGenForClassId(''); } catch { addToast('فشل إنشاء الفواتير.', 'error'); } }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">توليد</button><button onClick={() => setGenForClassId('')} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">إلغاء</button></div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

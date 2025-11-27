@@ -203,6 +203,16 @@ build({
     console.error('CSS copy failed:', e.message);
   }
 }).catch((error) => {
-  console.error('Build failed:', error);
+  try {
+    console.error('Build failed:', error && error.message ? error.message : error);
+    if (error && error.errors) {
+      console.error('Errors:', JSON.stringify(error.errors, null, 2));
+    }
+    if (error && error.warnings) {
+      console.warn('Warnings:', JSON.stringify(error.warnings, null, 2));
+    }
+  } catch (e) {
+    console.error('Build failed (logging error):', e.message || e);
+  }
   process.exit(1);
 });

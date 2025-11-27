@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription } = require('../models');
+const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
@@ -1139,11 +1139,18 @@ router.get('/:schoolId/settings', verifyToken, async (req, res) => {
         availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
       });
     }
+    const obj = settings.toJSON();
     res.json({
-        ...settings.toJSON(),
-        notifications: typeof settings.notifications === 'string' ? JSON.parse(settings.notifications) : settings.notifications,
-        availableStages: Array.isArray(settings.availableStages) ? settings.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
-        workingDays: Array.isArray(settings.workingDays) ? settings.workingDays : ['Sunday','Monday','Tuesday','Wednesday','Thursday'],
+        ...obj,
+        notifications: typeof obj.notifications === 'string' ? JSON.parse(obj.notifications) : obj.notifications,
+        availableStages: Array.isArray(obj.availableStages) ? obj.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
+        workingDays: Array.isArray(obj.workingDays) ? obj.workingDays : ['Sunday','Monday','Tuesday','Wednesday','Thursday'],
+        attendanceMethods: Array.isArray(obj.attendanceMethods) ? obj.attendanceMethods : ['Manual'],
+        lessonStartTime: obj.lessonStartTime || (obj.workingHoursStart || ''),
+        lateThresholdMinutes: typeof obj.lateThresholdMinutes === 'number' ? obj.lateThresholdMinutes : 10,
+        departureTime: obj.departureTime || (obj.workingHoursEnd || ''),
+        terms: Array.isArray(obj.terms) ? obj.terms : [ { name: 'الفصل الأول', start: obj.academicYearStart, end: '' }, { name: 'الفصل الثاني', start: '', end: obj.academicYearEnd } ],
+        holidays: Array.isArray(obj.holidays) ? obj.holidays : [],
     });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
@@ -1156,7 +1163,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const { 
       schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
       genderType, levelType, ownershipType, availableStages, workingHoursStart, workingHoursEnd, workingDays,
-      academicYearStart, academicYearEnd, notifications 
+      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays
     } = req.body;
     const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
     if (!settings) return res.status(404).json({ msg: 'Settings not found' });
@@ -1177,9 +1184,24 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     settings.academicYearStart = academicYearStart;
     settings.academicYearEnd = academicYearEnd;
     settings.notifications = notifications;
+    settings.lessonStartTime = lessonStartTime || settings.lessonStartTime;
+    settings.lateThresholdMinutes = typeof lateThresholdMinutes === 'number' ? lateThresholdMinutes : settings.lateThresholdMinutes;
+    settings.departureTime = departureTime || settings.departureTime;
+    if (attendanceMethods !== undefined) settings.attendanceMethods = Array.isArray(attendanceMethods) ? attendanceMethods : settings.attendanceMethods;
+    if (terms !== undefined) settings.terms = Array.isArray(terms) ? terms : settings.terms;
+    if (holidays !== undefined) settings.holidays = Array.isArray(holidays) ? holidays : settings.holidays;
     
     await settings.save();
-    res.json(settings);
+    const obj = settings.toJSON();
+    res.json({
+      ...obj,
+      notifications: typeof obj.notifications === 'string' ? JSON.parse(obj.notifications) : obj.notifications,
+      availableStages: Array.isArray(obj.availableStages) ? obj.availableStages : obj.availableStages,
+      workingDays: Array.isArray(obj.workingDays) ? obj.workingDays : obj.workingDays,
+      attendanceMethods: Array.isArray(obj.attendanceMethods) ? obj.attendanceMethods : obj.attendanceMethods,
+      terms: Array.isArray(obj.terms) ? obj.terms : obj.terms,
+      holidays: Array.isArray(obj.holidays) ? obj.holidays : obj.holidays,
+    });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -1216,6 +1238,53 @@ router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// Fees Setup CRUD
+router.get('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
+  try {
+    const rows = await FeeSetup.findAll({ where: { schoolId: Number(req.params.schoolId) }, order: [['stage','ASC']] });
+    res.json(rows.map(r => ({ id: String(r.id), stage: r.stage, tuitionFee: parseFloat(r.tuitionFee), bookFees: parseFloat(r.bookFees), uniformFees: parseFloat(r.uniformFees), activityFees: parseFloat(r.activityFees), paymentPlanType: r.paymentPlanType, paymentPlanDetails: typeof r.paymentPlanDetails === 'string' ? JSON.parse(r.paymentPlanDetails) : r.paymentPlanDetails, discounts: Array.isArray(r.discounts) ? r.discounts : [] })));
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.post('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), validate([
+  { name: 'stage', required: true, type: 'string' },
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const { stage } = req.body || {};
+    const exists = await FeeSetup.findOne({ where: { schoolId, stage } });
+    if (exists) return res.status(400).json({ msg: 'Stage already configured' });
+    const payload = req.body || {};
+    const row = await FeeSetup.create({ schoolId, stage: String(payload.stage), tuitionFee: Number(payload.tuitionFee || 0), bookFees: Number(payload.bookFees || 0), uniformFees: Number(payload.uniformFees || 0), activityFees: Number(payload.activityFees || 0), paymentPlanType: payload.paymentPlanType || 'Monthly', paymentPlanDetails: payload.paymentPlanDetails || {}, discounts: Array.isArray(payload.discounts) ? payload.discounts : [] });
+    res.status(201).json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : row.paymentPlanDetails, discounts: Array.isArray(row.discounts) ? row.discounts : [] });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.put('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
+  try {
+    const row = await FeeSetup.findOne({ where: { id: Number(req.params.id), schoolId: Number(req.params.schoolId) } });
+    if (!row) return res.status(404).json({ msg: 'Not Found' });
+    const p = req.body || {};
+    if (p.stage !== undefined) row.stage = String(p.stage);
+    if (p.tuitionFee !== undefined) row.tuitionFee = Number(p.tuitionFee || 0);
+    if (p.bookFees !== undefined) row.bookFees = Number(p.bookFees || 0);
+    if (p.uniformFees !== undefined) row.uniformFees = Number(p.uniformFees || 0);
+    if (p.activityFees !== undefined) row.activityFees = Number(p.activityFees || 0);
+    if (p.paymentPlanType !== undefined) row.paymentPlanType = p.paymentPlanType;
+    if (p.paymentPlanDetails !== undefined) row.paymentPlanDetails = p.paymentPlanDetails;
+    if (p.discounts !== undefined) row.discounts = Array.isArray(p.discounts) ? p.discounts : [];
+    await row.save();
+    res.json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : row.paymentPlanDetails, discounts: Array.isArray(row.discounts) ? row.discounts : [] });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.delete('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
+  try {
+    const count = await FeeSetup.destroy({ where: { id: Number(req.params.id), schoolId: Number(req.params.schoolId) } });
+    res.json({ deleted: count > 0 });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
 router.post('/:schoolId/logo', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const path = require('path');
@@ -1246,6 +1315,86 @@ router.post('/:schoolId/logo', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
       return res.status(201).json({ url: publicUrl });
     });
   } catch (e) { console.error(e); return res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), validate([
+  { name: 'dueDate', required: true, type: 'string' }
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const dueDate = String(req.body.dueDate);
+    const stage = req.body.stage ? String(req.body.stage) : '';
+    const include = req.body.include || {};
+    const defaultDiscounts = Array.isArray(req.body.defaultDiscounts) ? req.body.defaultDiscounts : [];
+    const discountTagsByStudentId = req.body.discountTagsByStudentId || {};
+    const settings = await SchoolSettings.findOne({ where: { schoolId } });
+    const stages = Array.isArray(settings?.availableStages) && settings.availableStages.length > 0 ? settings.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
+    const map = {
+      "رياض أطفال": ["رياض أطفال"],
+      "ابتدائي": ["الصف الأول","الصف الثاني","الصف الثالث","الصف الرابع","الصف الخامس","الصف السادس"],
+      "إعدادي": ["أول إعدادي","ثاني إعدادي","ثالث إعدادي"],
+      "ثانوي": ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
+    };
+    function resolveStage(grade){
+      for (const st of stages) {
+        const arr = map[st] || [];
+        if (arr.includes(String(grade))) return st;
+      }
+      if (String(grade).includes('ثانوي')) return 'ثانوي';
+      if (String(grade).includes('إعدادي')) return 'إعدادي';
+      if (String(grade).includes('الصف')) return 'ابتدائي';
+      return stages[0];
+    }
+    let targetStudents = [];
+    if (Array.isArray(req.body.studentIds) && req.body.studentIds.length > 0) {
+      targetStudents = await Student.findAll({ where: { schoolId, id: { [Op.in]: req.body.studentIds } } });
+    } else if (stage) {
+      const all = await Student.findAll({ where: { schoolId } });
+      const clsMap = new Map();
+      for (const s of all) {
+        let g = s.grade;
+        if (s.classId) {
+          const cached = clsMap.get(String(s.classId)) || null;
+          let c = cached;
+          if (!c) { c = await Class.findByPk(String(s.classId)); if (c) clsMap.set(String(s.classId), c); }
+          if (c) g = c.gradeLevel;
+        }
+        const st = resolveStage(g);
+        if (st === stage) targetStudents.push(s);
+      }
+    } else {
+      targetStudents = await Student.findAll({ where: { schoolId } });
+    }
+    const feeRows = await FeeSetup.findAll({ where: { schoolId } });
+    const feeByStage = new Map(feeRows.map(f => [f.stage, f]));
+    const created = [];
+    for (const s of targetStudents) {
+      let g = s.grade;
+      if (s.classId) {
+        const c = await Class.findByPk(String(s.classId));
+        if (c) g = c.gradeLevel;
+      }
+      const st = stage || resolveStage(g);
+      const fee = feeByStage.get(st);
+      if (!fee) continue;
+      const tags = Array.isArray(discountTagsByStudentId[String(s.id)]) ? discountTagsByStudentId[String(s.id)] : defaultDiscounts;
+      const rules = Array.isArray(fee.discounts) ? fee.discounts : [];
+      const percent = rules.reduce((sum, r) => tags.includes(r.type) ? sum + Number(r.percentage || 0) : sum, 0);
+      const maxPct = Math.max(0, Math.min(100, percent));
+      const tuitionBase = Number(fee.tuitionFee || 0);
+      const tuitionAfter = tuitionBase * (1 - maxPct / 100);
+      const items = [];
+      if (tuitionAfter > 0) items.push({ description: 'رسوم دراسية', amount: tuitionAfter });
+      if (include.books !== false && Number(fee.bookFees || 0) > 0) items.push({ description: 'رسوم الكتب', amount: Number(fee.bookFees || 0) });
+      if (include.uniform !== false && Number(fee.uniformFees || 0) > 0) items.push({ description: 'رسوم الزي', amount: Number(fee.uniformFees || 0) });
+      if (include.activities !== false && Number(fee.activityFees || 0) > 0) items.push({ description: 'رسوم الأنشطة', amount: Number(fee.activityFees || 0) });
+      const totalAmount = items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
+      if (totalAmount <= 0) continue;
+      const inv = await Invoice.create({ studentId: s.id, amount: totalAmount, dueDate: new Date(dueDate), status: 'UNPAID' });
+      created.push({ id: inv.id.toString(), studentId: s.id, studentName: s.name || '', status: 'غير مدفوعة', issueDate: inv.createdAt.toISOString().split('T')[0], dueDate, items, totalAmount });
+    }
+    res.status(201).json({ createdCount: created.length, invoices: created });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
 module.exports = router;
