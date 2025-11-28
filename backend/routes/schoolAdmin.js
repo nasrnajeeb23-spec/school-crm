@@ -1300,7 +1300,24 @@ router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
 router.get('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
   try {
     const rows = await FeeSetup.findAll({ where: { schoolId: Number(req.params.schoolId) }, order: [['stage','ASC']] });
-    res.json(rows.map(r => ({ id: String(r.id), stage: r.stage, tuitionFee: parseFloat(r.tuitionFee), bookFees: parseFloat(r.bookFees), uniformFees: parseFloat(r.uniformFees), activityFees: parseFloat(r.activityFees), paymentPlanType: r.paymentPlanType, paymentPlanDetails: typeof r.paymentPlanDetails === 'string' ? JSON.parse(r.paymentPlanDetails) : r.paymentPlanDetails, discounts: Array.isArray(r.discounts) ? r.discounts : [] })));
+    const list = rows.map(r => {
+      let plan;
+      try { plan = typeof r.paymentPlanDetails === 'string' ? JSON.parse(r.paymentPlanDetails) : (r.paymentPlanDetails || {}); } catch { plan = {}; }
+      let disc = r.discounts;
+      if (typeof disc === 'string') { try { disc = JSON.parse(disc); } catch { disc = []; } }
+      return {
+        id: String(r.id),
+        stage: r.stage,
+        tuitionFee: parseFloat(r.tuitionFee),
+        bookFees: parseFloat(r.bookFees),
+        uniformFees: parseFloat(r.uniformFees),
+        activityFees: parseFloat(r.activityFees),
+        paymentPlanType: r.paymentPlanType,
+        paymentPlanDetails: plan,
+        discounts: Array.isArray(disc) ? disc : [],
+      };
+    });
+    res.json(list);
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -1312,9 +1329,11 @@ router.post('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
     const { stage } = req.body || {};
     const exists = await FeeSetup.findOne({ where: { schoolId, stage } });
     if (exists) return res.status(400).json({ msg: 'Stage already configured' });
-    const payload = req.body || {};
-    const row = await FeeSetup.create({ schoolId, stage: String(payload.stage), tuitionFee: Number(payload.tuitionFee || 0), bookFees: Number(payload.bookFees || 0), uniformFees: Number(payload.uniformFees || 0), activityFees: Number(payload.activityFees || 0), paymentPlanType: payload.paymentPlanType || 'Monthly', paymentPlanDetails: payload.paymentPlanDetails || {}, discounts: Array.isArray(payload.discounts) ? payload.discounts : [] });
-    res.status(201).json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : row.paymentPlanDetails, discounts: Array.isArray(row.discounts) ? row.discounts : [] });
+  const payload = req.body || {};
+  const row = await FeeSetup.create({ schoolId, stage: String(payload.stage), tuitionFee: Number(payload.tuitionFee || 0), bookFees: Number(payload.bookFees || 0), uniformFees: Number(payload.uniformFees || 0), activityFees: Number(payload.activityFees || 0), paymentPlanType: payload.paymentPlanType || 'Monthly', paymentPlanDetails: payload.paymentPlanDetails || {}, discounts: Array.isArray(payload.discounts) ? payload.discounts : [] });
+  let planResp; try { planResp = typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : (row.paymentPlanDetails || {}); } catch { planResp = {}; }
+  let discResp = row.discounts; if (typeof discResp === 'string') { try { discResp = JSON.parse(discResp); } catch { discResp = []; } }
+  res.status(201).json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: planResp, discounts: Array.isArray(discResp) ? discResp : [] });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -1331,8 +1350,10 @@ router.put('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     if (p.paymentPlanType !== undefined) row.paymentPlanType = p.paymentPlanType;
     if (p.paymentPlanDetails !== undefined) row.paymentPlanDetails = p.paymentPlanDetails;
     if (p.discounts !== undefined) row.discounts = Array.isArray(p.discounts) ? p.discounts : [];
-    await row.save();
-    res.json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : row.paymentPlanDetails, discounts: Array.isArray(row.discounts) ? row.discounts : [] });
+  await row.save();
+  let planResp2; try { planResp2 = typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : (row.paymentPlanDetails || {}); } catch { planResp2 = {}; }
+  let discResp2 = row.discounts; if (typeof discResp2 === 'string') { try { discResp2 = JSON.parse(discResp2); } catch { discResp2 = []; } }
+  res.json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: planResp2, discounts: Array.isArray(discResp2) ? discResp2 : [] });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 

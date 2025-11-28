@@ -59,11 +59,26 @@ function requireRole(...allowedRoles) {
 function requireSameSchoolParam(paramName = 'schoolId') {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ msg: 'Unauthenticated' });
-    
+
+    const normalizeRole = (role) => {
+      if (!role) return '';
+      const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
+      const map = {
+        SUPERADMIN: 'SUPER_ADMIN',
+        SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL',
+        SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL',
+        SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
+        SCHOOLADMIN: 'SCHOOL_ADMIN',
+        TEACHER: 'TEACHER',
+        PARENT: 'PARENT'
+      };
+      return map[key] || String(role).toUpperCase();
+    };
+
     // Allow all SuperAdmin roles (including team members)
     const superAdminRoles = ['SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'];
-    if (superAdminRoles.includes(req.user.role.toUpperCase())) return next();
-    
+    if (superAdminRoles.includes(normalizeRole(req.user.role))) return next();
+
     const requestedSchoolId = parseInt(req.params[paramName], 10);
     const headerSchoolId = parseInt(req.headers['x-school-id'] || '0', 10);
     const userSchoolId = Number(req.user.schoolId || 0);

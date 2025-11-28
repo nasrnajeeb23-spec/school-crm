@@ -73,10 +73,46 @@ router.get('/:id', async (req, res) => {
 });
 
 // @route   POST api/schools
-// @desc    Add a new school
+// @desc    Add a new school with 7-day trial and initial admin
 // @access  Private (SuperAdmin)
-router.post('/', (req, res) => {
-  res.json({ msg: 'Add school placeholder' });
+router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const schoolData = payload.school || {};
+    const adminData = payload.admin || {};
+    const subData = payload.subscription || {};
+    if (!schoolData.name || !schoolData.contactEmail) return res.status(400).json({ msg: 'Invalid school data' });
+    if (!adminData.name || !adminData.email || !adminData.password) return res.status(400).json({ msg: 'Invalid admin data' });
+    const plan = await Plan.findByPk(Number(subData.planId || 1));
+    if (!plan) return res.status(400).json({ msg: 'Invalid planId' });
+
+    const existingSchool = await School.findOne({ where: { name: schoolData.name } });
+    if (existingSchool) return res.status(400).json({ msg: 'School already exists' });
+
+    const school = await School.create({ name: schoolData.name, contactEmail: schoolData.contactEmail, studentCount: 0, teacherCount: 0, balance: 0 });
+
+    // 7-day trial subscription
+    const start = new Date();
+    const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await Subscription.create({ schoolId: school.id, planId: plan.id, status: 'TRIAL', startDate: start, endDate: end, renewalDate: end });
+
+    // Default settings
+    const academicStart = new Date(start.getFullYear(), 8, 1); // Sep 1
+    const academicEnd = new Date(start.getFullYear() + 1, 5, 20); // Jun 20 next year
+    await SchoolSettings.create({ schoolId: school.id, schoolName: school.name, schoolAddress: schoolData.address || '', academicYearStart: academicStart, academicYearEnd: academicEnd, notifications: { email: true, sms: false, push: true }, availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"] });
+
+    // Create initial admin user
+    const bcrypt = require('bcryptjs');
+    const username = String(adminData.email).split('@')[0];
+    const existsUser = await require('../models').User.findOne({ where: { [require('sequelize').Op.or]: [{ email: adminData.email }, { username }] } });
+    if (existsUser) return res.status(400).json({ msg: 'Admin email already exists' });
+    const hash = await bcrypt.hash(String(adminData.password), 10);
+    const permissions = ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES','MANAGE_STAFF'];
+    const admin = await require('../models').User.create({ name: adminData.name, email: adminData.email, username, password: hash, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', isActive: true, permissions, passwordMustChange: true, tokenVersion: 0 });
+
+    const response = { id: school.id, name: school.name, plan: plan.name, status: 'TRIAL', students: school.studentCount, teachers: school.teacherCount, balance: parseFloat(school.balance), joinDate: school.createdAt.toISOString().split('T')[0] };
+    res.status(201).json(response);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
 router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {

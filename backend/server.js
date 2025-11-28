@@ -437,7 +437,7 @@ async function syncDatabase(){
   const opts = { force: false };
   
   // Sync models in correct order to avoid foreign key constraint issues
-  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule } = require('./models');
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup } = require('./models');
   
   // Sync independent tables first
   await School.sync(opts);
@@ -448,6 +448,7 @@ async function syncDatabase(){
   await Student.sync({ alter: true });
   await Teacher.sync({ alter: true });
   await Class.sync({ alter: true });
+  await FeeSetup.sync({ alter: true });
   
   // Then sync dependent tables
   await Subscription.sync(opts);
@@ -519,6 +520,8 @@ syncDatabase()
       const { SchoolSettings, Subscription } = require('./models');
       const settingsRows = await SchoolSettings.findAll();
       let updatedCount = 0;
+      const catalog = Array.isArray(app.locals.modulesCatalog) ? app.locals.modulesCatalog : [];
+      const allIds = catalog.map(m => m.id);
       for (const s of settingsRows) {
         const sub = await Subscription.findOne({ where: { schoolId: s.schoolId } });
         if (!sub || String(sub.status).toUpperCase() !== 'TRIAL') continue;
@@ -526,7 +529,7 @@ syncDatabase()
         const expiry = sub.endDate || sub.renewalDate;
         if (expiry && now > new Date(expiry)) continue; // لا تعديل بعد انتهاء التجربة
         const active = Array.isArray(s.activeModules) ? s.activeModules : [];
-        const nextSet = new Set([ ...active, ...((req.app?.locals?.modulesCatalog || []).map(m => m.id)) ]);
+        const nextSet = new Set([ ...active, ...allIds ]);
         const next = Array.from(nextSet);
         const changed = JSON.stringify(active) !== JSON.stringify(next);
         if (changed) { s.activeModules = next; await s.save(); updatedCount++; }
