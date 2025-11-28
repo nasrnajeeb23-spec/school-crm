@@ -6,8 +6,14 @@ import {
     PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup
 } from './types';
 
-// 🔗 الاتصال بالـ Backend الحقيقي على Render
-const API_BASE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') || 'https://school-crschool-crm-backendm.onrender.com/api';
+// 🔗 ضبط عنوان الـ API للإنتاج/التطوير بشكل مرن
+// الأولوية: متغير بيئة مُحقن أثناء البناء -> Vite import.meta.env (إن وجد) -> localStorage(api_base) -> الافتراضي
+const API_BASE_URL = (
+  (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
+  (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
+  'https://school-crschool-crm-backendm.onrender.com/api'
+);
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;

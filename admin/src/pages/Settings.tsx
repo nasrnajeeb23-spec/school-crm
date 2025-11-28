@@ -83,7 +83,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   };
 
-  const terms = settings?.terms && settings.terms.length > 0 ? settings.terms : [ { name: 'الفصل الأول', start: settings!.academicYearStart, end: '' }, { name: 'الفصل الثاني', start: '', end: settings!.academicYearEnd } ];
+  const terms = settings?.terms && settings.terms.length > 0 ? settings.terms : [ { name: 'الفصل الأول', start: settings?.academicYearStart || '', end: '' }, { name: 'الفصل الثاني', start: '', end: settings?.academicYearEnd || '' } ];
   const addTerm = () => {
     setSettings(prev => prev ? { ...prev, terms: [ ...(prev.terms || []), { name: '', start: '', end: '' } ] } : null);
   };

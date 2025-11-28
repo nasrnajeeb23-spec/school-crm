@@ -104,7 +104,7 @@ build({
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
       '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
-      '<script src="https://cdn.tailwindcss.com"></script>',
+      
       '<link rel="stylesheet" href="/assets/index.css">',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',

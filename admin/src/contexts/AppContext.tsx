@@ -7,6 +7,7 @@ type Theme = 'light' | 'dark';
 
 interface AppContextType {
   currentUser: User | null;
+  hydrating: boolean;
   theme: Theme;
   toggleTheme: () => void;
   login: (emailOrUsername: string, password: string) => Promise<boolean>;
@@ -19,6 +20,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [hydrating, setHydrating] = useState<boolean>(true);
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
         if (localStorage.getItem('theme')) {
@@ -44,6 +46,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const toggleTheme = useCallback(() => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+  }, []);
+
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) { setHydrating(false); return; }
+    (async () => {
+      try {
+        const me = await api.getCurrentUser();
+        if (me) {
+          setCurrentUser(me as User);
+          if ((me as any).schoolId) {
+            try { localStorage.setItem('current_school_id', String((me as any).schoolId)); } catch {}
+          }
+        }
+      } catch {}
+      setHydrating(false);
+    })();
   }, []);
 
   const login = async (emailOrUsername: string, password: string): Promise<boolean> => {
@@ -124,6 +143,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const value = {
     currentUser,
+    hydrating,
     theme,
     toggleTheme,
     login,

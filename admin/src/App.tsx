@@ -81,8 +81,11 @@ const getHomeRouteForUser = (role: UserRole) => {
 };
 
 const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }) => {
-    const { currentUser } = useAppContext();
+    const { currentUser, hydrating } = useAppContext();
     
+    if (hydrating) {
+        return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الجلسة...</div>;
+    }
     if (!currentUser) {
         return <Navigate to="/login" replace />;
     }
