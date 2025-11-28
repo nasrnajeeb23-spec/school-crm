@@ -20,7 +20,7 @@ build({
   define: {
     'process.env.REACT_APP_API_URL': JSON.stringify(apiUrl),
     'process.env.REACT_APP_ENVIRONMENT': JSON.stringify(environment),
-    'process.env.REACT_APP_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || ''),
+    'process.env.REACT_APP_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || 'true'),
     'process.env.NODE_ENV': JSON.stringify(environment)
   },
   loader: {
@@ -105,11 +105,11 @@ build({
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
       '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
       
-      '<link rel="stylesheet" href="/assets/index.css">',
+      '<link rel="stylesheet" href="./assets/index.css">',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
-      '<script type="module" src="/assets/index.js"></script>',
+      '<script type="module" src="./assets/index.js"></script>',
       '</body>',
       '</html>'
     ].join('');
