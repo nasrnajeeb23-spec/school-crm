@@ -109,6 +109,8 @@ build({
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
+      // Fallback: If Tailwind CSS failed to load, inject CDN to avoid broken styles
+      '<script>(function(){try{var d=document.createElement("div");d.className="text-3xl";document.body.appendChild(d);var fs=parseFloat(getComputedStyle(d).fontSize||"0");document.body.removeChild(d);if(!fs||fs<24){var s=document.createElement("script");s.src="https://cdn.tailwindcss.com";document.head.appendChild(s);}}catch(e){}})();</script>',
       '<script type="module" src="/assets/index.js"></script>',
       '</body>',
       '</html>'
