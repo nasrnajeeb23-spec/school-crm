@@ -459,7 +459,7 @@ export const getLandingPageContent = async (): Promise<LandingPageContent> => {
             ads: {
                 title: 'عروض',
                 slides: [
-                    { id: 'ad1', title: 'تجربة مجانية', description: 'ابدأ تجربتك الآن', ctaText: 'ابدأ', link: '/#contact', imageUrl: '' }
+                    { id: 'ad1', title: 'تجربة مجانية', description: 'ابدأ تجربتك الآن', ctaText: 'ابدأ', link: '#contact', imageUrl: '' }
                 ]
             }
         };

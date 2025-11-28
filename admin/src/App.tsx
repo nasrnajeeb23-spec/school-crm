@@ -122,7 +122,7 @@ const App: React.FC = () => {
       <ToastContainer />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الصفحة...</div>}>
         <Routes>
-          <Route path="/" element={!currentUser ? <LandingPage /> : <Navigate to={getHomeRouteForUser(currentUser.role)} replace />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={!currentUser ? <LoginPage mode="default" /> : <Navigate to={getHomeRouteForUser(currentUser.role)} replace />} />
           <Route path="/superadmin/login" element={!currentUser ? <LoginPage mode="superadmin" /> : <Navigate to={getHomeRouteForUser(currentUser.role)} replace />} />
 
