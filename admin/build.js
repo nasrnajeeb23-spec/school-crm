@@ -189,8 +189,8 @@ build({
         { type: 'rewrite', source: '/login', destination: '/index.html' },
         { type: 'rewrite', source: '/teacher/**', destination: '/index.html' },
         { type: 'rewrite', source: '/school/**', destination: '/index.html' },
-        { type: 'rewrite', source: '/parent/**', destination: '/index.html' },
-        { type: 'rewrite', source: '/**', destination: '/index.html' }
+        { type: 'rewrite', source: '/parent/**', destination: '/index.html' }
+        // لا تضع إعادة كتابة شاملة '/**' حتى لا تُكسر التحميل للأصول
       ],
       headers: [
         { path: '/*', name: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
