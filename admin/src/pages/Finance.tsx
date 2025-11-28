@@ -158,7 +158,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                     <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">اسم الطالب</th><th scope="col" className="px-6 py-3">تاريخ الاستحقاق</th><th scope="col" className="px-6 py-3">المبلغ</th><th scope="col" className="px-6 py-3">الحالة</th><th scope="col" className="px-6 py-3">إجراءات</th></tr></thead>
                         <tbody>
-                            {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button className="font-medium text-teal-600 dark:text-teal-500 hover:underline">عرض</button></td></tr>))}
+                            {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button className="font-medium text-teal-600 dark:text-teal-500 hover:underline">عرض</button></div></td></tr>))}
                         </tbody>
                     </table>
                 ) : (
@@ -299,11 +299,13 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                                         <td className="px-6 py-4">{s.month}</td>
                                         <td className="px-6 py-4 font-semibold">{Number(s.netAmount || 0).toFixed(2)}</td>
                                         <td className="px-6 py-4">{s.status}</td>
-                                        <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">
-                                            {s.status === 'Draft' && (<button onClick={() => handleApprove(s.id)} className="font-medium text-teال-600 dark:text-teal-500 hover:underline">موافقة</button>)}
-                                            {s.status !== 'Paid' && (
-                                              <button onClick={() => setReceiptSlipId(s.id)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">سند استلام</button>
-                                            )}
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex gap-2">
+                                                {s.status === 'Draft' && (<button onClick={() => handleApprove(s.id)} className="font-medium text-teال-600 dark:text-teal-500 hover:underline">موافقة</button>)}
+                                                {s.status !== 'Paid' && (
+                                                  <button onClick={() => setReceiptSlipId(s.id)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">سند استلام</button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -477,7 +479,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                                     <td className="px-6 py-4">{Number(f.activityFees || 0).toFixed(2)}</td>
                                     <td className="px-6 py-4">{f.paymentPlanType === 'Monthly' ? 'شهري' : f.paymentPlanType === 'Termly' ? 'فصلي' : 'أقساط'}</td>
                                     <td className="px-6 py-4">{(f.discounts || []).map(d => `${d.type}:${d.percentage}%`).join(', ')}</td>
-                                    <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap"><button onClick={() => editFee(f)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">تعديل</button><button onClick={() => deleteFee(f.id)} className="font-medium text-red-600 dark:text-red-500 hover:underline">حذف</button><button onClick={() => openGenerate(f.stage)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">توليد فواتير</button></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2"><button onClick={() => editFee(f)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">تعديل</button><button onClick={() => deleteFee(f.id)} className="font-medium text-red-600 dark:text-red-500 hover:underline">حذف</button><button onClick={() => openGenerate(f.stage)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">توليد فواتير</button></div></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -509,7 +511,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
     return (
         <>
             <div className="mt-6 space-y-6">
-                <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md"><nav className="flex space-x-2 rtl:space-x-reverse" aria-label="Tabs">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}><tab.icon className="h-5 w-5 ml-2" /><span>{tab.label}</span></button>))}</nav></div>
+                <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md"><nav className="flex gap-2" aria-label="Tabs">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}><tab.icon className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" /><span>{tab.label}</span></button>))}</nav></div>
                 {loading ? <TableSkeleton /> : (<>
                         {activeTab === 'overview' && (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><StatsCard icon={RevenueIcon} title="إجمالي الإيرادات" value={`$${summary.totalRevenue.toLocaleString()}`} description="مجموع الفواتير المدفوعة" /><StatsCard icon={ExpenseIcon} title="إجمالي المصروفات" value={`$${summary.totalExpenses.toLocaleString()}`} description="مجموع النفقات المسجلة" /><StatsCard icon={NetProfitIcon} title="صافي الربح" value={`$${summary.netProfit.toLocaleString()}`} description="الإيرادات - المصروفات" /></div>)}
                         {activeTab === 'invoices' && renderInvoicesTab()}

@@ -53,7 +53,7 @@ const TeacherDashboard: React.FC = () => {
 
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                      <h3 className="flex items-center text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                        <BellIcon className="h-6 w-6 ml-2 text-teal-500" />
+                        <BellIcon className="h-6 w-6 ml-2 rtl:mr-2 rtl:ml-0 text-teal-500" />
                         إجراءات مطلوبة
                     </h3>
                     <div className="space-y-4">

@@ -9,11 +9,6 @@ module.exports = {
     { pattern: /bg-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
     { pattern: /text-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
     { pattern: /border-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
-    { pattern: /hover:bg-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
-    { pattern: /hover:text-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
-    { pattern: /dark:bg-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
-    { pattern: /dark:text-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
-    { pattern: /dark:border-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
     { pattern: /p-[0-9]+/ },
     { pattern: /px-[0-9]+/ },
     { pattern: /py-[0-9]+/ },
@@ -27,8 +22,8 @@ module.exports = {
     { pattern: /w-[\[\]a-z0-9%-]+/ },
     { pattern: /h-[\[\]a-z0-9%-]+/ },
     { pattern: /container/ },
-    { pattern: /space-x-[0-9]+/ },
-    { pattern: /rtl:space-x-reverse/, variants: ['rtl'] },
   ],
-  plugins: [],
+  plugins: [
+    require('tailwindcss-rtl'),
+  ],
 };

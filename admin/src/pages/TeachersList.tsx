@@ -116,10 +116,12 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4">{teacher.joinDate}</td>
-                    <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">
-                      <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
-                        عرض التفاصيل
-                      </Link>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teال-500 hover:underline">
+                          عرض التفاصيل
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -187,7 +187,7 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
             </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md"><nav className="flex space-x-1 rtl:space-x-reverse" aria-label="Tabs">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}><tab.icon className="h-5 w-5 ml-2" /><span>{tab.label}</span></button>))}</nav></div>
+        <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md"><nav className="flex gap-1" aria-label="Tabs">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}><tab.icon className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" /><span>{tab.label}</span></button>))}</nav></div>
 
         {/* Tab Content */}
         {activeTab === 'overview' && (

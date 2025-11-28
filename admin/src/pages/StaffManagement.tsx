@@ -219,9 +219,11 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4" dir="ltr">{(member as any).bankAccount || '—'}</td>
-                    <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">
-                      <button onClick={() => { setEditing(member); setIsModalOpen(true); }} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">تعديل</button>
-                      <button onClick={() => handleDeleteStaff(member)} disabled={member.schoolRole === SchoolRole.Admin} className="font-medium text-red-600 dark:text-red-500 hover:underline disabled:text-red-300 disabled:cursor-not-allowed">حذف</button>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <button onClick={() => { setEditing(member); setIsModalOpen(true); }} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">تعديل</button>
+                        <button onClick={() => handleDeleteStaff(member)} disabled={member.schoolRole === SchoolRole.Admin} className="font-medium text-red-600 dark:text-red-500 hover:underline disabled:text-red-300 disabled:cursor-not-allowed">حذف</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

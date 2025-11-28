@@ -72,13 +72,15 @@ const Billing: React.FC = () => {
                       {SubscriptionStatus.PastDue}
                     </span>
                   </td>
-                  <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">
-                    <a href="#" className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">
-                      إرسال تذكير
-                    </a>
-                    <a href="#" className="font-medium text-gray-600 dark:text-gray-400 hover:underline">
-                      عرض الفاتورة
-                    </a>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex gap-2">
+                      <a href="#" className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">
+                        إرسال تذكير
+                      </a>
+                      <a href="#" className="font-medium text-gray-600 dark:text-gray-400 hover:underline">
+                        عرض الفاتورة
+                      </a>
+                    </div>
                   </td>
                 </tr>
               )) : (

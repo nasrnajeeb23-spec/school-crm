@@ -52,7 +52,7 @@ const PaymentProofModal: React.FC<PaymentProofModalProps> = ({ onClose, onSubmit
                 </p>
 
                 <div className="border-b border-gray-200 dark:border-gray-700 mb-4">
-                    <nav className="-mb-px flex space-x-4 rtl:space-x-reverse" aria-label="Tabs">
+                    <nav className="-mb-px flex gap-4" aria-label="Tabs">
                         <button onClick={() => setActiveTab(PaymentMethod.BankDeposit)} className={`whitespace-nowrap pb-2 px-1 border-b-2 font-medium text-sm ${activeTab === PaymentMethod.BankDeposit ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                             {PaymentMethod.BankDeposit}
                         </button>

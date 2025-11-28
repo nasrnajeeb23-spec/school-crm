@@ -221,7 +221,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">المراحل الدراسية المتاحة</label>
                     <div className="mt-2 flex flex-wrap gap-4">
                         {allStages.map(stage => (
-                          <label key={stage} className="flex items-center space-x-2 rtl:space-x-reverse">
+                          <label key={stage} className="flex items-center gap-2">
                             <input type="checkbox" checked={stages.includes(stage)} onChange={() => handleStageToggle(stage)} className="form-checkbox h-5 w-5 text-teal-600" />
                             <span className="text-gray-700 dark:text-gray-300">{stage}</span>
                           </label>
@@ -253,7 +253,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">أيام العمل</label>
                     <div className="mt-2 flex flex-wrap gap-4">
                         {allDays.map(day => (
-                          <label key={day} className="flex items-center space-x-2 rtl:space-x-reverse">
+                          <label key={day} className="flex items-center gap-2">
                             <input type="checkbox" checked={workingDays.includes(day)} onChange={() => handleDayToggle(day)} className="form-checkbox h-5 w-5 text-teal-600" />
                             <span className="text-gray-700 dark:text-gray-300">{arDays[day]}</span>
                           </label>
@@ -280,7 +280,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">طرق الحضور</label>
                     <div className="mt-2 flex flex-wrap gap-4">
                       {(['QR','RFID','Manual'] as ('QR'|'RFID'|'Manual')[]).map(m => (
-                        <label key={m} className="flex items-center space-x-2 rtl:space-x-reverse">
+                        <label key={m} className="flex items-center gap-2">
                           <input type="checkbox" checked={attendanceMethods.includes(m)} onChange={() => handleAttendanceMethodToggle(m)} className="form-checkbox h-5 w-5 text-teal-600" />
                           <span className="text-gray-700 dark:text-gray-300">{m === 'Manual' ? 'يدوي' : m}</span>
                         </label>
@@ -337,7 +337,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">بيانات الطالب المطلوبة</label>
                     <div className="mt-2 space-y-2">
                       {['الاسم الكامل','تاريخ الميلاد','الجنس','الرقم الوطني','العنوان','المدينة','تاريخ القبول'].map((field, idx) => (
-                        <label key={idx} className="flex items-center space-x-2 rtl:space-x-reverse">
+                        <label key={idx} className="flex items-center gap-2">
                           <input type="checkbox" checked={settings.admissionForm?.studentFields?.includes(field) || false} onChange={() => handleAdmissionFieldToggle('studentFields', field)} className="form-checkbox h-5 w-5 text-teal-600" />
                           <span className="text-gray-700 dark:text-gray-300">{field}</span>
                         </label>
@@ -348,7 +348,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">بيانات ولي الأمر المطلوبة</label>
                     <div className="mt-2 space-y-2">
                       {['الاسم','هاتف الاتصال','بريد الإلكتروني','العلاقة بالطالب'].map((field, idx) => (
-                        <label key={idx} className="flex items-center space-x-2 rtl:space-x-reverse">
+                        <label key={idx} className="flex items-center gap-2">
                           <input type="checkbox" checked={settings.admissionForm?.parentFields?.includes(field) || false} onChange={() => handleAdmissionFieldToggle('parentFields', field)} className="form-checkbox h-5 w-5 text-teal-600" />
                           <span className="text-gray-700 dark:text-gray-300">{field}</span>
                         </label>
@@ -359,7 +359,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">المرفقات المطلوبة</label>
                     <div className="mt-2 space-y-2">
                       {['صورة شخصية','نسخة من شهادة الميلاد','نسخة من بطاقة الهوية','شهادة تحصيل'].map((doc, idx) => (
-                        <label key={idx} className="flex items-center space-x-2 rtl:space-x-reverse">
+                        <label key={idx} className="flex items-center gap-2">
                           <input type="checkbox" checked={settings.admissionForm?.requiredDocuments?.includes(doc) || false} onChange={() => handleAdmissionFieldToggle('requiredDocuments', doc)} className="form-checkbox h-5 w-5 text-teal-600" />
                           <span className="text-gray-700 dark:text-gray-300">{doc}</span>
                         </label>
@@ -375,13 +375,13 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <input type="number" min="0" name="registrationFeeDueDays" id="registrationFeeDueDays" value={(settings.admissionForm?.registrationFeeDueDays ?? 7).toString()} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, registrationFeeDueDays: Number(e.target.value) } } : null)} className={inputStyle} />
                   </div>
                   <div>
-                    <label className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <label className="flex items-center gap-2">
                       <input type="checkbox" checked={settings.admissionForm?.autoGenerateRegistrationInvoice ?? true} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, autoGenerateRegistrationInvoice: e.target.checked } } : null)} className="form-checkbox h-5 w-5 text-teal-600" />
                       <span className="text-gray-700 dark:text-gray-300">إنشاء فاتورة رسوم التسجيل تلقائياً</span>
                     </label>
                   </div>
                   <div>
-                    <label className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <label className="flex items-center gap-2">
                       <input type="checkbox" checked={settings.admissionForm?.consentFormRequired || false} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, consentFormRequired: e.target.checked } } : null)} className="form-checkbox h-5 w-5 text-teal-600" />
                       <span className="text-gray-700 dark:text-gray-300">يتطلب نموذج موافقة</span>
                     </label>
@@ -396,9 +396,9 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
             <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">إعدادات الإشعارات</h4>
                  <div className="flex flex-col sm:flex-row gap-6">
-                    <label className="flex items-center space-x-3 rtl:space-x-reverse"><input type="checkbox" name="email" checked={settings.notifications.email} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">إشعارات البريد الإلكتروني</span></label>
-                    <label className="flex items-center space-x-3 rtl:space-x-reverse"><input type="checkbox" name="sms" checked={settings.notifications.sms} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">رسائل نصية (SMS)</span></label>
-                    <label className="flex items-center space-x-3 rtl:space-x-reverse"><input type="checkbox" name="push" checked={settings.notifications.push} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">إشعارات التطبيق</span></label>
+                    <label className="flex items-center gap-3"><input type="checkbox" name="email" checked={settings.notifications.email} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">إشعارات البريد الإلكتروني</span></label>
+                    <label className="flex items-center gap-3"><input type="checkbox" name="sms" checked={settings.notifications.sms} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">رسائل نصية (SMS)</span></label>
+                    <label className="flex items-center gap-3"><input type="checkbox" name="push" checked={settings.notifications.push} onChange={handleCheckboxChange} className="form-checkbox h-5 w-5 text-teal-600" /><span className="text-gray-700 dark:text-gray-300">إشعارات التطبيق</span></label>
                  </div>
             </div>
 

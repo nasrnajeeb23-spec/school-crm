@@ -314,7 +314,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
                   </div>
                 </div>
                 
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2 rtl:space-x-reverse">
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
                   <button onClick={() => setEditingClass(cls)} className="font-medium text-teal-600 dark:text-teال-500 hover:underline text-sm">
                     إدارة الطلاب
                   </button>

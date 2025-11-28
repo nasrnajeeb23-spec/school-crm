@@ -43,7 +43,7 @@ const RolesList: React.FC = () => {
                     <UsersIcon className="h-5 w-5 mr-2 rtl:ml-2 rtl:mr-0" />
                     <span>{role.userCount.toLocaleString()} مستخدم</span>
                 </div>
-                <div className="flex space-x-2 rtl:space-x-reverse">
+                <div className="flex gap-2">
                     <button className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                         تعديل
                     </button>

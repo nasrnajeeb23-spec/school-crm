@@ -45,7 +45,7 @@ const LicenseManagement: React.FC = () => {
           <label className="block text-sm mt-4 mb-2">الوحدات</label>
           <div className="space-y-2">
             {modules.map(m => (
-              <label key={m.id} className="flex items-center space-x-2">
+              <label key={m.id} className="flex items-center gap-2">
                 <input type="checkbox" checked={selectedModuleIds.includes(m.id)} onChange={() => toggleModule(m.id)} />
                 <span>{m.name}</span>
               </label>

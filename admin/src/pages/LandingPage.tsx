@@ -95,8 +95,8 @@ const LandingPage: React.FC = () => {
       <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm sticky top-0 z-40">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center"><LogoIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" /><span className="ml-3 text-2xl font-bold">SchoolSaaS</span></div>
-            <nav className="flex items-center space-x-4 sm:space-x-8 rtl:space-x-reverse text-sm sm:text-base">
+                    <div className="flex items-center"><LogoIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" /><span className="ml-3 rtl:mr-3 rtl:ml-0 text-2xl font-bold">SchoolSaaS</span></div>
+                    <nav className="flex items-center gap-x-4 sm:gap-x-8 text-sm sm:text-base">
               <a href="#features" onClick={(e) => handleNavClick(e, 'features')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الميزات</a>
               <a href="#pricing" onClick={(e) => handleNavClick(e, 'pricing')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الأسعار</a>
               <a href="#contact" onClick={(e) => handleNavClick(e, 'contact')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">تواصل معنا</a>
@@ -116,8 +116,8 @@ const LandingPage: React.FC = () => {
       </header>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700 z-50">
-          <div className="container mx-auto px-4 py-3 flex flex-col gap-3">
+                <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700 z-50">
+                  <div className="container mx-auto px-4 py-3 flex flex-col gap-3">
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
             <a href="#contact" onClick={(e) => { handleNavClick(e, 'contact'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a>
@@ -158,7 +158,7 @@ const LandingPage: React.FC = () => {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center md:text-right">
-                <div className="col-span-2 md:col-span-1"><div className="flex items-center justify-center md:justify-start"><LogoIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" /><span className="ml-3 text-2xl font-bold">SchoolSaaS</span></div><p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">النظام المتكامل لإدارة المدارس الحديثة.</p></div>
+                        <div className="col-span-2 md:col-span-1"><div className="flex items-center justify-center md:justify-start"><LogoIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" /><span className="ml-3 rtl:mr-3 rtl:ml-0 text-2xl font-bold">SchoolSaaS</span></div><p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">النظام المتكامل لإدارة المدارس الحديثة.</p></div>
                 <div><h3 className="font-semibold text-gray-900 dark:text-white tracking-wider uppercase">المنصة</h3><ul className="mt-4 space-y-2"><li><a href="#features" onClick={(e) => handleNavClick(e, 'features')} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a></li><li><a href="#pricing" onClick={(e) => handleNavClick(e, 'pricing')} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">اكتشف خططنا</a></li></ul></div>
                 <div><h3 className="font-semibold text-gray-900 dark:text-white tracking-wider uppercase">الشركة</h3><ul className="mt-4 space-y-2"><li><button onClick={() => setIsAboutUsModalOpen(true)} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">من نحن</button></li><li><a href="#contact" onClick={(e) => handleNavClick(e, 'contact')} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a></li><li><button onClick={() => setIsAdModalOpen(true)} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">اعلن معنا</button></li><li><button onClick={() => setIsBusOperatorModalOpen(true)} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">التسجيل كسائق</button></li></ul></div>
                 <div><h3 className="font-semibold text-gray-900 dark:text-white tracking-wider uppercase">قانوني</h3><ul className="mt-4 space-y-2"><li><button onClick={() => setIsPrivacyModalOpen(true)} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">سياسة الخصوصية</button></li><li><button onClick={() => setIsTermsModalOpen(true)} className="text-base text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">شروط الخدمة</button></li></ul></div>

@@ -186,12 +186,12 @@ const Messaging: React.FC = () => {
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-3">
-                                            <IconComponent className="h-5 w-5 text-gray-400" />
-                                            <div>
-                                                <h3 className="font-medium text-gray-800 dark:text-white">
-                                                    {conversation.title}
-                                                </h3>
+                                    <div className="flex items-center gap-3">
+                                        <IconComponent className="h-5 w-5 text-gray-400" />
+                                        <div>
+                                            <h3 className="font-medium text-gray-800 dark:text-white">
+                                                {conversation.title}
+                                            </h3>
                                                 <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                                                     {conversation.lastMessage || 'لا توجد رسائل'}
                                                 </p>
@@ -227,7 +227,7 @@ const Messaging: React.FC = () => {
                                 </div>
                                 <button
                                     onClick={() => setIsAiModalOpen(true)}
-                                    className="flex items-center space-x-2 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 transition-colors"
+                                    className="flex items-center gap-2 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 transition-colors"
                                 >
                                     <SparklesIcon className="h-4 w-4" />
                                     <span>مساعد AI</span>
@@ -272,7 +272,7 @@ const Messaging: React.FC = () => {
 
                         {/* Message Input */}
                         <div className="bg-white dark:bg-gray-800 p-4 border-t border-gray-200 dark:border-gray-700">
-                            <div className="flex space-x-2">
+                            <div className="flex gap-2">
                                 <input
                                     type="text"
                                     value={newMessage}
@@ -309,7 +309,7 @@ const Messaging: React.FC = () => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">نوع المستلم</label>
-                                <div className="flex space-x-4">
+                                <div className="flex gap-4">
                                     <button
                                         onClick={() => setTargetRole('TEACHER')}
                                         className={`px-4 py-2 rounded-lg ${
@@ -350,7 +350,7 @@ const Messaging: React.FC = () => {
                             </div>
                         </div>
                         
-                        <div className="flex justify-end space-x-3 mt-6">
+                        <div className="flex justify-end gap-3 mt-6">
                             <button
                                 onClick={() => setIsCreateModalOpen(false)}
                                 className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"

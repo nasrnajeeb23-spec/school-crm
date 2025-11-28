@@ -35,6 +35,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const { addToast } = useToast();
 
   useEffect(() => {
+    try {
+      const root = window.document.documentElement;
+      if (root.getAttribute('dir') !== 'rtl') {
+        root.setAttribute('dir', 'rtl');
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     const root = window.document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');

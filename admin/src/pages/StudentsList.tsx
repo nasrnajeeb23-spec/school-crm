@@ -144,7 +144,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
             onClick={() => setIsModalOpen(true)}
             className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
           >
-            <PlusIcon className="h-5 w-5 ml-2" />
+            <PlusIcon className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" />
             إضافة طالب جديد
           </button>
         </div>
@@ -184,7 +184,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4">{student.registrationDate}</td>
-                  <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">
+                  <td className="px-6 py-4 gap-2 whitespace-nowrap flex">
                     <Link 
                       to={`${location.pathname}/${student.id}`}
                       className="font-medium text-teal-600 dark:text-teal-500 hover:underline">

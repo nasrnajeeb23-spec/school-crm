@@ -249,7 +249,7 @@ export default function SuperAdminTeamManagement() {
                     {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleDateString('ar') : 'لم يدخل'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => {
                           setEditingMember(member);
@@ -378,7 +378,7 @@ export default function SuperAdminTeamManagement() {
                         type="checkbox"
                         checked={formData.permissions.includes(permission)}
                         onChange={() => togglePermission(permission)}
-                        className="ml-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        className="ml-2 rtl:mr-2 rtl:ml-0 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
                     </label>
@@ -386,7 +386,7 @@ export default function SuperAdminTeamManagement() {
                 </div>
               </div>
               
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => {

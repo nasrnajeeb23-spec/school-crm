@@ -237,7 +237,7 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
         <>
             <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                 <div className="border-b border-gray-200 dark:border-gray-700 mb-4">
-                    <nav className="-mb-px flex space-x-6 rtl:space-x-reverse" aria-label="Tabs">
+                    <nav className="-mb-px flex gap-6" aria-label="Tabs">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}

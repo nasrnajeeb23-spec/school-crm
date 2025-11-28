@@ -161,7 +161,7 @@ const SchoolAdminsList: React.FC = () => {
                     {new Date(admin.createdAt).toLocaleDateString('ar-SA')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2 rtl:space-x-reverse">
+                    <div className="flex gap-2">
                       <button 
                         onClick={() => {/* TODO: Add edit modal */}}
                         className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"

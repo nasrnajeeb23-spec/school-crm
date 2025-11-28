@@ -10,7 +10,7 @@ interface StatsCardProps {
 }
 
 const StatsCard: React.FC<StatsCardProps> = ({ icon: Icon, title, value, description, onClick }) => {
-  const baseClasses = "bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center space-x-4 rtl:space-x-reverse transition-all duration-300 w-full text-right";
+  const baseClasses = "bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center gap-4 transition-all duration-300 w-full text-right";
   const clickableClasses = onClick ? "cursor-pointer transform hover:-translate-y-1 hover:shadow-lg" : "";
 
   const Component = onClick ? 'button' : 'div';

@@ -88,7 +88,8 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
                       {parent.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 space-x-2 rtl:space-x-reverse whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex gap-2">
                     {parent.status === ParentAccountStatus.Invited ? (
                       <button className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
                           إعادة إرسال الدعوة
@@ -101,6 +102,7 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
                     <button className="font-medium text-red-600 dark:text-red-500 hover:underline">
                       إلغاء التنشيط
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}
