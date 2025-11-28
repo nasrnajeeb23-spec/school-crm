@@ -79,7 +79,7 @@ const TeacherAttendance: React.FC = () => {
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">اختر الفصل</label>
                         <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} disabled={classes.length === 0} className="w-full md:w-64 pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">
-                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {classes.map(c => <option key={c.id} value={c.id}>{`${c.gradeLevel} (${c.section || 'أ'})`}</option>)}
                         </select>
                     </div>
                      <div>
@@ -90,7 +90,7 @@ const TeacherAttendance: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">قائمة الطلاب - {classes.find(c => c.id === selectedClass)?.name || '...'}</h3>
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">قائمة الطلاب - {(() => { const cls = classes.find(c => c.id === selectedClass); return cls ? `${cls.gradeLevel} (${cls.section || 'أ'})` : '...'; })()}</h3>
                  {loading ? (<div className="text-center py-8">جاري تحميل سجل الحضور...</div>) : attendanceRecords.length === 0 ? (<div className="text-center py-8 text-gray-500 dark:text-gray-400">لا يوجد طلاب في هذا الفصل.</div>) : (
                     <div className="space-y-3">
                         {attendanceRecords.map(record => (

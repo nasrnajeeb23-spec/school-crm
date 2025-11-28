@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
-import { Student, StudentStatus, InvoiceStatus, Grade, Invoice, StudentNote, StudentGrades, AttendanceStatus, AttendanceRecord, StudentDocument, UpdatableStudentData, SchoolSettings } from '../types';
+import { Student, StudentStatus, InvoiceStatus, Grade, Invoice, StudentNote, StudentGrades, AttendanceStatus, AttendanceRecord, StudentDocument, UpdatableStudentData, SchoolSettings, Class } from '../types';
 import * as api from '../api';
 import { BackIcon, EditIcon, PrintIcon, NoteIcon, UsersIcon, AttendanceIcon, FinanceIcon, GradesIcon, TrashIcon, PlusIcon, FileIcon, DownloadIcon, UploadIcon, SparklesIcon, CopyIcon, CheckIcon } from '../components/icons';
 import { GoogleGenAI } from "@google/genai";
@@ -65,6 +65,7 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiError, setAiError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [classes, setClasses] = useState<Class[]>([]);
 
   useEffect(() => {
     if (!studentId) return;
@@ -82,6 +83,10 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
         addToast("فشل تحميل بيانات الطالب.", 'error');
     }).finally(() => setLoading(false));
   }, [studentId, schoolId, addToast]);
+
+  useEffect(() => {
+    api.getSchoolClasses(schoolId).then(setClasses).catch(() => setClasses([]));
+  }, [schoolId]);
   
   const handleUpdateStudent = async (data: UpdatableStudentData) => {
     if (!student) return;
@@ -172,7 +177,7 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
                 <div className="flex-grow text-center md:text-right">
                     <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{student.name}</h2>
                     <div className="flex items-center justify-center md:justify-start gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    <span>{student.grade}</span><span>|</span><span>ولي الأمر: {student.parentName}</span><span>|</span><span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[student.status]}`}>{student.status}</span>
+                    <span>{(() => { const cls = classes.find(c => String(c.id) === String(student.classId)); return cls ? `${cls.gradeLevel} (${cls.section || 'أ'})` : student.grade; })()}</span><span>|</span><span>ولي الأمر: {student.parentName}</span><span>|</span><span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[student.status]}`}>{student.status}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">

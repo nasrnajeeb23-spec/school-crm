@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Parent, Student, Grade, Attendance, Invoice, Notification } = require('../models');
+const { Parent, Student, Grade, Attendance, Invoice, Notification, Schedule, Class, Teacher } = require('../models');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
 // @route   GET api/parent/:parentId/dashboard
@@ -93,5 +93,25 @@ router.post('/:parentId/requests', verifyToken, requireRole('PARENT'), async (re
     if (!title) return res.status(400).json({ msg: 'title is required' });
     const row = await Notification.create({ parentId: req.params.parentId, title, description: description || '', status: 'Pending' });
     res.status(201).json({ id: String(row.id), title: row.title, description: row.description, status: 'قيد الانتظار', createdAt: row.createdAt.toISOString().split('T')[0] });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/action-items', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    const rows = await Notification.findAll({ where: { parentId: req.user.parentId }, order: [['date','DESC']] });
+    const typeMap = { 'Warning': 'warning', 'Info': 'info', 'Approval': 'approval' };
+    res.json(rows.map(r => ({ id: String(r.id), type: typeMap[r.type] || 'info', title: r.title, description: r.description, date: r.date.toISOString().split('T')[0], isRead: !!r.isRead })));
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/student-schedule', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const parent = await Parent.findByPk(req.params.parentId, { include: { model: Student, limit: 1 } });
+    if (!parent || !parent.Students || parent.Students.length === 0) return res.status(404).json({ msg: 'No student linked' });
+    const student = parent.Students[0];
+    const scheduleRows = await Schedule.findAll({ where: { classId: student.classId }, include: [{ model: Teacher, attributes: ['name'] }, { model: Class, attributes: ['gradeLevel','section'] }], order: [['day','ASC'],['timeSlot','ASC']] });
+    const schedule = scheduleRows.map(r => ({ id: String(r.id), classId: String(r.classId), className: r.Class ? `${r.Class.gradeLevel} (${r.Class.section || 'أ'})` : '', day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' }));
+    res.json({ student: student.toJSON(), schedule });
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });

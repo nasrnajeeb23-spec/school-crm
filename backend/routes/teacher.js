@@ -23,7 +23,7 @@ router.get('/:teacherId/dashboard', verifyToken, requireRole('TEACHER'), async (
                 teacherId: Number(teacherId),
                 day: today,
             },
-            include: { model: Class, attributes: ['name'] },
+            include: { model: Class, attributes: ['gradeLevel','section'] },
             order: [['timeSlot', 'ASC']]
         });
 
@@ -44,12 +44,13 @@ router.get('/:teacherId/dashboard', verifyToken, requireRole('TEACHER'), async (
         const actionItemTypeMap = { 'Warning': 'warning', 'Info': 'info', 'Approval': 'approval' };
 
         res.json({
-            classes: classes.map(c => c.toJSON()),
+            classes: classes.map(c => { const j = c.toJSON(); return { ...j, name: `${j.gradeLevel} (${j.section || 'أ'})` }; }),
             schedule: schedule.map(s => ({
                 id: s.id,
                 timeSlot: s.timeSlot,
                 subject: s.subject,
-                classId: s.Class.name, // Use class name for display
+                classId: String(s.classId),
+                className: s.Class ? `${s.Class.gradeLevel} (${s.Class.section || 'أ'})` : '',
             })),
             actionItems: actionItems.map(item => ({
                 id: item.id.toString(),
@@ -71,8 +72,8 @@ router.get('/:teacherId/classes', verifyToken, requireRole('TEACHER'), async (re
   try {
     const { teacherId } = req.params;
     if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
-    const classes = await Class.findAll({ where: { homeroomTeacherId: Number(teacherId) }, order: [['name','ASC']] });
-    res.json(classes.map(c => ({ ...c.toJSON(), subjects: ['الرياضيات', 'العلوم', 'اللغة الإنجليزية'] })));
+  const classes = await Class.findAll({ where: { homeroomTeacherId: Number(teacherId) }, order: [['name','ASC']] });
+  res.json(classes.map(c => { const j = c.toJSON(); return { ...j, name: `${j.gradeLevel} (${j.section || 'أ'})`, subjects: Array.isArray(j.subjects) && j.subjects.length > 0 ? j.subjects : ['الرياضيات', 'العلوم', 'اللغة الإنجليزية'] }; }));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 
@@ -81,8 +82,8 @@ router.get('/:teacherId/schedule', verifyToken, requireRole('TEACHER'), async (r
   try {
     const { teacherId } = req.params;
     if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
-    const rows = await Schedule.findAll({ where: { teacherId: Number(teacherId) }, include: [{ model: Class, attributes: ['name'] }, { model: Teacher, attributes: ['name'] }], order: [['day','ASC'],['timeSlot','ASC']] });
-    res.json(rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: r.Class ? r.Class.name : '', day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' })));
+    const rows = await Schedule.findAll({ where: { teacherId: Number(teacherId) }, include: [{ model: Class, attributes: ['gradeLevel','section'] }, { model: Teacher, attributes: ['name'] }], order: [['day','ASC'],['timeSlot','ASC']] });
+    res.json(rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: r.Class ? `${r.Class.gradeLevel} (${r.Class.section || 'أ'})` : '', day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' })));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 

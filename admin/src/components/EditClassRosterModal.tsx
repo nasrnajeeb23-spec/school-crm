@@ -64,7 +64,7 @@ const EditClassRosterModal: React.FC<EditClassRosterModalProps> = ({ classInfo, 
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">إدارة طلاب الفصل</h2>
-        <p className="text-gray-500 dark:text-gray-400 mb-6">فصل: <span className="font-semibold">{classInfo.name}</span></p>
+        <p className="text-gray-500 dark:text-gray-400 mb-6">فصل: <span className="font-semibold">{`${classInfo.gradeLevel} (${classInfo.section || 'أ'})`}</span></p>
 
         <div className="relative mb-4">
             <input

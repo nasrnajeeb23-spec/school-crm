@@ -89,7 +89,7 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {teacherDetails.classes.map(cls => (
                 <div key={cls.id} className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <p className="font-bold text-gray-800 dark:text-white">{cls.name}</p>
+                  <p className="font-bold text-gray-800 dark:text-white">{`${cls.gradeLevel} (${cls.section || 'أ'})`}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{cls.gradeLevel}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{cls.studentCount} طالب</p>
                 </div>

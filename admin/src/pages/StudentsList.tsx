@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Student, StudentStatus, NewStudentData, SchoolSettings } from '../types';
+import { Student, StudentStatus, NewStudentData, SchoolSettings, Class } from '../types';
 import * as api from '../api';
 import StudentFormModal from '../components/StudentFormModal';
 import { PlusIcon, UsersIcon } from '../components/icons';
@@ -25,6 +25,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | StudentStatus>('all');
   const [gradeFilter, setGradeFilter] = useState('');
   const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { addToast } = useToast();
@@ -48,6 +49,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
         setLoading(false);
     });
     api.getSchoolSettings(schoolId).then(setSchoolSettings).catch(() => setSchoolSettings(null));
+    api.getSchoolClasses(schoolId).then(setClasses).catch(() => setClasses([]));
   }, [schoolId, addToast]);
   
   const handleAddStudent = async (studentData: NewStudentData, selectedClassId?: string) => {
@@ -107,10 +109,18 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
     }
   };
 
+  const getDisplayGrade = (s: Student) => {
+    if (s.classId) {
+      const cls = classes.find(c => String(c.id) === String(s.classId));
+      if (cls) return `${cls.gradeLevel} (${cls.section || 'أ'})`;
+    }
+    return s.grade;
+  };
+
   const filteredStudents = students
     .filter(student => student.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .filter(student => statusFilter === 'all' || student.status === statusFilter)
-    .filter(student => !gradeFilter || student.grade.toLowerCase().includes(gradeFilter.toLowerCase()));
+    .filter(student => !gradeFilter || getDisplayGrade(student).toLowerCase().includes(gradeFilter.toLowerCase()));
 
   return (
     <>
@@ -166,7 +176,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
                   <>
                   <tr key={student.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{student.name}</td>
-                    <td className="px-6 py-4">{student.grade}</td>
+                    <td className="px-6 py-4">{getDisplayGrade(student)}</td>
                     <td className="px-6 py-4">{student.parentName}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[student.status]}`}>

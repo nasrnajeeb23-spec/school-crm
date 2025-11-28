@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { User, School, Plan, Subscription, SchoolSettings } = require('../models');
+const { User, School, Plan, Subscription, SchoolSettings, Parent } = require('../models');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const bcrypt = require('bcryptjs');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, requireRole } = require('../middleware/auth');
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 
@@ -233,6 +233,42 @@ router.post('/mfa/verify', verifyToken, validate([{ name: 'token', required: tru
     await user.save();
     res.json({ msg: 'MFA enabled' });
   } catch (e) {
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), validate([
+  { name: 'parentId', required: true, type: 'string' },
+]), async (req, res) => {
+  try {
+    const pid = Number(req.body.parentId);
+    if (!pid) return res.status(400).json({ msg: 'Invalid parentId' });
+    const parent = await Parent.findByPk(pid);
+    if (!parent) return res.status(404).json({ msg: 'Parent not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(parent.schoolId || 0)) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+    let user = await User.findOne({ where: { parentId: parent.id } });
+    if (!user) {
+      const rawPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
+      const hashed = await bcrypt.hash(rawPassword, 10);
+      user = await User.create({ email: parent.email, username: parent.email, password: hashed, name: parent.name, role: 'Parent', schoolId: parent.schoolId, parentId: parent.id, passwordMustChange: true });
+    } else {
+      user.email = parent.email;
+      user.username = parent.email;
+      user.name = parent.name;
+      user.role = 'Parent';
+      user.schoolId = parent.schoolId;
+      user.parentId = parent.id;
+      user.isActive = true;
+      user.passwordMustChange = true;
+      await user.save();
+    }
+    parent.status = 'Invited';
+    await parent.save();
+    return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id) });
+  } catch (e) {
+    console.error(e.message);
     res.status(500).json({ msg: 'Server Error' });
   }
 });

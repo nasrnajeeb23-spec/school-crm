@@ -70,7 +70,7 @@ const TeacherAssignments: React.FC = () => {
             <>
                 <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                     <div className="flex justify-between items-center mb-4">
-                        <div className="flex items-center gap-4"><label htmlFor="class-filter" className="text-sm font-medium">عرض واجبات فصل:</label><select id="class-filter" value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="pr-8 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                        <div className="flex items-center gap-4"><label htmlFor="class-filter" className="text-sm font-medium">عرض واجبات فصل:</label><select id="class-filter" value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="pr-8 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">{classes.map(c => <option key={c.id} value={c.id}>{`${c.gradeLevel} (${c.section || 'أ'})`}</option>)}</select></div>
                          <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />واجب جديد</button>
                     </div>
                     {loading ? <p>جاري تحميل الواجبات...</p> : (

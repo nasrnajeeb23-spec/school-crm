@@ -43,7 +43,7 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ classes, 
             <div>
               <label htmlFor="classId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الفصل الدراسي</label>
               <select name="classId" id="classId" value={formData.classId} onChange={handleChange} required className={inputStyle}>
-                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {classes.map(c => <option key={c.id} value={c.id}>{`${c.gradeLevel} (${c.section || 'أ'})`}</option>)}
               </select>
             </div>
             <div>

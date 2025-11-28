@@ -43,7 +43,7 @@ const TeacherDashboard: React.FC = () => {
                             <div key={s.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex justify-between items-center">
                                <div>
                                   <p className="font-semibold text-gray-800 dark:text-white">{s.subject}</p>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400">{s.classId}</p>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">{s.className || s.classId}</p>
                                </div>
                                <span className="text-sm font-medium text-teal-600 dark:text-teal-400">{s.timeSlot}</span>
                             </div>
@@ -78,7 +78,7 @@ const TeacherDashboard: React.FC = () => {
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                      {data.classes.length > 0 ? data.classes.map(c => (
                         <div key={c.id} className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                             <p className="font-bold text-gray-800 dark:text-white">{c.name}</p>
+                             <p className="font-bold text-gray-800 dark:text-white">{`${c.gradeLevel} (${c.section || 'أ'})`}</p>
                              <p className="text-sm text-gray-500 dark:text-gray-400">{c.studentCount} طالب</p>
                         </div>
                      )) : <p className="text-center text-gray-500 dark:text-gray-400 py-4 col-span-full">أنت غير مسجل كمعلم أساسي لأي فصل.</p>}

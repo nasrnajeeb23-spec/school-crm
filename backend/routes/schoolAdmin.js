@@ -581,7 +581,11 @@ router.delete('/:schoolId/staff/:userId', verifyToken, requireRole('SCHOOL_ADMIN
 router.get('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const classes = await Class.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']] });
-    res.json(classes.map(c => ({ ...c.toJSON(), subjects: Array.isArray(c.subjects) ? c.subjects : [] })));
+    res.json(classes.map(c => {
+      const json = c.toJSON();
+      const displayName = `${json.gradeLevel} (${json.section || 'أ'})`;
+      return { ...json, name: displayName, subjects: Array.isArray(json.subjects) ? json.subjects : [] };
+    }));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -615,7 +619,9 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       subjects: subjects,
       section: typeof section === 'string' ? section : 'أ',
     });
-    res.status(201).json({ ...newClass.toJSON(), subjects: Array.isArray(newClass.subjects) ? newClass.subjects : [] });
+    const json = newClass.toJSON();
+    const displayName = `${json.gradeLevel} (${json.section || 'أ'})`;
+    res.status(201).json({ ...json, name: displayName, subjects: Array.isArray(json.subjects) ? json.subjects : [] });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -668,7 +674,7 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
     const newCount = await Student.count({ where: { schoolId: cls.schoolId, classId: cls.id } });
     cls.studentCount = newCount;
     await cls.save();
-    res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
+    { const j = cls.toJSON(); const displayName = `${j.gradeLevel} (${j.section || 'أ'})`; res.json({ ...j, name: displayName, subjects: Array.isArray(j.subjects) ? j.subjects : [] }); }
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -694,7 +700,7 @@ router.put('/:schoolId/classes/:classId/details', verifyToken, requireRole('SCHO
     }
     if (typeof section === 'string' && section.trim()) cls.section = section.trim();
     await cls.save();
-    res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
+    { const j = cls.toJSON(); const displayName = `${j.gradeLevel} (${j.section || 'أ'})`; res.json({ ...j, name: displayName, subjects: Array.isArray(j.subjects) ? j.subjects : [] }); }
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -723,7 +729,7 @@ router.put('/:schoolId/classes/:classId/subjects', verifyToken, requireRole('SCH
     if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
     cls.subjects = subjects.filter(s => typeof s === 'string' && s.trim().length > 0);
     await cls.save();
-    res.json({ ...cls.toJSON(), subjects: Array.isArray(cls.subjects) ? cls.subjects : [] });
+    { const j = cls.toJSON(); const displayName = `${j.gradeLevel} (${j.section || 'أ'})`; res.json({ ...j, name: displayName, subjects: Array.isArray(j.subjects) ? j.subjects : [] }); }
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -812,7 +818,7 @@ router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN',
       byTeacherDay[key].push(n);
     }
     if (teacherIds.size > 0) {
-      const existing = await Schedule.findAll({ where: { teacherId: { [Op.in]: Array.from(teacherIds) }, day: { [Op.in]: Array.from(daysSet) } }, include: [{ model: Class, attributes: ['id','name'] }] });
+      const existing = await Schedule.findAll({ where: { teacherId: { [Op.in]: Array.from(teacherIds) }, day: { [Op.in]: Array.from(daysSet) } }, include: [{ model: Class, attributes: ['id','gradeLevel','section'] }] });
       for (const n of normalized) {
         if (!n.teacherId) continue;
         for (const r of existing) {
@@ -821,7 +827,8 @@ router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN',
           const ps2 = parseSlot(r.timeSlot);
           if (!ps2.ok) continue;
           if (n.start < ps2.end && ps2.start < n.end && String(r.classId) !== String(cls.id)) {
-            conflicts.push({ type: 'teacher', teacherId: n.teacherId, day: n.day, timeSlot: n.timeSlot, existingTimeSlot: r.timeSlot, conflictWithClassId: String(r.classId), conflictWithClassName: r.Class ? r.Class.name : '' });
+            const cname = r.Class ? `${r.Class.gradeLevel} (${r.Class.section || 'أ'})` : '';
+            conflicts.push({ type: 'teacher', teacherId: n.teacherId, day: n.day, timeSlot: n.timeSlot, existingTimeSlot: r.timeSlot, conflictWithClassId: String(r.classId), conflictWithClassName: cname });
           }
         }
       }
@@ -997,6 +1004,49 @@ router.get('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN'), requi
         }
     }));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// @route   POST api/school/:schoolId/parents
+// @desc    Upsert a parent and link to student
+// @access  Private (SchoolAdmin)
+router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('parent_portal'), validate([
+  { name: 'name', required: true, type: 'string', minLength: 2 },
+  { name: 'email', required: true, type: 'string' },
+  { name: 'phone', required: true, type: 'string' },
+  { name: 'studentId', required: true, type: 'string' },
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const { name, email, phone, studentId } = req.body || {};
+    if (!name || !email || !phone || !studentId) return res.status(400).json({ msg: 'Missing required fields' });
+
+    const student = await Student.findByPk(studentId);
+    if (!student || Number(student.schoolId) !== schoolId) return res.status(404).json({ msg: 'Student not found' });
+
+    let parent = await Parent.findOne({ where: { email } });
+    if (!parent) {
+      parent = await Parent.create({ name, email, phone, status: 'Invited', schoolId });
+    } else {
+      // Ensure parent belongs to this school; if not, create a new record scoped to this school
+      if (Number(parent.schoolId || 0) !== schoolId) {
+        parent = await Parent.create({ name, email, phone, status: 'Invited', schoolId });
+      } else {
+        parent.name = name;
+        parent.phone = phone;
+        if (!parent.status) parent.status = 'Invited';
+        await parent.save();
+      }
+    }
+
+    student.parentId = parent.id;
+    await student.save();
+
+    const statusMap = { 'Active': 'نشط', 'Invited': 'مدعو' };
+    return res.status(201).json({ id: String(parent.id), name: parent.name, email: parent.email, phone: parent.phone, status: statusMap[parent.status] || parent.status, studentId: student.id, studentName: student.name });
+  } catch (e) {
+    console.error(e.message);
+    return res.status(500).json({ msg: 'Server Error' });
+  }
 });
 
 // @route   GET api/school/:schoolId/invoices

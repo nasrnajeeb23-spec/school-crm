@@ -110,7 +110,7 @@ const Grades: React.FC<GradesProps> = ({ schoolId }) => {
                                 setSelectedSubject(newClassSubjects[0] || '');
                             }}
                             className="w-full md:w-64 pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">
-                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {classes.map(c => <option key={c.id} value={c.id}>{`${c.gradeLevel} (${c.section || 'أ'})`}</option>)}
                         </select>
                     </div>
                     <div>
@@ -125,7 +125,7 @@ const Grades: React.FC<GradesProps> = ({ schoolId }) => {
             
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                 <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                    إدخال درجات - {classes.find(c => c.id === selectedClass)?.name} - {selectedSubject}
+                    إدخال درجات - {(() => { const cls = classes.find(c => c.id === selectedClass); return cls ? `${cls.gradeLevel} (${cls.section || 'أ'})` : '...'; })()} - {selectedSubject}
                 </h3>
                 {loading ? (
                     <div className="text-center py-8">جاري تحميل الدرجات...</div>

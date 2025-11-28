@@ -120,13 +120,13 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
                   const id = e.target.value;
                   setSelectedClassId(id);
                   const cls = availableClasses.find(c => c.id === id);
-                  const name = cls ? cls.name : '';
+                  const name = cls ? `${cls.gradeLevel} (${cls.section || 'أ'})` : '';
                   setStudentData(prev => ({ ...prev, grade: name }));
                   setErrors(prev => ({ ...prev, grade: !name ? 'الصف الدراسي مطلوب.' : undefined }));
                 }} required className={inputStyle}>
                   <option value="" disabled>اختر الفصل...</option>
                   {availableClasses.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{`${c.gradeLevel} (${c.section || 'أ'})`}</option>
                   ))}
                 </select>
               ) : (
