@@ -101,8 +101,12 @@ async function testFrontend() {
     
     // اختبار صفحة تسجيل دخول المدير العام
     log('blue', 'اختبار صفحة تسجيل دخول المدير العام...');
-    const superadminUrl = CONFIG.FRONTEND_URL + CONFIG.SUPERADMIN_LOGIN;
-    const superadminPage = await makeRequest(superadminUrl);
+    const superadminUrlClean = CONFIG.FRONTEND_URL + CONFIG.SUPERADMIN_LOGIN;
+    const superadminUrlHash = CONFIG.FRONTEND_URL + '/#' + CONFIG.SUPERADMIN_LOGIN;
+    let superadminPage = await makeRequest(superadminUrlClean);
+    if (superadminPage.status !== 200) {
+      superadminPage = await makeRequest(superadminUrlHash);
+    }
     
     if (superadminPage.status === 200) {
       log('green', '✅ صفحة تسجيل دخول المدير العام تعمل بنجاح');

@@ -108,13 +108,11 @@ build({
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
       '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
       
-      '<script src="https://cdn.tailwindcss.com"></script>',
       '<link rel="stylesheet" href="/assets/index.css">',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
-      // Fallback: If Tailwind CSS failed to load, inject CDN to avoid broken styles
-      '<script>(function(){try{var d=document.createElement("div");d.className="text-3xl";document.body.appendChild(d);var fs=parseFloat(getComputedStyle(d).fontSize||"0");document.body.removeChild(d);if(!fs||fs<24){var s=document.createElement("script");s.src="https://cdn.tailwindcss.com";document.head.appendChild(s);}}catch(e){}})();</script>',
+      
       '<script type="module" src="/assets/index.js"></script>',
       '</body>',
       '</html>'
@@ -133,7 +131,7 @@ build({
       '<title>إعادة التوجيه</title>',
       '</head>',
       '<body>',
-      '<script>try{var p=location.pathname+location.search+location.hash; if(!location.hash){location.replace("/#"+p);}else{location.replace("/"+location.hash);} }catch(e){ location.replace("/"); }</script>',
+      '<script>try{location.replace("/");}catch(e){}</script>',
       '</body>',
       '</html>'
     ].join('');
@@ -195,8 +193,8 @@ build({
         { type: 'rewrite', source: '/login', destination: '/index.html' },
         { type: 'rewrite', source: '/teacher/**', destination: '/index.html' },
         { type: 'rewrite', source: '/school/**', destination: '/index.html' },
-        { type: 'rewrite', source: '/parent/**', destination: '/index.html' }
-        // لا تضع إعادة كتابة شاملة '/**' حتى لا تُكسر التحميل للأصول
+        { type: 'rewrite', source: '/parent/**', destination: '/index.html' },
+        { type: 'rewrite', source: '/*', destination: '/index.html' }
       ],
       headers: [
         { path: '/*', name: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
