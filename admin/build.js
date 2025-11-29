@@ -67,19 +67,10 @@ build({
         execSync(`npx tailwindcss -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
         console.log('Tailwind CSS built successfully via npx.');
       } catch (err2) {
-        console.warn('Tailwind build failed, falling back to production CSS copy:', err2?.message || err2);
-        const rootCss = path.join(__dirname, '../index.css');
-        const srcCss = path.join(__dirname, 'src/index.css');
+        console.warn('Tailwind build failed, enabling CDN fallback:', err2?.message || err2);
         const destCss = path.join(distDir, 'index.css');
-        if (fs.existsSync(rootCss)) {
-          fs.copyFileSync(rootCss, destCss);
-          console.log('Production CSS copied successfully.');
-        } else if (fs.existsSync(srcCss)) {
-          fs.copyFileSync(srcCss, destCss);
-          console.log('Raw CSS copied successfully.');
-        }
-        // Do NOT inject Tailwind CDN in production; rely on copied CSS
-        useCdn = false;
+        try { fs.writeFileSync(destCss, '/* Fallback: Tailwind CDN will be injected at runtime */', 'utf8'); } catch {}
+        useCdn = true;
       }
     }
     
@@ -112,7 +103,7 @@ build({
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
-      
+      `<script>(function(){try{var hasTw=(getComputedStyle(document.documentElement).getPropertyValue('--tw-ring-color')||'').trim();var needCdn=!hasTw;var USE_CDN=${useCdn? 'true':'false'};if(USE_CDN||needCdn){var s=document.createElement('script');s.src='https://cdn.tailwindcss.com';s.referrerPolicy='no-referrer';document.head.appendChild(s);}}catch(e){}})();</script>`,
       '<script type="module" src="/assets/index.js"></script>',
       '</body>',
       '</html>'

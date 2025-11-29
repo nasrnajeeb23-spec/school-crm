@@ -37,6 +37,10 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
   const [genIncludeUniform, setGenIncludeUniform] = useState<boolean>(true);
   const [genIncludeActivities, setGenIncludeActivities] = useState<boolean>(true);
   const [genDiscounts, setGenDiscounts] = useState<string[]>([]);
+  const [isRolloverOpen, setIsRolloverOpen] = useState(false);
+  const [promotionThreshold, setPromotionThreshold] = useState<number>(50);
+  const [rolloverComputing, setRolloverComputing] = useState(false);
+  const [rolloverPreview, setRolloverPreview] = useState<any[]>([]);
   const stageGradeMap: Record<string, string[]> = {
     'رياض أطفال': ['رياض أطفال'],
     'ابتدائي': ['الصف الأول','الصف الثاني','الصف الثالث','الصف الرابع','الصف الخامس','الصف السادس'],
@@ -186,23 +190,116 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
     return Object.entries(acc).map(([grade, v]) => ({ grade, ...v }));
   }, [classes, stageFilter]);
 
+  const getNextGradeName = (grade: string): string | null => {
+    const all = Object.values(stageGradeMap).flat();
+    const idx = all.indexOf(grade);
+    if (idx === -1) return null;
+    const next = all[idx + 1];
+    return next || null;
+  };
+
+  const ensureTargetClass = async (grade: string): Promise<string | null> => {
+    const existing = classes.find(c => c.gradeLevel === grade);
+    if (existing) return existing.id;
+    const section = 'أ';
+    const name = `${grade} (${section})`;
+    const homeroomTeacherId = teachers[0]?.id || '';
+    try {
+      const created = await api.addClass(schoolId, { name, gradeLevel: grade, homeroomTeacherId, capacity: 30, subjects: [], section });
+      setClasses(prev => [created, ...prev]);
+      return created.id;
+    } catch {
+      addToast('تعذر إنشاء فصل للصف التالي.', 'error');
+      return null;
+    }
+  };
+
+  const computeRolloverPreview = async () => {
+    setRolloverComputing(true);
+    try {
+      const allGrades = await api.getAllGrades(schoolId);
+      const res: any[] = [];
+      for (const cls of classesFiltered) {
+        const students = await api.getClassStudents(cls.id);
+        const promoteIds: string[] = [];
+        const repeatIds: string[] = [];
+        const graduates: string[] = [];
+        const nextGrade = getNextGradeName(cls.gradeLevel);
+        for (const s of students) {
+          const entries = allGrades.filter(g => g.classId === cls.id && g.studentId === s.id);
+          const totals = entries.map(e => (Number(e.grades.homework||0) + Number(e.grades.quiz||0) + Number(e.grades.midterm||0) + Number(e.grades.final||0)));
+          const avg = totals.length > 0 ? totals.reduce((a,b)=>a+b,0) / totals.length : 0;
+          if (!nextGrade) {
+            if (avg >= promotionThreshold) graduates.push(s.id); else repeatIds.push(s.id);
+          } else {
+            if (avg >= promotionThreshold) promoteIds.push(s.id); else repeatIds.push(s.id);
+          }
+        }
+        let targetClassId: string | null = null;
+        if (nextGrade && promoteIds.length > 0) {
+          targetClassId = await ensureTargetClass(nextGrade);
+        }
+        res.push({ classId: cls.id, className: `${cls.gradeLevel} (${cls.section || 'أ'})`, nextGrade: nextGrade || '', promoteCount: promoteIds.length, repeatCount: repeatIds.length, graduateCount: graduates.length, promoteIds, repeatIds, graduates, targetClassId });
+      }
+      setRolloverPreview(res);
+    } catch {
+      addToast('فشل حساب المعاينة.', 'error');
+      setRolloverPreview([]);
+    } finally {
+      setRolloverComputing(false);
+    }
+  };
+
+  const executeRollover = async () => {
+    if (!Array.isArray(rolloverPreview) || rolloverPreview.length === 0) return;
+    try {
+      for (const item of rolloverPreview) {
+        const currentRoster = await api.getClassStudents(item.classId);
+        const currentIds = currentRoster.map((s: any) => s.id);
+        const toRemove = [...item.promoteIds, ...item.graduates];
+        const nextCurrent = currentIds.filter((id: string) => !toRemove.includes(id));
+        await api.updateClassRoster({ schoolId, classId: item.classId, studentIds: nextCurrent });
+        if (item.targetClassId && item.promoteIds.length > 0) {
+          const targetRoster = await api.getClassStudents(item.targetClassId);
+          const targetIds = targetRoster.map((s: any) => s.id);
+          const merged = Array.from(new Set([...targetIds, ...item.promoteIds]));
+          await api.updateClassRoster({ schoolId, classId: item.targetClassId, studentIds: merged });
+        }
+      }
+      addToast('تم تنفيذ ترحيل نهاية العام بنجاح.', 'success');
+      setIsRolloverOpen(false);
+      setRolloverPreview([]);
+      fetchClasses();
+    } catch {
+      addToast('فشل ترحيل نهاية العام.', 'error');
+    }
+  };
+
   return (
     <>
       <div className="mt-6 space-y-6">
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <button 
             onClick={handleInitStructure}
             className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             إنشاء الهيكل الافتراضي
           </button>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <PlusIcon className="h-5 w-5 ml-2" />
-            إضافة فصل جديد
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              <PlusIcon className="h-5 w-5 ml-2" />
+              إضافة فصل جديد
+            </button>
+            <button 
+              onClick={() => setIsRolloverOpen(true)}
+              className="flex items-center px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors"
+            >
+              ترحيل نهاية العام
+            </button>
+          </div>
         </div>
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -372,6 +469,49 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
             defaultStage={addDefaults?.stage}
             defaultGrade={addDefaults?.grade}
         />
+      )}
+      {isRolloverOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center modal-fade-in" onClick={() => setIsRolloverOpen(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-3xl p-6 m-4 modal-content-scale-up" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">ترحيل نهاية العام</h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">حد النجاح (%)</label>
+                  <input type="number" min={0} max={100} value={promotionThreshold} onChange={e => setPromotionThreshold(parseInt(e.target.value||'50'))} className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700" />
+                </div>
+                <div className="flex items-end">
+                  <button onClick={computeRolloverPreview} disabled={rolloverComputing} className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">{rolloverComputing ? 'جاري الحساب...' : 'حساب المعاينة'}</button>
+                </div>
+                <div className="flex items-end">
+                  <button onClick={executeRollover} disabled={!rolloverPreview.length} className="w-full px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors disabled:bg-teal-400">تنفيذ الترحيل</button>
+                </div>
+              </div>
+              <div className="mt-4 max-h-96 overflow-y-auto">
+                {rolloverPreview.length === 0 ? (
+                  <div className="text-gray-600 dark:text-gray-300">لا توجد معاينة بعد. اضغط "حساب المعاينة".</div>
+                ) : (
+                  <div className="space-y-3">
+                    {rolloverPreview.map((item: any) => (
+                      <div key={item.classId} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                        <div className="text-sm font-semibold text-gray-800 dark:text-white">{item.className}</div>
+                        <div className="text-sm text-gray-700 dark:text-gray-300">الصف التالي: {item.nextGrade || '—'}</div>
+                        <div className="flex gap-4 text-sm mt-2">
+                          <div>الترقية: {item.promoteCount}</div>
+                          <div>البقاء: {item.repeatCount}</div>
+                          <div>الخريجون: {item.graduateCount}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <button onClick={() => setIsRolloverOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors">إغلاق</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

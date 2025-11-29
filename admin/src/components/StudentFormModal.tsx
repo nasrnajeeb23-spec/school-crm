@@ -9,7 +9,7 @@ interface StudentFormModalProps {
 }
 
 const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, schoolId }) => {
-  const [studentData, setStudentData] = useState<NewStudentData({
+  const [studentData, setStudentData] = useState<NewStudentData>({
     name: '',
     grade: '',
     parentName: '',
@@ -43,6 +43,15 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
       .then(setSchoolSettings)
       .catch(() => setSchoolSettings(null));
   }, [schoolId]);
+
+  const showStudentField = (label: string) => {
+    const arr = schoolSettings?.admissionForm?.studentFields;
+    return !arr || arr.includes(label);
+  };
+  const showParentField = (label: string) => {
+    const arr = schoolSettings?.admissionForm?.parentFields;
+    return !arr || arr.includes(label);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -278,11 +287,3 @@ const StudentFormModal: React.FC<StudentFormModalProps> = ({ onClose, onSave, sc
 };
 
 export default StudentFormModal;
-  const showStudentField = (label: string) => {
-    const arr = schoolSettings?.admissionForm?.studentFields;
-    return !arr || arr.includes(label);
-  };
-  const showParentField = (label: string) => {
-    const arr = schoolSettings?.admissionForm?.parentFields;
-    return !arr || arr.includes(label);
-  };
