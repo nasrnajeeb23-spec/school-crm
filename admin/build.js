@@ -3,7 +3,7 @@ const { build } = require('esbuild');
 const { execSync } = require('child_process');
 
 // Get environment variables
-const apiUrl = process.env.REACT_APP_API_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
+const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const environment = process.env.REACT_APP_ENVIRONMENT || 'production';
 
 console.log('Building with API URL:', apiUrl);
@@ -21,7 +21,10 @@ build({
     'process.env.REACT_APP_API_URL': JSON.stringify(apiUrl),
     'process.env.REACT_APP_ENVIRONMENT': JSON.stringify(environment),
     'process.env.REACT_APP_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || 'true'),
-    'process.env.NODE_ENV': JSON.stringify(environment)
+    'process.env.NODE_ENV': JSON.stringify(environment),
+    'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),
+    'import.meta.env.VITE_ENVIRONMENT': JSON.stringify(environment),
+    'import.meta.env.VITE_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || 'true')
   },
   loader: {
     '.tsx': 'tsx',

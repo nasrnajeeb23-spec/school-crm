@@ -12,7 +12,7 @@ const API_BASE_URL = (
   (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) ||
   (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
   (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
-  'https://school-crschool-crm-backendm.onrender.com/api'
+  'http://localhost:5000/api'
 );
 
 const authHeaders = () => {

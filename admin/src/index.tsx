@@ -10,7 +10,7 @@ import App from './App';
 if (typeof window !== 'undefined') {
   try {
     const key = 'api_base';
-    const prod = 'https://school-crschool-crm-backendm.onrender.com/api';
+    const prod = (process.env.REACT_APP_API_URL || ((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || 'http://localhost:5000/api'));
     const host = window.location.hostname || '';
     const cur = localStorage.getItem(key) || '';
     if (!cur || cur.includes('127.0.0.1') || cur.includes('localhost') || host.includes('onrender.com')) {

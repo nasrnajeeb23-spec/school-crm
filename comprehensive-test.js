@@ -12,9 +12,9 @@ const path = require('path');
 
 // إعدادات الاختبار
 const CONFIG = {
-  FRONTEND_URL: 'https://school-crm-admin.onrender.com',
-  BACKEND_URL: 'https://school-crschool-crm-backendm.onrender.com',
-  API_BASE: 'https://school-crschool-crm-backendm.onrender.com/api',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'https://school-crm-admin.onrender.com',
+  BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:5000',
+  API_BASE: process.env.API_BASE || ((process.env.BACKEND_URL ? (process.env.BACKEND_URL + '/api') : 'http://localhost:5000/api')),
   SUPERADMIN_LOGIN: '/superadmin/login',
   LOGIN_ENDPOINT: '/auth/login',
   TEST_CREDENTIALS: {
@@ -137,7 +137,7 @@ async function testBackend() {
   try {
     // اختبار حالة الخادم
     log('blue', 'اختبار حالة الخادم...');
-    const healthCheck = await makeRequest(CONFIG.BACKEND_URL);
+    const healthCheck = await makeRequest(CONFIG.BACKEND_URL + '/health');
     
     if (healthCheck.status === 200) {
       log('green', '✅ الخادم الخلفي يعمل بنجاح');
@@ -231,7 +231,7 @@ function checkProjectFiles() {
     'package.json',
     'admin/package.json',
     'backend/package.json',
-    'admin/build/index.html',
+    'admin/dist/index.html',
     'backend/server.js'
   ];
   
@@ -260,7 +260,9 @@ async function testIntegration() {
     if (fs.existsSync(apiFile)) {
       const apiContent = fs.readFileSync(apiFile, 'utf8');
       
-      if (apiContent.includes(CONFIG.BACKEND_URL)) {
+      const baseVariants = [CONFIG.API_BASE, CONFIG.BACKEND_URL, (CONFIG.BACKEND_URL + '/api')];
+      const pointsToBackend = baseVariants.some(v => v && apiContent.includes(v));
+      if (pointsToBackend) {
         log('green', '✅ ملف API يشير إلى الخادم الخلفي الصحيح');
       } else {
         log('yellow', '⚠️ ملف API قد لا يشير إلى الخادم الخلفي الصحيح');

@@ -73,16 +73,11 @@ app.locals.logger = logger;
 // Middleware
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed origins
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      logger.warn(`CORS blocked request from: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
-    }
+    if (allowedOrigins.includes('*')) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    logger.warn(`CORS blocked request from: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200
@@ -157,7 +152,7 @@ app.use(languageMiddleware);
 // License enforcement setup
 const { verifyLicenseKey } = require('./utils/license');
 const coreModules = ['student_management', 'academic_management', 'parent_portal', 'teacher_portal', 'teacher_app'];
-const licenseKey = process.env.LICENSE_KEY || null;
+const licenseKey = process.env.LICENSE_KEY || process.env.LICENSE_SECRET || null;
 let allowedModules = [...coreModules];
 if (licenseKey) {
   const result = verifyLicenseKey(licenseKey);
