@@ -6,9 +6,9 @@ module.exports = {
     extend: {},
   },
   safelist: [
-    { pattern: /bg-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
-    { pattern: /text-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
-    { pattern: /border-(gray|indigo|red|yellow|blue|teal)-(100|200|300|400|500|600|700|800|900)/ },
+    { pattern: /bg-(gray|indigo|red|yellow|blue|teal|green|emerald|purple|violet|slate|neutral|orange|rose|pink|lime|cyan|fuchsia|sky|amber)-(50|100|200|300|400|500|600|700|800|900)/, variants: ['hover','focus','active'] },
+    { pattern: /text-(gray|indigo|red|yellow|blue|teal|green|emerald|purple|violet|slate|neutral|orange|rose|pink|lime|cyan|fuchsia|sky|amber)-(50|100|200|300|400|500|600|700|800|900)/, variants: ['hover','focus','active'] },
+    { pattern: /border-(gray|indigo|red|yellow|blue|teal|green|emerald|purple|violet|slate|neutral|orange|rose|pink|lime|cyan|fuchsia|sky|amber)-(50|100|200|300|400|500|600|700|800|900)/, variants: ['hover','focus','active'] },
     { pattern: /p-[0-9]+/ },
     { pattern: /px-[0-9]+/ },
     { pattern: /py-[0-9]+/ },

@@ -5,7 +5,7 @@
   "scripts": {
     "start": "echo \"Serving static files. Use a live server or Docker for development.\"",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node build.js",
+    "build": "node --max-old-space-size=2048 build.js",
     "build:prod": "npm run build && echo 'Build completed for production'"
   },
   "dependencies": {

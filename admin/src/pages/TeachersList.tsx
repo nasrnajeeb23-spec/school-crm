@@ -118,7 +118,7 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                     <td className="px-6 py-4">{teacher.joinDate}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex gap-2">
-                        <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teال-500 hover:underline">
+                        <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
                           عرض التفاصيل
                         </Link>
                       </div>

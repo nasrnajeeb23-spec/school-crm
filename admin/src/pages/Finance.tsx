@@ -247,7 +247,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                             <option value="staff">الموظفون</option>
                             <option value="teacher">المعلمون</option>
                         </select>
-                        <button onClick={handleCreateStructure} className="px-4 py-2 bg-teال-600 text-white rounded-lg hover:bg-teال-700">إضافة هيكل</button>
+                        <button onClick={handleCreateStructure} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">إضافة هيكل</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <input type="number" step="0.01" placeholder="غرامة غياب/اليوم" value={Number(newStructure.absencePenaltyPerDay || 0)} onChange={e => setNewStructure(prev => ({ ...prev, absencePenaltyPerDay: Number(e.target.value || 0) }))} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
@@ -301,7 +301,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                                         <td className="px-6 py-4">{s.status}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex gap-2">
-                                                {s.status === 'Draft' && (<button onClick={() => handleApprove(s.id)} className="font-medium text-teال-600 dark:text-teal-500 hover:underline">موافقة</button>)}
+                                                {s.status === 'Draft' && (<button onClick={() => handleApprove(s.id)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">موافقة</button>)}
                                                 {s.status !== 'Paid' && (
                                                   <button onClick={() => setReceiptSlipId(s.id)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">سند استلام</button>
                                                 )}
@@ -367,7 +367,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                           const map: any = {}; inputs.forEach(inp => { if (inp._ci) map.checkIn = inp._ci; if (inp._co) map.checkOut = inp._co; if (inp._hw) map.hoursWorked = Number(inp._hw); if (inp._st) map.status = inp._st; if (inp._lm) map.lateMinutes = Number(inp._lm); if (inp._om) map.overtimeMinutes = Number(inp._om); });
                           if (!assignTargetId || !receiptDate) { addToast('اختر المعلم والتاريخ.', 'error'); return; }
                           try { await api.createTeacherAttendance(schoolId, { teacherId: assignTargetId, date: receiptDate, checkIn: map.checkIn, checkOut: map.checkOut, hoursWorked: map.hoursWorked, status: (map.status as any) || 'Present', lateMinutes: map.lateMinutes, overtimeMinutes: map.overtimeMinutes }); addToast('تم تسجيل حضور المعلم.', 'success'); } catch { addToast('فشل تسجيل حضور المعلم.', 'error'); }
-                        }} className="px-4 py-2 bg-teال-600 text-white rounded-lg hover:bg-teال-700">تسجيل</button>
+                        }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">تسجيل</button>
                     </div>
                 </BrandableCard>
             </div>

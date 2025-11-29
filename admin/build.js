@@ -108,6 +108,7 @@ build({
       '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">',
       '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
       
+      '<script src="https://cdn.tailwindcss.com"></script>',
       '<link rel="stylesheet" href="/assets/index.css">',
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
@@ -199,7 +200,7 @@ build({
       ],
       headers: [
         { path: '/*', name: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
-        { path: '/assets/*', name: 'Cache-Control', value: 'public, max-age=31536000, immutable' }
+        { path: '/assets/*', name: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }
       ]
     };
     fs.writeFileSync(path.join(__dirname, 'dist/static.json'), JSON.stringify(staticJson, null, 2), 'utf8');

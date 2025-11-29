@@ -124,7 +124,21 @@ async function testFrontend() {
     } else {
       log('red', `❌ فشل تحميل صفحة تسجيل دخول المدير العام: ${superadminPage.status}`);
     }
-    
+
+    // اختبار تحميل ملفات الأصول
+    log('blue', 'اختبار تحميل ملفات CSS و JS...');
+    const cssResp = await makeRequest(CONFIG.FRONTEND_URL + '/assets/index.css');
+    const jsResp = await makeRequest(CONFIG.FRONTEND_URL + '/assets/index.js');
+    if (cssResp.status === 200 && (cssResp.data || '').length > 5000) {
+      log('green', '✅ CSS محمل ويبدو صالحاً');
+    } else {
+      log('red', `❌ مشكلة في تحميل CSS: ${cssResp.status}`);
+    }
+    if (jsResp.status === 200 && (jsResp.data || '').length > 2000) {
+      log('green', '✅ JS محمل ويبدو صالحاً');
+    } else {
+      log('yellow', `⚠️ مشكلة في تحميل JS: ${jsResp.status}`);
+    }
   } catch (error) {
     log('red', `❌ خطأ في اختبار Frontend: ${error.message}`);
   }
