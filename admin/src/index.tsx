@@ -23,8 +23,15 @@ if (typeof window !== 'undefined') {
       let candidate = '';
       if (host.endsWith('.onrender.com')) {
         const sub = host.split('.onrender.com')[0];
-        let back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
-        candidate = `https://${back}.onrender.com/api`;
+        const map: Record<string, string> = {
+          'school-crm-admin': 'https://school-crschool-crm-backendm.onrender.com'
+        };
+        if (map[sub]) {
+          candidate = map[sub];
+        } else {
+          let back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
+          candidate = `https://${back}.onrender.com/api`;
+        }
       }
       localStorage.setItem(key, candidate || 'http://localhost:5000/api');
     }
