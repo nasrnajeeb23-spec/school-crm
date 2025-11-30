@@ -15,6 +15,13 @@ const API_BASE_URL = (
   'http://localhost:5000/api'
 );
 
+const API_ALT_BASE_URL = (() => {
+  const base = API_BASE_URL || '';
+  const hasApi = /\/api\/?$/.test(base);
+  if (hasApi) return base.replace(/\/api\/?$/, '');
+  return base.replace(/\/$/, '') + '/api';
+})();
+
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const schoolId = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
@@ -43,6 +50,25 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
             }
             const msg = bodyJson?.msg || bodyJson?.error || bodyText || '';
             const statusText = response.statusText ? ` ${response.statusText}` : '';
+            if (response.status === 404 || /Not\s*Found/i.test(msg)) {
+              const alt = await fetch(`${API_ALT_BASE_URL}${endpoint}`, {
+                ...options,
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...authHeaders(),
+                  ...options.headers,
+                },
+              });
+              if (!alt.ok) {
+                let altText = '';
+                let altJson: any = null;
+                try { altJson = await alt.json(); } catch { try { altText = await alt.text(); } catch {} }
+                const altMsg = altJson?.msg || altJson?.error || altText || '';
+                const altStatusText = alt.statusText ? ` ${alt.statusText}` : '';
+                throw new Error(`HTTP ${alt.status}${altStatusText}${altMsg ? `: ${altMsg}` : ''}`);
+              }
+              return await alt.json();
+            }
             throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
         }
 
@@ -102,7 +128,15 @@ export const verifySuperAdminMfa = async (tempToken: string, mfaCode: string): P
 // ==================== School APIs ====================
 
 export const getSchools = async (): Promise<School[]> => {
-    return await apiCall('/schools', { method: 'GET' });
+    try {
+      return await apiCall('/schools', { method: 'GET' });
+    } catch {
+      try {
+        return await apiCall('/public/schools', { method: 'GET' });
+      } catch {
+        return [] as School[];
+      }
+    }
 };
 
 export const getSchool = async (id: number): Promise<School> => {

@@ -298,12 +298,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                     <label htmlFor="school" className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">المدرسة</label>
                     <div className="relative">
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><SchoolIcon className="h-5 w-5 text-gray-400" /></div>
-                        <select id="school" name="school" value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} required={!isSuperAdminLogin} className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                          <option value="" disabled>اختر مدرستك...</option>
-                          {schools.map(school => (<option key={school.id} value={school.id}>{school.name}</option>))}
-                        </select>
+                        {schools.length > 0 ? (
+                          <select id="school" name="school" value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} required className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="" disabled>اختر مدرستك...</option>
+                            {schools.map(school => (<option key={school.id} value={school.id}>{school.name}</option>))}
+                          </select>
+                        ) : (
+                          <input id="school" name="school" type="text" placeholder="أدخل معرف المدرسة" value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} required className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        )}
                     </div>
-                     {errors.school && <p className="text-red-500 text-xs mt-1">{errors.school}</p>}
+                    {errors.school && <p className="text-red-500 text-xs mt-1">{errors.school}</p>}
                   </div>
                 )}
                 {isSuperAdminLogin ? (
