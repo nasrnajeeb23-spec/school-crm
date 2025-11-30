@@ -35,6 +35,11 @@ const messagingRoutes = require('./routes/messaging');
 const authEnterpriseRoutes = require('./routes/authEnterprise');
 const authSuperAdminRoutes = require('./routes/authSuperAdmin');
 const analyticsRoutes = require('./routes/analytics');
+const cron = require('node-cron');
+const archiver = require('archiver');
+const fse = require('fs-extra');
+const path = require('path');
+const fs = require('fs');
 
 
 const app = express();
@@ -436,6 +441,7 @@ async function syncDatabase(){
   
   // Sync independent tables first
   await School.sync(opts);
+  try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch {}
   await SchoolSettings.sync({ alter: true });
   await Plan.sync(opts);
   await BusOperator.sync({ alter: true });
@@ -476,7 +482,7 @@ syncDatabase()
           { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash('password', 10), role: 'SuperAdmin' },
           { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id },
         ]);
-        // Transportation seed
+    // Transportation seed
         const op = await BusOperator.create({ name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
         const rt = await Route.create({ name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
         const parent = await Parent.create({ name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active' });
@@ -567,6 +573,188 @@ syncDatabase()
           io.to(roomId).emit('new_message', { id: msg.id, conversationId, text, senderId, senderRole, timestamp: msg.createdAt });
         } catch {}
       });
+    });
+    async function toCSV(headers, rows){
+      const esc = (v) => { const s = v === null || v === undefined ? '' : String(v); return (s.includes(',') || s.includes('\n') || s.includes('"')) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+      const head = headers.join(',');
+      const body = rows.map(r => headers.map(h => esc(r[h])).join(',')).join('\n');
+      return head + '\n' + body + (body ? '\n' : '');
+    }
+    async function buildExportCSVMap(schoolId, types, filters){
+      const { Class, Student, Parent, Teacher, Grade, Attendance, Schedule, FeeSetup } = require('./models');
+      const map = {};
+      const classes = await Class.findAll({ where: { schoolId }, order: [['name','ASC']] });
+      const classNameById = new Map(classes.map(c => [String(c.id), `${c.gradeLevel} (${c.section || 'أ'})`]));
+      if (types.includes('students')){
+        const students = await Student.findAll({ where: { schoolId }, order: [['name','ASC']] });
+        const parents = await Parent.findAll({ where: { schoolId } });
+        const parentById = new Map(parents.map(p => [String(p.id), p]));
+        const rows = students.map(s => {
+          const p = s.parentId ? parentById.get(String(s.parentId)) || null : null;
+          const className = s.classId ? (classNameById.get(String(s.classId)) || '') : '';
+          return { studentId: s.id, nationalId: '', name: s.name, dateOfBirth: s.dateOfBirth || '', gender: '', city: '', address: '', admissionDate: s.registrationDate || '', parentName: s.parentName || (p ? p.name : ''), parentPhone: p ? (p.phone || '') : '', parentEmail: p ? (p.email || '') : '', className };
+        });
+        const f = String(filters?.className || '').trim();
+        const filtered = f ? rows.filter(r => r.className === f) : rows;
+        map['Export_Students.csv'] = toCSV(['studentId','nationalId','name','dateOfBirth','gender','city','address','admissionDate','parentName','parentPhone','parentEmail','className'], filtered);
+      }
+      if (types.includes('classes')){
+        const teachers = await Teacher.findAll({ where: { schoolId } });
+        const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
+        const rows = classes.map(c => ({ gradeLevel: c.gradeLevel, section: c.section || 'أ', capacity: c.capacity || 30, homeroomTeacherName: c.homeroomTeacherId ? (tNameById.get(String(c.homeroomTeacherId)) || '') : '' }));
+        map['Export_Classes.csv'] = toCSV(['gradeLevel','section','capacity','homeroomTeacherName'], rows);
+      }
+      if (types.includes('subjects')){
+        const rows = [];
+        for (const c of classes){
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          const list = Array.isArray(c.subjects) ? c.subjects : [];
+          if (list.length === 0){
+            const sched = await Schedule.findAll({ where: { classId: c.id } });
+            const subs = Array.from(new Set(sched.map(x => x.subject).filter(Boolean)));
+            for (const s of subs) rows.push({ className, subjectName: s });
+          } else {
+            for (const s of list) rows.push({ className, subjectName: s });
+          }
+        }
+        const f = String(filters?.className || '').trim();
+        const subj = String(filters?.subjectName || '').trim();
+        let filtered = f ? rows.filter(r => r.className === f) : rows;
+        filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
+        map['Export_Subjects.csv'] = toCSV(['className','subjectName'], filtered);
+      }
+      if (types.includes('classSubjectTeachers')){
+        const rows = [];
+        const teachers = await Teacher.findAll({ where: { schoolId } });
+        const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
+        for (const c of classes){
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          const sched = await Schedule.findAll({ where: { classId: c.id } });
+          for (const x of sched){
+            const teacherName = x.teacherId ? (tNameById.get(String(x.teacherId)) || '') : '';
+            rows.push({ className, subjectName: x.subject, teacherName });
+          }
+        }
+        const f = String(filters?.className || '').trim();
+        const subj = String(filters?.subjectName || '').trim();
+        let filtered = f ? rows.filter(r => r.className === f) : rows;
+        filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
+        map['Export_ClassSubjectTeachers.csv'] = toCSV(['className','subjectName','teacherName'], filtered);
+      }
+      if (types.includes('grades')){
+        const grades = await Grade.findAll({ include: [{ model: require('./models').Class, attributes: ['gradeLevel','section'] }], where: { '$Class.schoolId$': schoolId } });
+        const rows = grades.map(e => ({ className: `${e.Class?.gradeLevel || ''} (${e.Class?.section || 'أ'})`, subjectName: e.subject, studentId: String(e.studentId), studentName: '', homework: e.homework || 0, quiz: e.quiz || 0, midterm: e.midterm || 0, final: e.final || 0 }));
+        const f = String(filters?.className || '').trim();
+        const subj = String(filters?.subjectName || '').trim();
+        let filtered = f ? rows.filter(r => r.className === f) : rows;
+        filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
+        map['Export_Grades.csv'] = toCSV(['className','subjectName','studentId','studentName','homework','quiz','midterm','final'], filtered);
+      }
+      if (types.includes('attendance')){
+        const date = String(filters?.date || '').trim();
+        const rows = [];
+        for (const c of classes){
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
+          const where = { classId: c.id };
+          if (date) where.date = date;
+          const arr = await Attendance.findAll({ where });
+          for (const r of arr){ rows.push({ date: r.date, className, studentId: String(r.studentId), status: r.status }); }
+        }
+        map['Export_Attendance.csv'] = toCSV(['date','className','studentId','status'], rows);
+      }
+      if (types.includes('schedule')){
+        const rows = [];
+        for (const c of classes){
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
+          const sched = await Schedule.findAll({ where: { classId: c.id } });
+          for (const x of sched){ rows.push({ className, day: x.day, timeSlot: x.timeSlot, subjectName: x.subject, teacherName: '' }); }
+        }
+        const subj = String(filters?.subjectName || '').trim();
+        const filtered = subj ? rows.filter(r => String(r.subjectName||'').trim() === subj) : rows;
+        map['Export_Schedule.csv'] = toCSV(['className','day','timeSlot','subjectName','teacherName'], filtered);
+      }
+      if (types.includes('fees')){
+        const list = await FeeSetup.findAll({ where: { schoolId } });
+        const rows = list.map(x => ({ stage: x.stage, tuitionFee: Number(x.tuitionFee || 0), bookFees: Number(x.bookFees || 0), uniformFees: Number(x.uniformFees || 0), activityFees: Number(x.activityFees || 0), paymentPlanType: x.paymentPlanType || 'Monthly' }));
+        map['Export_Fees.csv'] = toCSV(['stage','tuitionFee','bookFees','uniformFees','activityFees','paymentPlanType'], rows);
+      }
+      if (types.includes('teachers')){
+        const list = await Teacher.findAll({ where: { schoolId }, order: [['name','ASC']] });
+        const rows = list.map(t => ({ teacherId: String(t.id), name: t.name, phone: t.phone || '', subject: t.subject || '' }));
+        map['Export_Teachers.csv'] = toCSV(['teacherId','name','phone','subject'], rows);
+      }
+      if (types.includes('parents')){
+        const list = await Parent.findAll({ where: { schoolId }, order: [['name','ASC']] });
+        const rows = list.map(p => ({ parentId: String(p.id), name: p.name, email: p.email || '', phone: p.phone || '', studentId: '' }));
+        map['Export_Parents.csv'] = toCSV(['parentId','name','email','phone','studentId'], rows);
+      }
+      return map;
+    }
+    async function storeBackupZip(schoolId, types, filters){
+      const map = await buildExportCSVMap(schoolId, types, filters);
+      const dir = path.join(__dirname, '..', 'uploads', 'backups', String(schoolId));
+      await fse.ensureDir(dir);
+      const fname = `Backup_${new Date().toISOString().replace(/[:]/g,'-')}.zip`;
+      const full = path.join(dir, fname);
+      const out = fs.createWriteStream(full);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      archive.pipe(out);
+      for (const [name, csv] of Object.entries(map)) archive.append(csv, { name });
+      await archive.finalize();
+      return full;
+    }
+    const lastRun = new Map();
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        const { SchoolSettings, School } = require('./models');
+        const schools = await School.findAll();
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2,'0');
+        const mm = String(now.getMinutes()).padStart(2,'0');
+        for (const sch of schools){
+          const s = await SchoolSettings.findOne({ where: { schoolId: Number(sch.id) } });
+          const cfg = s?.backupConfig || {};
+          const types = Array.isArray(cfg.types) ? cfg.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'];
+          const retainDays = Number(cfg.retainDays || 30);
+          if (cfg.enabledDaily){
+            const t = String(cfg.dailyTime || '02:00');
+            if (t === `${hh}:${mm}`){
+              const key = `daily_${sch.id}_${t}_${now.toISOString().slice(0,10)}`;
+              if (!lastRun.has(key)){
+                await storeBackupZip(Number(sch.id), types, {});
+                lastRun.set(key, true);
+              }
+            }
+          }
+          if (cfg.enabledMonthly){
+            const day = Number(cfg.monthlyDay || 1);
+            const t = String(cfg.monthlyTime || '03:00');
+            const dNow = now.getDate();
+            if (dNow === day && t === `${hh}:${mm}`){
+              const key = `monthly_${sch.id}_${t}_${now.getFullYear()}_${now.getMonth()+1}`;
+              if (!lastRun.has(key)){
+                await storeBackupZip(Number(sch.id), types, {});
+                lastRun.set(key, true);
+              }
+            }
+          }
+          try {
+            const dir = path.join(__dirname, '..', 'uploads', 'backups', String(sch.id));
+            await fse.ensureDir(dir);
+            const files = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
+            for (const f of files){
+              const full = path.join(dir, f);
+              const stat = fs.statSync(full);
+              const ageDays = Math.floor((now.getTime() - (stat.mtime || stat.birthtime).getTime()) / (1000*60*60*24));
+              if (retainDays > 0 && ageDays > retainDays){
+                try { fs.unlinkSync(full); } catch {}
+              }
+            }
+          } catch {}
+        }
+      } catch {}
     });
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

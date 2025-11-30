@@ -103,6 +103,10 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  backupConfig: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   // schoolId FK is added via association
 });
 

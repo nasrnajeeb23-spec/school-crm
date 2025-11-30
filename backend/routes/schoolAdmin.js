@@ -9,6 +9,8 @@ const { StaffAttendance, TeacherAttendance } = require('../models');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const fse = require('fs-extra');
+const archiver = require('archiver');
 const uploadDir = path.join(__dirname, '..', 'uploads', 'payroll-receipts');
 fs.mkdirSync(uploadDir, { recursive: true });
 const storage = multer.diskStorage({
@@ -1334,6 +1336,204 @@ router.post('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
   let planResp; try { planResp = typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : (row.paymentPlanDetails || {}); } catch { planResp = {}; }
   let discResp = row.discounts; if (typeof discResp === 'string') { try { discResp = JSON.parse(discResp); } catch { discResp = []; } }
   res.status(201).json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: planResp, discounts: Array.isArray(discResp) ? discResp : [] });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+function toCSV(headers, rows){
+  const esc = (v) => { const s = v === null || v === undefined ? '' : String(v); return (s.includes(',') || s.includes('\n') || s.includes('"')) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  const head = headers.join(',');
+  const body = rows.map(r => headers.map(h => esc(r[h])).join(',')).join('\n');
+  return head + '\n' + body + (body ? '\n' : '');
+}
+
+async function buildExportCSVMap(schoolId, types, filters){
+  const map = {};
+  const classes = await Class.findAll({ where: { schoolId }, order: [['name','ASC']] });
+  const classNameById = new Map(classes.map(c => [String(c.id), `${c.gradeLevel} (${c.section || 'أ'})`]));
+  if (types.includes('students')){
+    const students = await Student.findAll({ where: { schoolId }, order: [['name','ASC']] });
+    const parents = await Parent.findAll({ where: { schoolId } });
+    const parentById = new Map(parents.map(p => [String(p.id), p]));
+    const rows = students.map(s => {
+      const p = s.parentId ? parentById.get(String(s.parentId)) || null : null;
+      const className = s.classId ? (classNameById.get(String(s.classId)) || '') : '';
+      return { studentId: s.id, nationalId: '', name: s.name, dateOfBirth: s.dateOfBirth || '', gender: '', city: '', address: '', admissionDate: s.registrationDate || '', parentName: s.parentName || (p ? p.name : ''), parentPhone: p ? (p.phone || '') : '', parentEmail: p ? (p.email || '') : '', className };
+    });
+    const f = String(filters?.className || '').trim();
+    const filtered = f ? rows.filter(r => r.className === f) : rows;
+    map['Export_Students.csv'] = toCSV(['studentId','nationalId','name','dateOfBirth','gender','city','address','admissionDate','parentName','parentPhone','parentEmail','className'], filtered);
+  }
+  if (types.includes('classes')){
+    const teachers = await Teacher.findAll({ where: { schoolId } });
+    const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
+    const rows = classes.map(c => ({ gradeLevel: c.gradeLevel, section: c.section || 'أ', capacity: c.capacity || 30, homeroomTeacherName: c.homeroomTeacherId ? (tNameById.get(String(c.homeroomTeacherId)) || '') : '' }));
+    map['Export_Classes.csv'] = toCSV(['gradeLevel','section','capacity','homeroomTeacherName'], rows);
+  }
+  if (types.includes('subjects')){
+    const rows = [];
+    for (const c of classes){
+      const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+      const list = Array.isArray(c.subjects) ? c.subjects : [];
+      if (list.length === 0){
+        const sched = await Schedule.findAll({ where: { classId: c.id } });
+        const subs = Array.from(new Set(sched.map(x => x.subject).filter(Boolean)));
+        for (const s of subs) rows.push({ className, subjectName: s });
+      } else {
+        for (const s of list) rows.push({ className, subjectName: s });
+      }
+    }
+    const f = String(filters?.className || '').trim();
+    const subj = String(filters?.subjectName || '').trim();
+    let filtered = f ? rows.filter(r => r.className === f) : rows;
+    filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
+    map['Export_Subjects.csv'] = toCSV(['className','subjectName'], filtered);
+  }
+  if (types.includes('classSubjectTeachers')){
+    const rows = [];
+    const teachers = await Teacher.findAll({ where: { schoolId } });
+    const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
+    for (const c of classes){
+      const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+      const sched = await Schedule.findAll({ where: { classId: c.id } });
+      for (const x of sched){
+        const teacherName = x.teacherId ? (tNameById.get(String(x.teacherId)) || '') : '';
+        rows.push({ className, subjectName: x.subject, teacherName });
+      }
+    }
+    const f = String(filters?.className || '').trim();
+    const subj = String(filters?.subjectName || '').trim();
+    let filtered = f ? rows.filter(r => r.className === f) : rows;
+    filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
+    map['Export_ClassSubjectTeachers.csv'] = toCSV(['className','subjectName','teacherName'], filtered);
+  }
+  if (types.includes('grades')){
+    const grades = await Grade.findAll({ include: [{ model: Class, attributes: ['gradeLevel','section'] }], where: { '$Class.schoolId$': schoolId } });
+    const rows = grades.map(e => ({ className: `${e.Class?.gradeLevel || ''} (${e.Class?.section || 'أ'})`, subjectName: e.subject, studentId: String(e.studentId), studentName: '', homework: e.homework || 0, quiz: e.quiz || 0, midterm: e.midterm || 0, final: e.final || 0 }));
+    const f = String(filters?.className || '').trim();
+    const subj = String(filters?.subjectName || '').trim();
+    let filtered = f ? rows.filter(r => r.className === f) : rows;
+    filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
+    map['Export_Grades.csv'] = toCSV(['className','subjectName','studentId','studentName','homework','quiz','midterm','final'], filtered);
+  }
+  if (types.includes('attendance')){
+    const date = String(filters?.date || '').trim();
+    const rows = [];
+    for (const c of classes){
+      const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+      if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
+      const where = { classId: c.id };
+      if (date) where.date = date;
+      const arr = await Attendance.findAll({ where });
+      for (const r of arr){ rows.push({ date: r.date, className, studentId: String(r.studentId), status: r.status }); }
+    }
+    map['Export_Attendance.csv'] = toCSV(['date','className','studentId','status'], rows);
+  }
+  if (types.includes('schedule')){
+    const rows = [];
+    for (const c of classes){
+      const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+      if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
+      const sched = await Schedule.findAll({ where: { classId: c.id } });
+      for (const x of sched){ rows.push({ className, day: x.day, timeSlot: x.timeSlot, subjectName: x.subject, teacherName: '' }); }
+    }
+    const subj = String(filters?.subjectName || '').trim();
+    const filtered = subj ? rows.filter(r => String(r.subjectName||'').trim() === subj) : rows;
+    map['Export_Schedule.csv'] = toCSV(['className','day','timeSlot','subjectName','teacherName'], filtered);
+  }
+  if (types.includes('fees')){
+    const list = await FeeSetup.findAll({ where: { schoolId } });
+    const rows = list.map(x => ({ stage: x.stage, tuitionFee: Number(x.tuitionFee || 0), bookFees: Number(x.bookFees || 0), uniformFees: Number(x.uniformFees || 0), activityFees: Number(x.activityFees || 0), paymentPlanType: x.paymentPlanType || 'Monthly' }));
+    map['Export_Fees.csv'] = toCSV(['stage','tuitionFee','bookFees','uniformFees','activityFees','paymentPlanType'], rows);
+  }
+  if (types.includes('teachers')){
+    const list = await Teacher.findAll({ where: { schoolId }, order: [['name','ASC']] });
+    const rows = list.map(t => ({ teacherId: String(t.id), name: t.name, phone: t.phone || '', subject: t.subject || '' }));
+    map['Export_Teachers.csv'] = toCSV(['teacherId','name','phone','subject'], rows);
+  }
+  if (types.includes('parents')){
+    const list = await Parent.findAll({ where: { schoolId }, order: [['name','ASC']] });
+    const rows = list.map(p => ({ parentId: String(p.id), name: p.name, email: p.email || '', phone: p.phone || '', studentId: '' }));
+    map['Export_Parents.csv'] = toCSV(['parentId','name','email','phone','studentId'], rows);
+  }
+  return map;
+}
+
+router.get('/:schoolId/backups', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const dir = path.join(__dirname, '..', 'uploads', 'backups', String(req.params.schoolId));
+    await fse.ensureDir(dir);
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
+    const list = files.map(f => {
+      const full = path.join(dir, f);
+      const stat = fs.statSync(full);
+      return { file: f, size: stat.size, createdAt: stat.birthtime || stat.mtime };
+    }).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    res.json(list);
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.get('/:schoolId/backups/:file', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const dir = path.join(__dirname, '..', 'uploads', 'backups', String(req.params.schoolId));
+    const full = path.join(dir, req.params.file);
+    if (!fs.existsSync(full)) return res.status(404).json({ msg: 'Not Found' });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${path.basename(full)}"`);
+    fs.createReadStream(full).pipe(res);
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.get('/:schoolId/backup/config', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const s = await SchoolSettings.findOne({ where: { schoolId: Number(req.params.schoolId) } });
+    const cfg = s?.backupConfig || {};
+    res.json({ enabledDaily: !!cfg.enabledDaily, dailyTime: cfg.dailyTime || '02:00', enabledMonthly: !!cfg.enabledMonthly, monthlyDay: Number(cfg.monthlyDay || 1), monthlyTime: cfg.monthlyTime || '03:00', retainDays: Number(cfg.retainDays || 30), types: Array.isArray(cfg.types) ? cfg.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'] });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.put('/:schoolId/backup/config', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    let s = await SchoolSettings.findOne({ where: { schoolId } });
+    if (!s) s = await SchoolSettings.create({ schoolId, schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } });
+    s.backupConfig = req.body || {};
+    await s.save();
+    res.json(s.backupConfig || {});
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.post('/:schoolId/backup/download', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const types = Array.isArray(req.body?.types) ? req.body.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'];
+    const filters = req.body?.filters || {};
+    const map = await buildExportCSVMap(Number(req.params.schoolId), types, filters);
+    res.setHeader('Content-Type', 'application/zip');
+    const fname = `Backup_${new Date().toISOString().replace(/[:]/g,'-')}.zip`;
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', err => { try { res.status(500).end(); } catch {} });
+    archive.pipe(res);
+    for (const [name, csv] of Object.entries(map)) archive.append(csv, { name });
+    await archive.finalize();
+  } catch (e) { console.error(e); try { res.status(500).json({ msg: 'Server Error' }); } catch {} }
+});
+
+router.post('/:schoolId/backup/store', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const types = Array.isArray(req.body?.types) ? req.body.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'];
+    const filters = req.body?.filters || {};
+    const map = await buildExportCSVMap(Number(req.params.schoolId), types, filters);
+    const dir = path.join(__dirname, '..', 'uploads', 'backups', String(req.params.schoolId));
+    await fse.ensureDir(dir);
+    const fname = `Backup_${new Date().toISOString().replace(/[:]/g,'-')}.zip`;
+    const full = path.join(dir, fname);
+    const out = fs.createWriteStream(full);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', err => { try { out.close(); fs.unlinkSync(full); } catch {} });
+    archive.pipe(out);
+    for (const [name, csv] of Object.entries(map)) archive.append(csv, { name });
+    await archive.finalize();
+    out.on('close', () => { res.status(201).json({ file: fname, size: archive.pointer() }); });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 

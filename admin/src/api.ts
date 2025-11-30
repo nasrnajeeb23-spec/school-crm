@@ -816,6 +816,44 @@ export const getAllGrades = async (schoolId: number): Promise<StudentGrades[]> =
     return await apiCall(`/school/${schoolId}/grades/all`, { method: 'GET' });
 };
 
+export const getBackupConfig = async (schoolId: number): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/backup/config`, { method: 'GET' });
+};
+
+export const updateBackupConfig = async (schoolId: number, cfg: any): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/backup/config`, { method: 'PUT', body: JSON.stringify(cfg) });
+};
+
+export const getSchoolBackups = async (schoolId: number): Promise<Array<{ file: string; size: number; createdAt: string }>> => {
+    return await apiCall(`/school/${schoolId}/backups`, { method: 'GET' });
+};
+
+export const downloadBackupZip = async (schoolId: number, payload: { types: string[]; filters?: any }): Promise<Blob> => {
+    const url = `${API_BASE_URL}/school/${schoolId}/backup/download`;
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) });
+    if (!res.ok) {
+        let txt = '';
+        try { txt = await res.text(); } catch {}
+        throw new Error(`HTTP ${res.status}${res.statusText ? ' '+res.statusText : ''}${txt ? `: ${txt}` : ''}`);
+    }
+    return await res.blob();
+};
+
+export const runBackupStore = async (schoolId: number, payload: { types: string[]; filters?: any }): Promise<{ file: string; size: number } | any> => {
+    return await apiCall(`/school/${schoolId}/backup/store`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const downloadStoredBackup = async (schoolId: number, file: string): Promise<Blob> => {
+    const url = `${API_BASE_URL}/school/${schoolId}/backups/${encodeURIComponent(file)}`;
+    const res = await fetch(url, { method: 'GET', headers: { ...authHeaders() } });
+    if (!res.ok) {
+        let txt = '';
+        try { txt = await res.text(); } catch {}
+        throw new Error(`HTTP ${res.status}${res.statusText ? ' '+res.statusText : ''}${txt ? `: ${txt}` : ''}`);
+    }
+    return await res.blob();
+};
+
 export const getDashboardStats = async (): Promise<any> => {
     const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
     const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
