@@ -13,7 +13,8 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
   const [saving, setSaving] = useState(false);
   const { addToast } = useToast();
   const [genSelecting, setGenSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;teachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean}>({students:true,classes:true,subjects:true,teachers:true,grades:true,attendance:false,schedule:false,fees:true});
-  const [importState, setImportState] = useState<{students:any[];classes:any[];grades:any[];logs:string[]}>({students:[],classes:[],grades:[],logs:[]});
+  const [importState, setImportState] = useState<{students:any[];classes:any[];grades:any[];attendance:any[];schedule:any[];fees:any[];logs:string[]}>({students:[],classes:[],grades:[],attendance:[],schedule:[],fees:[],logs:[]});
+  const [importPreview, setImportPreview] = useState<{students:{valid:number;invalid:number;errors:string[]};classes:{valid:number;invalid:number;errors:string[]};grades:{valid:number;invalid:number;errors:string[]};attendance:{valid:number;invalid:number;errors:string[]};schedule:{valid:number;invalid:number;errors:string[]};fees:{valid:number;invalid:number;errors:string[]}}>({students:{valid:0,invalid:0,errors:[]},classes:{valid:0,invalid:0,errors:[]},grades:{valid:0,invalid:0,errors:[]},attendance:{valid:0,invalid:0,errors:[]},schedule:{valid:0,invalid:0,errors:[]},fees:{valid:0,invalid:0,errors:[]}});
   const [importProcessing, setImportProcessing] = useState(false);
 
   useEffect(() => {
@@ -328,9 +329,48 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     return { headers, rows };
   };
 
+  const toEnDay = (d: string) => {
+    const x = (d || '').trim();
+    if (x === 'الأحد') return 'Sunday';
+    if (x === 'الاثنين') return 'Monday';
+    if (x === 'الثلاثاء') return 'Tuesday';
+    if (x === 'الأربعاء') return 'Wednesday';
+    if (x === 'الخميس') return 'Thursday';
+    if (x === 'الجمعة') return 'Friday';
+    if (x === 'السبت') return 'Saturday';
+    return x;
+  };
+
+  const mapAttendanceStatus = (s: string): 'Present' | 'Absent' | 'Late' | 'Excused' => {
+    const v = (s || '').trim();
+    if (/^حاضر$/i.test(v) || /^Present$/i.test(v)) return 'Present';
+    if (/^غائب$/i.test(v) || /^Absent$/i.test(v)) return 'Absent';
+    if (/^متأخر$/i.test(v) || /^Late$/i.test(v)) return 'Late';
+    if (/^مُعفى$/i.test(v) || /^Excused$/i.test(v)) return 'Excused';
+    return 'Present';
+  };
+
+  const mapPaymentPlan = (s: string) => {
+    const v = (s || '').trim();
+    if (v === 'شهري' || /^Monthly$/i.test(v)) return 'Monthly';
+    if (v === 'فصلي' || /^Termly$/i.test(v) || /^Quarterly$/i.test(v)) return 'Termly';
+    if (v === 'سنوي' || /^Yearly$/i.test(v)) return 'Installments';
+    return 'Monthly';
+  };
+
   const importStudents = async (rows: any[]) => {
     const logs: string[] = [];
     const classes = await api.getSchoolClasses(schoolId);
+    const existingStudents = await api.getSchoolStudents(schoolId);
+    const norm = (s: string) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const byNameDobArr: Record<string, any[]> = {};
+    const byNamePhoneArr: Record<string, any[]> = {};
+    for (const s of existingStudents) {
+      const k1 = norm(s.name) + '|' + String(s.dateOfBirth || '');
+      const k2 = norm(s.name) + '|' + String(s.parentPhone || '');
+      (byNameDobArr[k1] ||= []).push(s);
+      (byNamePhoneArr[k2] ||= []).push(s);
+    }
     for (const r of rows) {
       try {
         const className = r.className || '';
@@ -352,7 +392,19 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
           emergencyContactPhone: r.emergencyContactPhone || r.parentPhone || '',
           medicalNotes: r.medicalNotes || ''
         };
-        const created = await api.addSchoolStudent(schoolId, payload);
+        const keyDob = norm(payload.name) + '|' + String(payload.dateOfBirth || '');
+        const keyPhone = norm(payload.name) + '|' + String(payload.parentPhone || '');
+        let existing: any | null = null;
+        const arrDob = byNameDobArr[keyDob] || [];
+        const arrPhone = byNamePhoneArr[keyPhone] || [];
+        if (arrDob.length === 1) existing = arrDob[0];
+        else if (arrDob.length > 1) { logs.push(`مطابقة غامضة: ${payload.name} (${payload.dateOfBirth})`); continue; }
+        else if (arrPhone.length === 1) existing = arrPhone[0];
+        else if (arrPhone.length > 1) { logs.push(`مطابقة غامضة: ${payload.name} (هاتف ولي الأمر ${payload.parentPhone})`); continue; }
+        const created = existing
+          ? await api.updateStudent(existing.id, { name: payload.name, grade: payload.grade, parentName: payload.parentName, dateOfBirth: payload.dateOfBirth, status: StudentStatus.Active })
+          : await api.addSchoolStudent(schoolId, payload);
+        try { await api.upsertSchoolParent(schoolId, { name: payload.parentName, email: payload.parentEmail, phone: payload.parentPhone, studentId: created.id }); } catch {}
         if (className) {
           let target = classes.find((c: any) => `${c.gradeLevel} (${c.section||'أ'})` === className);
           if (!target) {
@@ -388,12 +440,34 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     const logs: string[] = [];
     try {
       const classes = await api.getSchoolClasses(schoolId);
+      const students = await api.getSchoolStudents(schoolId);
+      const norm = (s: string) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const byNameDobMap: Record<string, string[]> = {};
+      const byNamePhoneMap: Record<string, string[]> = {};
+      for (const s of students) {
+        const k1 = norm(s.name) + '|' + String(s.dateOfBirth || '');
+        const k2 = norm(s.name) + '|' + String(s.parentPhone || '');
+        (byNameDobMap[k1] ||= []).push(String(s.id));
+        (byNamePhoneMap[k2] ||= []).push(String(s.id));
+      }
       const entries: any[] = [];
       for (const r of rows) {
         try {
           const cls = classes.find((c: any) => `${c.gradeLevel} (${c.section||'أ'})` === r.className);
           if (!cls) { logs.push(`فصل غير موجود: ${r.className}`); continue; }
-          entries.push({ classId: cls.id, subject: r.subjectName, studentId: r.studentId, studentName: '', grades: { homework: Number(r.homework||0), quiz: Number(r.quiz||0), midterm: Number(r.midterm||0), final: Number(r.final||0) } });
+          let sid = String(r.studentId || '').trim();
+          if (!sid) {
+            const k1 = norm(r.studentName || '') + '|' + String(r.dateOfBirth || '');
+            const k2 = norm(r.studentName || '') + '|' + String(r.parentPhone || '');
+            const arr1 = byNameDobMap[k1] || [];
+            const arr2 = byNamePhoneMap[k2] || [];
+            if (arr1.length === 1) sid = arr1[0];
+            else if (arr1.length > 1) { logs.push(`مطابقة غامضة درجات: ${r.studentName} (${r.dateOfBirth})`); continue; }
+            else if (arr2.length === 1) sid = arr2[0];
+            else if (arr2.length > 1) { logs.push(`مطابقة غامضة درجات: ${r.studentName} (هاتف ولي الأمر ${r.parentPhone||''})`); continue; }
+            else { logs.push(`طالب غير موجود: ${r.studentName || r.studentId}`); continue; }
+          }
+          entries.push({ classId: cls.id, subject: r.subjectName, studentId: sid, studentName: '', grades: { homework: Number(r.homework||0), quiz: Number(r.quiz||0), midterm: Number(r.midterm||0), final: Number(r.final||0) } });
         } catch {
           logs.push(`فشل تجهيز درجات: ${r.studentId} في ${r.className}`);
         }
@@ -406,6 +480,332 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       logs.push('تعذر تحميل الفصول');
     }
     setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
+  };
+
+  const importAttendance = async (rows: any[]) => {
+    const logs: string[] = [];
+    try {
+      const classes = await api.getSchoolClasses(schoolId);
+      const students = await api.getSchoolStudents(schoolId);
+      const norm = (s: string) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const byNameDobMap2: Record<string, string[]> = {};
+      const byNamePhoneMap2: Record<string, string[]> = {};
+      for (const s of students) {
+        const k1 = norm(s.name) + '|' + String(s.dateOfBirth || '');
+        const k2 = norm(s.name) + '|' + String(s.parentPhone || '');
+        (byNameDobMap2[k1] ||= []).push(String(s.id));
+        (byNamePhoneMap2[k2] ||= []).push(String(s.id));
+      }
+      const groups: Record<string, any[]> = {};
+      for (const r of rows) {
+        const key = `${(r.className || '').trim()}||${(r.date || '').trim()}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(r);
+      }
+      for (const [key, group] of Object.entries(groups)) {
+        const [className, date] = key.split('||');
+        const cls = classes.find((c: any) => `${c.gradeLevel} (${c.section||'أ'})` === className);
+        if (!cls) { logs.push(`فصل غير موجود: ${className}`); continue; }
+        const records = group.map((r: any) => {
+          let sid = String(r.studentId || '').trim();
+          if (!sid) {
+            const k1 = norm(r.studentName || '') + '|' + String(r.dateOfBirth || '');
+            const k2 = norm(r.studentName || '') + '|' + String(r.parentPhone || '');
+            const arr1 = byNameDobMap2[k1] || [];
+            const arr2 = byNamePhoneMap2[k2] || [];
+            if (arr1.length === 1) sid = arr1[0];
+            else if (arr1.length > 1) sid = '';
+            else if (arr2.length === 1) sid = arr2[0];
+            else if (arr2.length > 1) sid = '';
+          }
+          return sid ? { studentId: sid, status: mapAttendanceStatus(r.status) } : null;
+        }).filter(Boolean) as { studentId: string; status: 'Present'|'Absent'|'Late'|'Excused' }[];
+        try {
+          await api.saveAttendance(cls.id, date, records);
+          logs.push(`تم حفظ حضور ${records.length} سجل: ${className} ${date}`);
+        } catch {
+          logs.push(`فشل حفظ حضور: ${className} ${date}`);
+        }
+      }
+    } catch {
+      logs.push('تعذر تحميل الفصول');
+    }
+    setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
+  };
+
+  const importSchedule = async (rows: any[]) => {
+    const logs: string[] = [];
+    try {
+      const classes = await api.getSchoolClasses(schoolId);
+      const teachers = await api.getSchoolTeachers(schoolId);
+      const groups: Record<string, any[]> = {};
+      for (const r of rows) {
+        const key = (r.className || '').trim();
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(r);
+      }
+      for (const [className, group] of Object.entries(groups)) {
+        const cls = classes.find((c: any) => `${c.gradeLevel} (${c.section||'أ'})` === className);
+        if (!cls) { logs.push(`فصل غير موجود: ${className}`); continue; }
+        const entries: { day: 'Sunday'|'Monday'|'Tuesday'|'Wednesday'|'Thursday'|'Friday'|'Saturday'; timeSlot: string; subject: string; }[] = [];
+        const mapping: Record<string, string> = {};
+        for (const r of group) {
+          const day = toEnDay(r.day) as any;
+          const timeSlot = r.timeSlot || '';
+          const subject = r.subjectName || '';
+          if (day && timeSlot && subject) entries.push({ day, timeSlot, subject });
+          const tName = (r.teacherName || '').trim();
+          if (tName) {
+            const t = teachers.find((x: any) => String(x.name).trim() === tName);
+            if (t) mapping[subject] = String(t.id);
+          }
+        }
+        try {
+          if (entries.length > 0) {
+            await api.saveClassSchedule(cls.id, entries);
+          }
+          if (Object.keys(mapping).length > 0) {
+            await api.updateSubjectTeacherMap(schoolId, cls.id, mapping);
+          }
+          logs.push(`تم حفظ جدول ${entries.length} حصة: ${className}`);
+        } catch {
+          logs.push(`فشل حفظ جدول: ${className}`);
+        }
+      }
+    } catch {
+      logs.push('تعذر تحميل الفصول أو المعلمين');
+    }
+    setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
+  };
+
+  const importFees = async (rows: any[]) => {
+    const logs: string[] = [];
+    try {
+      const existing = await api.getFeeSetups(schoolId);
+      for (const r of rows) {
+        const stage = (r.stage || '').trim();
+        const payload: any = {
+          stage,
+          tuitionFee: Number(r.tuitionFee || 0),
+          bookFees: Number(r.bookFees || 0),
+          uniformFees: Number(r.uniformFees || 0),
+          activityFees: Number(r.activityFees || 0),
+          paymentPlanType: mapPaymentPlan(r.paymentPlanType || 'شهري'),
+        };
+        try {
+          const found = existing.find((x: any) => String(x.stage).trim() === stage);
+          if (found) {
+            await api.updateFeeSetup(schoolId, found.id, payload);
+            logs.push(`تم تحديث رسوم مرحلة: ${stage}`);
+          } else {
+            await api.createFeeSetup(schoolId, payload);
+            logs.push(`تم إنشاء رسوم مرحلة: ${stage}`);
+          }
+        } catch {
+          logs.push(`فشل معالجة رسوم مرحلة: ${stage}`);
+        }
+      }
+    } catch {
+      logs.push('تعذر تحميل إعدادات الرسوم');
+    }
+    setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
+  };
+
+  const validateAll = async () => {
+    try {
+      const [classes, students, teachers] = await Promise.all([
+        api.getSchoolClasses(schoolId),
+        api.getSchoolStudents(schoolId),
+        api.getSchoolTeachers(schoolId)
+      ]);
+      const classNames = new Set(classes.map((c: any) => `${c.gradeLevel} (${c.section||'أ'})`));
+      const studentIds = new Set(students.map((s: any) => String(s.id)));
+      const teacherNames = new Set(teachers.map((t: any) => String(t.name).trim()));
+
+      const studentsErrors: string[] = [];
+      let studentsValid = 0, studentsInvalid = 0;
+      for (const r of importState.students) {
+        const nameOk = !!String(r.name || '').trim();
+        const parentOk = !!(String(r.parentPhone||'').trim() || String(r.parentEmail||'').trim() || String(r.parentName||'').trim());
+        const cls = String(r.className||'').trim();
+        const clsOk = !cls || classNames.has(cls);
+        if (nameOk && parentOk && clsOk) studentsValid++; else {
+          studentsInvalid++;
+          const errs = [!nameOk ? 'اسم الطالب مفقود' : '', !parentOk ? 'بيانات ولي الأمر ناقصة' : '', (!clsOk ? `فصل غير موجود: ${cls}` : '')].filter(Boolean).join(' — ');
+          studentsErrors.push(`${r.name || 'سجل'}: ${errs}`);
+        }
+      }
+
+      const classesErrors: string[] = [];
+      let classesValid = 0, classesInvalid = 0;
+      for (const r of importState.classes) {
+        const ok = !!String(r.gradeLevel||'').trim();
+        if (ok) classesValid++; else { classesInvalid++; classesErrors.push('صف بدون مستوى'); }
+      }
+
+      const gradesErrors: string[] = [];
+      let gradesValid = 0, gradesInvalid = 0;
+      for (const r of importState.grades) {
+        const cls = String(r.className||'').trim();
+        const sid = String(r.studentId||'').trim();
+        const subj = String(r.subjectName||'').trim();
+        const numsOk = ['homework','quiz','midterm','final'].every(k => String(r[k]||'').trim() === '' || !isNaN(Number(r[k])));
+        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && !!subj && numsOk;
+        if (ok) gradesValid++; else {
+          gradesInvalid++;
+          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) ? `طالب غير موجود: ${sid}` : '', !subj ? 'مادة مفقودة' : '', !numsOk ? 'قيم درجات غير رقمية' : ''].filter(Boolean).join(' — ');
+          gradesErrors.push(`سجل درجات: ${errs}`);
+        }
+      }
+
+      const attendanceErrors: string[] = [];
+      let attendanceValid = 0, attendanceInvalid = 0;
+      for (const r of importState.attendance) {
+        const cls = String(r.className||'').trim();
+        const sid = String(r.studentId||'').trim();
+        const date = String(r.date||'').trim();
+        const status = String(r.status||'').trim();
+        const statusOk = ['حاضر','غائب','متأخر','مُعفى','Present','Absent','Late','Excused'].includes(status);
+        const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date);
+        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && statusOk && dateOk;
+        if (ok) attendanceValid++; else {
+          attendanceInvalid++;
+          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) ? `طالب غير موجود: ${sid}` : '', !statusOk ? 'حالة حضور غير معروفة' : '', !dateOk ? 'تاريخ غير صحيح (YYYY-MM-DD)' : ''].filter(Boolean).join(' — ');
+          attendanceErrors.push(`سجل حضور: ${errs}`);
+        }
+      }
+    } catch {
+      addToast('تعذر إجراء التحقق.', 'error');
+    }
+  };
+
+  const validateAllPreview = async () => {
+    try {
+      const [classes, students, teachers] = await Promise.all([
+        api.getSchoolClasses(schoolId),
+        api.getSchoolStudents(schoolId),
+        api.getSchoolTeachers(schoolId)
+      ]);
+      const classNames = new Set(classes.map((c: any) => `${c.gradeLevel} (${c.section||'أ'})`));
+      const studentIds = new Set(students.map((s: any) => String(s.id)));
+      const teacherNames = new Set(teachers.map((t: any) => String(t.name).trim()));
+      const norm = (s: string) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const byNameDobMap: Record<string, string[]> = {};
+      const byNamePhoneMap: Record<string, string[]> = {};
+      for (const s of students) {
+        const k1 = norm(s.name) + '|' + String(s.dateOfBirth || '');
+        const k2 = norm(s.name) + '|' + String(s.parentPhone || '');
+        (byNameDobMap[k1] ||= []).push(String(s.id));
+        (byNamePhoneMap[k2] ||= []).push(String(s.id));
+      }
+
+      const studentsErrors: string[] = [];
+      let studentsValid = 0, studentsInvalid = 0;
+      for (const r of importState.students) {
+        const nameOk = !!String(r.name || '').trim();
+        const parentOk = !!(String(r.parentPhone||'').trim() || String(r.parentEmail||'').trim() || String(r.parentName||'').trim());
+        const cls = String(r.className||'').trim();
+        const clsOk = !cls || classNames.has(cls);
+        const kCsvDob = norm(r.name || '') + '|' + String(r.dateOfBirth || '');
+        const kCsvPhone = norm(r.name || '') + '|' + String(r.parentPhone || '');
+        const dupDobCount = importState.students.filter(x => norm(x.name||'') + '|' + String(x.dateOfBirth||'') === kCsvDob).length;
+        const dupPhoneCount = importState.students.filter(x => norm(x.name||'') + '|' + String(x.parentPhone||'') === kCsvPhone).length;
+        if (nameOk && parentOk && clsOk) studentsValid++; else {
+          studentsInvalid++;
+          const errs = [!nameOk ? 'اسم الطالب مفقود' : '', !parentOk ? 'بيانات ولي الأمر ناقصة' : '', (!clsOk ? `فصل غير موجود: ${cls}` : ''), (dupDobCount>1 ? `تكرار في الملف (الاسم+تاريخ الميلاد)` : ''), (dupPhoneCount>1 ? `تكرار في الملف (الاسم+هاتف ولي الأمر)` : '')].filter(Boolean).join(' — ');
+          studentsErrors.push(`${r.name || 'سجل'}: ${errs}`);
+        }
+      }
+
+      const classesErrors: string[] = [];
+      let classesValid = 0, classesInvalid = 0;
+      for (const r of importState.classes) {
+        const ok = !!String(r.gradeLevel||'').trim();
+        if (ok) classesValid++; else { classesInvalid++; classesErrors.push('صف بدون مستوى'); }
+      }
+
+      const gradesErrors: string[] = [];
+      let gradesValid = 0, gradesInvalid = 0;
+      for (const r of importState.grades) {
+        const cls = String(r.className||'').trim();
+        const sid = String(r.studentId||'').trim();
+        const subj = String(r.subjectName||'').trim();
+        const numsOk = ['homework','quiz','midterm','final'].every(k => String(r[k]||'').trim() === '' || !isNaN(Number(r[k])));
+        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && !!subj && numsOk;
+        if (ok) gradesValid++; else {
+          gradesInvalid++;
+          const k1 = norm(r.studentName || '') + '|' + String(r.dateOfBirth || '');
+          const k2 = norm(r.studentName || '') + '|' + String(r.parentPhone || '');
+          const amb = (!sid && ((byNameDobMap[k1]||[]).length>1 || (byNamePhoneMap[k2]||[]).length>1)) ? 'تطابق غامض في تحديد الطالب' : '';
+          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) && !amb ? `طالب غير موجود: ${sid || r.studentName || ''}` : '', amb, !subj ? 'مادة مفقودة' : '', !numsOk ? 'قيم درجات غير رقمية' : ''].filter(Boolean).join(' — ');
+          gradesErrors.push(`سجل درجات: ${errs}`);
+        }
+      }
+
+      const attendanceErrors: string[] = [];
+      let attendanceValid = 0, attendanceInvalid = 0;
+      for (const r of importState.attendance) {
+        const cls = String(r.className||'').trim();
+        const sid = String(r.studentId||'').trim();
+        const date = String(r.date||'').trim();
+        const status = String(r.status||'').trim();
+        const statusOk = ['حاضر','غائب','متأخر','مُعفى','Present','Absent','Late','Excused'].includes(status);
+        const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date);
+        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && statusOk && dateOk;
+        if (ok) attendanceValid++; else {
+          attendanceInvalid++;
+          const k1 = norm(r.studentName || '') + '|' + String(r.dateOfBirth || '');
+          const k2 = norm(r.studentName || '') + '|' + String(r.parentPhone || '');
+          const amb = (!sid && ((byNameDobMap[k1]||[]).length>1 || (byNamePhoneMap[k2]||[]).length>1)) ? 'تطابق غامض في تحديد الطالب' : '';
+          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) && !amb ? `طالب غير موجود: ${sid || r.studentName || ''}` : '', amb, !statusOk ? 'حالة حضور غير معروفة' : '', !dateOk ? 'تاريخ غير صحيح (YYYY-MM-DD)' : ''].filter(Boolean).join(' — ');
+          attendanceErrors.push(`سجل حضور: ${errs}`);
+        }
+      }
+
+      const scheduleErrors: string[] = [];
+      let scheduleValid = 0, scheduleInvalid = 0;
+      const daySet = new Set(['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']);
+      const timeRegex = /^(?:[01]\d|2[0-3]):[0-5]\d\s-\s(?:[01]\d|2[0-3]):[0-5]\d$/;
+      for (const r of importState.schedule) {
+        const cls = String(r.className||'').trim();
+        const day = toEnDay(String(r.day||'').trim());
+        const timeSlot = String(r.timeSlot||'').trim();
+        const subject = String(r.subjectName||'').trim();
+        const tName = String(r.teacherName||'').trim();
+        const teacherOk = !tName || teacherNames.has(tName);
+        const ok = (!!cls && classNames.has(cls)) && daySet.has(day) && timeRegex.test(timeSlot) && !!subject && teacherOk;
+        if (ok) scheduleValid++; else {
+          scheduleInvalid++;
+          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !daySet.has(day) ? 'يوم غير صحيح' : '', !timeRegex.test(timeSlot) ? 'وقت غير صحيح (HH:MM - HH:MM)' : '', !subject ? 'مادة مفقودة' : '', !teacherOk ? `معلم غير موجود: ${tName}` : ''].filter(Boolean).join(' — ');
+          scheduleErrors.push(`سجل جدول: ${errs}`);
+        }
+      }
+
+      const feesErrors: string[] = [];
+      let feesValid = 0, feesInvalid = 0;
+      for (const r of importState.fees) {
+        const stage = String(r.stage||'').trim();
+        const stageOk = stages.includes(stage);
+        const numsOk = ['tuitionFee','bookFees','uniformFees','activityFees'].every(k => String(r[k]||'').trim() === '' || !isNaN(Number(r[k])));
+        const ok = stageOk && numsOk;
+        if (ok) feesValid++; else {
+          feesInvalid++;
+          const errs = [!stageOk ? `مرحلة غير معروفة: ${stage}` : '', !numsOk ? 'قيم الرسوم غير رقمية' : ''].filter(Boolean).join(' — ');
+          feesErrors.push(`سجل رسوم: ${errs}`);
+        }
+      }
+
+      setImportPreview({
+        students: { valid: studentsValid, invalid: studentsInvalid, errors: studentsErrors },
+        classes: { valid: classesValid, invalid: classesInvalid, errors: classesErrors },
+        grades: { valid: gradesValid, invalid: gradesInvalid, errors: gradesErrors },
+        attendance: { valid: attendanceValid, invalid: attendanceInvalid, errors: attendanceErrors },
+        schedule: { valid: scheduleValid, invalid: scheduleInvalid, errors: scheduleErrors },
+        fees: { valid: feesValid, invalid: feesInvalid, errors: feesErrors },
+      });
+    } catch {
+      addToast('تعذر إجراء التحقق.', 'error');
+    }
   };
 
   return (
@@ -685,17 +1085,64 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الدرجات (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, grades: rows })); }} className="mt-1 block w-full" />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الحضور (CSV)</label>
+              <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, attendance: rows })); }} className="mt-1 block w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الجدول (CSV)</label>
+              <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, schedule: rows })); }} className="mt-1 block w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الرسوم (CSV)</label>
+              <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, fees: rows })); }} className="mt-1 block w-full" />
+            </div>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
             <span>جاهز للاستيراد:</span>
             <span>طلاب: {importState.students.length}</span>
             <span>فصول: {importState.classes.length}</span>
             <span>درجات: {importState.grades.length}</span>
+            <span>حضور: {importState.attendance.length}</span>
+            <span>جدول: {importState.schedule.length}</span>
+            <span>رسوم: {importState.fees.length}</span>
+          </div>
+          <div className="mt-3">
+            <button type="button" onClick={async ()=>{ await validateAllPreview(); addToast('تم فحص الملفات.', 'info'); }} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800">تحقق الملفات المختارة</button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mt-4">
+            <div>
+              <div className="font-semibold">طلاب: صالح {importPreview.students.valid} | غير صالح {importPreview.students.invalid}</div>
+              {importPreview.students.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
+            </div>
+            <div>
+              <div className="font-semibold">فصول: صالح {importPreview.classes.valid} | غير صالح {importPreview.classes.invalid}</div>
+              {importPreview.classes.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
+            </div>
+            <div>
+              <div className="font-semibold">درجات: صالح {importPreview.grades.valid} | غير صالح {importPreview.grades.invalid}</div>
+              {importPreview.grades.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
+            </div>
+            <div>
+              <div className="font-semibold">حضور: صالح {importPreview.attendance.valid} | غير صالح {importPreview.attendance.invalid}</div>
+              {importPreview.attendance.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
+            </div>
+            <div>
+              <div className="font-semibold">جدول: صالح {importPreview.schedule.valid} | غير صالح {importPreview.schedule.invalid}</div>
+              {importPreview.schedule.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
+            </div>
+            <div>
+              <div className="font-semibold">رسوم: صالح {importPreview.fees.valid} | غير صالح {importPreview.fees.invalid}</div>
+              {importPreview.fees.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <button type="button" disabled={importProcessing||importState.classes.length===0} onClick={async ()=>{ setImportProcessing(true); await importClasses(importState.classes); setImportProcessing(false); addToast('تم استيراد الفصول.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الفصول</button>
             <button type="button" disabled={importProcessing||importState.students.length===0} onClick={async ()=>{ setImportProcessing(true); await importStudents(importState.students); setImportProcessing(false); addToast('تم استيراد الطلاب.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الطلاب</button>
             <button type="button" disabled={importProcessing||importState.grades.length===0} onClick={async ()=>{ setImportProcessing(true); await importGrades(importState.grades); setImportProcessing(false); addToast('تم استيراد الدرجات.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد الدرجات</button>
+            <button type="button" disabled={importProcessing||importState.attendance.length===0} onClick={async ()=>{ setImportProcessing(true); await importAttendance(importState.attendance); setImportProcessing(false); addToast('تم استيراد الحضور.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الحضور</button>
+            <button type="button" disabled={importProcessing||importState.schedule.length===0} onClick={async ()=>{ setImportProcessing(true); await importSchedule(importState.schedule); setImportProcessing(false); addToast('تم استيراد الجدول.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الجدول</button>
+            <button type="button" disabled={importProcessing||importState.fees.length===0} onClick={async ()=>{ setImportProcessing(true); await importFees(importState.fees); setImportProcessing(false); addToast('تم استيراد الرسوم.', 'success'); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-400">استيراد الرسوم</button>
           </div>
           <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto text-sm">
             {importState.logs.length === 0 ? <div className="text-gray-500">لا توجد سجلات بعد.</div> : importState.logs.map((l,i)=>(<div key={i} className="text-gray-700 dark:text-gray-300">{l}</div>))}
