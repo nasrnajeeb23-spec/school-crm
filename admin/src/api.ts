@@ -23,21 +23,6 @@ const authHeaders = () => {
     return base;
 };
 
-const mapRole = (r: string) => {
-    const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-    const m: any = {
-      SUPERADMIN: 'SUPER_ADMIN',
-      SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL',
-      SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL',
-      SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
-      SCHOOLADMIN: 'SCHOOL_ADMIN',
-      TEACHER: 'TEACHER',
-      PARENT: 'PARENT',
-      DRIVER: 'DRIVER'
-    };
-    return m[key] || key;
-};
-
 // دالة مساعدة للاتصال بالـ API
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     try {
@@ -81,6 +66,11 @@ export const login = async (emailOrUsername: string, password: string, schoolId?
     if (typeof window !== 'undefined' && token) {
         localStorage.setItem('auth_token', token);
     }
+    const mapRole = (r: string) => {
+        const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+        const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
+        return m[key] || key;
+    };
     return { ...user, role: mapRole(user.role) } as User;
 };
 
@@ -89,9 +79,7 @@ export const logout = async (): Promise<void> => {
 };
 
 export const getCurrentUser = async (): Promise<User> => {
-    const me: any = await apiCall('/auth/me', { method: 'GET' });
-    const src = (me && me.user) ? me.user : me;
-    return { ...src, role: mapRole(src?.role) } as User;
+    return await apiCall('/auth/me', { method: 'GET' });
 };
 
 export const superAdminLogin = async (email: string, password: string): Promise<any> => {
@@ -536,8 +524,7 @@ export const submitTrialRequest = async (data: NewTrialRequestData): Promise<Use
     if (typeof window !== 'undefined' && token) {
         localStorage.setItem('auth_token', token);
     }
-    const u = response?.user || null;
-    return u ? ({ ...u, role: mapRole(u.role) } as User) : null;
+    return response?.user || null;
 };
 
 // ==================== User Profile APIs ====================
