@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogoIcon, SchoolIcon, EmailIcon, LockIcon, EyeIcon, EyeOffIcon, ShieldIcon, AlertTriangleIcon } from '../components/icons';
-import { School, UserRole } from '../types';
+import { School } from '../types';
 import * as api from '../api';
 import { useAppContext } from '../contexts/AppContext';
 import { useToast } from '../contexts/ToastContext';
@@ -11,7 +11,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
-  const { login, currentUser } = useAppContext();
+  const { login } = useAppContext();
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [email, setEmail] = useState('');
@@ -32,20 +32,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
   const [lockTimer, setLockTimer] = useState(0);
 
   const isSuperAdminLogin = mode === 'superadmin';
-
-  const getHomeRouteForUser = (role: UserRole) => {
-    switch (role) {
-      case UserRole.SuperAdmin:
-      case UserRole.SuperAdminFinancial:
-      case UserRole.SuperAdminTechnical:
-      case UserRole.SuperAdminSupervisor:
-        return '/superadmin';
-      case UserRole.SchoolAdmin: return '/school';
-      case UserRole.Teacher: return '/teacher';
-      case UserRole.Parent: return '/parent';
-      default: return '/';
-    }
-  };
 
   // Security lockout logic for SuperAdmin
   useEffect(() => {
@@ -93,13 +79,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
         });
     }
   }, [isSuperAdminLogin]);
-
-  useEffect(() => {
-    if (currentUser) {
-      const route = getHomeRouteForUser((currentUser as any).role);
-      navigate(route, { replace: true });
-    }
-  }, [currentUser]);
   
   const validate = () => {
     const newErrors: { email?: string; password?: string; school?: string } = {};
@@ -135,8 +114,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
           // Reset attempts on successful login
           localStorage.removeItem('superadmin_login_attempts');
           localStorage.removeItem('superadmin_lock_time');
-          const ok = await login(loginIdentifier, password);
-          if (ok) navigate('/superadmin', { replace: true });
+          await login(loginIdentifier, password);
         } else {
           handleLoginError(result.message);
         }
@@ -145,8 +123,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
       }
     } else {
       // Regular login
-      const ok = await login(email, password, selectedSchool ? Number(selectedSchool) : undefined);
-      if (ok) navigate('/school', { replace: true });
+      await login(email, password);
     }
     
     setIsLoading(false);
@@ -168,8 +145,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
       if (result.success) {
         localStorage.removeItem('superadmin_login_attempts');
         localStorage.removeItem('superadmin_lock_time');
-        const ok = await login(email, password);
-        if (ok) navigate('/superadmin', { replace: true });
+        await login(email, password);
       } else {
         addToast('رمز المصادقة غير صحيح', 'error');
       }
@@ -298,16 +274,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                     <label htmlFor="school" className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">المدرسة</label>
                     <div className="relative">
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><SchoolIcon className="h-5 w-5 text-gray-400" /></div>
-                        {schools.length > 0 ? (
-                          <select id="school" name="school" value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} required className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="" disabled>اختر مدرستك...</option>
-                            {schools.map(school => (<option key={school.id} value={school.id}>{school.name}</option>))}
-                          </select>
-                        ) : (
-                          <input id="school" name="school" type="text" placeholder="أدخل معرف المدرسة" value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} required className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                        )}
+                        <select id="school" name="school" value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} required={!isSuperAdminLogin} className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                          <option value="" disabled>اختر مدرستك...</option>
+                          {schools.map(school => (<option key={school.id} value={school.id}>{school.name}</option>))}
+                        </select>
                     </div>
-                    {errors.school && <p className="text-red-500 text-xs mt-1">{errors.school}</p>}
+                     {errors.school && <p className="text-red-500 text-xs mt-1">{errors.school}</p>}
                   </div>
                 )}
                 {isSuperAdminLogin ? (
