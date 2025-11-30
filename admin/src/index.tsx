@@ -4,17 +4,29 @@ import { BrowserRouter, HashRouter } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import { AppProvider } from './contexts/AppContext';
 import App from './App';
-// CSS is built via Tailwind CLI into dist/assets/index.css and linked from index.html
 
-// Ensure mock API uses the remote backend base URL in production
 if (typeof window !== 'undefined') {
   try {
     const key = 'api_base';
-    const prod = (process.env.REACT_APP_API_URL || ((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || 'http://localhost:5000/api'));
+    const envApi = (process.env.REACT_APP_API_URL || ((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || ''));
     const host = window.location.hostname || '';
     const cur = localStorage.getItem(key) || '';
-    if (!cur || cur.includes('127.0.0.1') || cur.includes('localhost') || host.includes('onrender.com')) {
-      localStorage.setItem(key, prod);
+
+    // Allow override via query param: ?api_base=https://backend.onrender.com/api
+    const params = new URLSearchParams(window.location.search);
+    const qp = params.get('api_base');
+    if (qp && /^https?:\/\//.test(qp)) {
+      localStorage.setItem(key, decodeURIComponent(qp));
+    } else if (envApi) {
+      localStorage.setItem(key, envApi);
+    } else if (!cur) {
+      let candidate = '';
+      if (host.endsWith('.onrender.com')) {
+        const sub = host.split('.onrender.com')[0];
+        let back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
+        candidate = `https://${back}.onrender.com/api`;
+      }
+      localStorage.setItem(key, candidate || 'http://localhost:5000/api');
     }
   } catch {}
 }
