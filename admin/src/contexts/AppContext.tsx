@@ -10,7 +10,7 @@ interface AppContextType {
   hydrating: boolean;
   theme: Theme;
   toggleTheme: () => void;
-  login: (emailOrUsername: string, password: string) => Promise<boolean>;
+  login: (emailOrUsername: string, password: string, schoolId?: number) => Promise<boolean>;
   logout: () => void;
   trialSignup: (data: NewTrialRequestData) => Promise<boolean>;
   updateProfile: (data: UpdatableUserData) => Promise<boolean>;
@@ -74,9 +74,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     })();
   }, []);
 
-  const login = async (emailOrUsername: string, password: string): Promise<boolean> => {
+  const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<boolean> => {
     try {
-      const result = await api.login(emailOrUsername, password);
+      const result = await api.login(emailOrUsername, password, schoolId);
       if (result === "TRIAL_EXPIRED") {
           addToast('لقد انتهت الفترة التجريبية لحسابك. يرجى الاشتراك للمتابعة.', 'warning');
           return false;

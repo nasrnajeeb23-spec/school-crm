@@ -135,7 +135,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
           // Reset attempts on successful login
           localStorage.removeItem('superadmin_login_attempts');
           localStorage.removeItem('superadmin_lock_time');
-          await login(loginIdentifier, password);
+          const ok = await login(loginIdentifier, password);
+          if (ok) navigate('/superadmin', { replace: true });
         } else {
           handleLoginError(result.message);
         }
@@ -144,7 +145,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
       }
     } else {
       // Regular login
-      await login(email, password);
+      const ok = await login(email, password, selectedSchool ? Number(selectedSchool) : undefined);
+      if (ok) navigate('/school', { replace: true });
     }
     
     setIsLoading(false);
@@ -166,7 +168,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
       if (result.success) {
         localStorage.removeItem('superadmin_login_attempts');
         localStorage.removeItem('superadmin_lock_time');
-        await login(email, password);
+        const ok = await login(email, password);
+        if (ok) navigate('/superadmin', { replace: true });
       } else {
         addToast('رمز المصادقة غير صحيح', 'error');
       }
