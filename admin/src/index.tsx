@@ -24,7 +24,7 @@ if (typeof window !== 'undefined') {
       if (host.endsWith('.onrender.com')) {
         const sub = host.split('.onrender.com')[0];
         const map: Record<string, string> = {
-          'school-crm-admin': 'https://school-crschool-crm-backendm.onrender.com'
+          'school-crm-admin': 'https://school-crschool-crm-backendm.onrender.com/api'
         };
         if (map[sub]) {
           candidate = map[sub];
