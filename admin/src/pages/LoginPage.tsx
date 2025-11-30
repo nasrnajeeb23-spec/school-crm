@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogoIcon, SchoolIcon, EmailIcon, LockIcon, EyeIcon, EyeOffIcon, ShieldIcon, AlertTriangleIcon } from '../components/icons';
-import { School } from '../types';
+import { School, UserRole } from '../types';
 import * as api from '../api';
 import { useAppContext } from '../contexts/AppContext';
 import { useToast } from '../contexts/ToastContext';
@@ -11,7 +11,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
-  const { login } = useAppContext();
+  const { login, currentUser } = useAppContext();
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [email, setEmail] = useState('');
@@ -32,6 +32,20 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
   const [lockTimer, setLockTimer] = useState(0);
 
   const isSuperAdminLogin = mode === 'superadmin';
+
+  const getHomeRouteForUser = (role: UserRole) => {
+    switch (role) {
+      case UserRole.SuperAdmin:
+      case UserRole.SuperAdminFinancial:
+      case UserRole.SuperAdminTechnical:
+      case UserRole.SuperAdminSupervisor:
+        return '/superadmin';
+      case UserRole.SchoolAdmin: return '/school';
+      case UserRole.Teacher: return '/teacher';
+      case UserRole.Parent: return '/parent';
+      default: return '/';
+    }
+  };
 
   // Security lockout logic for SuperAdmin
   useEffect(() => {
@@ -79,6 +93,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
         });
     }
   }, [isSuperAdminLogin]);
+
+  useEffect(() => {
+    if (currentUser) {
+      const route = getHomeRouteForUser((currentUser as any).role);
+      navigate(route, { replace: true });
+    }
+  }, [currentUser]);
   
   const validate = () => {
     const newErrors: { email?: string; password?: string; school?: string } = {};
