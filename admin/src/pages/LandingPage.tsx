@@ -102,8 +102,8 @@ const LandingPage: React.FC = () => {
               <a href="#contact" onClick={(e) => handleNavClick(e, 'contact')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">تواصل معنا</a>
             </nav>
             <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/superadmin/login')} className="inline-flex px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all">بوابة المدير العام</button>
-                <button onClick={() => navigate('/login')} className="px-5 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-all">تسجيل الدخول</button>
+                <button onClick={() => goTo('/superadmin/login')} className="inline-flex px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all">بوابة المدير العام</button>
+                <button onClick={() => goTo('/login')} className="px-5 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-all">تسجيل الدخول</button>
                 <button onClick={() => setIsTrialModalOpen(true)} className="inline-flex px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">ابدأ تجربتك المجانية</button>
                 <button onClick={() => setIsMobileMenuOpen(v => !v)} className="md:hidden p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -121,7 +121,7 @@ const LandingPage: React.FC = () => {
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
             <a href="#contact" onClick={(e) => { handleNavClick(e, 'contact'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a>
-            <button onClick={() => { navigate('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
+            <button onClick={() => { goTo('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
             <button onClick={() => { setIsTrialModalOpen(true); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">ابدأ تجربتك المجانية</button>
           </div>
         </div>
@@ -179,3 +179,12 @@ const LandingPage: React.FC = () => {
 };
 
 export default LandingPage;
+  const useHashRouter = (process.env.REACT_APP_HASH_ROUTER === 'true');
+  const goTo = (route: string) => {
+    if (useHashRouter) {
+      const target = route.startsWith('#/') ? route : `#${route.startsWith('/') ? route : `/${route}`}`;
+      window.location.hash = target.replace(/^#\/?/, '#/');
+    } else {
+      navigate(route);
+    }
+  };
