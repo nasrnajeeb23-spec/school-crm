@@ -3,7 +3,7 @@ const { build } = require('esbuild');
 const { execSync } = require('child_process');
 
 // Get environment variables
-const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const apiUrl = process.env.REACT_APP_API_URL || '';
 const environment = process.env.REACT_APP_ENVIRONMENT || 'production';
 
 console.log('Building with API URL:', apiUrl);
@@ -20,11 +20,11 @@ build({
   define: {
     'process.env.REACT_APP_API_URL': JSON.stringify(apiUrl),
     'process.env.REACT_APP_ENVIRONMENT': JSON.stringify(environment),
-    'process.env.REACT_APP_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || 'true'),
+    'process.env.REACT_APP_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || 'false'),
     'process.env.NODE_ENV': JSON.stringify(environment),
     'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),
     'import.meta.env.VITE_ENVIRONMENT': JSON.stringify(environment),
-    'import.meta.env.VITE_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || 'true')
+    'import.meta.env.VITE_HASH_ROUTER': JSON.stringify(process.env.REACT_APP_HASH_ROUTER || 'false')
   },
   loader: {
     '.tsx': 'tsx',
@@ -67,10 +67,10 @@ build({
         execSync(`npx tailwindcss -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
         console.log('Tailwind CSS built successfully via npx.');
       } catch (err2) {
-        console.warn('Tailwind build failed, enabling CDN fallback:', err2?.message || err2);
+        console.warn('Tailwind build failed. No CDN fallback will be used:', err2?.message || err2);
         const destCss = path.join(distDir, 'index.css');
-        try { fs.writeFileSync(destCss, '/* Fallback: Tailwind CDN will be injected at runtime */', 'utf8'); } catch {}
-        useCdn = true;
+        try { fs.writeFileSync(destCss, '/* Tailwind build failed. CSS not generated. */', 'utf8'); } catch {}
+        useCdn = false;
       }
     }
     
@@ -103,9 +103,7 @@ build({
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
-      (useCdn 
-        ? `<script src="https://cdn.tailwindcss.com" referrerpolicy="no-referrer"></script>` 
-        : ''),
+      '',
       '<script type="module" src="/assets/index.js"></script>',
       '</body>',
       '</html>'

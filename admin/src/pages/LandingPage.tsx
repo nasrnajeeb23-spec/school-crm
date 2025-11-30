@@ -35,6 +35,7 @@ const featureIconMap: { [key: string]: React.ElementType } = {
 const LandingPage: React.FC = () => {
   const { trialSignup } = useAppContext();
   const navigate = useNavigate();
+  const goTo = (route: string) => navigate(route);
   const [content, setContent] = useState<LandingPageContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
@@ -121,7 +122,7 @@ const LandingPage: React.FC = () => {
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
             <a href="#contact" onClick={(e) => { handleNavClick(e, 'contact'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a>
-            <button onClick={() => { goTo('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
+            <button onClick={() => { goTo('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg紫-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
             <button onClick={() => { setIsTrialModalOpen(true); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">ابدأ تجربتك المجانية</button>
           </div>
         </div>
@@ -179,12 +180,4 @@ const LandingPage: React.FC = () => {
 };
 
 export default LandingPage;
-  const useHashRouter = (process.env.REACT_APP_HASH_ROUTER === 'true');
-  const goTo = (route: string) => {
-    if (useHashRouter) {
-      const target = route.startsWith('#/') ? route : `#${route.startsWith('/') ? route : `/${route}`}`;
-      window.location.hash = target.replace(/^#\/?/, '#/');
-    } else {
-      navigate(route);
-    }
-  };
+ 

@@ -19,7 +19,7 @@ if (typeof window !== 'undefined') {
       localStorage.setItem(key, decodeURIComponent(qp));
     } else if (envApi) {
       localStorage.setItem(key, envApi);
-    } else if (!cur) {
+    } else if (!cur || /localhost|127\.0\.0\.1/i.test(cur)) {
       let candidate = '';
       if (host.endsWith('.onrender.com')) {
         const sub = host.split('.onrender.com')[0];
