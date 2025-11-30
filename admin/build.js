@@ -57,13 +57,13 @@ build({
         '.bin',
         process.platform === 'win32' ? 'tailwindcss.cmd' : 'tailwindcss'
       );
-      const envOpts = { ...process.env, NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=1536' };
+      const envOpts = { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' };
       execSync(`"${tailwindBin}" -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
       console.log('Tailwind CSS built successfully.');
     } catch (err) {
       console.warn('Tailwind CLI build failed, trying npx fallback:', err?.message || err);
       try {
-        const envOpts = { ...process.env, NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=1536' };
+        const envOpts = { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' };
         execSync(`npx tailwindcss -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
         console.log('Tailwind CSS built successfully via npx.');
       } catch (err2) {

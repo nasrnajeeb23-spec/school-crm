@@ -11,14 +11,19 @@ if (typeof window !== 'undefined') {
     const envApi = (process.env.REACT_APP_API_URL || ((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || ''));
     const host = window.location.hostname || '';
     const cur = localStorage.getItem(key) || '';
+    const hasApi = (v: string) => /\/api\/?$/.test(v || '');
+    const withApi = (v: string) => {
+      const s = String(v || '').replace(/\/$/, '');
+      return hasApi(s) ? s.replace(/\/$/, '') : `${s}/api`;
+    };
 
     // Allow override via query param: ?api_base=https://backend.onrender.com/api
     const params = new URLSearchParams(window.location.search);
     const qp = params.get('api_base');
     if (qp && /^https?:\/\//.test(qp)) {
-      localStorage.setItem(key, decodeURIComponent(qp));
+      localStorage.setItem(key, withApi(decodeURIComponent(qp)));
     } else if (envApi) {
-      localStorage.setItem(key, envApi);
+      localStorage.setItem(key, withApi(envApi));
     } else if (!cur || /localhost|127\.0\.0\.1/i.test(cur)) {
       let candidate = '';
       if (host.endsWith('.onrender.com')) {
@@ -34,13 +39,16 @@ if (typeof window !== 'undefined') {
         }
       }
       localStorage.setItem(key, candidate || 'http://localhost:5000/api');
+    } else if (!hasApi(cur)) {
+      localStorage.setItem(key, withApi(cur));
     }
   } catch {}
 }
 
 const container = document.getElementById('root');
 if (container) {
-  const useHash = (process.env.REACT_APP_HASH_ROUTER === 'true');
+  const isRenderHost = typeof window !== 'undefined' && /\.onrender\.com$/i.test(window.location.hostname || '');
+  const useHash = (!isRenderHost && (process.env.REACT_APP_HASH_ROUTER === 'true'));
   const root = ReactDOM.createRoot(container);
   root.render(
     <React.StrictMode>
