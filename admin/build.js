@@ -103,7 +103,9 @@ build({
       '</head>',
       '<body class="bg-gray-100 dark:bg-gray-900">',
       '<div id="root"></div>',
-      `<script>(function(){try{var hasTw=(getComputedStyle(document.documentElement).getPropertyValue('--tw-ring-color')||'').trim();var needCdn=!hasTw;var USE_CDN=${useCdn? 'true':'false'};if(USE_CDN||needCdn){var s=document.createElement('script');s.src='https://cdn.tailwindcss.com';s.referrerPolicy='no-referrer';document.head.appendChild(s);}}catch(e){}})();</script>`,
+      (useCdn 
+        ? `<script src="https://cdn.tailwindcss.com" referrerpolicy="no-referrer"></script>` 
+        : ''),
       '<script type="module" src="/assets/index.js"></script>',
       '</body>',
       '</html>'
