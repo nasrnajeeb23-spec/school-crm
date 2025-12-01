@@ -58,6 +58,8 @@ router.get('/by-role', verifyToken, async (req, res) => {
     if (!['SCHOOLADMIN','SUPERADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
     const role = String(req.query.role || '').toUpperCase();
     const schoolId = req.query.schoolId ? Number(req.query.schoolId) : null;
+    if (userRole.startsWith('SCHOOL') && !schoolId) return res.status(400).json({ msg: 'schoolId is required' });
+    if (userRole.startsWith('SCHOOL') && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     if (!['TEACHER','PARENT'].includes(role)) return res.status(400).json({ msg: 'Invalid role' });
     if (role === 'TEACHER') {
       const rows = await Teacher.findAll({ where: schoolId ? { schoolId } : {}, order: [['name','ASC']] });

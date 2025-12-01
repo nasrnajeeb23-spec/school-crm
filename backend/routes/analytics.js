@@ -9,6 +9,7 @@ router.get('/insights/at-risk-students', auth, async (req, res) => {
   try {
     const { schoolId } = req.query;
     const userId = req.user.id;
+    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
     
     if (!schoolId) {
       return res.status(400).json({
@@ -51,6 +52,7 @@ router.get('/insights/academic-performance', auth, [
     }
 
     const { schoolId, timeRange = 'month' } = req.query;
+    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
     const userId = req.user.id;
 
     const insights = await AnalyticsService.analyzeAcademicPerformance(schoolId, timeRange);
@@ -85,6 +87,7 @@ router.get('/insights/financial-trends', auth, async (req, res) => {
   try {
     const { schoolId, timeRange = 'year' } = req.query;
     const userId = req.user.id;
+    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
 
     if (!schoolId) {
       return res.status(400).json({
@@ -126,6 +129,7 @@ router.get('/insights/teacher-performance', auth, async (req, res) => {
   try {
     const { schoolId, timeRange = 'quarter' } = req.query;
     const userId = req.user.id;
+    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
 
     if (!schoolId) {
       return res.status(400).json({
@@ -167,6 +171,7 @@ router.get('/insights/automated', auth, async (req, res) => {
   try {
     const { schoolId } = req.query;
     const userId = req.user.id;
+    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
 
     if (!schoolId) {
       return res.status(400).json({
@@ -207,6 +212,7 @@ router.get('/dashboard/overview', auth, async (req, res) => {
   try {
     const { schoolId } = req.query;
     const userId = req.user.id;
+    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
 
     if (!schoolId) {
       return res.status(400).json({

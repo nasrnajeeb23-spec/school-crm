@@ -1,0 +1,75 @@
+{
+  "id": null,
+  "uid": "schoolcrm-node",
+  "title": "School CRM - Backend Metrics",
+  "tags": ["school-crm", "backend"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Backend Up",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 3 },
+      "targets": [ { "expr": "up{job=\"school-crm-backend\"}", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "none" } }
+    },
+    {
+      "type": "stat",
+      "title": "Event Loop Lag (s)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 3 },
+      "targets": [ { "expr": "nodejs_eventloop_lag_seconds", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+    },
+    {
+      "type": "stat",
+      "title": "RSS Memory",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 3 },
+      "targets": [ { "expr": "process_resident_memory_bytes", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "type": "graph",
+      "title": "Request Rate by Status",
+      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 8 },
+      "lines": true,
+      "fill": 3,
+      "stack": true,
+      "legend": { "show": true },
+      "targets": [
+        { "expr": "sum by (status) (rate(http_requests_total[5m]))", "legendFormat": "{{status}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "CPU (user seconds rate)",
+      "gridPos": { "x": 12, "y": 3, "w": 12, "h": 8 },
+      "lines": true,
+      "targets": [ { "expr": "rate(process_cpu_user_seconds_total[5m])", "legendFormat": "user", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "HTTP P95 Latency (s)",
+      "gridPos": { "x": 0, "y": 11, "w": 6, "h": 4 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+    },
+    {
+      "type": "bargauge",
+      "title": "Top Routes by RPS",
+      "gridPos": { "x": 6, "y": 11, "w": 18, "h": 4 },
+      "targets": [
+        { "expr": "topk(5, sum by (route) (rate(http_requests_total[5m])))", "refId": "A" }
+      ],
+      "options": { "orientation": "horizontal" },
+      "fieldConfig": { "defaults": { "unit": "req/s", "decimals": 2 } }
+    }
+  ]
+}
+

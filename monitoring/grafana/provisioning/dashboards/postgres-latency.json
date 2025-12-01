@@ -1,0 +1,71 @@
+{
+  "uid": "schoolcrm-postgres",
+  "title": "School CRM - Postgres Latency",
+  "tags": ["school-crm", "postgres"],
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "DB Up",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 3 },
+      "targets": [ { "expr": "up{job=\"postgres\"}", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Active Connections",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 3 },
+      "targets": [ { "expr": "sum(pg_stat_activity_count)", "refId": "A" } ]
+    },
+    {
+      "type": "graph",
+      "title": "Transactions/sec",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 6 },
+      "targets": [
+        { "expr": "rate(pg_stat_database_xact_commit[5m])", "legendFormat": "commit", "refId": "A" },
+        { "expr": "rate(pg_stat_database_xact_rollback[5m])", "legendFormat": "rollback", "refId": "B" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Tuples Read/Returned/sec",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 6 },
+      "targets": [
+        { "expr": "rate(pg_stat_database_tup_read[5m])", "legendFormat": "read", "refId": "A" },
+        { "expr": "rate(pg_stat_database_tup_returned[5m])", "legendFormat": "returned", "refId": "B" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Blocks Read/Hit/sec",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 6 },
+      "targets": [
+        { "expr": "rate(pg_stat_database_blks_read[5m])", "legendFormat": "read", "refId": "A" },
+        { "expr": "rate(pg_stat_database_blks_hit[5m])", "legendFormat": "hit", "refId": "B" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "DB Size",
+      "gridPos": { "x": 0, "y": 12, "w": 6, "h": 3 },
+      "targets": [ { "expr": "sum(pg_database_size_bytes)", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "type": "graph",
+      "title": "Checkpoints/sec",
+      "gridPos": { "x": 6, "y": 12, "w": 6, "h": 6 },
+      "targets": [ { "expr": "rate(pg_stat_bgwriter_checkpoints_timed[5m])", "legendFormat": "timed", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Mean Query Time (pg_stat_statements)",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 3 },
+      "targets": [ { "expr": "avg(pg_stat_statements_mean_time_seconds)", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
+    }
+  ]
+}
+

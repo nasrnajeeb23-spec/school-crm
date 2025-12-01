@@ -33,6 +33,7 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
   try {
     const op = await BusOperator.findByPk(req.params.operatorId);
     if (!op) return res.status(404).json({ msg: 'Operator not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     op.status = 'Approved';
     await op.save();
     res.json({ ...op.toJSON(), status: 'معتمد' });
@@ -141,6 +142,7 @@ router.post('/routes/:routeId/simulate', verifyToken, requireRole('SCHOOL_ADMIN'
     const { progress } = req.body;
     const route = await Route.findByPk(req.params.routeId);
     if (!route) return res.status(404).json({ msg: 'Route not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(route.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     const rs = await RouteStudent.findAll({ where: { routeId: route.id } });
     const studentIds = rs.map(x => x.studentId);
     const students = await Student.findAll({ where: { id: studentIds } });

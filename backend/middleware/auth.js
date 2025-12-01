@@ -80,11 +80,9 @@ function requireSameSchoolParam(paramName = 'schoolId') {
     if (superAdminRoles.includes(normalizeRole(req.user.role))) return next();
 
     const requestedSchoolId = parseInt(req.params[paramName], 10);
-    const headerSchoolId = parseInt(req.headers['x-school-id'] || '0', 10);
     const userSchoolId = Number(req.user.schoolId || 0);
     const matchesParam = !!requestedSchoolId && userSchoolId === requestedSchoolId;
-    const headerMatchesParam = !!headerSchoolId && headerSchoolId === requestedSchoolId;
-    if (!matchesParam && !headerMatchesParam) {
+    if (!matchesParam) {
       return res.status(403).json({ msg: 'Access denied for this school' });
     }
     next();

@@ -106,10 +106,11 @@ router.post('/trial-signup', validate([
   { name: 'schoolName', required: true, type: 'string' },
   { name: 'adminName', required: true, type: 'string' },
   { name: 'adminEmail', required: true, type: 'string' },
-  { name: 'adminPassword', required: true, type: 'string', minLength: 6 },
+  { name: 'adminPassword', required: true, type: 'string' },
 ]), async (req, res) => {
   try {
     const { schoolName, adminName, adminEmail, adminPassword } = req.body;
+    if (!isStrongPassword(adminPassword)) return res.status(400).json({ msg: 'Weak password' });
 
     const exists = await User.findOne({ where: { email: adminEmail } });
     if (exists) return res.status(400).json({ msg: 'Email already in use' });

@@ -5,6 +5,7 @@ const { JWT_SECRET } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { User, AuditLog } = require('../models');
 const { verifyToken } = require('../middleware/auth');
+const speakeasy = require('speakeasy');
 const router = express.Router();
 
 // Super Admin IP whitelist (should be in environment variables in production)
@@ -14,6 +15,17 @@ const SUPER_ADMIN_WHITELIST = process.env.SUPER_ADMIN_IP_WHITELIST ?
 
 // Rate limiting for SuperAdmin login attempts
 const loginAttempts = new Map();
+let redisClient = null;
+try {
+  if (process.env.REDIS_URL) {
+    const redis = require('redis');
+    const useTls = String(process.env.REDIS_URL || '').startsWith('rediss://');
+    redisClient = redis.createClient({ url: process.env.REDIS_URL, socket: useTls ? { tls: true } : {} });
+    redisClient.on('error', () => {});
+    // Connect lazily; failures will fall back to in-memory
+    redisClient.connect().catch(() => { redisClient = null; });
+  }
+} catch {}
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 const MAX_ATTEMPTS = 3;
 
@@ -103,40 +115,66 @@ const logSuperAdminAction = async (action, details, req) => {
   }
 };
 
-// Check rate limiting
-const checkRateLimit = (identifier) => {
+// Check rate limiting (supports Redis if available)
+const checkRateLimit = async (identifier) => {
+  if (redisClient) {
+    try {
+      const lockKey = `sa:login:${identifier}:lock`;
+      const ttl = await redisClient.ttl(lockKey);
+      if (ttl && ttl > 0) {
+        const attempts = parseInt(await redisClient.get(`sa:login:${identifier}:count`) || '0');
+        return { allowed: false, remainingTime: ttl, attempts };
+      }
+      const attempts = parseInt(await redisClient.get(`sa:login:${identifier}:count`) || '0');
+      return { allowed: true, attempts };
+    } catch {}
+  }
   const now = Date.now();
   const attempts = loginAttempts.get(identifier);
-  
   if (attempts && attempts.count >= MAX_ATTEMPTS) {
     const timeDiff = now - attempts.lastAttempt;
     if (timeDiff < LOCKOUT_DURATION) {
       const remainingTime = Math.ceil((LOCKOUT_DURATION - timeDiff) / 1000);
-      return {
-        allowed: false,
-        remainingTime,
-        attempts: attempts.count
-      };
+      return { allowed: false, remainingTime, attempts: attempts.count };
     } else {
-      // Reset after lockout period
       loginAttempts.delete(identifier);
     }
   }
-  
   return { allowed: true, attempts: attempts?.count || 0 };
 };
 
-// Increment rate limit counter
-const incrementRateLimit = (identifier) => {
+// Increment rate limit counter (supports Redis if available)
+const incrementRateLimit = async (identifier) => {
+  if (redisClient) {
+    try {
+      const countKey = `sa:login:${identifier}:count`;
+      const lockKey = `sa:login:${identifier}:lock`;
+      const attempts = await redisClient.incr(countKey);
+      await redisClient.set(`sa:login:${identifier}:last`, String(Date.now()));
+      if (attempts >= MAX_ATTEMPTS) {
+        const seconds = Math.ceil(LOCKOUT_DURATION / 1000);
+        await redisClient.setEx(lockKey, seconds, '1');
+      }
+      return attempts;
+    } catch {}
+  }
   const now = Date.now();
   const attempts = loginAttempts.get(identifier) || { count: 0, lastAttempt: now };
-  
   attempts.count += 1;
   attempts.lastAttempt = now;
-  
   loginAttempts.set(identifier, attempts);
-  
   return attempts.count;
+};
+
+const clearRateLimit = async (identifier) => {
+  if (redisClient) {
+    try {
+      await redisClient.del(`sa:login:${identifier}:count`);
+      await redisClient.del(`sa:login:${identifier}:lock`);
+      await redisClient.del(`sa:login:${identifier}:last`);
+    } catch {}
+  }
+  loginAttempts.delete(identifier);
 };
 
 // @route   POST /api/auth/superadmin/login
@@ -190,7 +228,7 @@ router.post('/login', [
     }
 
     // Rate limiting check
-    const rateLimit = checkRateLimit(email);
+    const rateLimit = await checkRateLimit(email);
     if (!rateLimit.allowed) {
       await logSuperAdminAction('login.rate_limited', {
         email,
@@ -215,7 +253,7 @@ router.post('/login', [
     });
 
     if (!user) {
-      incrementRateLimit(email);
+      await incrementRateLimit(email);
       
       await logSuperAdminAction('login.failed', {
         email,
@@ -233,7 +271,7 @@ router.post('/login', [
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      const attempts = incrementRateLimit(email);
+      const attempts = await incrementRateLimit(email);
       
       await logSuperAdminAction('login.failed', {
         userId: user.id,
@@ -251,13 +289,13 @@ router.post('/login', [
     }
 
     // Check if MFA is required
-    const requiresMfa = user.mfaEnabled && securityCheck.requiresAdditionalVerification;
+    const requiresMfa = (String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification;
     const tempToken = requiresMfa ? 
       jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) : 
       undefined;
 
     // Clear rate limit on successful login
-    loginAttempts.delete(email);
+    await clearRateLimit(email);
 
     // Log successful login attempt
     await logSuperAdminAction('login.attempt', {
@@ -333,7 +371,7 @@ router.post('/verify-mfa', [
     // Verify temp token
     let decoded;
     try {
-      decoded = jwt.verify(tempToken, process.env.JWT_SECRET || 'default_secret');
+      decoded = jwt.verify(tempToken, JWT_SECRET);
     } catch (error) {
       await logSuperAdminAction('mfa_verify.invalid_token', {
         tempToken,
@@ -363,10 +401,21 @@ router.post('/verify-mfa', [
       });
     }
 
-    // Verify MFA code (in production, use proper TOTP verification)
-    // For demo purposes, accept specific codes
-    const validCodes = ['123456', '654321', '000000'];
-    if (!validCodes.includes(mfaCode)) {
+    const isDev = String(process.env.NODE_ENV || '').toLowerCase() !== 'production';
+    let otpValid = false;
+    if (user.mfaSecret) {
+      otpValid = speakeasy.totp.verify({
+        secret: user.mfaSecret,
+        encoding: 'base32',
+        token: mfaCode,
+        window: 1
+      });
+    } else if (isDev) {
+      const validCodes = ['123456', '654321', '000000'];
+      otpValid = validCodes.includes(mfaCode);
+    }
+
+    if (!otpValid) {
       await logSuperAdminAction('mfa_verify.failed', {
         userId: user.id,
         userEmail: user.email,

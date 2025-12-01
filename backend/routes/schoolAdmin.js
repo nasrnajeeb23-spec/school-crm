@@ -11,13 +11,88 @@ const path = require('path');
 const fs = require('fs');
 const fse = require('fs-extra');
 const archiver = require('archiver');
-const uploadDir = path.join(__dirname, '..', 'uploads', 'payroll-receipts');
-fs.mkdirSync(uploadDir, { recursive: true });
+const baseReceiptDir = path.join(__dirname, '..', 'storage', 'payroll-receipts');
+fse.ensureDirSync(baseReceiptDir);
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `receipt_${Date.now()}_${file.originalname}`)
+  destination: (req, file, cb) => {
+    try {
+      const schoolId = String(req.params.schoolId || '');
+      const target = path.join(baseReceiptDir, schoolId);
+      fse.ensureDirSync(target);
+      cb(null, target);
+    } catch (e) { cb(e); }
+  },
+  filename: (req, file, cb) => {
+    try {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const base = path.basename(file.originalname || '', ext).replace(/[^a-zA-Z0-9_.-]/g,'_');
+      cb(null, `receipt_${Date.now()}_${base}${ext}`);
+    } catch (e) { cb(e); }
+  }
 });
-const upload = multer({ storage });
+const allowedReceiptMimes = new Set(['application/pdf','image/png','image/jpeg']);
+const allowedReceiptExts = new Set(['.pdf','.png','.jpg','.jpeg']);
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    try {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      if (!allowedReceiptMimes.has(file.mimetype) || !allowedReceiptExts.has(ext)) return cb(new Error('Invalid file type'));
+      cb(null, true);
+    } catch (e) { cb(new Error('Invalid file')); }
+  }
+});
+const net = require('net');
+const { spawn } = require('child_process');
+async function scanFile(filePath) {
+  const mode = String(process.env.CLAMAV_MODE || '').toLowerCase();
+  const host = process.env.CLAMAV_HOST || '';
+  const port = parseInt(process.env.CLAMAV_PORT || '3310');
+  const timeoutMs = parseInt(process.env.CLAMAV_TIMEOUT_MS || '5000');
+  const clamscanPath = process.env.CLAMAV_CLAMSCAN_PATH || 'clamscan';
+  if (host && !mode) {
+    return new Promise((resolve) => {
+      const socket = new net.Socket();
+      let result = '';
+      let done = false;
+      socket.setTimeout(timeoutMs, () => { if (!done) { done = true; socket.destroy(); resolve({ clean: true, reason: 'timeout' }); } });
+      socket.connect(port, host, () => {
+        socket.write('zINSTREAM\0');
+        const stream = fs.createReadStream(filePath);
+        stream.on('data', (chunk) => {
+          const len = Buffer.alloc(4);
+          len.writeUInt32BE(chunk.length, 0);
+          socket.write(len);
+          socket.write(chunk);
+        });
+        stream.on('end', () => { const end = Buffer.alloc(4); end.writeUInt32BE(0, 0); socket.write(end); });
+      });
+      socket.on('data', (data) => { result += data.toString(); });
+      socket.on('error', () => { if (!done) { done = true; resolve({ clean: true, reason: 'error' }); } });
+      socket.on('close', () => {
+        if (!done) {
+          done = true;
+          const ok = /OK/i.test(result) && !/FOUND/i.test(result);
+          resolve({ clean: !!ok, reason: result.trim() });
+        }
+      });
+    });
+  }
+  if (mode === 'cli') {
+    return new Promise((resolve) => {
+      const p = spawn(clamscanPath, ['--no-summary', filePath], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      let err = '';
+      p.stdout.on('data', (d) => out += d.toString());
+      p.stderr.on('data', (d) => err += d.toString());
+      const to = setTimeout(() => { try { p.kill(); } catch {} }, timeoutMs);
+      p.on('close', (code) => { clearTimeout(to); resolve({ clean: code === 0, reason: (out || err).trim() }); });
+      p.on('error', () => { clearTimeout(to); resolve({ clean: true, reason: 'error' }); });
+    });
+  }
+  return { clean: true, reason: 'disabled' };
+}
 const { validate } = require('../middleware/validate');
 const { requireModule } = require('../middleware/modules');
 
@@ -58,7 +133,7 @@ async function enforceActiveSubscription(req, res, next) {
 // @route   GET api/schools/:id
 // @desc    Get school by ID
 // @access  Private (SchoolAdmin, SuperAdmin)
-router.get('/schools/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+router.get('/schools/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
     const school = await School.findByPk(req.params.id);
     if (!school) return res.status(404).json({ msg: 'School not found' });
@@ -74,7 +149,7 @@ router.get('/schools/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const students = await Student.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']] });
+    const students = await Student.findAll({ where: { schoolId: req.user.schoolId }, order: [['name', 'ASC']] });
     if (!students) return res.status(404).json({ msg: 'No students found' });
     
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
@@ -403,15 +478,30 @@ router.post('/:schoolId/payroll/salary-slips/:id/receipt', verifyToken, requireR
   try {
     const row = await SalarySlip.findOne({ where: { id: req.params.id, schoolId: req.params.schoolId } });
     if (!row) return res.status(404).json({ msg: 'Not Found' });
+    if (req.file) {
+      const scan = await scanFile(path.join(__dirname, '..', 'storage', 'payroll-receipts', String(req.params.schoolId), req.file.filename));
+      if (!scan.clean) { try { await fse.remove(path.join(__dirname, '..', 'storage', 'payroll-receipts', String(req.params.schoolId), req.file.filename)); } catch {} return res.status(400).json({ msg: 'Malware detected' }); }
+    }
     const { receiptNumber, receiptDate, receivedBy } = req.body || {};
     if (receiptNumber) row.receiptNumber = receiptNumber;
     if (receiptDate) row.receiptDate = receiptDate;
     row.receivedBy = receivedBy || (req.user?.name || '');
-    if (req.file) row.receiptAttachmentUrl = `/uploads/payroll-receipts/${req.file.filename}`;
+    if (req.file) row.receiptAttachmentUrl = `/api/school/${req.params.schoolId}/payroll/receipts/${req.file.filename}`;
     row.status = 'Paid';
     row.paidAt = new Date();
     await row.save();
     res.json(row.toJSON());
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.get('/:schoolId/payroll/receipts/:filename', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(__dirname, '..', 'storage', 'payroll-receipts', String(req.params.schoolId), filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename=${filename}`);
+    res.type(path.extname(filename));
+    fs.createReadStream(filePath).pipe(res);
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -609,6 +699,7 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     }
     const teacher = await Teacher.findByPk(Number(homeroomTeacherId));
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (Number(teacher.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied for this school' });
     const newClass = await Class.create({
       id: `cls_${Date.now()}`,
       name,
@@ -616,7 +707,7 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       homeroomTeacherName: teacher.name,
       studentCount: 0,
       capacity: typeof capacity === 'number' ? capacity : 30,
-      schoolId: parseInt(req.params.schoolId, 10),
+      schoolId: Number(req.user.schoolId || 0),
       homeroomTeacherId: Number(homeroomTeacherId),
       subjects: subjects,
       section: typeof section === 'string' ? section : 'أ',
@@ -1060,7 +1151,7 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         include: {
             model: Student,
             attributes: ['name'],
-            where: { schoolId: req.params.schoolId },
+            where: { schoolId: req.user.schoolId },
         },
         order: [['dueDate', 'DESC']]
     });
@@ -1498,6 +1589,10 @@ router.put('/:schoolId/backup/config', verifyToken, requireRole('SCHOOL_ADMIN', 
     if (!s) s = await SchoolSettings.create({ schoolId, schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } });
     s.backupConfig = req.body || {};
     await s.save();
+    try {
+      const { AuditLog } = require('../models');
+      await AuditLog.create({ action: 'school.backup.config.update', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId, backupConfig: s.backupConfig }), timestamp: new Date(), riskLevel: 'low' });
+    } catch {}
     res.json(s.backupConfig || {});
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
@@ -1533,7 +1628,13 @@ router.post('/:schoolId/backup/store', verifyToken, requireRole('SCHOOL_ADMIN', 
     archive.pipe(out);
     for (const [name, csv] of Object.entries(map)) archive.append(csv, { name });
     await archive.finalize();
-    out.on('close', () => { res.status(201).json({ file: fname, size: archive.pointer() }); });
+    out.on('close', async () => {
+      try {
+        const { AuditLog } = require('../models');
+        await AuditLog.create({ action: 'school.backup.store', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: Number(req.params.schoolId), file: fname, size: archive.pointer(), types }), timestamp: new Date(), riskLevel: 'low' });
+      } catch {}
+      res.status(201).json({ file: fname, size: archive.pointer() });
+    });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 

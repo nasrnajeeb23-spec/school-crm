@@ -8,8 +8,9 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 // @desc    Get all necessary data for the teacher dashboard
 // @access  Private (Teacher)
 router.get('/:teacherId/dashboard', verifyToken, requireRole('TEACHER'), async (req, res) => {
-    try {
-        const { teacherId } = req.params;
+  try {
+    const { teacherId } = req.params;
+    if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
         const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
         const classesPromise = Class.findAll({

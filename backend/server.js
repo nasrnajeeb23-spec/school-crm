@@ -43,7 +43,14 @@ const fs = require('fs');
 
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
+let Sentry;
+try { Sentry = require('@sentry/node'); } catch {}
+if (Sentry && process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development' });
+  app.use(Sentry.Handlers.requestHandler());
+}
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001';
 const allowedOrigins = allowedOrigin.split(',').map(o => o.trim());
 allowedOrigins.push('https://school-crm-admin.onrender.com');
@@ -120,11 +127,58 @@ app.use(rateLimit({
     retryAfter: rateLimitWindow * 60
   }
 }));
+
+// Basic HTTP request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    try {
+      const ms = Date.now() - start;
+      const u = req.user || {};
+      logger.info('http_access', { method: req.method, path: req.originalUrl || req.url, status: res.statusCode, durationMs: ms, userId: u.id || null, role: u.role || null, ip: req.ip });
+    } catch {}
+  });
+  next();
+});
 app.use(express.json());
+let promClient;
+try { promClient = require('prom-client'); } catch {}
+if (promClient) { 
+  promClient.collectDefaultMetrics();
+  const httpRequestCounter = new promClient.Counter({ name: 'http_requests_total', help: 'Total HTTP requests', labelNames: ['method','route','status'] });
+  const httpRequestDuration = new promClient.Histogram({ name: 'http_request_duration_seconds', help: 'HTTP request duration in seconds', labelNames: ['method','route','status'], buckets: [0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10] });
+  app.use((req, res, next) => {
+    const start = process.hrtime.bigint();
+    res.on('finish', () => {
+      try {
+        const diff = Number(process.hrtime.bigint() - start);
+        const sec = diff / 1e9;
+        const route = (req.route && req.route.path) || (req.baseUrl ? req.baseUrl + (req.path || '') : (req.path || req.originalUrl || 'unknown'));
+        const labels = { method: req.method, route, status: String(res.statusCode) };
+        httpRequestCounter.inc(labels);
+        httpRequestDuration.observe(labels, sec);
+        if (Sentry && process.env.SENTRY_DSN && res.statusCode >= 500) {
+          Sentry.captureMessage('HTTP_5xx', { level: 'fatal', extra: { method: req.method, route, status: res.statusCode, duration_seconds: sec } });
+        }
+      } catch {}
+    });
+    next();
+  });
+  app.get('/metrics', async (req, res) => {
+    try {
+      res.setHeader('Content-Type', promClient.register.contentType);
+      res.send(await promClient.register.metrics());
+    } catch {
+      res.status(500).end();
+    }
+  });
+}
 
 // Session middleware for enterprise/SAML features
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret && process.env.NODE_ENV === 'production') { throw new Error('SESSION_SECRET required'); }
 const sessionConfig = {
-  secret: process.env.SESSION_SECRET || 'dev_session_secret',
+  secret: sessionSecret || 'dev_session_secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -157,7 +211,7 @@ app.use(languageMiddleware);
 // License enforcement setup
 const { verifyLicenseKey } = require('./utils/license');
 const coreModules = ['student_management', 'academic_management', 'parent_portal', 'teacher_portal', 'teacher_app'];
-const licenseKey = process.env.LICENSE_KEY || process.env.LICENSE_SECRET || null;
+const licenseKey = process.env.LICENSE_KEY || null;
 let allowedModules = [...coreModules];
 if (licenseKey) {
   const result = verifyLicenseKey(licenseKey);
@@ -179,8 +233,8 @@ app.locals.allowedModules = allowedModules;
 // API Routes
 const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth/superadmin', authLimiter, authSuperAdminRoutes);
 app.use('/api/users', usersRoutes);
-app.use('/api/auth/superadmin', authSuperAdminRoutes);
 app.use('/api/schools', schoolsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/payments', paymentsRoutes);
@@ -196,7 +250,6 @@ app.use('/api/superadmin', packageRoutes);
 app.use('/api/messaging', messagingRoutes);
 app.use('/api/auth/enterprise', authEnterpriseRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.use('/uploads', express.static(require('path').join(__dirname, '..', 'uploads')));
 
 // Public content endpoints for landing page
 app.get('/api/content/landing', (req, res) => {
@@ -442,27 +495,27 @@ async function syncDatabase(){
   // Sync independent tables first
   await School.sync(opts);
   try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch {}
-  await SchoolSettings.sync({ alter: true });
+  await SchoolSettings.sync(isProd ? { force: false } : { alter: true });
   await Plan.sync(opts);
-  await BusOperator.sync({ alter: true });
+  await BusOperator.sync(isProd ? { force: false } : { alter: true });
   await Parent.sync(opts);
-  await Student.sync({ alter: true });
-  await Teacher.sync({ alter: true });
-  await Class.sync({ alter: true });
-  await FeeSetup.sync({ alter: true });
+  await Student.sync(isProd ? { force: false } : { alter: true });
+  await Teacher.sync(isProd ? { force: false } : { alter: true });
+  await Class.sync(isProd ? { force: false } : { alter: true });
+  await FeeSetup.sync(isProd ? { force: false } : { alter: true });
   
   // Then sync dependent tables
   await Subscription.sync(opts);
-  await Route.sync({ alter: true });
-  await User.sync({ alter: true });
+  await Route.sync(isProd ? { force: false } : { alter: true });
+  await User.sync(isProd ? { force: false } : { alter: true });
   await Conversation.sync(opts);
   await Message.sync(opts);
   await Expense.sync(opts);
-  await SalaryStructure.sync({ alter: true });
-  await SalarySlip.sync({ alter: true });
-  await StaffAttendance.sync({ alter: true });
-  await TeacherAttendance.sync({ alter: true });
-  await Schedule.sync({ alter: true });
+  await SalaryStructure.sync(isProd ? { force: false } : { alter: true });
+  await SalarySlip.sync(isProd ? { force: false } : { alter: true });
+  await StaffAttendance.sync(isProd ? { force: false } : { alter: true });
+  await TeacherAttendance.sync(isProd ? { force: false } : { alter: true });
+  await Schedule.sync(isProd ? { force: false } : { alter: true });
 }
 syncDatabase()
   .then(async () => {
@@ -483,10 +536,10 @@ syncDatabase()
           { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id },
         ]);
     // Transportation seed
-        const op = await BusOperator.create({ name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
-        const rt = await Route.create({ name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
+        const op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
+        const rt = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
         const parent = await Parent.create({ name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active' });
-        const student = await Student.create({ name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] });
+        const student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] });
         await RouteStudent.create({ routeId: rt.id, studentId: student.id });
         console.log('Seeded minimal dev data');
       }
@@ -494,9 +547,9 @@ syncDatabase()
       const school = await School.findOne();
       if (school) {
         const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active' } });
-        const [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
-        const [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
-        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
+        const [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
+        const [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
+        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
         await RouteStudent.findOrCreate({ where: { routeId: rt.id, studentId: student.id }, defaults: { routeId: rt.id, studentId: student.id } });
         // Ensure parent user for dashboard login
         const { User } = require('./models');
@@ -705,6 +758,32 @@ syncDatabase()
       await archive.finalize();
       return full;
     }
+    async function acquireBackupLock(schoolId){
+      try {
+        const { SchoolSettings } = require('./models');
+        const s = await SchoolSettings.findOne({ where: { schoolId } });
+        if (!s) return false;
+        const now = Date.now();
+        const lock = s.backupLock || {};
+        const until = lock.until ? new Date(lock.until).getTime() : 0;
+        if (until && until > now) return false;
+        const token = Math.random().toString(36).slice(2);
+        s.backupLock = { token, until: new Date(now + 2 * 60 * 1000).toISOString() };
+        await s.save();
+        return token;
+      } catch { return false; }
+    }
+    async function releaseBackupLock(schoolId, token){
+      try {
+        const { SchoolSettings } = require('./models');
+        const s = await SchoolSettings.findOne({ where: { schoolId } });
+        if (!s) return;
+        const lock = s.backupLock || {};
+        if (lock.token && lock.token !== token) return;
+        s.backupLock = null;
+        await s.save();
+      } catch {}
+    }
     const lastRun = new Map();
     cron.schedule('*/5 * * * *', async () => {
       try {
@@ -723,7 +802,16 @@ syncDatabase()
             if (t === `${hh}:${mm}`){
               const key = `daily_${sch.id}_${t}_${now.toISOString().slice(0,10)}`;
               if (!lastRun.has(key)){
-                await storeBackupZip(Number(sch.id), types, {});
+                const token = await acquireBackupLock(Number(sch.id));
+                if (token){
+                  const full = await storeBackupZip(Number(sch.id), types, {});
+                  try {
+                    const { AuditLog } = require('./models');
+                    const stat = fs.statSync(full);
+                    await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
+                  } catch {}
+                  await releaseBackupLock(Number(sch.id), token);
+                }
                 lastRun.set(key, true);
               }
             }
@@ -735,7 +823,16 @@ syncDatabase()
             if (dNow === day && t === `${hh}:${mm}`){
               const key = `monthly_${sch.id}_${t}_${now.getFullYear()}_${now.getMonth()+1}`;
               if (!lastRun.has(key)){
-                await storeBackupZip(Number(sch.id), types, {});
+                const token = await acquireBackupLock(Number(sch.id));
+                if (token){
+                  const full = await storeBackupZip(Number(sch.id), types, {});
+                  try {
+                    const { AuditLog } = require('./models');
+                    const stat = fs.statSync(full);
+                    await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
+                  } catch {}
+                  await releaseBackupLock(Number(sch.id), token);
+                }
                 lastRun.set(key, true);
               }
             }
@@ -772,3 +869,4 @@ syncDatabase()
   .catch(err => {
     console.error('Unable to connect to the database:', err);
   });
+if (Sentry && Sentry.Handlers && typeof Sentry.Handlers.errorHandler === 'function') { app.use(Sentry.Handlers.errorHandler()); }

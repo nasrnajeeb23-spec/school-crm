@@ -9,6 +9,7 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 router.get('/:parentId/dashboard', verifyToken, requireRole('PARENT'), async (req, res) => {
     try {
         const { parentId } = req.params;
+        if (String(req.user.parentId) !== String(parentId)) return res.status(403).json({ msg: 'Access denied' });
 
         const parent = await Parent.findByPk(parentId, {
             include: { model: Student, limit: 1 } // Assuming one student per parent for now

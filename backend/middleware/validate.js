@@ -2,7 +2,12 @@ function validate(requiredSpec) {
   return (req, res, next) => {
     const errors = [];
     for (const spec of requiredSpec) {
-      const value = req.body[spec.name];
+      let value = req.body[spec.name];
+      if (typeof value === 'string') {
+        const sanitized = value.replace(/[<>"'`]/g, '').trim();
+        req.body[spec.name] = sanitized;
+        value = sanitized;
+      }
       if (spec.required && (value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))){
         errors.push(`${spec.name} is required`);
         continue;

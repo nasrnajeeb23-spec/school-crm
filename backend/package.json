@@ -8,11 +8,13 @@
     "dev": "nodemon server.js",
     "db:seed": "node seed.js",
     "db:seed:staff": "node scripts/seedStaff.js",
+    "db:migrate": "node scripts/migrate.js",
     "start:pm2": "pm2 start ecosystem.config.js --env production",
     "test:smoke": "node scripts/smokeTest.js",
     "test:e2e": "node scripts/e2e-smoke.js"
   },
   "dependencies": {
+    "@sentry/node": "^7.108.0",
     "@azure/msal-node": "^2.6.0",
     "archiver": "^6.0.2",
     "bcryptjs": "^2.4.3",
@@ -46,6 +48,7 @@
     "socket.io": "^4.7.5",
     "speakeasy": "^2.0.0",
     "sqlite3": "^5.1.7",
+    "prom-client": "^15.1.1",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1"
   },

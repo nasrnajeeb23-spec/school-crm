@@ -50,6 +50,20 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
             }
             const msg = bodyJson?.msg || bodyJson?.error || bodyText || '';
             const statusText = response.statusText ? ` ${response.statusText}` : '';
+            if (response.status === 401) {
+              try {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('auth_token');
+                  localStorage.removeItem('current_school_id');
+                  const toast = (window as any).__addToast;
+                  if (typeof toast === 'function') {
+                    toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
+                  }
+                  setTimeout(() => { window.location.href = '/login'; }, 0);
+                }
+              } catch {}
+              throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
+            }
             if (response.status === 404 || /Not\s*Found/i.test(msg)) {
               const alt = await fetch(`${API_ALT_BASE_URL}${endpoint}`, {
                 ...options,
@@ -107,6 +121,9 @@ export const logout = async (): Promise<void> => {
 export const getCurrentUser = async (): Promise<User> => {
     return await apiCall('/auth/me', { method: 'GET' });
 };
+
+// ==================== Backup APIs ====================
+
 
 export const superAdminLogin = async (email: string, password: string): Promise<any> => {
     const payload = { email, password, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown', timestamp: Date.now() };
