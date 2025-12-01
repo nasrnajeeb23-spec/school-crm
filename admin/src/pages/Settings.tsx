@@ -28,6 +28,35 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   }, [schoolId]);
 
+  const [exportSelecting, setExportSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true});
+  const [exportFilters, setExportFilters] = useState<{className:string;date:string;subjectName:string}>({className:'',date:'',subjectName:''});
+  const [backupSelecting, setBackupSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true});
+  const [backupConfig, setBackupConfig] = useState<{enabledDaily:boolean;dailyTime:string;enabledMonthly:boolean;monthlyDay:number;monthlyTime:string;retainDays:number;types?:string[]}>({enabledDaily:false,dailyTime:'02:00',enabledMonthly:false,monthlyDay:1,monthlyTime:'03:00',retainDays:30,types:[]});
+  const [backupsList, setBackupsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.getBackupConfig(schoolId).then(cfg => {
+      setBackupConfig({
+        enabledDaily: !!cfg.enabledDaily,
+        dailyTime: cfg.dailyTime || '02:00',
+        enabledMonthly: !!cfg.enabledMonthly,
+        monthlyDay: Number(cfg.monthlyDay || 1),
+        monthlyTime: cfg.monthlyTime || '03:00',
+        retainDays: Number(cfg.retainDays || 30),
+        types: Array.isArray(cfg.types) ? cfg.types : []
+      });
+      const typesArr = Array.isArray(cfg.types) ? cfg.types : [];
+      if (typesArr.length > 0) {
+        setBackupSelecting(prev => {
+          const next: any = { ...prev };
+          Object.keys(next).forEach(k => { next[k] = typesArr.includes(k); });
+          return next;
+        });
+      }
+    }).catch(() => {});
+    api.getSchoolBackups(schoolId).then(setBackupsList).catch(() => {});
+  }, [schoolId]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setSettings(prev => prev ? { ...prev, [name]: value } : null);
@@ -300,11 +329,6 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     }
   };
 
-  const [exportSelecting, setExportSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true});
-  const [exportFilters, setExportFilters] = useState<{className:string;date:string;subjectName:string}>({className:'',date:'',subjectName:''});
-  const [backupSelecting, setBackupSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true});
-  const [backupConfig, setBackupConfig] = useState<{enabledDaily:boolean;dailyTime:string;enabledMonthly:boolean;monthlyDay:number;monthlyTime:string;retainDays:number;types?:string[]}>({enabledDaily:false,dailyTime:'02:00',enabledMonthly:false,monthlyDay:1,monthlyTime:'03:00',retainDays:30,types:[]});
-  const [backupsList, setBackupsList] = useState<any[]>([]);
 
   const exportStudentsCSV = async () => {
     const students = await api.getSchoolStudents(schoolId);
@@ -458,28 +482,6 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     } catch { addToast('فشل تنزيل الحزمة.', 'error'); }
   };
 
-  useEffect(() => {
-    api.getBackupConfig(schoolId).then(cfg => {
-      setBackupConfig({
-        enabledDaily: !!cfg.enabledDaily,
-        dailyTime: cfg.dailyTime || '02:00',
-        enabledMonthly: !!cfg.enabledMonthly,
-        monthlyDay: Number(cfg.monthlyDay || 1),
-        monthlyTime: cfg.monthlyTime || '03:00',
-        retainDays: Number(cfg.retainDays || 30),
-        types: Array.isArray(cfg.types) ? cfg.types : []
-      });
-      const typesArr = Array.isArray(cfg.types) ? cfg.types : [];
-      if (typesArr.length > 0) {
-        setBackupSelecting(prev => {
-          const next: any = { ...prev };
-          Object.keys(next).forEach(k => { next[k] = typesArr.includes(k); });
-          return next;
-        });
-      }
-    }).catch(() => {});
-    api.getSchoolBackups(schoolId).then(setBackupsList).catch(() => {});
-  }, [schoolId]);
 
   const saveBackupSchedule = async () => {
     try {
