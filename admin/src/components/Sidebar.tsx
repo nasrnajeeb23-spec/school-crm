@@ -1,10 +1,41 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { DashboardIcon, SchoolIcon, SubscriptionIcon, BillingIcon, ModuleIcon, ContentIcon, UsageLimitsIcon, PermissionsIcon, ProfileIcon, LogoutIcon, UsersIcon, ShieldIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
 const Sidebar: React.FC = () => {
   const { logout, currentUser } = useAppContext();
+  const navContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = navContainerRef.current;
+    if (!el) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const links = Array.from(el.querySelectorAll('a[href]')) as HTMLElement[];
+      if (links.length === 0) return;
+      const active = document.activeElement as HTMLElement | null;
+      let idx = links.findIndex(l => l === active);
+      const move = (nextIdx: number) => {
+        const clamped = Math.max(0, Math.min(links.length - 1, nextIdx));
+        links[clamped].focus();
+      };
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
+        move(idx >= 0 ? idx + 1 : 0);
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        move(idx > 0 ? idx - 1 : 0);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        move(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        move(links.length - 1);
+      }
+    };
+    el.addEventListener('keydown', onKeyDown);
+    return () => { el.removeEventListener('keydown', onKeyDown); };
+  }, []);
 
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: DashboardIcon, path: '/superadmin/dashboard' },
@@ -32,13 +63,14 @@ const Sidebar: React.FC = () => {
   const inactiveLinkClasses = "hover:bg-gray-100 dark:hover:bg-gray-700";
 
   return (
-    <aside className="fixed top-0 right-0 h-full w-16 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex flex-col transition-all duration-300 shadow-lg z-30">
+    <aside className="fixed top-0 right-0 h-full w-16 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex flex-col transition-all duration-300 shadow-lg z-30 overflow-hidden">
       <div className="flex items-center justify-center md:justify-start md:pr-6 h-20 border-b border-gray-200 dark:border-gray-700">
         <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">S</span>
         <h1 className="hidden md:block ml-2 text-2xl font-bold text-gray-800 dark:text-white">SchoolSaaS</h1>
       </div>
-      <nav className="flex-grow pt-4">
-        <ul>
+      <div ref={navContainerRef} className="flex-grow pt-4 overflow-y-auto" tabIndex={0}>
+        <nav>
+          <ul>
           {navItems.map(item => (
             <li key={item.id} className="px-2">
               <NavLink
@@ -55,8 +87,9 @@ const Sidebar: React.FC = () => {
               </NavLink>
             </li>
           ))}
-        </ul>
-      </nav>
+          </ul>
+        </nav>
+      </div>
       
       <div className="p-2 border-t border-gray-200 dark:border-gray-700">
         <NavLink

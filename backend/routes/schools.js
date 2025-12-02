@@ -43,6 +43,33 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Public endpoint alias to list schools without auth
+router.get('/public', async (req, res) => {
+  try {
+    const schools = await School.findAll({
+      include: { model: Subscription, include: { model: Plan } },
+      order: [['name', 'ASC']],
+    });
+    const formattedSchools = schools.map(school => {
+      const s = school.toJSON();
+      return {
+        id: s.id,
+        name: s.name,
+        plan: s.Subscription?.Plan?.name || 'N/A',
+        status: s.Subscription?.status || 'N/A',
+        students: s.studentCount,
+        teachers: s.teacherCount,
+        balance: parseFloat(s.balance),
+        joinDate: new Date(s.createdAt).toISOString().split('T')[0],
+      };
+    });
+    res.json(formattedSchools);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/schools/:id
 // @desc    Get a single school by id with its subscription details
 // @access  Private (SchoolAdmin) / Public where appropriate
