@@ -19,19 +19,21 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [idCounter, setIdCounter] = useState(0);
+  const [lastToast, setLastToast] = useState<{ message: string; type: ToastType; time: number } | null>(null);
 
   const addToast = useCallback((message: string, type: ToastType) => {
+    const now = Date.now();
+    if (lastToast && lastToast.message === message && lastToast.type === type && (now - lastToast.time) < 4000) {
+      return;
+    }
+    setLastToast({ message, type, time: now });
     setToasts(prevToasts => {
       const newToast = { id: idCounter, message, type };
-      // Keep only the last 5 toasts
-      const updatedToasts = [...prevToasts, newToast];
-      if (updatedToasts.length > 5) {
-        updatedToasts.shift();
-      }
+      const updatedToasts = [...prevToasts, newToast].slice(-5);
       return updatedToasts;
     });
     setIdCounter(prevId => prevId + 1);
-  }, [idCounter]);
+  }, [idCounter, lastToast]);
 
   const removeToast = useCallback((id: number) => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
