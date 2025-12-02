@@ -197,9 +197,10 @@ try {
       const redis = require('redis');
       const useTls = process.env.REDIS_URL.startsWith('rediss://');
       client = redis.createClient({ url: process.env.REDIS_URL, socket: useTls ? { tls: true } : {} });
-      client.on('error', () => {});
+      client.on('error', (err) => { try { logger.warn('Redis client error'); } catch {} });
       client.connect().catch(() => {});
       sessionConfig.store = new RedisStore({ client });
+      try { logger.info('Session store: Redis'); } catch {}
     } catch {}
   }
 } catch {}
