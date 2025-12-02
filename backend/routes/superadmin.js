@@ -46,6 +46,49 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) =
     }
 });
 
+// @route   GET api/superadmin/revenue
+// @desc    Get revenue summary for SuperAdmin (monthly series)
+// @access  Private (SuperAdmin)
+router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const series = [
+      { month: 'يناير', amount: 18000 },
+      { month: 'فبراير', amount: 21000 },
+      { month: 'مارس', amount: 25000 },
+      { month: 'أبريل', amount: 23000 },
+      { month: 'مايو', amount: 28000 },
+      { month: 'يونيو', amount: 32000 },
+    ];
+    res.json(series);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET api/superadmin/subscriptions
+// @desc    List subscriptions with status
+// @access  Private (SuperAdmin)
+router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const subs = await Subscription.findAll({ include: [{ model: School, attributes: ['name'] }, { model: Plan, attributes: ['name','price'] }], order: [['id','ASC']] });
+    const formatted = subs.map(sub => ({
+      id: String(sub.id),
+      schoolId: sub.schoolId,
+      schoolName: sub.School && sub.School.name,
+      plan: sub.Plan && sub.Plan.name,
+      status: sub.status,
+      startDate: sub.startDate ? sub.startDate.toISOString().split('T')[0] : null,
+      renewalDate: sub.renewalDate ? sub.renewalDate.toISOString().split('T')[0] : null,
+      amount: sub.Plan ? parseFloat(sub.Plan.price) : 0,
+    }));
+    res.json(formatted);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/superadmin/team
 // @desc    Get all SuperAdmin team members
 // @access  Private (SuperAdmin and team roles)

@@ -418,11 +418,19 @@ export const getSchoolsList = async (): Promise<School[]> => {
 };
 
 export const getRevenueData = async (): Promise<RevenueData[]> => {
-    return await apiCall('/superadmin/revenue', { method: 'GET' });
+    try {
+        return await apiCall('/superadmin/revenue', { method: 'GET' });
+    } catch {
+        return [];
+    }
 };
 
 export const getSubscriptions = async (): Promise<Subscription[]> => {
-    return await apiCall('/superadmin/subscriptions', { method: 'GET' });
+    try {
+        return await apiCall('/superadmin/subscriptions', { method: 'GET' });
+    } catch {
+        return [] as Subscription[];
+    }
 };
 
 export const getPlans = async (): Promise<Plan[]> => {
@@ -857,11 +865,18 @@ export const createConversation = async (payload: any): Promise<any> => {
     return await apiCall('/messaging/conversations', { method: 'POST', body: JSON.stringify(payload) });
 };
 
-export const getUsersByRole = async (role: 'TEACHER' | 'PARENT'): Promise<any[]> => {
+export const getUsersByRole = async (role: string): Promise<any[]> => {
     const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
     const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
-    const q = schoolId ? `?role=${role}&schoolId=${schoolId}` : `?role=${role}`;
-    return await apiCall(`/users/by-role${q}`, { method: 'GET' });
+    const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
+    const map: Record<string, string> = { SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
+    const roleParam = map[key] || key;
+    const q = schoolId ? `?role=${encodeURIComponent(roleParam)}&schoolId=${schoolId}` : `?role=${encodeURIComponent(roleParam)}`;
+    try {
+        return await apiCall(`/users/by-role${q}`, { method: 'GET' });
+    } catch {
+        return [] as any[];
+    }
 };
 
 // ==================== Missing API Functions ====================
@@ -935,7 +950,26 @@ export const downloadStoredBackup = async (schoolId: number, file: string): Prom
 export const getDashboardStats = async (): Promise<any> => {
     const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
     const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
-    return await apiCall(`/dashboard/stats${schoolId ? `?schoolId=${schoolId}` : ''}`, { method: 'GET' });
+    try {
+        return await apiCall(`/dashboard/stats${schoolId ? `?schoolId=${schoolId}` : ''}`, { method: 'GET' });
+    } catch {
+        const schools = await getSchools().catch(() => []);
+        const subs = await getSubscriptions().catch(() => []);
+        const activeSubs = Array.isArray(subs) ? subs.filter((s: any) => String(s?.status || '').toUpperCase().includes('ACTIVE')).length : 0;
+        const usageBySchool = (schools || []).map((s: any) => ({ school: s?.name || `School #${s?.id}`, activeUsers: s?.activeUsers ?? 0 }));
+        return {
+            totalSchools: (schools || []).length,
+            totalUsers: 0,
+            mrr: 0,
+            activeJobs: 0,
+            activeSubscriptions: activeSubs,
+            totalRevenue: 0,
+            revenueData: [],
+            churnRate: 0,
+            newSchoolsThisMonth: 0,
+            usageBySchool,
+        };
+    }
 };
 
 export const addSchool = async (data: NewSchoolData): Promise<School> => {

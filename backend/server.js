@@ -269,6 +269,9 @@ app.use('/api/superadmin', packageRoutes);
 app.use('/api/messaging', messagingRoutes);
 app.use('/api/auth/enterprise', authEnterpriseRoutes);
 app.use('/api/analytics', analyticsRoutes);
+// Additional route mounts for compatibility with frontend endpoints
+app.use('/api/dashboard', analyticsRoutes);
+app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
 
 // Public content endpoints for landing page
 app.get('/api/content/landing', (req, res) => {
