@@ -89,6 +89,111 @@ router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req
   }
 });
 
+// Security policies (central)
+router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const defaults = {
+      enforceMfaForAdmins: true,
+      passwordMinLength: 10,
+      lockoutThreshold: 3,
+      allowedIpRanges: [],
+      sessionMaxAgeHours: 24,
+    };
+    const cfg = (req.app.locals && req.app.locals.securityPolicies) || defaults;
+    res.json(cfg);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const prev = (req.app.locals && req.app.locals.securityPolicies) || {};
+    const merged = {
+      enforceMfaForAdmins: typeof payload.enforceMfaForAdmins === 'boolean' ? payload.enforceMfaForAdmins : (prev.enforceMfaForAdmins ?? true),
+      passwordMinLength: Number(payload.passwordMinLength ?? (prev.passwordMinLength ?? 10)) || 10,
+      lockoutThreshold: Number(payload.lockoutThreshold ?? (prev.lockoutThreshold ?? 3)) || 3,
+      allowedIpRanges: Array.isArray(payload.allowedIpRanges) ? payload.allowedIpRanges : (prev.allowedIpRanges ?? []),
+      sessionMaxAgeHours: Number(payload.sessionMaxAgeHours ?? (prev.sessionMaxAgeHours ?? 24)) || 24,
+    };
+    req.app.locals.securityPolicies = merged;
+    res.json(merged);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// API keys management (in-memory for now)
+router.get('/api-keys', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const list = (req.app.locals && req.app.locals.apiKeys) || [];
+    res.json(list);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/api-keys', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { provider, key } = req.body || {};
+    if (!provider || !key) return res.status(400).json({ message: 'Invalid payload' });
+    const list = (req.app.locals.apiKeys = (req.app.locals.apiKeys || []));
+    const id = provider + '_' + Date.now().toString(36);
+    list.push({ id, provider, createdAt: new Date().toISOString() });
+    res.json({ id });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.delete('/api-keys/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const list = (req.app.locals && req.app.locals.apiKeys) || [];
+    req.app.locals.apiKeys = list.filter(k => String(k.id) !== String(id));
+    res.json({ success: true });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// SSO config (in-memory for now)
+router.get('/security/sso', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const defaults = { enabled: false, providers: [], callbackUrl: '' };
+    const cfg = (req.app.locals && req.app.locals.ssoConfig) || defaults;
+    res.json(cfg);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/security/sso', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const prev = (req.app.locals && req.app.locals.ssoConfig) || { enabled: false, providers: [], callbackUrl: '' };
+    const merged = {
+      enabled: typeof payload.enabled === 'boolean' ? payload.enabled : (prev.enabled ?? false),
+      callbackUrl: String(payload.callbackUrl ?? (prev.callbackUrl || '')),
+      providers: Array.isArray(payload.providers) ? payload.providers.map(p => ({ id: String(p.id || p.name || 'prov_'+Date.now().toString(36)), name: String(p.name || ''), clientId: p.clientId || undefined, clientSecretSet: !!p.clientSecret })) : (prev.providers || []),
+    };
+    req.app.locals.ssoConfig = merged;
+    res.json(merged);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// Jobs center
+router.get('/jobs', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const jobs = req.app.locals.jobs || {};
+    const list = Object.values(jobs);
+    res.json(list);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/jobs/trigger', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { schoolIds = [], jobType = 'report_generate', params = {} } = req.body || {};
+    if (!Array.isArray(schoolIds) || schoolIds.length === 0) return res.status(400).json({ message: 'schoolIds required' });
+    const enqueue = req.app.locals.enqueueJob;
+    const ids = schoolIds.map(sid => enqueue(jobType, { schoolId: sid, params }, async (payload) => {
+      // Dummy executors; replace with real logic
+      await new Promise(r => setTimeout(r, 500));
+      return { ok: true, jobType, schoolId: payload.schoolId };
+    }));
+    res.json({ started: ids.length, jobIds: ids });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
 // @route   GET api/superadmin/team
 // @desc    Get all SuperAdmin team members
 // @access  Private (SuperAdmin and team roles)

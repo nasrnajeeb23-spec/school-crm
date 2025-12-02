@@ -871,6 +871,9 @@ export const getUsersByRole = async (role: string): Promise<any[]> => {
     const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
     const map: Record<string, string> = { SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
     const roleParam = map[key] || key;
+    if (!['TEACHER','PARENT'].includes(roleParam)) {
+      return [] as any[];
+    }
     const q = schoolId ? `?role=${encodeURIComponent(roleParam)}&schoolId=${schoolId}` : `?role=${encodeURIComponent(roleParam)}`;
     try {
         return await apiCall(`/users/by-role${q}`, { method: 'GET' });

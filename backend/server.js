@@ -272,6 +272,10 @@ app.use('/api/analytics', analyticsRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
+// Aliases without "/api" to support frontend fallback requests
+app.use('/superadmin', superadminRoutes);
+app.use('/dashboard', analyticsRoutes);
+app.use('/public', schoolsRoutes);
 
 // Public content endpoints for landing page
 app.get('/api/content/landing', (req, res) => {
