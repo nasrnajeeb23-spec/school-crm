@@ -33,6 +33,8 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
     { id: 'messaging', label: 'الرسائل', icon: MessagingIcon, requiredPermission: Permission.MANAGE_MESSAGING, path: `${basePath}/messaging` },
     { id: 'finance', label: 'المالية', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, path: `${basePath}/finance` },
     { id: 'reports', label: 'التقارير', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/reports` },
+    { id: 'parent_requests', label: 'طلبات أولياء الأمور', icon: ParentsIcon, requiredPermission: Permission.MANAGE_PARENTS, path: `${basePath}/parent_requests` },
+    { id: 'jobs', label: 'مهام الخلفية', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/jobs` },
     { id: 'settings', label: 'الإعدادات', icon: SettingsIcon, requiredPermission: Permission.MANAGE_SETTINGS, path: `${basePath}/settings` },
     { id: 'modules', label: 'الوحدات', icon: ModuleIcon, requiredPermission: Permission.MANAGE_MODULES, path: `${basePath}/modules` },
   ];

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TextInput, TouchableOpacity } from 'react-native';
 import * as api from '../api';
-import { User, Student, Invoice, StudentGrades, AttendanceStatus, InvoiceStatus } from '../types';
+import { User, Student, Invoice, StudentGrades, AttendanceStatus, InvoiceStatus, RequestType } from '../types';
 
 interface DashboardScreenProps {
     user: User;
@@ -10,6 +10,8 @@ interface DashboardScreenProps {
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [quickDetails, setQuickDetails] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (!user.parentId) { setLoading(false); return; }
@@ -67,7 +69,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
                 </View>
             </View>
             
-             <View style={styles.card}>
+            <View style={styles.card}>
                 <Text style={styles.cardTitle}>إعلانات المدرسة</Text>
                 {data.announcements.map((ann: any) => (
                     <View key={ann.id} style={styles.announcementItem}>
@@ -75,6 +77,38 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
                         <Text style={styles.announcementTime}>{ann.timestamp}</Text>
                     </View>
                 ))}
+            </View>
+
+            <View style={styles.card}>
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.cardTitle}>طلب سريع</Text>
+                </View>
+                <Text style={{ textAlign: 'right', color: '#6b7280', marginBottom: 8 }}>أدخل تفاصيل الطلب ثم اضغط إرسال.</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="تفاصيل الطلب..."
+                    multiline
+                    value={quickDetails}
+                    onChangeText={setQuickDetails}
+                />
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <TouchableOpacity
+                        disabled={!quickDetails.trim() || isSubmitting}
+                        onPress={async () => {
+                            if (!user.parentId || !quickDetails.trim()) return;
+                            setIsSubmitting(true);
+                            try {
+                                await api.submitParentRequest(user.parentId, { type: RequestType.Leave, details: quickDetails.trim() });
+                                setQuickDetails('');
+                            } catch (e) {
+                                // يمكن لاحقًا إضافة تنبيه
+                            } finally { setIsSubmitting(false); }
+                        }}
+                        style={{ backgroundColor: isSubmitting || !quickDetails.trim() ? '#9ca3af' : '#dc2626', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>{isSubmitting ? 'جاري الإرسال...' : 'إرسال'}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </ScrollView>
     );
@@ -115,6 +149,7 @@ const styles = StyleSheet.create({
     },
     announcementText: { fontSize: 14, color: '#374151', textAlign: 'right' },
     announcementTime: { fontSize: 12, color: '#9ca3af', textAlign: 'left', marginTop: 4 },
+    input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 10, height: 100, textAlignVertical: 'top', textAlign: 'right' },
 });
 
 export default DashboardScreen;

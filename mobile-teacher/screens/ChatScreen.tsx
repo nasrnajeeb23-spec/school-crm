@@ -40,7 +40,7 @@ const ChatScreen: React.FC<Props> = ({ route }) => {
         setMessages(prev => [...prev, tempMessage]);
 
         try {
-            const sentMessage = await api.sendMessage(conversationId, textToSend);
+            const sentMessage = await api.sendMessage(conversationId, { content: textToSend, senderId: 'me' });
             // Replace temp message with actual message from server
             setMessages(prev => prev.map(msg => msg.id === tempMessage.id ? sentMessage : msg));
         } catch (error) {

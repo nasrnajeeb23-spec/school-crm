@@ -3,9 +3,11 @@ import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAppContext } from './contexts/AppContext';
 import { User, UserRole } from './types';
 import ToastContainer from './components/ToastContainer';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy load pages and layouts for better performance
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const AppsPage = React.lazy(() => import('./pages/AppsPage'));
 const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const SuperAdminLayout = React.lazy(() => import('./layouts/SuperAdminLayout'));
 const SchoolAdminLayout = React.lazy(() => import('./layouts/SchoolAdminLayout'));
@@ -25,6 +27,13 @@ const LicenseManagement = React.lazy(() => import('./pages/LicenseManagement'));
 const UserProfile = React.lazy(() => import('./pages/UserProfile'));
 const SchoolAdminsList = React.lazy(() => import('./pages/SchoolAdminsList'));
 const SuperAdminTeamManagement = React.lazy(() => import('./pages/SuperAdminTeamManagement'));
+const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
+const SecuritySettings = React.lazy(() => import('./pages/SecuritySettings'));
+const BulkOps = React.lazy(() => import('./pages/BulkOps'));
+const Analytics = React.lazy(() => import('./pages/Analytics'));
+const ApiKeys = React.lazy(() => import('./pages/ApiKeys'));
+const SsoSettings = React.lazy(() => import('./pages/SsoSettings'));
+const TaskCenter = React.lazy(() => import('./pages/TaskCenter'));
 
 // School Admin Pages
 const SchoolDashboard = React.lazy(() => import('./pages/SchoolDashboard'));
@@ -120,9 +129,11 @@ const App: React.FC = () => {
   return (
     <>
       <ToastContainer />
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الصفحة...</div>}>
-        <Routes>
+      <ErrorBoundary>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الصفحة...</div>}>
+          <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/apps" element={<AppsPage />} />
           <Route path="/login" element={<LoginPage mode="default" />} />
           <Route path="/superadmin/login" element={<LoginPage mode="superadmin" />} />
 
@@ -140,6 +151,13 @@ const App: React.FC = () => {
               <Route path="content" element={<ContentManagement />} />
               <Route path="usage_limits" element={<UsageLimits />} />
               <Route path="permissions" element={<RolesList />} />
+              <Route path="audit-logs" element={<AuditLogs />} />
+              <Route path="security" element={<SecuritySettings />} />
+              <Route path="bulk-ops" element={<BulkOps />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="api-keys" element={<ApiKeys />} />
+              <Route path="sso" element={<SsoSettings />} />
+              <Route path="tasks" element={<TaskCenter />} />
               <Route path="license" element={<LicenseManagement />} />
               <Route path="profile" element={<UserProfile />} />
             </Route>
@@ -185,8 +203,9 @@ const App: React.FC = () => {
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </>
   );
 };

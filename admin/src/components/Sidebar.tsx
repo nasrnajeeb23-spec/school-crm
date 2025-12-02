@@ -11,13 +11,20 @@ const Sidebar: React.FC = () => {
     { id: 'schools', label: 'إدارة المدارس', icon: SchoolIcon, path: '/superadmin/schools' },
     { id: 'school-admins', label: 'مدراء المدارس', icon: UsersIcon, path: '/superadmin/school-admins' },
     { id: 'superadmin-team', label: 'فريق المدير العام', icon: ShieldIcon, path: '/superadmin/team' },
+    { id: 'analytics', label: 'التحليلات', icon: DashboardIcon, path: '/superadmin/analytics' },
     { id: 'subscriptions', label: 'الاشتراكات', icon: SubscriptionIcon, path: '/superadmin/subscriptions' },
     { id: 'billing', label: 'الفوترة والمالية', icon: BillingIcon, path: '/superadmin/billing' },
     { id: 'modules', label: 'إدارة الوحدات', icon: ModuleIcon, path: '/superadmin/modules' },
+    { id: 'audit-logs', label: 'سجلات التدقيق', icon: ShieldIcon, path: '/superadmin/audit-logs' },
     { id: 'license', label: 'إدارة التراخيص', icon: ModuleIcon, path: '/superadmin/license' },
     { id: 'content', label: 'إدارة المحتوى', icon: ContentIcon, path: '/superadmin/content' },
     { id: 'usage_limits', label: 'حدود الاستخدام', icon: UsageLimitsIcon, path: '/superadmin/usage_limits' },
     { id: 'permissions', label: 'الصلاحيات والأدوار', icon: PermissionsIcon, path: '/superadmin/permissions' },
+    { id: 'security', label: 'الأمان', icon: ShieldIcon, path: '/superadmin/security' },
+    { id: 'bulk', label: 'عمليات جماعية', icon: UsersIcon, path: '/superadmin/bulk-ops' },
+    { id: 'api-keys', label: 'مفاتيح API', icon: ShieldIcon, path: '/superadmin/api-keys' },
+    { id: 'sso', label: 'SSO', icon: ShieldIcon, path: '/superadmin/sso' },
+    { id: 'tasks', label: 'مركز المهام', icon: DashboardIcon, path: '/superadmin/tasks' },
   ];
 
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-2 rounded-lg transition-colors duration-200";

@@ -94,6 +94,16 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
         }
     };
     
+    const handleReject = async (operatorId: string) => {
+        try {
+            await api.rejectBusOperator(operatorId);
+            addToast('تم رفض طلب السائق بنجاح!', 'success');
+            fetchData();
+        } catch (error) {
+            addToast('فشل في رفض الطلب.', 'error');
+        }
+    };
+    
     const handleAddRoute = async (data: Omit<Route, 'id' | 'studentIds'>) => {
          try {
             await api.addRoute(schoolId, data);
@@ -174,7 +184,7 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
                                         <p className="text-sm text-gray-600 dark:text-gray-400">الحافلة: {op.busPlateNumber} ({op.busModel})</p>
                                         <div className="mt-3 flex gap-2">
                                             <button onClick={() => handleApprove(op.id)} className="text-sm flex items-center px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600"><CheckIcon className="w-4 h-4 ml-1"/>موافقة</button>
-                                            <button className="text-sm flex items-center px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600"><CanceledIcon className="w-4 h-4 ml-1"/>رفض</button>
+                                            <button onClick={() => handleReject(op.id)} className="text-sm flex items-center px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600"><CanceledIcon className="w-4 h-4 ml-1"/>رفض</button>
                                         </div>
                                     </div>
                                 ))}

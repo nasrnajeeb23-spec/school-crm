@@ -19,6 +19,11 @@ const Notification = sequelize.define('Notification', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+  status: {
+    type: DataTypes.ENUM('Pending', 'Approved', 'Rejected'),
+    allowNull: false,
+    defaultValue: 'Pending',
+  },
   date: {
     type: DataTypes.DATE,
     allowNull: false,

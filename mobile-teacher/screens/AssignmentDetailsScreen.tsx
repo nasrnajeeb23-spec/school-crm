@@ -22,8 +22,8 @@ const AssignmentDetailsScreen: React.FC<Props> = ({ route }) => {
     useEffect(() => {
         setLoading(true);
         api.getSubmissionsForAssignment(assignment.id)
-            .then(data => setSubmissions(data))
-            .catch(err => console.error("Failed to fetch submissions", err))
+            .then((data: Submission[]) => setSubmissions(data))
+            .catch((err: any) => console.error("Failed to fetch submissions", err))
             .finally(() => setLoading(false));
     }, [assignment.id]);
     

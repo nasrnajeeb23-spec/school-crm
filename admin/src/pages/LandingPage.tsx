@@ -101,6 +101,7 @@ const LandingPage: React.FC = () => {
               <a href="#features" onClick={(e) => handleNavClick(e, 'features')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الميزات</a>
               <a href="#pricing" onClick={(e) => handleNavClick(e, 'pricing')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الأسعار</a>
               <a href="#contact" onClick={(e) => handleNavClick(e, 'contact')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">تواصل معنا</a>
+              <button onClick={() => goTo('/apps')} className="px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-200 dark:hover:bg-indigo-800">تحميل التطبيقات</button>
             </nav>
             <div className="flex items-center gap-4">
                 <button onClick={() => goTo('/superadmin/login')} className="inline-flex px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all">بوابة المدير العام</button>
@@ -122,6 +123,7 @@ const LandingPage: React.FC = () => {
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
             <a href="#contact" onClick={(e) => { handleNavClick(e, 'contact'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a>
+            <button onClick={() => { goTo('/apps'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200">تحميل التطبيقات</button>
             <button onClick={() => { goTo('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg紫-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
             <button onClick={() => { setIsTrialModalOpen(true); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">ابدأ تجربتك المجانية</button>
           </div>

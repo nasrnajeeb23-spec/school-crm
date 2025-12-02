@@ -24,6 +24,8 @@ const ParentSchedule: React.FC = () => {
     const { currentUser: user } = useAppContext();
     const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
     const [student, setStudent] = useState<Student | null>(null);
+    const [children, setChildren] = useState<Student[]>([]);
+    const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -31,14 +33,21 @@ const ParentSchedule: React.FC = () => {
             setLoading(false);
             return;
         }
-        api.getStudentAndScheduleByParentId(user.parentId)
+        api.getStudentAndScheduleByParentId(user.parentId, selectedStudentId || undefined)
             .then(data => {
-                setStudent(data.student);
-                setSchedule(data.schedule);
+                if (Array.isArray((data as any).children) && (data as any).children.length) {
+                    const arr = ((data as any).children as any[]);
+                    setChildren(arr.map(x => x.student));
+                    setStudent(arr[0].student);
+                    setSchedule(arr[0].schedule || []);
+                } else {
+                    setStudent((data as any).student);
+                    setSchedule(((data as any).schedule) || []);
+                }
             })
             .catch(err => console.error("Failed to fetch schedule data", err))
             .finally(() => setLoading(false));
-    }, [user?.parentId]);
+    }, [user?.parentId, selectedStudentId]);
     
     const scheduleData = useMemo(() => {
         const grid: { [key: string]: { [key: string]: ScheduleEntry } } = {};
@@ -62,6 +71,17 @@ const ParentSchedule: React.FC = () => {
             <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
                 الجدول الدراسي للطالب: {student.name}
             </h3>
+            {children.length > 1 && (
+              <div className="mb-4">
+                <label className="block mb-1">اختر ابنًا</label>
+                <select className="border rounded p-2" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
+                  <option value="">الكل</option>
+                  {children.map(c => (
+                    <option key={String((c as any).id)} value={String((c as any).id)}>{(c as any).name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {loading ? <div className="text-center py-8">جاري تحميل الجدول...</div> : (
                 <div className="grid grid-cols-6 min-w-[900px]">
                     <div className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">الوقت</div>

@@ -16,7 +16,7 @@ build({
   format: 'esm',
   target: 'es2020',
   outdir: 'dist/assets',
-  sourcemap: true,
+  sourcemap: environment !== 'production',
   define: {
     'process.env.REACT_APP_API_URL': JSON.stringify(apiUrl),
     'process.env.REACT_APP_ENVIRONMENT': JSON.stringify(environment),
@@ -33,7 +33,7 @@ build({
     '.jsx': 'jsx'
   },
   external: [],
-  minify: environment === 'production',
+  minify: false,
   treeShaking: true
 }).then(() => {
   console.log('Build completed successfully!');
@@ -129,7 +129,7 @@ build({
     fs.writeFileSync(notFoundPath, notFoundContent, 'utf8');
     console.log('404.html generated successfully.');
 
-    // Mirror build output to repository root's dist for Render publish
+    
     const rootDist = path.join(__dirname, '../dist');
     const adminAssets = path.join(__dirname, 'dist/assets');
     const rootAssets = path.join(rootDist, 'assets');
@@ -177,9 +177,155 @@ build({
     fs.writeFileSync(path.join(__dirname, 'dist/favicon.svg'), faviconSvg, 'utf8');
     fs.writeFileSync(path.join(rootDist, 'favicon.svg'), faviconSvg, 'utf8');
 
+    const copyRecursive = (src, dest) => {
+      const entries = fs.readdirSync(src, { withFileTypes: true });
+      if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+      for (const entry of entries) {
+        const s = path.join(src, entry.name);
+        const d = path.join(dest, entry.name);
+        if (entry.isDirectory()) copyRecursive(s, d);
+        else fs.copyFileSync(s, d);
+      }
+    };
+
+    const parentWebDist = path.join(__dirname, '../mobile-parent/web-dist');
+    const teacherWebDist = path.join(__dirname, '../mobile-teacher/web-dist');
+
+    if (fs.existsSync(parentWebDist)) {
+      const adminAppsParent = path.join(__dirname, 'dist/apps/parent');
+      if (!fs.existsSync(adminAppsParent)) fs.mkdirSync(adminAppsParent, { recursive: true });
+      const parentIndexSrc = path.join(parentWebDist, 'index.html');
+      if (fs.existsSync(parentIndexSrc)) fs.copyFileSync(parentIndexSrc, path.join(adminAppsParent, 'index.html'));
+      const expoSrc = path.join(parentWebDist, '_expo');
+      const expoDestAdmin = path.join(__dirname, 'dist/_expo');
+      if (fs.existsSync(expoSrc)) copyRecursive(expoSrc, expoDestAdmin);
+      const rootAppsParent = path.join(rootDist, 'apps/parent');
+      if (!fs.existsSync(rootAppsParent)) fs.mkdirSync(rootAppsParent, { recursive: true });
+      if (fs.existsSync(parentIndexSrc)) fs.copyFileSync(parentIndexSrc, path.join(rootAppsParent, 'index.html'));
+      const expoDestRoot = path.join(rootDist, '_expo');
+      if (fs.existsSync(expoSrc)) copyRecursive(expoSrc, expoDestRoot);
+      console.log('Parent web app exported and copied.');
+    } else {
+      console.log('Parent web app export not found; skipping.');
+    }
+
+    if (fs.existsSync(teacherWebDist)) {
+      const adminAppsTeacher = path.join(__dirname, 'dist/apps/teacher');
+      if (!fs.existsSync(adminAppsTeacher)) fs.mkdirSync(adminAppsTeacher, { recursive: true });
+      const teacherIndexSrc = path.join(teacherWebDist, 'index.html');
+      if (fs.existsSync(teacherIndexSrc)) fs.copyFileSync(teacherIndexSrc, path.join(adminAppsTeacher, 'index.html'));
+      const expoSrcT = path.join(teacherWebDist, '_expo');
+      const expoDestAdminT = path.join(__dirname, 'dist/_expo');
+      if (fs.existsSync(expoSrcT)) copyRecursive(expoSrcT, expoDestAdminT);
+      const rootAppsTeacher = path.join(rootDist, 'apps/teacher');
+      if (!fs.existsSync(rootAppsTeacher)) fs.mkdirSync(rootAppsTeacher, { recursive: true });
+      if (fs.existsSync(teacherIndexSrc)) fs.copyFileSync(teacherIndexSrc, path.join(rootAppsTeacher, 'index.html'));
+      const expoDestRootT = path.join(rootDist, '_expo');
+      if (fs.existsSync(expoSrcT)) copyRecursive(expoSrcT, expoDestRootT);
+      console.log('Teacher web app exported and copied.');
+    } else {
+      console.log('Teacher web app export not found; skipping.');
+    }
+
+    // APK ingestion and SHA-256 fingerprint
+    const crypto = require('crypto');
+    const findFirstExisting = (candidates) => candidates.find(p => fs.existsSync(p));
+    const parentReleaseApk = findFirstExisting([
+      path.join(__dirname, '../mobile-parent/android/app/build/outputs/apk/release/app-release.apk'),
+      path.join(__dirname, '../mobile-parent/apk-output/app-release.apk'),
+      path.join(__dirname, '../mobile-parent/builds/app-release.apk'),
+      path.join(__dirname, '../mobile-parent/dist/app-release.apk'),
+      path.join(__dirname, '../mobile-parent/app-release.apk')
+    ]);
+    const parentDebugApk = findFirstExisting([
+      path.join(__dirname, '../mobile-parent/android/app/build/outputs/apk/debug/app-debug.apk'),
+      path.join(__dirname, '../mobile-parent/apk-output/app-debug.apk'),
+      path.join(__dirname, '../mobile-parent/builds/app-debug.apk'),
+      path.join(__dirname, '../mobile-parent/dist/app-debug.apk'),
+      path.join(__dirname, '../mobile-parent/app-debug.apk')
+    ]);
+    const parentApkSrc = parentReleaseApk || parentDebugApk;
+    const parentApkLabel = parentReleaseApk ? 'release' : (parentDebugApk ? 'debug' : '');
+
+    const teacherReleaseApk = findFirstExisting([
+      path.join(__dirname, '../mobile-teacher/android/app/build/outputs/apk/release/app-release.apk'),
+      path.join(__dirname, '../mobile-teacher/apk-output/app-release.apk'),
+      path.join(__dirname, '../mobile-teacher/builds/app-release.apk'),
+      path.join(__dirname, '../mobile-teacher/dist/app-release.apk'),
+      path.join(__dirname, '../mobile-teacher/app-release.apk')
+    ]);
+    const teacherDebugApk = findFirstExisting([
+      path.join(__dirname, '../mobile-teacher/android/app/build/outputs/apk/debug/app-debug.apk'),
+      path.join(__dirname, '../mobile-teacher/apk-output/app-debug.apk'),
+      path.join(__dirname, '../mobile-teacher/builds/app-debug.apk'),
+      path.join(__dirname, '../mobile-teacher/dist/app-debug.apk'),
+      path.join(__dirname, '../mobile-teacher/app-debug.apk')
+    ]);
+    const teacherApkSrc = teacherReleaseApk || teacherDebugApk;
+    const teacherApkLabel = teacherReleaseApk ? 'release' : (teacherDebugApk ? 'debug' : '');
+
+    const adminAppsParentDir = path.join(__dirname, 'dist/apps/parent');
+    const adminAppsTeacherDir = path.join(__dirname, 'dist/apps/teacher');
+    const rootAppsParentDir = path.join(rootDist, 'apps/parent');
+    const rootAppsTeacherDir = path.join(rootDist, 'apps/teacher');
+    if (!fs.existsSync(adminAppsParentDir)) fs.mkdirSync(adminAppsParentDir, { recursive: true });
+    if (!fs.existsSync(adminAppsTeacherDir)) fs.mkdirSync(adminAppsTeacherDir, { recursive: true });
+    if (!fs.existsSync(rootAppsParentDir)) fs.mkdirSync(rootAppsParentDir, { recursive: true });
+    if (!fs.existsSync(rootAppsTeacherDir)) fs.mkdirSync(rootAppsTeacherDir, { recursive: true });
+
+    const appsMeta = { parent: { apkUrl: '', sha256: '', label: '' }, teacher: { apkUrl: '', sha256: '', label: '' } };
+
+    const computeSha256 = (filePath) => {
+      const hash = crypto.createHash('sha256');
+      const data = fs.readFileSync(filePath);
+      hash.update(data);
+      return hash.digest('hex');
+    };
+
+    if (parentApkSrc) {
+      const adminApkDest = path.join(adminAppsParentDir, 'app.apk');
+      const rootApkDest = path.join(rootAppsParentDir, 'app.apk');
+      fs.copyFileSync(parentApkSrc, adminApkDest);
+      fs.copyFileSync(parentApkSrc, rootApkDest);
+      const sha = computeSha256(parentApkSrc);
+      appsMeta.parent.apkUrl = '/apps/parent/app.apk';
+      appsMeta.parent.sha256 = sha;
+      appsMeta.parent.label = parentApkLabel;
+      console.log('Parent APK copied with SHA-256:', sha);
+    } else {
+      console.log('Parent APK not found; skipping copy.');
+    }
+
+    if (teacherApkSrc) {
+      const adminApkDest = path.join(adminAppsTeacherDir, 'app.apk');
+      const rootApkDest = path.join(rootAppsTeacherDir, 'app.apk');
+      fs.copyFileSync(teacherApkSrc, adminApkDest);
+      fs.copyFileSync(teacherApkSrc, rootApkDest);
+      const sha = computeSha256(teacherApkSrc);
+      appsMeta.teacher.apkUrl = '/apps/teacher/app.apk';
+      appsMeta.teacher.sha256 = sha;
+      appsMeta.teacher.label = teacherApkLabel;
+      console.log('Teacher APK copied with SHA-256:', sha);
+    } else {
+      console.log('Teacher APK not found; skipping copy.');
+    }
+
+    // Write apps metadata to assets for frontend consumption
+    const adminAssetsDir = path.join(__dirname, 'dist/assets');
+    const rootAssetsDir = path.join(rootDist, 'assets');
+    if (!fs.existsSync(adminAssetsDir)) fs.mkdirSync(adminAssetsDir, { recursive: true });
+    if (!fs.existsSync(rootAssetsDir)) fs.mkdirSync(rootAssetsDir, { recursive: true });
+    const appsJson = JSON.stringify(appsMeta, null, 2);
+    fs.writeFileSync(path.join(adminAssetsDir, 'apps.json'), appsJson, 'utf8');
+    fs.writeFileSync(path.join(rootAssetsDir, 'apps.json'), appsJson, 'utf8');
+    console.log('apps.json written to assets.');
+
     // Generate static.json for Render SPA rewrites (Render format)
     const staticJson = {
       routes: [
+        // Allow PWAs for apps to serve their own index without SPA rewrite
+        { type: 'rewrite', source: '/apps/parent/**', destination: '/apps/parent/index.html' },
+        { type: 'rewrite', source: '/apps/teacher/**', destination: '/apps/teacher/index.html' },
         { type: 'rewrite', source: '/superadmin/**', destination: '/index.html' },
         { type: 'rewrite', source: '/login', destination: '/index.html' },
         { type: 'rewrite', source: '/teacher/**', destination: '/index.html' },
@@ -189,7 +335,8 @@ build({
       ],
       headers: [
         { path: '/*', name: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
-        { path: '/assets/*', name: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }
+        { path: '/assets/*', name: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+        { path: '/apps/*', name: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }
       ]
     };
     fs.writeFileSync(path.join(__dirname, 'dist/static.json'), JSON.stringify(staticJson, null, 2), 'utf8');

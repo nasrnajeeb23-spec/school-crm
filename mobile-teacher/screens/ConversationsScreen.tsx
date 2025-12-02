@@ -14,8 +14,8 @@ const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
 
     useEffect(() => {
         api.getConversations()
-            .then(data => setConversations(data))
-            .catch(err => console.error("Failed to fetch conversations", err))
+            .then((data: Conversation[]) => setConversations(data))
+            .catch((err: any) => console.error("Failed to fetch conversations", err))
             .finally(() => setLoading(false));
     }, []);
 

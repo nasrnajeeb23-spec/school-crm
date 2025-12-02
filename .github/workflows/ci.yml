@@ -122,3 +122,31 @@ jobs:
           OUT=$(curl -fsSL "${URL}/metrics" || true)
           echo "$OUT" | head -n 10
           echo "$OUT" | grep -E 'http_requests_total|http_request_duration_seconds' >/dev/null && echo "Required metrics present" || (echo "Required metrics missing" && exit 1)
+      - name: Trial signup smoke
+        if: success()
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_EXTERNAL_URL: ${{ secrets.RENDER_EXTERNAL_URL }}
+        run: |
+          get_url() {
+            if [ -n "$RENDER_EXTERNAL_URL" ]; then echo "$RENDER_EXTERNAL_URL"; return; fi
+            if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then echo ""; return; fi
+            SVC=$(curl -fsSL -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/$RENDER_SERVICE_ID" || true)
+            URL=$(echo "$SVC" | jq -r '.externalUrl // .serviceDetails.externalUrl // .serviceDetails.url // .url // empty')
+            echo "$URL"
+          }
+          URL=$(get_url)
+          if [ -z "$URL" ]; then echo "External URL not found; skipping trial signup"; exit 0; fi
+          TS=$(date +%s)
+          EMAIL="admin+ci_${TS}@example.edu"
+          BODY=$(jq -n --arg sn "مدرسة CI ${TS}" --arg an "مدير CI" --arg ae "$EMAIL" --arg ap "S!ch00lCrm2025#" '{schoolName:$sn, adminName:$an, adminEmail:$ae, adminPassword:$ap}')
+          RESP=$(curl -fsSL -X POST "$URL/api/auth/trial-signup" -H "Content-Type: application/json" --data "$BODY" || true)
+          TOKEN=$(echo "$RESP" | jq -r '.token // empty')
+          REFRESH=$(echo "$RESP" | jq -r '.refreshToken // empty')
+          if [ -z "$TOKEN" ] || [ -z "$REFRESH" ]; then echo "Trial signup failed: $RESP"; exit 1; fi
+          echo "Trial signup OK for $EMAIL"
+          REFR=$(curl -fsSL -X POST "$URL/api/auth/refresh" -H "Content-Type: application/json" --data "$(jq -n --arg rt "$REFRESH" '{refreshToken:$rt}')" || true)
+          ACCESS=$(echo "$REFR" | jq -r '.token // empty')
+          if [ -z "$ACCESS" ]; then echo "Refresh failed: $REFR"; exit 1; fi
+          echo "Refresh token OK (length: ${#ACCESS})"

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import * as api from '../api';
 import { User, Class, ScheduleEntry, ActionItem } from '../types';
 import { ClassesIcon, ScheduleIcon, BellIcon, ActionItemIcon } from '../components/icons';
+import { useNavigation } from '@react-navigation/native';
 
 interface TeacherDashboardScreenProps {
     user: User;
@@ -15,6 +16,7 @@ const TeacherDashboardScreen: React.FC<TeacherDashboardScreenProps> = ({ user })
         actionItems: ActionItem[]
     } | null>(null);
     const [loading, setLoading] = useState(true);
+    const navigation = useNavigation<any>();
     
     useEffect(() => {
         if (!user.teacherId) {
@@ -96,6 +98,16 @@ const TeacherDashboardScreen: React.FC<TeacherDashboardScreenProps> = ({ user })
                             <Text style={styles.classChipCount}>{c.studentCount} طالب</Text>
                         </View>
                     )) : <Text style={styles.emptyText}>أنت غير مسجل كمعلم أساسي لأي فصل.</Text>}
+                </View>
+            </Card>
+
+            {/* Quick Message Card */}
+            <Card title="رسالة سريعة" icon={BellIcon}>
+                <Text style={{ textAlign: 'right', color: '#6b7280', marginBottom: 8 }}>افتح الرسائل لبدء محادثة سريعة مع ولي أمر أو معلم.</Text>
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'flex-end' }}>
+                    <TouchableOpacity onPress={() => navigation.navigate('Messages')} style={{ backgroundColor: '#1e3a8a', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}>
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>فتح الرسائل</Text>
+                    </TouchableOpacity>
                 </View>
             </Card>
         </ScrollView>

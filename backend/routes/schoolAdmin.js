@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup } = require('../models');
+const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
@@ -1369,6 +1369,80 @@ router.get('/:schoolId/events', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
     const eventTypeMap = { 'Meeting': 'اجتماع', 'Activity': 'نشاط', 'Exam': 'اختبار', 'Holiday': 'عطلة' };
     res.json(events.map(e => ({...e.toJSON(), eventType: eventTypeMap[e.eventType] || e.eventType })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:schoolId/parent-requests', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const rows = await Notification.findAll({
+      where: { type: 'Approval' },
+      include: [{ model: Parent, attributes: ['id','name','email','phone','schoolId'], required: true }],
+      order: [['createdAt','DESC']]
+    });
+    const statusMap = { 'Pending': 'قيد الانتظار', 'Approved': 'موافق عليه', 'Rejected': 'مرفوض' };
+    const list = rows.filter(r => String(r.Parent?.schoolId || '') === String(req.params.schoolId)).map(r => ({ id: String(r.id), title: r.title, description: r.description, status: statusMap[r.status] || 'قيد الانتظار', parentId: String(r.Parent.id), parentName: r.Parent.name, parentEmail: r.Parent.email, parentPhone: r.Parent.phone, createdAt: r.createdAt.toISOString().split('T')[0] }));
+    res.json(list);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/:schoolId/parent-requests/:id/approve', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const row = await Notification.findByPk(req.params.id, { include: [{ model: Parent, attributes: ['id','schoolId'] }] });
+    if (!row || !row.Parent) return res.status(404).json({ msg: 'Request not found' });
+    if (String(row.Parent.schoolId) !== String(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    row.status = 'Approved';
+    row.isRead = true;
+    await row.save();
+    try { await AuditLog.create({ userId: req.user.id, schoolId: Number(req.params.schoolId), action: 'parent_request_approve', description: String(row.id) }); } catch {}
+    res.json({ approved: true });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/:schoolId/parent-requests/:id/reject', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const row = await Notification.findByPk(req.params.id, { include: [{ model: Parent, attributes: ['id','schoolId'] }] });
+    if (!row || !row.Parent) return res.status(404).json({ msg: 'Request not found' });
+    if (String(row.Parent.schoolId) !== String(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    row.status = 'Rejected';
+    row.isRead = true;
+    await row.save();
+    try { await AuditLog.create({ userId: req.user.id, schoolId: Number(req.params.schoolId), action: 'parent_request_reject', description: String(row.id) }); } catch {}
+    res.json({ rejected: true });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:schoolId/reports/generate', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const id = req.app.locals.enqueueJob('report_generate', { schoolId }, async ({ schoolId }) => {
+      const studentsCount = await Student.count({ where: { schoolId } });
+      const teachersCount = await Teacher.count({ where: { schoolId } });
+      const invoicesCount = await Invoice.count({ where: { schoolId } });
+      const payload = JSON.stringify({ studentsCount, teachersCount, invoicesCount });
+      try { await AuditLog.create({ userId: req.user.id, schoolId, action: 'report_generate', description: payload }); } catch {}
+      return payload;
+    });
+    res.status(202).json({ jobId: id });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:schoolId/import/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const { sourceUrl } = req.body || {};
+    const id = req.app.locals.enqueueJob('import_students', { schoolId, sourceUrl }, async ({ schoolId, sourceUrl }) => {
+      try { await AuditLog.create({ userId: req.user.id, schoolId, action: 'import_students_schedule', description: String(sourceUrl || '') }); } catch {}
+      return true;
+    });
+    res.status(202).json({ jobId: id });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:schoolId/jobs/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const j = req.app.locals.jobs[req.params.id];
+    if (!j) return res.status(404).json({ msg: 'Not found' });
+    res.json(j);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 
 router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {

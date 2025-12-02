@@ -231,6 +231,24 @@ if (licenseKey) {
 }
 app.locals.allowedModules = allowedModules;
 
+app.locals.jobs = Object.create(null);
+app.locals.enqueueJob = (name, payload, executor) => {
+  const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  app.locals.jobs[id] = { id, name, status: 'queued', createdAt: Date.now() };
+  setImmediate(async () => {
+    app.locals.jobs[id].status = 'running';
+    try {
+      const result = await executor(payload);
+      app.locals.jobs[id].status = 'completed';
+      app.locals.jobs[id].result = result || true;
+    } catch (e) {
+      app.locals.jobs[id].status = 'failed';
+      app.locals.jobs[id].error = e && e.message ? e.message : 'error';
+    }
+  });
+  return id;
+};
+
 // API Routes
 const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
 app.use('/api/auth', authLimiter, authRoutes);

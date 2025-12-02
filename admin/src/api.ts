@@ -22,6 +22,9 @@ const API_ALT_BASE_URL = (() => {
   return base.replace(/\/$/, '') + '/api';
 })();
 
+export const getApiBase = (): string => API_BASE_URL;
+export const getApiAltBase = (): string => API_ALT_BASE_URL;
+
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const schoolId = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
@@ -706,8 +709,9 @@ export const saveClassSchedule = async (classId: string, entries: { day: 'Sunday
     return await response.json();
 };
 
-export const getParentDashboardData = async (parentId: string): Promise<any> => {
-    return await apiCall(`/parent/${parentId}/dashboard`, { method: 'GET' });
+export const getParentDashboardData = async (parentId: string, studentId?: string): Promise<any> => {
+    const qs = studentId ? `?studentId=${encodeURIComponent(String(studentId))}` : '';
+    return await apiCall(`/parent/${parentId}/dashboard${qs}`, { method: 'GET' });
 };
 
 export const getParentRequests = async (parentId: string): Promise<any[]> => {
@@ -766,6 +770,63 @@ export const getBusOperators = async (schoolId: number): Promise<BusOperator[]> 
 
 export const approveBusOperator = async (operatorId: string): Promise<void> => {
     await apiCall(`/transportation/operator/${operatorId}/approve`, { method: 'PUT' });
+};
+
+export const rejectBusOperator = async (operatorId: string): Promise<void> => {
+    await apiCall(`/transportation/operator/${operatorId}/reject`, { method: 'PUT' });
+};
+
+// ==================== Super Admin: Security Policies ====================
+export const getSecurityPolicies = async (): Promise<{ enforceMfaForAdmins: boolean; passwordMinLength: number; lockoutThreshold: number; allowedIpRanges: string[]; sessionMaxAgeHours: number; }> => {
+    return await apiCall('/superadmin/security/policies', { method: 'GET' });
+};
+
+export const updateSecurityPolicies = async (payload: { enforceMfaForAdmins?: boolean; passwordMinLength?: number; lockoutThreshold?: number; allowedIpRanges?: string[]; sessionMaxAgeHours?: number; }): Promise<void> => {
+    await apiCall('/superadmin/security/policies', { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+// ==================== Super Admin: API Keys ====================
+export const getApiKeys = async (): Promise<Array<{ id: string; provider: string; createdAt: string }>> => {
+    return await apiCall('/superadmin/api-keys', { method: 'GET' });
+};
+
+export const createOrUpdateApiKey = async (payload: { provider: string; key: string }): Promise<{ id: string }> => {
+    return await apiCall('/superadmin/api-keys', { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const deleteApiKey = async (id: string): Promise<void> => {
+    await apiCall(`/superadmin/api-keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+};
+
+// ==================== Super Admin: SSO ====================
+export const getSsoConfig = async (): Promise<{ enabled: boolean; providers: Array<{ id: string; name: string; clientId?: string; clientSecretSet?: boolean }>; callbackUrl?: string; }> => {
+    return await apiCall('/superadmin/security/sso', { method: 'GET' });
+};
+
+export const updateSsoConfig = async (payload: { enabled?: boolean; providers?: Array<{ id: string; name: string; clientId?: string; clientSecret?: string }>; callbackUrl?: string; }): Promise<void> => {
+    await apiCall('/superadmin/security/sso', { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+// ==================== Super Admin: Bulk Ops ====================
+export const bulkUpdateModules = async (payload: { schoolIds: number[]; moduleId: string; enable: boolean }): Promise<{ updated: number }> => {
+    return await apiCall('/superadmin/bulk/modules', { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const bulkUpdateUsageLimits = async (payload: { schoolIds: number[]; planId: string; limits: Record<string, number> }): Promise<{ updated: number }> => {
+    return await apiCall('/superadmin/bulk/usage-limits', { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+export const bulkBackupSchedule = async (payload: { schoolIds: number[]; schedule: { daily?: boolean; monthly?: boolean; time?: string } }): Promise<{ scheduled: number }> => {
+    return await apiCall('/superadmin/bulk/backup-schedule', { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+// ==================== Super Admin: Task Center ====================
+export const getAllJobs = async (): Promise<Array<{ id: string; name: string; status: string; schoolId: number; createdAt: string; updatedAt?: string }>> => {
+    return await apiCall('/superadmin/jobs', { method: 'GET' });
+};
+
+export const triggerJobForSchools = async (payload: { schoolIds: number[]; jobType: string; params?: any }): Promise<{ started: number; jobIds: string[] }> => {
+    return await apiCall('/superadmin/jobs/trigger', { method: 'POST', body: JSON.stringify(payload) });
 };
 
 export const getRoutes = async (schoolId: number): Promise<Route[]> => {
@@ -937,8 +998,35 @@ export const gradeSubmission = async (submissionId: string, grade: number, feedb
     });
 };
 
-export const getStudentAndScheduleByParentId = async (parentId: string): Promise<{ student: Student; schedule: ScheduleEntry[] }> => {
-    return await apiCall(`/parent/${parentId}/student-schedule`, { method: 'GET' });
+export const getStudentAndScheduleByParentId = async (parentId: string, studentId?: string): Promise<{ student?: Student; schedule?: ScheduleEntry[]; children?: { student: Student; schedule: ScheduleEntry[] }[] }> => {
+    const qs = studentId ? `?studentId=${encodeURIComponent(String(studentId))}` : '';
+    return await apiCall(`/parent/${parentId}/student-schedule${qs}`, { method: 'GET' });
+};
+
+// ==================== School Admin: Parent Requests ====================
+export const getSchoolParentRequests = async (schoolId: number): Promise<any[]> => {
+    return await apiCall(`/school/${schoolId}/parent-requests`, { method: 'GET' });
+};
+
+export const approveParentRequest = async (schoolId: number, requestId: string): Promise<void> => {
+    await apiCall(`/school/${schoolId}/parent-requests/${requestId}/approve`, { method: 'PUT' });
+};
+
+export const rejectParentRequest = async (schoolId: number, requestId: string): Promise<void> => {
+    await apiCall(`/school/${schoolId}/parent-requests/${requestId}/reject`, { method: 'PUT' });
+};
+
+// ==================== School Admin: Background Jobs ====================
+export const enqueueReportGenerate = async (schoolId: number): Promise<{ jobId: string }> => {
+    return await apiCall(`/school/${schoolId}/reports/generate`, { method: 'POST' });
+};
+
+export const enqueueStudentsImport = async (schoolId: number, sourceUrl: string): Promise<{ jobId: string }> => {
+    return await apiCall(`/school/${schoolId}/import/students`, { method: 'POST', body: JSON.stringify({ sourceUrl }) });
+};
+
+export const getJobStatus = async (schoolId: number, jobId: string): Promise<{ id: string; name: string; status: string; result?: any; error?: string }> => {
+    return await apiCall(`/school/${schoolId}/jobs/${jobId}`, { method: 'GET' });
 };
 
 // تصدير جميع الدوال

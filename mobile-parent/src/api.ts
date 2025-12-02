@@ -92,7 +92,21 @@ export const getParentInvoices = async (parentId: string): Promise<Invoice[]> =>
 };
 
 export const getParentRequests = async (parentId: string): Promise<ParentRequest[]> => {
-    return await apiCall(`/parents/${parentId}/requests`);
+    const rows: any[] = await apiCall(`/parents/${parentId}/requests`);
+    const statusMap: Record<string, RequestStatus> = {
+        'قيد الانتظار': RequestStatus.Pending,
+        'قيد المراجعة': RequestStatus.Pending,
+        'تمت الموافقة': RequestStatus.Approved,
+        'موافق عليه': RequestStatus.Approved,
+        'مرفوض': RequestStatus.Rejected,
+    };
+    return rows.map(r => ({
+        id: String(r.id),
+        type: RequestType.Other,
+        details: r.description || r.title || '',
+        submissionDate: r.createdAt || new Date().toISOString().split('T')[0],
+        status: statusMap[r.status] || RequestStatus.Pending,
+    }));
 };
 
 export const createParentRequest = async (parentId: string, request: {
@@ -104,6 +118,14 @@ export const createParentRequest = async (parentId: string, request: {
     return await apiCall(`/parents/${parentId}/requests`, {
         method: 'POST',
         body: JSON.stringify(request),
+    });
+};
+
+export const submitParentRequest = async (parentId: string, data: { type: RequestType; details: string }): Promise<ParentRequest> => {
+    const payload = { title: `طلب: ${data.type}`, description: data.details };
+    return await apiCall(`/parents/${parentId}/requests`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
     });
 };
 

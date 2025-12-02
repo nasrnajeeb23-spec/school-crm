@@ -31,6 +31,8 @@ const UserProfile = React.lazy(() => import('../pages/UserProfile'));
 const StaffManagement = React.lazy(() => import('../pages/StaffManagement'));
 const Transportation = React.lazy(() => import('../pages/Transportation'));
 const ModulesPage = React.lazy(() => import('../pages/ModulesPage'));
+const SchoolParentRequests = React.lazy(() => import('../pages/SchoolParentRequests'));
+const BackgroundJobs = React.lazy(() => import('../pages/BackgroundJobs'));
 
 interface SchoolAdminLayoutProps {
   isSuperAdminView?: boolean;
@@ -184,6 +186,8 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="messaging" element={<ProtectedPage permission={Permission.MANAGE_MESSAGING}><Messaging /></ProtectedPage>} />
                     <Route path="finance" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><Finance schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
                     <Route path="reports" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><Reports schoolSettings={settings} /></ProtectedPage>} />
+                    <Route path="parent_requests" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><SchoolParentRequests schoolId={school.id} /></ProtectedPage>} />
+                    <Route path="jobs" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><BackgroundJobs schoolId={school.id} /></ProtectedPage>} />
                     <Route path="settings" element={<ProtectedPage permission={Permission.MANAGE_SETTINGS}><Settings schoolId={school.id} /></ProtectedPage>} />
                     <Route path="profile" element={<UserProfile />} />
                     <Route path="modules" element={<ProtectedPage permission={Permission.MANAGE_MODULES}><ModulesPage school={school} /></ProtectedPage>} />

@@ -1,25 +1,18 @@
 // Mobile Teacher App - Real API Connection
 // هذا الملف يتصل بالـ Backend الحقيقي
 
-import { User, School, Student, Teacher, Class, Assignment, Submission, AttendanceRecord, Conversation, Message } from './types';
+import { User, School, Student, Class, Assignment, Submission, AttendanceRecord, Conversation, Message } from './types';
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 let memoryToken: string | null = null;
 
 async function getToken() {
-  try {
-    const SecureStore = (await import('expo-secure-store')).default;
-    const t = await SecureStore.getItemAsync('auth_token');
-    return t || memoryToken;
-  } catch {
-    return memoryToken;
-  }
+  return memoryToken;
 }
 
 async function setToken(token: string) {
   memoryToken = token;
-  try { const SecureStore = (await import('expo-secure-store')).default; await SecureStore.setItemAsync('auth_token', token); } catch {}
 }
 
 const authHeaders = async () => {
@@ -30,14 +23,12 @@ const authHeaders = async () => {
 // دالة مساعدة للاتصال بالـ API
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...(await authHeaders()),
-                ...options.headers,
-            },
-        });
+        const hdrs: Record<string, string> = { 'Content-Type': 'application/json', ...(await authHeaders()) as any };
+        if (options.headers) {
+            const h: any = options.headers as any;
+            if (h && typeof h === 'object') Object.assign(hdrs, h);
+        }
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers: hdrs });
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -90,6 +81,10 @@ export const getTeacherSchedule = async (teacherId: string): Promise<any[]> => {
     return await apiCall(`/teachers/${teacherId}/schedule`);
 };
 
+export const getTeacherDashboardData = async (teacherId: string): Promise<{ classes: any[]; schedule: any[]; actionItems: any[] }> => {
+    return await apiCall(`/teachers/${teacherId}/dashboard`);
+};
+
 export const getTeacherAssignments = async (teacherId: string): Promise<Assignment[]> => {
     return await apiCall(`/teachers/${teacherId}/assignments`);
 };
@@ -112,6 +107,10 @@ export const createAssignment = async (assignment: {
 
 export const getAssignmentSubmissions = async (assignmentId: string): Promise<Submission[]> => {
     return await apiCall(`/assignments/${assignmentId}/submissions`);
+};
+
+export const getSubmissionsForAssignment = async (assignmentId: string): Promise<Submission[]> => {
+    return await getAssignmentSubmissions(assignmentId);
 };
 
 export const gradeSubmission = async (submissionId: string, grade: number, feedback: string): Promise<Submission> => {
@@ -163,7 +162,11 @@ export const addGrade = async (grade: {
 
 // ==================== Messaging ====================
 
-export const getConversations = async (userId: string): Promise<Conversation[]> => {
+export const getConversations = async (userId?: string): Promise<Conversation[]> => {
+    if (!userId) {
+        const me: User = await getCurrentUser();
+        userId = String(me.id);
+    }
     return await apiCall(`/conversations/user/${userId}`);
 };
 
