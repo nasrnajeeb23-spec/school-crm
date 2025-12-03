@@ -43,23 +43,23 @@ const Analytics: React.FC = () => {
       <h2 className="text-xl font-semibold text-gray-800 dark:text-white">لوحة التحليلات والمؤشرات</h2>
       <div className="text-xs text-gray-600 dark:text-gray-300">يتصل حالياً بـ API: <span className="font-mono" dir="ltr">{getApiBase()}</span></div>
 
-      {(stats || kpis) && (
+      {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
             <p className="text-sm text-gray-500">إجمالي المدارس</p>
-            <p className="text-2xl font-bold">{stats?.totalSchools ?? '-'}</p>
+            <p className="text-2xl font-bold">{stats.totalSchools ?? '-'}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
-            <p className="text-sm text-gray-500">الاشتراكات النشطة</p>
-            <p className="text-2xl font-bold">{(kpis?.activeSubscriptions ?? stats?.activeSubscriptions) ?? '-'}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
-            <p className="text-sm text-gray-500">إجمالي الإيرادات</p>
-            <p className="text-2xl font-bold">{stats?.totalRevenue !== undefined ? `$${Number(stats.totalRevenue).toLocaleString()}` : '-'}</p>
+            <p className="text-sm text-gray-500">عدد المستخدمين</p>
+            <p className="text-2xl font-bold">{stats.totalUsers ?? '-'}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
             <p className="text-sm text-gray-500">MRR</p>
-            <p className="text-2xl font-bold">{kpis?.mrr !== undefined ? `$${kpis.mrr.toFixed(2)}` : '-'}</p>
+            <p className="text-2xl font-bold">${stats.mrr ?? '-'}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
+            <p className="text-sm text-gray-500">المهام النشطة</p>
+            <p className="text-2xl font-bold">{stats.activeJobs ?? '-'}</p>
           </div>
         </div>
       )}
@@ -120,7 +120,7 @@ const Analytics: React.FC = () => {
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="revenue" stroke="#4f46e5" strokeWidth={2} />
+              <Line type="monotone" dataKey="amount" stroke="#4f46e5" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>

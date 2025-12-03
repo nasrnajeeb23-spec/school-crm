@@ -144,7 +144,7 @@ const App: React.FC = () => {
           <Route path="/superadmin/login" element={<LoginPage mode="superadmin" />} />
 
           {/* Super Admin Routes */}
-          <Route element={<ProtectedRoute allowedRoles={[UserRole.SuperAdmin]} />}>
+          <Route element={<ProtectedRoute allowedRoles={[UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor]} />}>
             <Route path="/superadmin" element={<SuperAdminLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />

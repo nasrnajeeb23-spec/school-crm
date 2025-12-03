@@ -13,24 +13,22 @@ interface DashboardStats {
   activeSubscriptions: number;
   totalRevenue: number;
   revenueData: RevenueData[];
+  mrr: number;
+  churnRate: number;
+  newSchoolsThisMonth: number;
 }
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
-  const [kpis, setKpis] = useState<{ mrr: number } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [statsData, kpiData] = await Promise.all([
-          api.getDashboardStats(),
-          api.getKpis().catch(() => null)
-        ]);
+        const statsData = await api.getDashboardStats();
         setStats(statsData);
-        setKpis(kpiData ? { mrr: Number((kpiData as any).mrr || 0) } : null);
       } catch (error) {
         console.error("Failed to fetch dashboard stats:", error);
         addToast("فشل تحميل إحصائيات لوحة التحكم.", 'error');
@@ -66,17 +64,27 @@ const Dashboard: React.FC = () => {
         <StatsCard 
           icon={RevenueIcon} 
           title="إجمالي الإيرادات" 
-          value={`$${Number(stats.totalRevenue).toLocaleString()}`}
+          value={`$${(stats.totalRevenue / 1000).toFixed(1)}k`}
           description="إجمالي المدفوعات المسجلة"
         />
-        {kpis && (
-          <StatsCard 
+        <StatsCard 
             icon={MRRIcon} 
             title="الإيرادات الشهرية المتكررة" 
-            value={`$${kpis.mrr.toLocaleString()}`}
+            value={`$${stats.mrr.toLocaleString()}`}
             description="من الاشتراكات النشطة حالياً"
-          />
-        )}
+        />
+        <StatsCard 
+            icon={TotalSchoolsIcon}
+            title="مدارس جديدة (هذا الشهر)" 
+            value={`+${stats.newSchoolsThisMonth}`}
+            description="مدارس انضمت هذا الشهر"
+        />
+        <StatsCard 
+            icon={LogoutIcon}
+            title="معدل إلغاء الاشتراك" 
+            value={`${stats.churnRate.toFixed(1)}%`}
+            description="نسبة الإلغاء (إجمالي)"
+        />
       </div>
       <div>
         <RevenueChart data={stats.revenueData} />

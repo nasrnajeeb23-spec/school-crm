@@ -103,17 +103,14 @@ const Sidebar: React.FC = () => {
           <ProfileIcon className="h-6 w-6" />
           <span className="hidden md:block mr-4">ملفي الشخصي</span>
         </NavLink>
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            logout();
-          }}
+        <button
+          type="button"
+          onClick={() => { logout(); }}
           className={`relative flex items-center justify-center md:justify-start p-3 my-1 rounded-lg transition-colors duration-200 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50`}
         >
           <LogoutIcon className="h-6 w-6" />
           <span className="hidden md:block mr-4">تسجيل الخروج</span>
-        </a>
+        </button>
       </div>
 
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">

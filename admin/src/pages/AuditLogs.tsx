@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useToast } from '../contexts/ToastContext';
-import * as api from '../api';
+import { getSuperAdminAuditLogs } from '../api/superAdminAuth';
 
 const AuditLogs: React.FC = () => {
   const { addToast } = useToast();
@@ -11,7 +11,7 @@ const AuditLogs: React.FC = () => {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const data = await api.getAuditLogs(filters);
+      const data = await getSuperAdminAuditLogs(filters);
       setLogs(data || []);
     } catch (err) {
       addToast('فشل تحميل سجلات التدقيق.', 'error');
@@ -74,13 +74,13 @@ const AuditLogs: React.FC = () => {
             <tbody>
               {logs.map((log) => (
                 <tr key={log.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                  <td className="px-6 py-4" dir="ltr">{new Date(log.timestamp).toLocaleString('ar-EG')}</td>
+                  <td className="px-6 py-4" dir="ltr">{log.timestamp}</td>
                   <td className="px-6 py-4">{log.action}</td>
                   <td className="px-6 py-4">{log.userEmail} (#{log.userId})</td>
                   <td className="px-6 py-4" dir="ltr">{log.ipAddress}</td>
                   <td className="px-6 py-4">{log.userAgent?.slice(0, 40)}...</td>
                   <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${log.riskLevel === 'high' ? 'bg-red-100 text-red-800' : log.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>{log.riskLevel}</span></td>
-                  <td className="px-6 py-4"><pre className="text-xs whitespace-pre-wrap max-w-xs overflow-hidden">{JSON.stringify(log.details, null, 2)}</pre></td>
+                  <td className="px-6 py-4"><pre className="text-xs whitespace-pre-wrap">{JSON.stringify(log.details, null, 2)}</pre></td>
                 </tr>
               ))}
             </tbody>

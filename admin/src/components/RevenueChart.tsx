@@ -7,6 +7,11 @@ interface RevenueChartProps {
 }
 
 const RevenueChart: React.FC<RevenueChartProps> = ({ data }) => {
+  const key = (() => {
+    const first = Array.isArray(data) && data.length > 0 ? data[0] as any : null;
+    if (first && typeof first.amount === 'number') return 'amount';
+    return 'revenue';
+  })();
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-96">
         <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-4">نمو الإيرادات الشهرية</h3>
@@ -29,7 +34,7 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ data }) => {
             }}
             labelStyle={{ color: '#e5e7eb' }}
           />
-          <Area type="monotone" dataKey="revenue" stroke="#8884d8" fillOpacity={1} fill="url(#colorRevenue)" />
+          <Area type="monotone" dataKey={key} stroke="#8884d8" fillOpacity={1} fill="url(#colorRevenue)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
