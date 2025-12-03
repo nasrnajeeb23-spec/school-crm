@@ -9,7 +9,7 @@ const Billing: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getSchools().then(data => {
+    api.getSchoolsList().then(data => {
       setSchools(data);
       setLoading(false);
     });
@@ -19,8 +19,8 @@ const Billing: React.FC = () => {
     return <div className="text-center p-8">جاري تحميل بيانات الفوترة...</div>;
   }
 
-  const schoolsWithDebt = schools.filter(school => school.balance > 0);
-  const totalDebt = schoolsWithDebt.reduce((acc, school) => acc + school.balance, 0);
+  const schoolsWithDebt = schools.filter(school => (school.balance || 0) > 0);
+  const totalDebt = schoolsWithDebt.reduce((acc, school) => acc + (school.balance || 0), 0);
   const averageDebt = schoolsWithDebt.length > 0 ? totalDebt / schoolsWithDebt.length : 0;
 
   return (
@@ -65,8 +65,8 @@ const Billing: React.FC = () => {
               {schoolsWithDebt.length > 0 ? schoolsWithDebt.map((school: School) => (
                 <tr key={school.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                   <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{school.name}</td>
-                  <td className="px-6 py-4">{school.plan}</td>
-                  <td className="px-6 py-4 font-semibold text-red-500">${school.balance.toFixed(2)}</td>
+                  <td className="px-6 py-4">{school.plan || 'N/A'}</td>
+                  <td className="px-6 py-4 font-semibold text-red-500">${(school.balance || 0).toFixed(2)}</td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
                       {SubscriptionStatus.PastDue}

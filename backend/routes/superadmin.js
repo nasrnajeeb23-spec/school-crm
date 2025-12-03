@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { School, Subscription, Invoice, Payment, Plan, User, BusOperator, SecurityPolicy } = require('../models');
+const { School, Subscription, Invoice, Payment, Plan, User, BusOperator, SecurityPolicy, AuditLog } = require('../models');
 const { TrialRequest } = require('../models');
 const clientMetrics = require('prom-client');
 clientMetrics.collectDefaultMetrics({ prefix: 'schoolsaas_', timeout: 5000 });
 const { sequelize } = require('../models');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
+const { Op } = require('sequelize');
 
 // @route   GET api/superadmin/stats
 // @desc    Get dashboard stats for SuperAdmin
@@ -105,6 +106,70 @@ router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req
     console.error(err.message);
     res.status(500).send('Server Error');
   }
+});
+
+// @route   GET api/superadmin/schools
+// @desc    List all schools for superadmin
+// @access  Private (SuperAdmin)
+router.get('/schools', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+    try {
+      const schools = await School.findAll({
+        include: [{ model: Subscription, attributes: ['status'], include: [{ model: Plan, attributes: ['name'] }] }],
+        order: [['createdAt', 'DESC']]
+      });
+      
+      const formatted = schools.map(school => ({
+        id: school.id,
+        name: school.name,
+        plan: school.Subscription?.Plan?.name || 'N/A',
+        status: school.Subscription?.status || 'Inactive',
+        students: school.studentsCount || 0, // Note: Need a way to count students if not stored on School model
+        teachers: school.teachersCount || 0,
+        balance: parseFloat(school.balance || 0),
+        joinDate: school.createdAt
+      }));
+      
+      res.json(formatted);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
+});
+
+// @route   GET api/superadmin/audit-logs
+// @desc    Get audit logs
+// @access  Private (SuperAdmin)
+router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+    try {
+        const { startDate, endDate, action, userId } = req.query;
+        const where = {};
+        
+        if (startDate) where.timestamp = { [Op.gte]: new Date(startDate) };
+        if (endDate) where.timestamp = { ...where.timestamp, [Op.lte]: new Date(endDate) };
+        if (action) where.action = { [Op.like]: `%${action}%` };
+        if (userId) where.userId = userId;
+
+        const logs = await AuditLog.findAll({
+            where,
+            order: [['timestamp', 'DESC']],
+            limit: 100
+        });
+        
+        res.json(logs.map(log => ({
+            id: log.id,
+            timestamp: log.timestamp,
+            action: log.action,
+            userId: log.userId,
+            userEmail: log.userEmail,
+            ipAddress: log.ipAddress,
+            userAgent: log.userAgent,
+            riskLevel: log.riskLevel,
+            details: typeof log.details === 'string' ? JSON.parse(log.details) : log.details
+        })));
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
 });
 
 // Security policies (central)
@@ -386,64 +451,17 @@ router.post('/schedule/backups/reload', verifyToken, requireRole('SUPER_ADMIN'),
   try { await req.app.locals.reloadBackupSchedules(); res.json({ reloaded: true }); } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.get('/backup/retention', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const redis = req.app.locals.redisClient;
-    const daysStr = redis ? await redis.get('backup:retention:days').catch(() => null) : null;
-    const days = Number(daysStr || 30) || 30;
-    res.json({ days });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-router.put('/backup/retention', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const redis = req.app.locals.redisClient;
-    const v = Number((req.body || {}).days || 30) || 30;
-    if (redis) await redis.set('backup:retention:days', String(v)).catch(() => {});
-    res.json({ days: v });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-router.post('/schools/create', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const { name, planId, adminEmail, adminUsername, adminPassword } = req.body || {};
-    if (!name || !planId || !adminEmail || !adminUsername || !adminPassword) return res.status(400).json({ message: 'Invalid payload' });
-    const bcrypt = require('bcryptjs');
-    const school = await School.create({ name });
-    const plan = await Plan.findByPk(planId);
-    if (!plan) return res.status(404).json({ message: 'Plan not found' });
-    const start = new Date();
-    const renewal = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
-    await Subscription.create({ schoolId: school.id, planId: plan.id, status: 'TRIAL', startDate: start, renewalDate: renewal });
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(String(adminPassword), salt);
-    const existing = await User.findOne({ where: { email: adminEmail } });
-    if (existing) return res.status(400).json({ message: 'Admin email already exists' });
-    const admin = await User.create({ name: adminUsername, email: adminEmail, username: adminUsername, password: hashedPassword, role: 'SchoolAdmin', schoolId: school.id, isActive: true });
-    res.json({ school: { id: school.id, name: school.name }, admin: { id: admin.id, email: admin.email, username: admin.username }, subscription: { status: 'TRIAL', renewalDate: renewal.toISOString() } });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-// @route   GET api/superadmin/team
-// @desc    Get all SuperAdmin team members
-// @access  Private (SuperAdmin and team roles)
-router.get('/team', verifyToken, async (req, res) => {
+// Super Admin Team Management routes
+router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
-        // Allow all SuperAdmin team roles to view team members
-        const allowedRoles = ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'];
-        if (!allowedRoles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Access denied' });
-        }
-
         const teamMembers = await User.findAll({
             where: {
                 role: {
                     [require('sequelize').Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
                 }
             },
-            attributes: ['id', 'name', 'email', 'username', 'role', 'isActive', 'lastLoginAt', 'createdAt', 'permissions']
+            attributes: { exclude: ['password'] }
         });
-
         res.json(teamMembers);
     } catch (err) {
         console.error(err.message);
@@ -451,9 +469,6 @@ router.get('/team', verifyToken, async (req, res) => {
     }
 });
 
-// @route   POST api/superadmin/team
-// @desc    Create a new SuperAdmin team member
-// @access  Private (SuperAdmin only)
 router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
         const { name, email, username, password, role, permissions } = req.body;
@@ -464,39 +479,27 @@ router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) =
             return res.status(400).json({ message: 'Invalid role for team member' });
         }
 
-        // Check if username or email already exists
-        const existingUser = await User.findOne({
-            where: {
-                [require('sequelize').Op.or]: [
-                    { username: username },
-                    { email: email }
-                ]
-            }
-        });
-
-        if (existingUser) {
-            return res.status(400).json({ message: 'Username or email already exists' });
+        // Check if user already exists
+        let user = await User.findOne({ where: { email } });
+        if (user) {
+            return res.status(400).json({ message: 'User already exists' });
         }
 
-        // Hash password
+        // Create new user
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new team member
-        const newTeamMember = await User.create({
+        const newUser = await User.create({
             name,
             email,
             username,
             password: hashedPassword,
             role,
             permissions: permissions || getDefaultPermissions(role),
-            isActive: true,
-            schoolId: null // SuperAdmin team members don't belong to a specific school
+            isActive: true
         });
 
-        // Remove password from response
-        const { password: _, ...memberWithoutPassword } = newTeamMember.toJSON();
-        
+        const { password: _, ...memberWithoutPassword } = newUser.toJSON();
         res.status(201).json(memberWithoutPassword);
     } catch (err) {
         console.error(err.message);
@@ -504,15 +507,11 @@ router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) =
     }
 });
 
-// @route   PUT api/superadmin/team/:id
-// @desc    Update a SuperAdmin team member
-// @access  Private (SuperAdmin only)
 router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
         const { name, email, username, password, role, permissions } = req.body;
         const memberId = req.params.id;
 
-        // Find the team member
         const teamMember = await User.findOne({
             where: {
                 id: memberId,
@@ -526,7 +525,6 @@ router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res
             return res.status(404).json({ message: 'Team member not found' });
         }
 
-        // Validate role if provided
         if (role) {
             const allowedRoles = ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'];
             if (!allowedRoles.includes(role)) {
@@ -534,13 +532,10 @@ router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res
             }
         }
 
-        // Check if new username or email already exists (excluding current member)
         if (username || email) {
             const existingUser = await User.findOne({
                 where: {
-                    id: {
-                        [require('sequelize').Op.ne]: memberId
-                    },
+                    id: { [require('sequelize').Op.ne]: memberId },
                     [require('sequelize').Op.or]: [
                         username ? { username: username } : null,
                         email ? { email: email } : null
@@ -553,24 +548,19 @@ router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res
             }
         }
 
-        // Update fields
         if (name) teamMember.name = name;
         if (email) teamMember.email = email;
         if (username) teamMember.username = username;
         if (role) teamMember.role = role;
         if (permissions) teamMember.permissions = permissions;
         
-        // Update password if provided
         if (password) {
             const salt = await bcrypt.genSalt(10);
             teamMember.password = await bcrypt.hash(password, salt);
         }
 
         await teamMember.save();
-
-        // Remove password from response
         const { password: _, ...memberWithoutPassword } = teamMember.toJSON();
-        
         res.json(memberWithoutPassword);
     } catch (err) {
         console.error(err.message);
@@ -578,14 +568,9 @@ router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res
     }
 });
 
-// @route   DELETE api/superadmin/team/:id
-// @desc    Delete a SuperAdmin team member
-// @access  Private (SuperAdmin only)
 router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
         const memberId = req.params.id;
-
-        // Find the team member
         const teamMember = await User.findOne({
             where: {
                 id: memberId,
@@ -607,7 +592,6 @@ router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, 
     }
 });
 
-// Helper function to get default permissions for a role
 function getDefaultPermissions(role) {
     const defaultPermissions = {
         'SuperAdminFinancial': ['view_financial_reports', 'manage_billing', 'view_subscriptions', 'manage_invoices'],
@@ -617,14 +601,11 @@ function getDefaultPermissions(role) {
     return defaultPermissions[role] || [];
 }
 
- 
-
 router.get('/action-items', verifyToken, async (req, res) => {
   try {
     const role = String(req.user.role || '').toUpperCase();
     const isSuper = ['SUPER_ADMIN','SUPER_ADMIN_FINANCIAL','SUPER_ADMIN_TECHNICAL','SUPER_ADMIN_SUPERVISOR'].includes(role);
     const schoolId = isSuper ? Number(req.query.schoolId || 0) : Number(req.user.schoolId || 0);
-    const whereInv = schoolId ? { '$Student.schoolId$': schoolId } : {};
     const invoices = await Invoice.findAll({ include: { model: require('../models').Student, attributes: [], where: schoolId ? { schoolId } : {} }, where: {}, limit: 50 });
     const unpaid = invoices.filter(i => i.status === 'UNPAID');
     const ops = await BusOperator.findAll({ where: schoolId ? { schoolId, status: 'Pending' } : { status: 'Pending' }, limit: 20 });
@@ -636,6 +617,7 @@ router.get('/action-items', verifyToken, async (req, res) => {
 });
 
 module.exports = router;
+
 function getJSON(redis, key, fallback) {
   if (redis && typeof redis.get === 'function') {
     return redis.get(key).then(val => {

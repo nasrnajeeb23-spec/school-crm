@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubscriptionStatus, School, NewSchoolData } from '../types';
@@ -26,7 +25,7 @@ const SchoolsList: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    api.getSchools().then(data => {
+    api.getSchoolsList().then(data => {
       setSchools(data);
     }).catch(error => {
         console.error("Failed to fetch schools:", error);
@@ -38,9 +37,10 @@ const SchoolsList: React.FC = () => {
   
   const handleAddSchool = async (data: NewSchoolData) => {
       try {
-          const newSchool = await api.addSchool(data);
-          setSchools(prev => [newSchool, ...prev]);
-          addToast(`تمت إضافة مدرسة "${newSchool.name}" بنجاح!`, 'success');
+          await api.addSchool(data);
+          const updatedList = await api.getSchoolsList();
+          setSchools(updatedList);
+          addToast(`تمت إضافة مدرسة "${data.name}" بنجاح!`, 'success');
           setIsModalOpen(false);
       } catch (error) {
           console.error("Failed to add school", error);
@@ -92,14 +92,14 @@ const SchoolsList: React.FC = () => {
                 {schools.map((school) => (
                   <tr key={school.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{school.name}</td>
-                    <td className="px-6 py-4">{school.plan}</td>
+                    <td className="px-6 py-4">{school.plan || 'N/A'}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[school.status]}`}>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[school.status] || 'bg-gray-100 text-gray-800'}`}>
                         {school.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">{school.students}</td>
-                    <td className={`px-6 py-4 font-semibold ${school.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>${school.balance.toFixed(2)}</td>
+                    <td className="px-6 py-4">{school.students ?? 0}</td>
+                    <td className={`px-6 py-4 font-semibold ${(school.balance || 0) > 0 ? 'text-red-500' : 'text-green-500'}`}>${(school.balance || 0).toFixed(2)}</td>
                     <td className="px-6 py-4">
                       <button onClick={() => handleManageSchool(school)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">
                         إدارة
