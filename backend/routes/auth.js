@@ -74,6 +74,17 @@ router.post('/login', validate([
       }
     } catch {}
 
+    // منع الدخول إذا كانت المدرسة موقوفة
+    if (user.role !== 'SUPER_ADMIN' && user.schoolId) {
+      try {
+        const s = await SchoolSettings.findOne({ where: { schoolId: user.schoolId } });
+        const st = String(s?.operationalStatus || 'ACTIVE').toUpperCase();
+        if (st === 'SUSPENDED') {
+          return res.status(403).json({ msg: 'تم إيقاف المدرسة مؤقتًا. الرجاء التواصل مع الإدارة.' });
+        }
+      } catch {}
+    }
+
     user.lastLogin = new Date();
     user.lastLoginAt = new Date();
     await user.save();
@@ -273,12 +284,3 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     res.status(500).json({ msg: 'Server Error' });
   }
 });
-    if (user.role !== 'SUPER_ADMIN' && user.schoolId) {
-      try {
-        const s = await SchoolSettings.findOne({ where: { schoolId: user.schoolId } });
-        const st = String(s?.operationalStatus || 'ACTIVE').toUpperCase();
-        if (st === 'SUSPENDED') {
-          return res.status(403).json({ msg: 'تم إيقاف المدرسة مؤقتًا. الرجاء التواصل مع الإدارة.' });
-        }
-      } catch {}
-    }
