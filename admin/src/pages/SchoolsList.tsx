@@ -49,7 +49,7 @@ const SchoolsList: React.FC = () => {
   };
   
   const handleManageSchool = (school: School) => {
-    navigate(`/manage/school/${school.id}`);
+    navigate(`/superadmin/schools/${school.id}/manage`);
   };
 
   return (

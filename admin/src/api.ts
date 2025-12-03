@@ -612,6 +612,12 @@ export const updateSchoolModules = async (schoolId: number, moduleIds: string[])
     return hasParent ? modules : [...modules, { schoolId, moduleId: ModuleId.ParentPortal }];
 };
 
+export const activateSchoolSubscription = async (schoolId: number, moduleIds: string[], renewalDate?: string): Promise<{ activated: boolean; activeModules: string[]; renewalDate: string }> => {
+    const payload: any = { moduleIds };
+    if (renewalDate) payload.renewalDate = renewalDate;
+    return await apiCall(`/schools/${schoolId}/modules/activate`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
 export const getActionItems = async (): Promise<ActionItem[]> => {
     try {
         const data = await apiCall('/superadmin/action-items', { method: 'GET' });
@@ -872,6 +878,10 @@ export const bulkUpdateUsageLimits = async (payload: { schoolIds: number[]; plan
 
 export const bulkBackupSchedule = async (payload: { schoolIds: number[]; schedule: { daily?: boolean; monthly?: boolean; time?: string } }): Promise<{ scheduled: number }> => {
     return await apiCall('/superadmin/bulk/backup-schedule', { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+export const reloadBackupSchedules = async (): Promise<{ reloaded: boolean }> => {
+    return await apiCall('/superadmin/schedule/backups/reload', { method: 'POST' });
 };
 
 // ==================== Super Admin: Task Center ====================

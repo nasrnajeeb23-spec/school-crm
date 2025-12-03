@@ -39,6 +39,7 @@ const ReportsCenter = React.lazy(() => import('./pages/ReportsCenter'));
 const CreateSchool = React.lazy(() => import('./pages/CreateSchool'));
 const TrialSignupPublic = React.lazy(() => import('./pages/TrialSignupPublic'));
 const OnboardingRequests = React.lazy(() => import('./pages/OnboardingRequests'));
+const SuperAdminSchoolManage = React.lazy(() => import('./pages/SuperAdminSchoolManage'));
 
 // School Admin Pages
 const SchoolDashboard = React.lazy(() => import('./pages/SchoolDashboard'));
@@ -149,6 +150,7 @@ const App: React.FC = () => {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="schools" element={<SchoolsList />} />
+              <Route path="schools/:schoolId/manage" element={<SuperAdminSchoolManage />} />
               <Route path="school-admins" element={<SchoolAdminsList />} />
               <Route path="team" element={<SuperAdminTeamManagement />} />
               <Route path="subscriptions" element={<SubscriptionsList />} />
@@ -171,7 +173,6 @@ const App: React.FC = () => {
               <Route path="license" element={<LicenseManagement />} />
               <Route path="profile" element={<UserProfile />} />
             </Route>
-            {/* SuperAdmin managing a specific school */}
             <Route path="/manage/school/:schoolId/*" element={<SchoolAdminLayout isSuperAdminView />} />
           </Route>
 
