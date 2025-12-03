@@ -149,12 +149,14 @@ router.get('/schools/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const students = await Student.findAll({ where: { schoolId: req.user.schoolId }, order: [['name', 'ASC']] });
-    if (!students) return res.status(404).json({ msg: 'No students found' });
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+    const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+    const students = await Student.findAll({ where: { schoolId: req.user.schoolId }, order: [['name', 'ASC']], limit, offset });
+    if (!students) return res.error(404, 'NOT_FOUND', 'No students found');
     
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
-    res.json(students.map(s => ({ ...s.toJSON(), status: statusMap[s.status] || s.status })));
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+    return res.success({ students: students.map(s => ({ ...s.toJSON(), status: statusMap[s.status] || s.status })), limit, offset });
+  } catch (err) { console.error(err.message); return res.error(500, 'SERVER_ERROR', 'Server Error'); }
 });
 
 // @route   POST api/school/:schoolId/students
@@ -170,10 +172,10 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     const { schoolId } = req.params;
     const { name, grade, parentName, dateOfBirth, address, city, homeLocation, lat, lng } = req.body;
 
-    const school = await School.findByPk(schoolId);
-    if (!school) {
-      return res.status(404).json({ msg: 'School not found' });
-    }
+  const school = await School.findByPk(schoolId);
+  if (!school) {
+      return res.error(404, 'NOT_FOUND', 'School not found');
+  }
 
     const newStudent = await Student.create({
       id: `std_${Date.now()}`,
@@ -198,10 +200,10 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         status: statusMap[newStudent.status] || newStudent.status
     };
 
-    res.status(201).json(formattedStudent);
+    return res.success(formattedStudent, 'Student created', 'CREATED');
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    return res.error(500, 'SERVER_ERROR', 'Server Error');
   }
 });
 
@@ -218,10 +220,10 @@ router.put('/:schoolId/students/:studentId', verifyToken, requireRole('SCHOOL_AD
   try {
     const { name, grade, parentName, dateOfBirth, status } = req.body;
     if (!name || !grade || !parentName || !dateOfBirth || !status) {
-      return res.status(400).json({ msg: 'Missing required fields' });
+      return res.error(400, 'VALIDATION_FAILED', 'Missing required fields');
     }
     const student = await Student.findByPk(req.params.studentId);
-    if (!student) return res.status(404).json({ msg: 'Student not found' });
+    if (!student) return res.error(404, 'NOT_FOUND', 'Student not found');
     student.name = name;
     student.grade = grade;
     student.parentName = parentName;
@@ -229,8 +231,8 @@ router.put('/:schoolId/students/:studentId', verifyToken, requireRole('SCHOOL_AD
     student.status = status === 'نشط' ? 'Active' : status === 'موقوف' ? 'Suspended' : student.status;
     await student.save();
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
-    res.json({ ...student.toJSON(), status: statusMap[student.status] || student.status });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+    return res.success({ ...student.toJSON(), status: statusMap[student.status] || student.status }, 'Student updated');
+  } catch (err) { console.error(err.message); return res.error(500, 'SERVER_ERROR', 'Server Error'); }
 });
 
 
@@ -239,12 +241,14 @@ router.put('/:schoolId/students/:studentId', verifyToken, requireRole('SCHOOL_AD
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const teachers = await Teacher.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']] });
-    if (!teachers) return res.status(404).json({ msg: 'No teachers found' });
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+    const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+    const teachers = await Teacher.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']], limit, offset });
+    if (!teachers) return res.error(404, 'NOT_FOUND', 'No teachers found');
     
     const statusMap = { 'Active': 'نشط', 'OnLeave': 'في إجازة' };
-    res.json(teachers.map(t => ({ ...t.toJSON(), status: statusMap[t.status] || t.status })));
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+    return res.success({ teachers: teachers.map(t => ({ ...t.toJSON(), status: statusMap[t.status] || t.status })), limit, offset });
+  } catch (err) { console.error(err.message); return res.error(500, 'SERVER_ERROR', 'Server Error'); }
 });
 
 // Salary Structures CRUD
@@ -418,16 +422,16 @@ router.get('/:schoolId/staff-attendance', verifyToken, requireRole('SCHOOL_ADMIN
     if (date) where.date = String(date);
     if (userId) where.userId = Number(userId);
     const rows = await StaffAttendance.findAll({ where, order: [['date','DESC']] });
-    res.json(rows.map(r => r.toJSON()));
+    return res.success({ attendance: rows.map(r => r.toJSON()) });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 router.post('/:schoolId/staff-attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const { userId, date, checkIn, checkOut, hoursWorked, status, overtimeMinutes } = req.body || {};
-    if (!userId || !date) return res.status(400).json({ msg: 'userId and date required' });
+    if (!userId || !date) return res.error(400, 'VALIDATION_FAILED', 'userId and date required');
     const id = 'stfatt_' + Date.now();
     const row = await StaffAttendance.create({ id, schoolId: Number(req.params.schoolId), userId: Number(userId), date, checkIn: checkIn || null, checkOut: checkOut || null, hoursWorked: hoursWorked || null, status: status || 'Present', overtimeMinutes: overtimeMinutes || 0 });
-    res.status(201).json(row.toJSON());
+    return res.success(row.toJSON(), 'Staff attendance created', 'CREATED');
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -439,16 +443,16 @@ router.get('/:schoolId/teacher-attendance', verifyToken, requireRole('SCHOOL_ADM
     if (date) where.date = String(date);
     if (teacherId) where.teacherId = Number(teacherId);
     const rows = await TeacherAttendance.findAll({ where, order: [['date','DESC']] });
-    res.json(rows.map(r => r.toJSON()));
+    return res.success({ attendance: rows.map(r => r.toJSON()) });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 router.post('/:schoolId/teacher-attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const { teacherId, date, checkIn, checkOut, hoursWorked, status, overtimeMinutes, lateMinutes } = req.body || {};
-    if (!teacherId || !date) return res.status(400).json({ msg: 'teacherId and date required' });
+    if (!teacherId || !date) return res.error(400, 'VALIDATION_FAILED', 'teacherId and date required');
     const id = 'teachatt_' + Date.now();
     const row = await TeacherAttendance.create({ id, schoolId: Number(req.params.schoolId), teacherId: Number(teacherId), date, checkIn: checkIn || null, checkOut: checkOut || null, hoursWorked: hoursWorked || null, status: status || 'Present', overtimeMinutes: overtimeMinutes || 0, lateMinutes: lateMinutes || 0 });
-    res.status(201).json(row.toJSON());
+    return res.success(row.toJSON(), 'Teacher attendance created', 'CREATED');
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -1267,7 +1271,7 @@ router.get('/:schoolId/student/:studentId/details', verifyToken, requireRole('SC
 // @route   GET api/school/:schoolId/settings
 // @desc    Get settings for a specific school
 // @access  Private (SchoolAdmin)
-router.get('/:schoolId/settings', verifyToken, async (req, res) => {
+router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
     let settings = await SchoolSettings.findOne({ where: { schoolId } });
@@ -1484,7 +1488,7 @@ router.get('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
         discounts: Array.isArray(disc) ? disc : [],
       };
     });
-    res.json(list);
+    return res.success({ fees: list });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -1494,13 +1498,13 @@ router.post('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
   try {
     const schoolId = Number(req.params.schoolId);
     const { stage } = req.body || {};
-    const exists = await FeeSetup.findOne({ where: { schoolId, stage } });
-    if (exists) return res.status(400).json({ msg: 'Stage already configured' });
+  const exists = await FeeSetup.findOne({ where: { schoolId, stage } });
+    if (exists) return res.error(400, 'DUPLICATE', 'Stage already configured');
   const payload = req.body || {};
   const row = await FeeSetup.create({ schoolId, stage: String(payload.stage), tuitionFee: Number(payload.tuitionFee || 0), bookFees: Number(payload.bookFees || 0), uniformFees: Number(payload.uniformFees || 0), activityFees: Number(payload.activityFees || 0), paymentPlanType: payload.paymentPlanType || 'Monthly', paymentPlanDetails: payload.paymentPlanDetails || {}, discounts: Array.isArray(payload.discounts) ? payload.discounts : [] });
   let planResp; try { planResp = typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : (row.paymentPlanDetails || {}); } catch { planResp = {}; }
   let discResp = row.discounts; if (typeof discResp === 'string') { try { discResp = JSON.parse(discResp); } catch { discResp = []; } }
-  res.status(201).json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: planResp, discounts: Array.isArray(discResp) ? discResp : [] });
+  return res.success({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: planResp, discounts: Array.isArray(discResp) ? discResp : [] }, 'Fee setup created', 'CREATED');
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -1715,7 +1719,7 @@ router.post('/:schoolId/backup/store', verifyToken, requireRole('SCHOOL_ADMIN', 
 router.put('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
   try {
     const row = await FeeSetup.findOne({ where: { id: Number(req.params.id), schoolId: Number(req.params.schoolId) } });
-    if (!row) return res.status(404).json({ msg: 'Not Found' });
+    if (!row) return res.error(404, 'NOT_FOUND', 'Fee setup not found');
     const p = req.body || {};
     if (p.stage !== undefined) row.stage = String(p.stage);
     if (p.tuitionFee !== undefined) row.tuitionFee = Number(p.tuitionFee || 0);
@@ -1728,14 +1732,15 @@ router.put('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   await row.save();
   let planResp2; try { planResp2 = typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : (row.paymentPlanDetails || {}); } catch { planResp2 = {}; }
   let discResp2 = row.discounts; if (typeof discResp2 === 'string') { try { discResp2 = JSON.parse(discResp2); } catch { discResp2 = []; } }
-  res.json({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: planResp2, discounts: Array.isArray(discResp2) ? discResp2 : [] });
+  return res.success({ id: String(row.id), stage: row.stage, tuitionFee: parseFloat(row.tuitionFee), bookFees: parseFloat(row.bookFees), uniformFees: parseFloat(row.uniformFees), activityFees: parseFloat(row.activityFees), paymentPlanType: row.paymentPlanType, paymentPlanDetails: planResp2, discounts: Array.isArray(discResp2) ? discResp2 : [] }, 'Fee setup updated');
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
 router.delete('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
   try {
     const count = await FeeSetup.destroy({ where: { id: Number(req.params.id), schoolId: Number(req.params.schoolId) } });
-    res.json({ deleted: count > 0 });
+    if (count === 0) return res.error(404, 'NOT_FOUND', 'Fee setup not found');
+    return res.success({ deleted: true }, 'Fee setup deleted');
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 

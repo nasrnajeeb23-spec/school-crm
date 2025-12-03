@@ -37,137 +37,137 @@ const TrialRequest = require('./TrialRequest');
 
 // Define associations
 // School <-> Subscription (One-to-One)
-School.hasOne(Subscription, { foreignKey: 'schoolId' });
-Subscription.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasOne(Subscription, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Subscription.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // Plan <-> Subscription (One-to-Many)
-Plan.hasMany(Subscription, { foreignKey: 'planId' });
-Subscription.belongsTo(Plan, { foreignKey: 'planId' });
+Plan.hasMany(Subscription, { foreignKey: 'planId', onDelete: 'SET NULL' });
+Subscription.belongsTo(Plan, { foreignKey: 'planId', onDelete: 'SET NULL' });
 
 // Invoice <-> Payment (One-to-Many, as an invoice can have partial payments)
-Invoice.hasMany(Payment, { foreignKey: 'invoiceId' });
-Payment.belongsTo(Invoice, { foreignKey: 'invoiceId' });
+Invoice.hasMany(Payment, { foreignKey: 'invoiceId', onDelete: 'CASCADE', hooks: true });
+Payment.belongsTo(Invoice, { foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 
 // School <-> User (One-to-Many) - For SchoolAdmins
-School.hasMany(User, { foreignKey: 'schoolId' });
-User.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(User, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+User.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // User <-> Teacher (One-to-One)
-User.belongsTo(Teacher, { foreignKey: 'teacherId', constraints: false });
-Teacher.hasOne(User, { foreignKey: 'teacherId' });
+User.belongsTo(Teacher, { foreignKey: 'teacherId', constraints: false, onDelete: 'SET NULL' });
+Teacher.hasOne(User, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
 
 // User <-> Parent (One-to-One)
-User.belongsTo(Parent, { foreignKey: 'parentId', constraints: false });
-Parent.hasOne(User, { foreignKey: 'parentId' });
+User.belongsTo(Parent, { foreignKey: 'parentId', constraints: false, onDelete: 'SET NULL' });
+Parent.hasOne(User, { foreignKey: 'parentId', onDelete: 'SET NULL' });
 
 
 // School <-> Student (One-to-Many)
-School.hasMany(Student, { foreignKey: 'schoolId' });
-Student.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(Student, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Student.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // School <-> Teacher (One-to-Many)
-School.hasMany(Teacher, { foreignKey: 'schoolId' });
-Teacher.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(Teacher, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Teacher.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // School <-> Class (One-to-Many)
-School.hasMany(Class, { foreignKey: 'schoolId' });
-Class.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(Class, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Class.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // Class <-> homeroomTeacher (One-to-One)
-Teacher.hasOne(Class, { as: 'HomeroomClass', foreignKey: 'homeroomTeacherId' });
-Class.belongsTo(Teacher, { as: 'HomeroomTeacher', foreignKey: 'homeroomTeacherId' });
+Teacher.hasOne(Class, { as: 'HomeroomClass', foreignKey: 'homeroomTeacherId', onDelete: 'SET NULL' });
+Class.belongsTo(Teacher, { as: 'HomeroomTeacher', foreignKey: 'homeroomTeacherId', onDelete: 'SET NULL' });
 
 
 // School <-> Parent (One-to-Many)
-School.hasMany(Parent, { foreignKey: 'schoolId' });
-Parent.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(Parent, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Parent.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // Parent <-> Student (One-to-Many, a parent can have multiple children)
-Parent.hasMany(Student, { foreignKey: 'parentId' });
-Student.belongsTo(Parent, { foreignKey: 'parentId' });
+Parent.hasMany(Student, { foreignKey: 'parentId', onDelete: 'SET NULL' });
+Student.belongsTo(Parent, { foreignKey: 'parentId', onDelete: 'SET NULL' });
 
 // Student <-> Invoice (One-to-Many)
-Student.hasMany(Invoice, { foreignKey: 'studentId' });
-Invoice.belongsTo(Student, { foreignKey: 'studentId' });
+Student.hasMany(Invoice, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+Invoice.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
 
 // School <-> SchoolSettings (One-to-One)
-School.hasOne(SchoolSettings, { foreignKey: 'schoolId' });
-SchoolSettings.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasOne(SchoolSettings, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+SchoolSettings.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // School <-> SchoolEvent (One-to-Many)
-School.hasMany(SchoolEvent, { foreignKey: 'schoolId' });
-SchoolEvent.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(SchoolEvent, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+SchoolEvent.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // School <-> Expense (One-to-Many)
-School.hasMany(Expense, { foreignKey: 'schoolId' });
-Expense.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(Expense, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Expense.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // Teacher <-> Notification (One-to-Many)
-Teacher.hasMany(Notification, { foreignKey: 'teacherId' });
-Notification.belongsTo(Teacher, { foreignKey: 'teacherId' });
+Teacher.hasMany(Notification, { foreignKey: 'teacherId', onDelete: 'CASCADE', hooks: true });
+Notification.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'CASCADE' });
 
 // Parent <-> Notification (One-to-Many)
-Parent.hasMany(Notification, { foreignKey: 'parentId' });
-Notification.belongsTo(Parent, { foreignKey: 'parentId' });
+Parent.hasMany(Notification, { foreignKey: 'parentId', onDelete: 'CASCADE', hooks: true });
+Notification.belongsTo(Parent, { foreignKey: 'parentId', onDelete: 'CASCADE' });
 
 
 // --- Student Profile Associations ---
 
 // Student <-> Grade (One-to-Many)
-Student.hasMany(Grade, { foreignKey: 'studentId' });
-Grade.belongsTo(Student, { foreignKey: 'studentId' });
-Teacher.hasMany(Grade, { foreignKey: 'teacherId' });
-Grade.belongsTo(Teacher, { foreignKey: 'teacherId' });
-Class.hasMany(Grade, { foreignKey: 'classId' });
-Grade.belongsTo(Class, { foreignKey: 'classId' });
+Student.hasMany(Grade, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+Grade.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
+Teacher.hasMany(Grade, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
+Grade.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
+Class.hasMany(Grade, { foreignKey: 'classId', onDelete: 'CASCADE', hooks: true });
+Grade.belongsTo(Class, { foreignKey: 'classId', onDelete: 'CASCADE' });
 
 // Student <-> Attendance (One-to-Many)
-Student.hasMany(Attendance, { foreignKey: 'studentId' });
-Attendance.belongsTo(Student, { foreignKey: 'studentId' });
-Class.hasMany(Attendance, { foreignKey: 'classId' });
-Attendance.belongsTo(Class, { foreignKey: 'classId' });
+Student.hasMany(Attendance, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+Attendance.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
+Class.hasMany(Attendance, { foreignKey: 'classId', onDelete: 'CASCADE', hooks: true });
+Attendance.belongsTo(Class, { foreignKey: 'classId', onDelete: 'CASCADE' });
 
 // Student <-> Note (One-to-Many)
-Student.hasMany(StudentNote, { foreignKey: 'studentId' });
-StudentNote.belongsTo(Student, { foreignKey: 'studentId' });
+Student.hasMany(StudentNote, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+StudentNote.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
 
 // Student <-> Document (One-to-Many)
-Student.hasMany(StudentDocument, { foreignKey: 'studentId' });
-StudentDocument.belongsTo(Student, { foreignKey: 'studentId' });
+Student.hasMany(StudentDocument, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+StudentDocument.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
 
 // Class <-> Student (One-to-Many roster membership)
-Class.hasMany(Student, { foreignKey: 'classId' });
-Student.belongsTo(Class, { foreignKey: 'classId' });
+Class.hasMany(Student, { foreignKey: 'classId', onDelete: 'SET NULL' });
+Student.belongsTo(Class, { foreignKey: 'classId', onDelete: 'SET NULL' });
 
 // Class <-> Schedule (One-to-Many)
-Class.hasMany(Schedule, { foreignKey: 'classId' });
-Schedule.belongsTo(Class, { foreignKey: 'classId' });
-Teacher.hasMany(Schedule, { foreignKey: 'teacherId' });
-Schedule.belongsTo(Teacher, { foreignKey: 'teacherId' });
+Class.hasMany(Schedule, { foreignKey: 'classId', onDelete: 'CASCADE', hooks: true });
+Schedule.belongsTo(Class, { foreignKey: 'classId', onDelete: 'CASCADE' });
+Teacher.hasMany(Schedule, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
+Schedule.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
 
 // --- Transportation Associations ---
-School.hasMany(BusOperator, { foreignKey: 'schoolId' });
-BusOperator.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(BusOperator, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+BusOperator.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
-School.hasMany(Route, { foreignKey: 'schoolId' });
-Route.belongsTo(School, { foreignKey: 'schoolId' });
-BusOperator.hasMany(Route, { foreignKey: 'busOperatorId' });
-Route.belongsTo(BusOperator, { foreignKey: 'busOperatorId' });
+School.hasMany(Route, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Route.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+BusOperator.hasMany(Route, { foreignKey: 'busOperatorId', onDelete: 'CASCADE', hooks: true });
+Route.belongsTo(BusOperator, { foreignKey: 'busOperatorId', onDelete: 'CASCADE' });
 
-Route.hasMany(RouteStudent, { foreignKey: 'routeId' });
-RouteStudent.belongsTo(Route, { foreignKey: 'routeId' });
-Student.hasMany(RouteStudent, { foreignKey: 'studentId' });
-RouteStudent.belongsTo(Student, { foreignKey: 'studentId' });
+Route.hasMany(RouteStudent, { foreignKey: 'routeId', onDelete: 'CASCADE', hooks: true });
+RouteStudent.belongsTo(Route, { foreignKey: 'routeId', onDelete: 'CASCADE' });
+Student.hasMany(RouteStudent, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+RouteStudent.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
 
 // --- Messaging Associations ---
-Conversation.hasMany(Message, { foreignKey: 'conversationId' });
-Message.belongsTo(Conversation, { foreignKey: 'conversationId' });
-Teacher.hasMany(Conversation, { foreignKey: 'teacherId' });
-Parent.hasMany(Conversation, { foreignKey: 'parentId' });
-Conversation.belongsTo(Teacher, { foreignKey: 'teacherId' });
-Conversation.belongsTo(Parent, { foreignKey: 'parentId' });
-School.hasMany(Conversation, { foreignKey: 'schoolId' });
-Conversation.belongsTo(School, { foreignKey: 'schoolId' });
+Conversation.hasMany(Message, { foreignKey: 'conversationId', onDelete: 'CASCADE', hooks: true });
+Message.belongsTo(Conversation, { foreignKey: 'conversationId', onDelete: 'CASCADE' });
+Teacher.hasMany(Conversation, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
+Parent.hasMany(Conversation, { foreignKey: 'parentId', onDelete: 'SET NULL' });
+Conversation.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
+Conversation.belongsTo(Parent, { foreignKey: 'parentId', onDelete: 'SET NULL' });
+School.hasMany(Conversation, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Conversation.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 
 const db = {
@@ -210,28 +210,28 @@ const db = {
 
 module.exports = db;
 // School <-> SalaryStructure (One-to-Many)
-School.hasMany(SalaryStructure, { foreignKey: 'schoolId' });
-SalaryStructure.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(SalaryStructure, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+SalaryStructure.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // School <-> FeeSetup (One-to-Many)
-School.hasMany(FeeSetup, { foreignKey: 'schoolId' });
-FeeSetup.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(FeeSetup, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+FeeSetup.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // School <-> SalarySlip (One-to-Many)
-School.hasMany(SalarySlip, { foreignKey: 'schoolId' });
-SalarySlip.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(SalarySlip, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+SalarySlip.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 // User/Teacher <-> SalarySlip (One-to-Many via personId)
 // School <-> StaffAttendance (One-to-Many)
-School.hasMany(StaffAttendance, { foreignKey: 'schoolId' });
-StaffAttendance.belongsTo(School, { foreignKey: 'schoolId' });
-User.hasMany(StaffAttendance, { foreignKey: 'userId' });
-StaffAttendance.belongsTo(User, { foreignKey: 'userId' });
+School.hasMany(StaffAttendance, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+StaffAttendance.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+User.hasMany(StaffAttendance, { foreignKey: 'userId', onDelete: 'CASCADE', hooks: true });
+StaffAttendance.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
 
 // School <-> TeacherAttendance (One-to-Many)
-School.hasMany(TeacherAttendance, { foreignKey: 'schoolId' });
-TeacherAttendance.belongsTo(School, { foreignKey: 'schoolId' });
-Teacher.hasMany(TeacherAttendance, { foreignKey: 'teacherId' });
-TeacherAttendance.belongsTo(Teacher, { foreignKey: 'teacherId' });
-School.hasMany(Job, { foreignKey: 'schoolId' });
-Job.belongsTo(School, { foreignKey: 'schoolId' });
+School.hasMany(TeacherAttendance, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+TeacherAttendance.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+Teacher.hasMany(TeacherAttendance, { foreignKey: 'teacherId', onDelete: 'CASCADE', hooks: true });
+TeacherAttendance.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'CASCADE' });
+School.hasMany(Job, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Job.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });

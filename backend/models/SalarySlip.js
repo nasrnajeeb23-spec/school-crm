@@ -83,6 +83,12 @@ const SalarySlip = sequelize.define('SalarySlip', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+}, {
+  indexes: [
+    { fields: ['schoolId'] },
+    { fields: ['schoolId','month'] },
+    { fields: ['personType','personId','month'] }
+  ]
 });
 
 module.exports = SalarySlip;

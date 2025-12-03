@@ -46,6 +46,7 @@ async function verifyToken(req, res, next) {
     }
     next();
   } catch (err) {
+    try { const logger = req.app && req.app.locals && req.app.locals.logger; if (logger) logger.warn('auth_invalid_token', { path: req.originalUrl || req.url, ip: req.ip }); } catch {}
     return res.status(401).json({ msg: 'Invalid or expired token' });
   }
 }
@@ -73,6 +74,7 @@ function requireRole(...allowedRoles) {
     const allowedRolesUpper = allowedRoles.map(role => normalizeRole(role));
 
     if (!allowedRolesUpper.includes(userRole)) {
+      try { const logger = req.app && req.app.locals && req.app.locals.logger; if (logger) logger.warn('access_denied_role', { userId: req.user.id, role: userRole, allowed: allowedRolesUpper, path: req.originalUrl || req.url }); } catch {}
       return res.status(403).json({ msg: 'Access denied' });
     }
     next();
@@ -106,6 +108,7 @@ function requireSameSchoolParam(paramName = 'schoolId') {
     const userSchoolId = Number(req.user.schoolId || 0);
     const matchesParam = !!requestedSchoolId && userSchoolId === requestedSchoolId;
     if (!matchesParam) {
+      try { const logger = req.app && req.app.locals && req.app.locals.logger; if (logger) logger.warn('access_denied_school', { userId: req.user.id, role: req.user.role, userSchoolId, requestedSchoolId, path: req.originalUrl || req.url }); } catch {}
       return res.status(403).json({ msg: 'Access denied for this school' });
     }
     next();
@@ -117,9 +120,42 @@ function requirePermission(...requiredPerms) {
     if (!req.user) return res.status(401).json({ msg: 'Unauthenticated' });
     const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
     const ok = requiredPerms.some(p => perms.includes(p));
-    if (!ok) return res.status(403).json({ msg: 'Insufficient permissions' });
+    if (!ok) { try { const logger = req.app && req.app.locals && req.app.locals.logger; if (logger) logger.warn('access_denied_permission', { userId: req.user.id, role: req.user.role, requiredPerms, path: req.originalUrl || req.url }); } catch {} return res.status(403).json({ msg: 'Insufficient permissions' }); }
     next();
   };
 }
 
-module.exports = { verifyToken, requireRole, requireSameSchoolParam, requirePermission, JWT_SECRET };
+function requireSameSchoolQuery(paramName = 'schoolId') {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ msg: 'Unauthenticated' });
+
+    const normalizeRole = (role) => {
+      if (!role) return '';
+      const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
+      const map = {
+        SUPERADMIN: 'SUPER_ADMIN',
+        SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL',
+        SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL',
+        SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
+        SCHOOLADMIN: 'SCHOOL_ADMIN',
+        TEACHER: 'TEACHER',
+        PARENT: 'PARENT'
+      };
+      return map[key] || String(role).toUpperCase();
+    };
+
+    const superAdminRoles = ['SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'];
+    if (superAdminRoles.includes(normalizeRole(req.user.role))) return next();
+
+    const requestedSchoolId = parseInt((req.query && req.query[paramName]) || '', 10);
+    const userSchoolId = Number(req.user.schoolId || 0);
+    const matchesQuery = !!requestedSchoolId && userSchoolId === requestedSchoolId;
+    if (!matchesQuery) {
+      try { const logger = req.app && req.app.locals && req.app.locals.logger; if (logger) logger.warn('access_denied_school_query', { userId: req.user.id, role: req.user.role, userSchoolId, requestedSchoolId, path: req.originalUrl || req.url }); } catch {}
+      return res.status(403).json({ msg: 'Access denied for this school' });
+    }
+    next();
+  };
+}
+
+module.exports = { verifyToken, requireRole, requireSameSchoolParam, requirePermission, JWT_SECRET, requireSameSchoolQuery };

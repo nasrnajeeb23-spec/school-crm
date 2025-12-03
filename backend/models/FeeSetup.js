@@ -12,6 +12,9 @@ const FeeSetup = sequelize.define('FeeSetup', {
   paymentPlanType: { type: DataTypes.ENUM('Monthly','Termly','Installments'), allowNull: false, defaultValue: 'Monthly' },
   paymentPlanDetails: { type: DataTypes.JSON, allowNull: true, defaultValue: {} },
   discounts: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
-}, { tableName: 'fee_setups' });
+}, { tableName: 'fee_setups', indexes: [
+  { fields: ['schoolId'] },
+  { fields: ['schoolId','stage'] }
+] });
 
 module.exports = FeeSetup;

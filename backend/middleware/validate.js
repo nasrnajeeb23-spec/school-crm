@@ -12,8 +12,30 @@ function validate(requiredSpec) {
         errors.push(`${spec.name} is required`);
         continue;
       }
-      if (value !== undefined && spec.type && typeof value !== spec.type) {
-        errors.push(`${spec.name} must be of type ${spec.type}`);
+      if (value !== undefined && spec.type) {
+        if (spec.type === 'array') {
+          if (!Array.isArray(value)) {
+            errors.push(`${spec.name} must be an array`);
+          } else if (spec.element && typeof spec.element === 'object') {
+            for (const [k, rule] of Object.entries(spec.element)) {
+              for (const [idx, item] of value.entries()) {
+                const v = item[k];
+                if (rule.required && (v === undefined || v === null || (typeof v === 'string' && v.trim() === ''))) {
+                  errors.push(`${spec.name}[${idx}].${k} is required`);
+                  continue;
+                }
+                if (v !== undefined && rule.type && typeof v !== rule.type) {
+                  errors.push(`${spec.name}[${idx}].${k} must be of type ${rule.type}`);
+                }
+                if (v !== undefined && rule.enum && !rule.enum.includes(v)) {
+                  errors.push(`${spec.name}[${idx}].${k} must be one of: ${rule.enum.join(', ')}`);
+                }
+              }
+            }
+          }
+        } else if (typeof value !== spec.type) {
+          errors.push(`${spec.name} must be of type ${spec.type}`);
+        }
       }
       if (value !== undefined && spec.enum && !spec.enum.includes(value)) {
         errors.push(`${spec.name} must be one of: ${spec.enum.join(', ')}`);
@@ -22,7 +44,7 @@ function validate(requiredSpec) {
         errors.push(`${spec.name} must be at least ${spec.minLength} chars`);
       }
     }
-    if (errors.length) return res.status(400).json({ msg: 'Validation failed', errors });
+    if (errors.length) return res.error(400, 'VALIDATION_FAILED', 'Validation failed', errors);
     next();
   };
 }

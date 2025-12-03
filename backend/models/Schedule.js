@@ -21,6 +21,13 @@ const Schedule = sequelize.define('Schedule', {
   },
   // Foreign keys are added via association
   // classId, teacherId
+}, {
+  indexes: [
+    { fields: ['classId'] },
+    { fields: ['teacherId'] },
+    { fields: ['day'] },
+    { fields: ['classId','day'] }
+  ]
 });
 
 module.exports = Schedule;

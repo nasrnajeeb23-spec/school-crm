@@ -22,6 +22,13 @@ const Invoice = sequelize.define('Invoice', {
   },
   // Foreign keys are added via associations
   // studentId
+}, {
+  indexes: [
+    { fields: ['studentId'] },
+    { fields: ['status'] },
+    { fields: ['dueDate'] },
+    { fields: ['studentId','dueDate'] }
+  ]
 });
 
 module.exports = Invoice;

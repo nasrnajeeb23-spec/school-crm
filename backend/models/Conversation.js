@@ -8,6 +8,13 @@ const Conversation = sequelize.define('Conversation', {
   schoolId: { type: DataTypes.INTEGER, allowNull: false },
   teacherId: { type: DataTypes.INTEGER, allowNull: true },
   parentId: { type: DataTypes.INTEGER, allowNull: true },
+}, {
+  indexes: [
+    { fields: ['schoolId'] },
+    { fields: ['teacherId'] },
+    { fields: ['parentId'] },
+    { unique: true, fields: ['roomId'] }
+  ]
 });
 
 module.exports = Conversation;

@@ -90,7 +90,6 @@ router.get('/:id', async (req, res) => {
       status: s.Subscription?.status || 'N/A',
       students: s.studentCount,
       teachers: s.teacherCount,
-      balance: parseFloat(s.balance),
       joinDate: new Date(s.createdAt).toISOString().split('T')[0],
     });
   } catch (err) {

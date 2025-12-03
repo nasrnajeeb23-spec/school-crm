@@ -17,6 +17,12 @@ const Attendance = sequelize.define('Attendance', {
   },
   // Foreign keys are added via association
   // studentId, classId
+}, {
+  indexes: [
+    { fields: ['date'] },
+    { fields: ['studentId','date'] },
+    { fields: ['classId','date'] }
+  ]
 });
 
 module.exports = Attendance;

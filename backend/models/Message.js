@@ -9,6 +9,11 @@ const Message = sequelize.define('Message', {
   attachmentUrl: { type: DataTypes.STRING, allowNull: true },
   attachmentType: { type: DataTypes.STRING, allowNull: true },
   attachmentName: { type: DataTypes.STRING, allowNull: true },
+}, {
+  indexes: [
+    { fields: ['senderId'] },
+    { fields: ['senderRole'] }
+  ]
 });
 
 module.exports = Message;

@@ -119,10 +119,10 @@ router.get('/conversations/:conversationId/messages', verifyToken, requireRole('
 router.post('/conversations', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { title, schoolId, teacherId, parentId } = req.body || {};
-    if (!title || !schoolId || (!teacherId && !parentId)) return res.status(400).json({ msg: 'Invalid payload' });
+    if (!title || !schoolId || (!teacherId && !parentId)) return res.error(400, 'VALIDATION_FAILED', 'Invalid payload');
     if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId)) return res.status(403).json({ msg: 'Access denied' });
     const conv = await Conversation.create({ id: `conv_${Date.now()}`, roomId: `room_${Date.now()}`, title, schoolId, teacherId: teacherId || null, parentId: parentId || null });
-    res.status(201).json({ id: conv.id, roomId: conv.roomId, title: conv.title });
+    return res.success({ id: conv.id, roomId: conv.roomId, title: conv.title }, 'Conversation created', 'CREATED');
   } catch (e) { res.status(500).send('Server Error'); }
 });
 
@@ -149,10 +149,10 @@ router.post('/upload', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', '
 router.post('/send', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), async (req, res) => {
   try {
     const { conversationId, text, attachmentUrl, attachmentType, attachmentName } = req.body || {};
-    if (!conversationId || !text) return res.status(400).json({ msg: 'conversationId and text are required' });
+    if (!conversationId || !text) return res.error(400, 'VALIDATION_FAILED', 'conversationId and text are required');
 
     const conv = await Conversation.findByPk(conversationId);
-    if (!conv) return res.status(404).json({ msg: 'Conversation not found' });
+    if (!conv) return res.error(404, 'NOT_FOUND', 'Conversation not found');
     if (req.user.role !== 'SUPER_ADMIN' && Number(conv.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     if (req.user.role === 'TEACHER' && conv.teacherId && String(req.user.teacherId) !== String(conv.teacherId)) return res.status(403).json({ msg: 'Access denied' });
     if (req.user.role === 'PARENT' && conv.parentId && String(req.user.parentId) !== String(conv.parentId)) return res.status(403).json({ msg: 'Access denied' });
@@ -178,7 +178,7 @@ router.post('/send', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TE
 
     try { await conv.update({ updatedAt: new Date() }); } catch {}
 
-    return res.status(201).json({
+    return res.success({
       id: msg.id,
       text: msg.text,
       senderId: msg.senderId,
@@ -187,7 +187,7 @@ router.post('/send', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TE
       attachmentUrl: msg.attachmentUrl,
       attachmentType: msg.attachmentType,
       attachmentName: msg.attachmentName,
-    });
+    }, 'Message sent', 'CREATED');
   } catch (e) {
     console.error(e.message);
     res.status(500).send('Server Error');

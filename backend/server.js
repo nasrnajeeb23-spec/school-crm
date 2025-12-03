@@ -141,6 +141,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+// Standard API response middleware
+try { app.use(require('./middleware/response').responseFormatter); } catch {}
 let promClient;
 try { promClient = require('prom-client'); } catch {}
 if (promClient) { 
@@ -382,6 +384,58 @@ app.get('/api/content/landing', (req, res) => {
   });
 });
 
+// Health check endpoint for production verification
+app.get('/api/health', async (req, res) => {
+  const out = {
+    success: true,
+    code: 'HEALTH_OK',
+    message: 'Health status',
+    data: {
+      env: {
+        JWT_SECRET: !!process.env.JWT_SECRET,
+        SESSION_SECRET: !!process.env.SESSION_SECRET,
+        REDIS_URL: !!process.env.REDIS_URL,
+        ANALYTICS_CACHE_ENABLED: (process.env.ANALYTICS_CACHE_ENABLED || null),
+        ANALYTICS_CACHE_TTL_SECONDS: (process.env.ANALYTICS_CACHE_TTL_SECONDS || null)
+      },
+      responseMiddlewareAttached: typeof (res.success) === 'function',
+      cache: {
+        enabled: (() => { try { return (process.env.ANALYTICS_CACHE_ENABLED ? String(process.env.ANALYTICS_CACHE_ENABLED).toLowerCase() === 'true' : (process.env.NODE_ENV !== 'development')); } catch { return false; } })()
+      },
+      redis: { connected: false, ping: null },
+      db: { authenticated: false, dialect: null },
+      indexes: { checked: false, tables: [] }
+    }
+  };
+  try {
+    // Redis check
+    const client = app.locals.redisClient;
+    if (client) {
+      try { const pong = await client.ping(); out.data.redis.connected = true; out.data.redis.ping = pong; } catch {}
+    }
+  } catch {}
+  try {
+    // DB check
+    const db = require('./models');
+    const qi = db.sequelize.getQueryInterface();
+    out.data.db.dialect = db.sequelize.getDialect();
+    await db.sequelize.authenticate();
+    out.data.db.authenticated = true;
+    // Indexes check (Postgres): use model table names for accuracy
+    const tables = [db.FeeSetup, db.StaffAttendance, db.TeacherAttendance, db.SalarySlip, db.SalaryStructure, db.Conversation, db.Message]
+      .map(m => (m && typeof m.getTableName === 'function') ? m.getTableName() : null)
+      .filter(Boolean);
+    for (const t of tables) {
+      try {
+        const idx = await qi.showIndex(t);
+        out.data.indexes.tables.push({ table: t, indexes: (idx || []).map(i => ({ name: i.name || i.indexName || '', fields: i.fields ? i.fields.map(f => f.attribute || f) : [] })) });
+        out.data.indexes.checked = true;
+      } catch {}
+    }
+  } catch {}
+  try { return res.json(out); } catch { return res.status(200).json(out); }
+});
+
 // Modules catalog and pricing config (in-memory)
 const modulesCatalog = [
   { id: 'student_management', name: 'إدارة الطلاب', description: 'ملفات الطلاب والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
@@ -468,35 +522,6 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/messaging', (req, res) => res.json({ ok: true }));
-app.get('/api/messaging/conversations', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), async (req, res) => {
-  try {
-    const { Conversation } = require('./models');
-    const { schoolId } = req.query;
-    const where = {};
-    if (schoolId) where.schoolId = Number(schoolId);
-    if (req.user.role === 'TEACHER') where.teacherId = req.user.teacherId;
-    if (req.user.role === 'PARENT') where.parentId = req.user.parentId;
-    const convs = await Conversation.findAll({ where, order: [['updatedAt','DESC']] });
-    res.json(convs.map(c => ({ id: c.id, roomId: c.roomId, title: c.title })));
-  } catch (e) { res.status(500).send('Server Error'); }
-});
-app.get('/api/messaging/conversations/:conversationId/messages', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), async (req, res) => {
-  try {
-    const { Message } = require('./models');
-    const msgs = await Message.findAll({ where: { conversationId: req.params.conversationId }, order: [['createdAt','ASC']] });
-    res.json(msgs.map(m => ({ id: m.id, text: m.text, senderId: m.senderId, senderRole: m.senderRole, timestamp: m.createdAt, attachmentUrl: m.attachmentUrl, attachmentType: m.attachmentType, attachmentName: m.attachmentName })));
-  } catch (e) { res.status(500).send('Server Error'); }
-});
-app.post('/api/messaging/conversations', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
-  try {
-    const { Conversation } = require('./models');
-    const { title, schoolId, teacherId, parentId } = req.body || {};
-    if (!title || !schoolId || (!teacherId && !parentId)) return res.status(400).json({ msg: 'Invalid payload' });
-    const conv = await Conversation.create({ id: `conv_${Date.now()}`, roomId: `room_${Date.now()}`, title, schoolId, teacherId: teacherId || null, parentId: parentId || null });
-    res.status(201).json({ id: conv.id, roomId: conv.roomId, title: conv.title });
-  } catch (e) { res.status(500).send('Server Error'); }
-});
 const uploadLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 100 });
 app.post('/api/messaging/upload', uploadLimiter, verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), async (req, res) => {
   try {
@@ -639,7 +664,7 @@ syncDatabase()
     // Transportation seed
         const op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
         const rt = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
-        const parent = await Parent.create({ name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active' });
+        const parent = await Parent.create({ name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id });
         const student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] });
         await RouteStudent.create({ routeId: rt.id, studentId: student.id });
         console.log('Seeded minimal dev data');
@@ -647,14 +672,15 @@ syncDatabase()
       // Ensure demo parent/student and transportation always exist
       const school = await School.findOne();
       if (school) {
-        const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active' } });
+        const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id } });
+        if (!parent.schoolId) { try { parent.schoolId = school.id; await parent.save(); } catch {} }
         const [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
         const [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
         const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
         await RouteStudent.findOrCreate({ where: { routeId: rt.id, studentId: student.id }, defaults: { routeId: rt.id, studentId: student.id } });
         // Ensure parent user for dashboard login
         const { User } = require('./models');
-        await User.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: parent.name, email: 'parent@school.com', password: await bcrypt.hash('password', 10), role: 'Parent', parentId: parent.id } });
+        await User.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: parent.name, email: 'parent@school.com', password: await bcrypt.hash('password', 10), role: 'Parent', parentId: parent.id, schoolId: school.id } });
         await User.findOrCreate({ where: { email: 'super@admin.com' }, defaults: { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash('password', 10), role: 'SuperAdmin' } });
         const [adminUser] = await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES'] } });
         if (!adminUser.schoolId || !adminUser.permissions || adminUser.permissions.length === 0) { adminUser.schoolId = school.id; adminUser.schoolRole = 'مدير'; adminUser.permissions = ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES']; await adminUser.save(); }
@@ -671,6 +697,43 @@ syncDatabase()
     } catch (e) {
       console.warn('Seeding skipped or failed:', e?.message || e);
     }
+    // Ensure critical indexes exist in production
+    try {
+      const db = require('./models');
+      const qi = db.sequelize.getQueryInterface();
+      const ensureIndex = async (model, fields, nameHint) => {
+        try {
+          const table = (model && typeof model.getTableName === 'function') ? model.getTableName() : null;
+          if (!table) return;
+          const existing = await qi.showIndex(table);
+          const exists = (existing || []).some(ix => {
+            const f = ix.fields ? ix.fields.map(x => (x.attribute || x)) : [];
+            return f.join(',') === fields.join(',');
+          });
+          if (!exists) {
+            const name = `idx_${String(table).replace(/[^a-z0-9_]/gi,'_')}_${fields.join('_')}`.toLowerCase();
+            await qi.addIndex(table, fields, { name });
+            try { console.log('Added index', name, 'on', table); } catch {}
+          }
+        } catch (e) { try { console.warn('Index ensure failed', nameHint || fields.join(','), e?.message || e); } catch {} }
+      };
+      await ensureIndex(db.FeeSetup, ['schoolId'], 'fee_school');
+      await ensureIndex(db.FeeSetup, ['schoolId','stage'], 'fee_school_stage');
+      await ensureIndex(db.StaffAttendance, ['schoolId'], 'staff_school');
+      await ensureIndex(db.StaffAttendance, ['schoolId','date'], 'staff_school_date');
+      await ensureIndex(db.StaffAttendance, ['userId','date'], 'staff_user_date');
+      await ensureIndex(db.TeacherAttendance, ['schoolId'], 'teach_school');
+      await ensureIndex(db.TeacherAttendance, ['schoolId','date'], 'teach_school_date');
+      await ensureIndex(db.TeacherAttendance, ['teacherId','date'], 'teach_teacher_date');
+      await ensureIndex(db.SalarySlip, ['schoolId'], 'slip_school');
+      await ensureIndex(db.SalarySlip, ['schoolId','month'], 'slip_school_month');
+      await ensureIndex(db.SalarySlip, ['personType','personId','month'], 'slip_person_month');
+      await ensureIndex(db.Conversation, ['schoolId'], 'conv_school');
+      await ensureIndex(db.Conversation, ['teacherId'], 'conv_teacher');
+      await ensureIndex(db.Conversation, ['parentId'], 'conv_parent');
+      await ensureIndex(db.Message, ['senderId'], 'msg_sender');
+      await ensureIndex(db.Message, ['senderRole'], 'msg_role');
+    } catch (e) { try { console.warn('Index bootstrap failed', e?.message || e); } catch {} }
     try {
       const { SchoolSettings, Subscription } = require('./models');
       const settingsRows = await SchoolSettings.findAll();

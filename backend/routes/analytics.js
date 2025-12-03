@@ -1,15 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const AnalyticsService = require('../services/AnalyticsService');
-const { verifyToken: auth } = require('../middleware/auth');
+const { verifyToken: auth, requireSameSchoolQuery } = require('../middleware/auth');
 const { query, validationResult } = require('express-validator');
 
 // AI-Powered Analytics Routes
-router.get('/insights/at-risk-students', auth, async (req, res) => {
+router.get('/insights/at-risk-students', auth, requireSameSchoolQuery('schoolId'), async (req, res) => {
   try {
     const { schoolId } = req.query;
-    const userId = req.user.id;
-    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
+    const redis = req.app && req.app.locals && req.app.locals.redisClient;
+    const enabled = process.env.ANALYTICS_CACHE_ENABLED ? String(process.env.ANALYTICS_CACHE_ENABLED).toLowerCase() === 'true' : (process.env.NODE_ENV !== 'development');
+    const ttl = parseInt(process.env.ANALYTICS_CACHE_TTL_SECONDS || '600', 10);
+    const key = `analytics:at_risk:${schoolId}`;
+    if (enabled && redis) {
+      try { const cached = await redis.get(key); if (cached) return res.json(JSON.parse(cached)); } catch {}
+    }
     
     if (!schoolId) {
       return res.status(400).json({
@@ -20,8 +25,7 @@ router.get('/insights/at-risk-students', auth, async (req, res) => {
     }
 
     const insights = await AnalyticsService.predictAtRiskStudents(schoolId);
-    
-    res.json({
+    const payload = {
       success: true,
       data: {
         insights,
@@ -29,7 +33,9 @@ router.get('/insights/at-risk-students', auth, async (req, res) => {
         modelAccuracy: 0.85,
         totalPredictions: insights.length
       }
-    });
+    };
+    if (enabled && redis) { try { await redis.setEx(key, ttl, JSON.stringify(payload)); } catch {} }
+    res.json(payload);
 
   } catch (error) {
     console.error('At-risk students analytics error:', error);
@@ -41,7 +47,7 @@ router.get('/insights/at-risk-students', auth, async (req, res) => {
   }
 });
 
-router.get('/insights/academic-performance', auth, [
+router.get('/insights/academic-performance', auth, requireSameSchoolQuery('schoolId'), [
   query('schoolId').optional().isInt({ min: 1 }).withMessage('Invalid school ID'),
   query('timeRange').optional().isIn(['week', 'month', 'quarter', 'year']).withMessage('Invalid time range')
 ], async (req, res) => {
@@ -52,12 +58,14 @@ router.get('/insights/academic-performance', auth, [
     }
 
     const { schoolId, timeRange = 'month' } = req.query;
-    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
-    const userId = req.user.id;
+    const redis = req.app && req.app.locals && req.app.locals.redisClient;
+    const enabled = process.env.ANALYTICS_CACHE_ENABLED ? String(process.env.ANALYTICS_CACHE_ENABLED).toLowerCase() === 'true' : (process.env.NODE_ENV !== 'development');
+    const ttl = parseInt(process.env.ANALYTICS_CACHE_TTL_SECONDS || '600', 10);
+    const key = `analytics:academic:${schoolId}:${timeRange}`;
+    if (enabled && redis) { try { const cached = await redis.get(key); if (cached) return res.json(JSON.parse(cached)); } catch {} }
 
     const insights = await AnalyticsService.analyzeAcademicPerformance(schoolId, timeRange);
-    
-    res.json({
+    const payload = {
       success: true,
       data: {
         insights,
@@ -71,7 +79,9 @@ router.get('/insights/academic-performance', auth, [
           needsAttention: insights.needsAttention
         }
       }
-    });
+    };
+    if (enabled && redis) { try { await redis.setEx(key, ttl, JSON.stringify(payload)); } catch {} }
+    res.json(payload);
 
   } catch (error) {
     console.error('Academic performance analytics error:', error);
@@ -83,11 +93,14 @@ router.get('/insights/academic-performance', auth, [
   }
 });
 
-router.get('/insights/financial-trends', auth, async (req, res) => {
+router.get('/insights/financial-trends', auth, requireSameSchoolQuery('schoolId'), async (req, res) => {
   try {
     const { schoolId, timeRange = 'year' } = req.query;
-    const userId = req.user.id;
-    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
+    const redis = req.app && req.app.locals && req.app.locals.redisClient;
+    const enabled = process.env.ANALYTICS_CACHE_ENABLED ? String(process.env.ANALYTICS_CACHE_ENABLED).toLowerCase() === 'true' : (process.env.NODE_ENV !== 'development');
+    const ttl = parseInt(process.env.ANALYTICS_CACHE_TTL_SECONDS || '600', 10);
+    const key = `analytics:financial:${schoolId}:${timeRange}`;
+    if (enabled && redis) { try { const cached = await redis.get(key); if (cached) return res.json(JSON.parse(cached)); } catch {} }
 
     if (!schoolId) {
       return res.status(400).json({
@@ -98,8 +111,7 @@ router.get('/insights/financial-trends', auth, async (req, res) => {
     }
 
     const insights = await AnalyticsService.analyzeFinancialTrends(schoolId, timeRange);
-    
-    res.json({
+    const payload = {
       success: true,
       data: {
         insights,
@@ -113,7 +125,9 @@ router.get('/insights/financial-trends', auth, async (req, res) => {
           financialHealth: insights.financialHealth
         }
       }
-    });
+    };
+    if (enabled && redis) { try { await redis.setEx(key, ttl, JSON.stringify(payload)); } catch {} }
+    res.json(payload);
 
   } catch (error) {
     console.error('Financial trends analytics error:', error);
@@ -125,11 +139,14 @@ router.get('/insights/financial-trends', auth, async (req, res) => {
   }
 });
 
-router.get('/insights/teacher-performance', auth, async (req, res) => {
+router.get('/insights/teacher-performance', auth, requireSameSchoolQuery('schoolId'), async (req, res) => {
   try {
     const { schoolId, timeRange = 'quarter' } = req.query;
-    const userId = req.user.id;
-    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
+    const redis = req.app && req.app.locals && req.app.locals.redisClient;
+    const enabled = process.env.ANALYTICS_CACHE_ENABLED ? String(process.env.ANALYTICS_CACHE_ENABLED).toLowerCase() === 'true' : (process.env.NODE_ENV !== 'development');
+    const ttl = parseInt(process.env.ANALYTICS_CACHE_TTL_SECONDS || '600', 10);
+    const key = `analytics:teacher:${schoolId}:${timeRange}`;
+    if (enabled && redis) { try { const cached = await redis.get(key); if (cached) return res.json(JSON.parse(cached)); } catch {} }
 
     if (!schoolId) {
       return res.status(400).json({
@@ -140,8 +157,7 @@ router.get('/insights/teacher-performance', auth, async (req, res) => {
     }
 
     const insights = await AnalyticsService.analyzeTeacherPerformance(schoolId, timeRange);
-    
-    res.json({
+    const payload = {
       success: true,
       data: {
         insights,
@@ -155,7 +171,9 @@ router.get('/insights/teacher-performance', auth, async (req, res) => {
           retentionRisk: insights.retentionRisk
         }
       }
-    });
+    };
+    if (enabled && redis) { try { await redis.setEx(key, ttl, JSON.stringify(payload)); } catch {} }
+    res.json(payload);
 
   } catch (error) {
     console.error('Teacher performance analytics error:', error);
@@ -167,11 +185,14 @@ router.get('/insights/teacher-performance', auth, async (req, res) => {
   }
 });
 
-router.get('/insights/automated', auth, async (req, res) => {
+router.get('/insights/automated', auth, requireSameSchoolQuery('schoolId'), async (req, res) => {
   try {
     const { schoolId } = req.query;
-    const userId = req.user.id;
-    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
+    const redis = req.app && req.app.locals && req.app.locals.redisClient;
+    const enabled = process.env.ANALYTICS_CACHE_ENABLED ? String(process.env.ANALYTICS_CACHE_ENABLED).toLowerCase() === 'true' : (process.env.NODE_ENV !== 'development');
+    const ttl = parseInt(process.env.ANALYTICS_CACHE_TTL_SECONDS || '600', 10);
+    const key = `analytics:auto:${schoolId}`;
+    if (enabled && redis) { try { const cached = await redis.get(key); if (cached) return res.json(JSON.parse(cached)); } catch {} }
 
     if (!schoolId) {
       return res.status(400).json({
@@ -182,8 +203,7 @@ router.get('/insights/automated', auth, async (req, res) => {
     }
 
     const insights = await AnalyticsService.generateAutomatedInsights(schoolId);
-    
-    res.json({
+    const payload = {
       success: true,
       data: {
         insights,
@@ -196,7 +216,9 @@ router.get('/insights/automated', auth, async (req, res) => {
         },
         recommendations: insights.filter(i => i.recommendation).length
       }
-    });
+    };
+    if (enabled && redis) { try { await redis.setEx(key, ttl, JSON.stringify(payload)); } catch {} }
+    res.json(payload);
 
   } catch (error) {
     console.error('Automated insights error:', error);
@@ -208,11 +230,14 @@ router.get('/insights/automated', auth, async (req, res) => {
   }
 });
 
-router.get('/dashboard/overview', auth, async (req, res) => {
+router.get('/dashboard/overview', auth, requireSameSchoolQuery('schoolId'), async (req, res) => {
   try {
     const { schoolId } = req.query;
-    const userId = req.user.id;
-    if (String(req.user.role).toUpperCase() !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ success: false, error: 'ACCESS_DENIED' });
+    const redis = req.app && req.app.locals && req.app.locals.redisClient;
+    const enabled = process.env.ANALYTICS_CACHE_ENABLED ? String(process.env.ANALYTICS_CACHE_ENABLED).toLowerCase() === 'true' : (process.env.NODE_ENV !== 'development');
+    const ttl = parseInt(process.env.ANALYTICS_CACHE_TTL_SECONDS || '600', 10);
+    const key = `analytics:dashboard:${schoolId}`;
+    if (enabled && redis) { try { const cached = await redis.get(key); if (cached) return res.json(JSON.parse(cached)); } catch {} }
 
     if (!schoolId) {
       return res.status(400).json({
@@ -223,8 +248,7 @@ router.get('/dashboard/overview', auth, async (req, res) => {
     }
 
     const overview = await AnalyticsService.getDashboardOverview(schoolId);
-    
-    res.json({
+    const payload = {
       success: true,
       data: {
         overview,
@@ -243,7 +267,9 @@ router.get('/dashboard/overview', auth, async (req, res) => {
           financialStability: overview.financialStability
         }
       }
-    });
+    };
+    if (enabled && redis) { try { await redis.setEx(key, ttl, JSON.stringify(payload)); } catch {} }
+    res.json(payload);
 
   } catch (error) {
     console.error('Dashboard overview error:', error);

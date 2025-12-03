@@ -45,6 +45,12 @@ const StaffAttendance = sequelize.define('StaffAttendance', {
     allowNull: true,
     defaultValue: 0,
   },
+}, {
+  indexes: [
+    { fields: ['schoolId'] },
+    { fields: ['schoolId','date'] },
+    { fields: ['userId','date'] }
+  ]
 });
 
 module.exports = StaffAttendance;

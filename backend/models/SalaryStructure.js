@@ -60,6 +60,12 @@ const SalaryStructure = sequelize.define('SalaryStructure', {
     allowNull: false,
     defaultValue: false,
   },
+}, {
+  indexes: [
+    { fields: ['schoolId'] },
+    { fields: ['schoolId','appliesTo'] },
+    { fields: ['schoolId','isDefault'] }
+  ]
 });
 
 module.exports = SalaryStructure;
