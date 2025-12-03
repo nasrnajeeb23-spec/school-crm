@@ -198,6 +198,14 @@ export const updateSchool = async (id: number, schoolData: Partial<School>): Pro
     });
 };
 
+export const getSchoolSubscriptionDetails = async (schoolId: number): Promise<Subscription> => {
+    return await apiCall(`/schools/${schoolId}/subscription`, { method: 'GET' });
+};
+
+export const getSchoolBillingSummary = async (schoolId: number): Promise<{ totalInvoices: number; paidCount: number; unpaidCount: number; overdueCount: number; totalAmount: number; outstandingAmount: number; }> => {
+    return await apiCall(`/schools/${schoolId}/billing/summary`, { method: 'GET' });
+};
+
 // ==================== Student APIs ====================
 
 export const getStudents = async (schoolId: number): Promise<Student[]> => {
@@ -1043,6 +1051,26 @@ export const downloadStoredBackup = async (schoolId: number, file: string): Prom
         throw new Error(`HTTP ${res.status}${res.statusText ? ' '+res.statusText : ''}${txt ? `: ${txt}` : ''}`);
     }
     return await res.blob();
+};
+
+export const getSchoolLastLogin = async (schoolId: number): Promise<{ lastLoginAt: string | null }> => {
+    return await apiCall(`/school/${schoolId}/users/last-login`, { method: 'GET' });
+};
+
+export const getSchoolStorageUsage = async (schoolId: number): Promise<{ bytes: number }> => {
+    return await apiCall(`/school/${schoolId}/storage/usage`, { method: 'GET' });
+};
+
+export const notifySchool = async (schoolId: number, message: string): Promise<{ sent: boolean }> => {
+    return await apiCall(`/school/${schoolId}/notify`, { method: 'POST', body: JSON.stringify({ message }) });
+};
+
+export const updateSchoolOperationalStatus = async (schoolId: number, status: 'ACTIVE' | 'SUSPENDED'): Promise<{ schoolId: number; status: string }> => {
+    return await apiCall(`/schools/${schoolId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+};
+
+export const deleteSchool = async (schoolId: number): Promise<{ deleted: boolean }> => {
+    return await apiCall(`/schools/${schoolId}`, { method: 'DELETE' });
 };
 
 export const getDashboardStats = async (): Promise<any> => {

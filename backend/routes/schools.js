@@ -141,6 +141,90 @@ router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// Get subscription details for a school
+router.get('/:id/subscription', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const sub = await Subscription.findOne({ where: { schoolId: Number(req.params.id) }, include: [{ model: Plan }] });
+    if (!sub) return res.status(404).json({ msg: 'Subscription not found' });
+    const p = sub.Plan;
+    const price = p ? parseFloat(p.price) : 0;
+    return res.json({
+      id: String(sub.id),
+      schoolId: Number(sub.schoolId),
+      schoolName: '',
+      plan: p?.name || 'N/A',
+      status: sub.status || 'N/A',
+      startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : '',
+      renewalDate: sub.renewalDate ? new Date(sub.renewalDate).toISOString().split('T')[0] : '',
+      amount: price,
+      trialEndDate: sub.endDate ? new Date(sub.endDate).toISOString().split('T')[0] : undefined,
+    });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Billing summary for a school
+router.get('/:id/billing/summary', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const sid = Number(req.params.id);
+    const { Invoice, Student } = require('../models');
+    const rows = await Invoice.findAll({ include: [{ model: Student, where: { schoolId: sid }, attributes: [] }] });
+    let paid = 0, unpaid = 0, overdue = 0, total = 0, outstanding = 0;
+    rows.forEach(r => {
+      const amt = parseFloat(r.amount || 0);
+      total += amt;
+      if (String(r.status).toUpperCase() === 'PAID') paid++;
+      else if (String(r.status).toUpperCase() === 'OVERDUE') { overdue++; outstanding += amt; }
+      else { unpaid++; outstanding += amt; }
+    });
+    return res.json({ totalInvoices: rows.length, paidCount: paid, unpaidCount: unpaid, overdueCount: overdue, totalAmount: total, outstandingAmount: outstanding });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Update operational status for a school (ACTIVE/SUSPENDED)
+router.put('/:id/status', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const sid = Number(req.params.id);
+    const status = String(req.body?.status || '').toUpperCase();
+    if (!['ACTIVE','SUSPENDED'].includes(status)) return res.status(400).json({ msg: 'Invalid status' });
+    let s = await SchoolSettings.findOne({ where: { schoolId: sid } });
+    if (!s) s = await SchoolSettings.create({ schoolId: sid, schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } });
+    const settings = s.toJSON();
+    const next = { ...(settings || {}), operationalStatus: status };
+    delete next.id; delete next.createdAt; delete next.updatedAt;
+    s.schoolName = next.schoolName || s.schoolName;
+    s.schoolAddress = next.schoolAddress || s.schoolAddress;
+    s.academicYearStart = next.academicYearStart || s.academicYearStart;
+    s.academicYearEnd = next.academicYearEnd || s.academicYearEnd;
+    s.notifications = next.notifications || s.notifications;
+    s.availableStages = next.availableStages || s.availableStages;
+    s.backupConfig = next.backupConfig || s.backupConfig;
+    s.operationalStatus = next.operationalStatus;
+    await s.save();
+    try {
+      const { AuditLog } = require('../models');
+      await AuditLog.create({ action: 'school.status.update', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: sid, operationalStatus: status }), timestamp: new Date(), riskLevel: 'medium' });
+    } catch {}
+    return res.json({ schoolId: sid, status });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const sid = Number(req.params.id);
+    const { User } = require('../models');
+    let s = await SchoolSettings.findOne({ where: { schoolId: sid } });
+    if (!s) s = await SchoolSettings.create({ schoolId: sid, schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } });
+    s.operationalStatus = 'DELETED';
+    await s.save();
+    await User.update({ isActive: false }, { where: { schoolId: sid } });
+    try {
+      const { AuditLog } = require('../models');
+      await AuditLog.create({ action: 'school.delete', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: sid }), timestamp: new Date(), riskLevel: 'high' });
+    } catch {}
+    return res.json({ deleted: true });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
 router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
     const schoolId = Number(req.params.id);

@@ -1769,6 +1769,40 @@ router.post('/:schoolId/backup/store', verifyToken, requireRole('SCHOOL_ADMIN', 
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
+router.get('/:schoolId/users/last-login', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { User } = require('../models');
+    const sid = Number(req.params.schoolId);
+    const rows = await User.findAll({ where: { schoolId: sid }, attributes: ['lastLoginAt','lastLogin'], order: [['lastLoginAt','DESC']] });
+    const latest = rows.length ? (rows[0].lastLoginAt || rows[0].lastLogin || null) : null;
+    return res.json({ lastLoginAt: latest });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.get('/:schoolId/storage/usage', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const sid = String(req.params.schoolId);
+    const base = path.join(__dirname, '..', 'uploads', 'backups', sid);
+    let total = 0;
+    try {
+      await fse.ensureDir(base);
+      const files = fs.readdirSync(base);
+      files.forEach(f => { try { total += fs.statSync(path.join(base, f)).size || 0; } catch {} });
+    } catch {}
+    return res.json({ bytes: total });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.post('/:schoolId/notify', verifyToken, requireRole('SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const msg = String(req.body?.message || '').trim();
+    if (!msg) return res.status(400).json({ msg: 'Message required' });
+    const { AuditLog } = require('../models');
+    await AuditLog.create({ action: 'school.notify', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: Number(req.params.schoolId), message: msg }), timestamp: new Date(), riskLevel: 'low' });
+    return res.status(201).json({ sent: true });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
 router.put('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
   try {
     const row = await FeeSetup.findOne({ where: { id: Number(req.params.id), schoolId: Number(req.params.schoolId) } });

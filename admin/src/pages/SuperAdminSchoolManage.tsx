@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as api from '../api';
-import { School, Module, ModuleId, Invoice } from '../types';
+import { School, Module, ModuleId, Invoice, SchoolSettings, Subscription } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import StatsCard from '../components/StatsCard';
 import { BackIcon, SchoolIcon, SubscriptionIcon, BillingIcon, UsersIcon, ModuleIcon } from '../components/icons';
@@ -21,22 +21,43 @@ const SuperAdminSchoolManage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [schedule, setSchedule] = useState<{ daily?: boolean; monthly?: boolean; time?: string }>({ daily: true, time: '02:00' });
   const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState<SchoolSettings | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [billingSummary, setBillingSummary] = useState<{ totalInvoices: number; paidCount: number; unpaidCount: number; overdueCount: number; totalAmount: number; outstandingAmount: number } | null>(null);
+  const [backups, setBackups] = useState<Array<{ file: string; size: number; createdAt: string }>>([]);
+  const [lastLoginAt, setLastLoginAt] = useState<string | null>(null);
+  const [storageUsageBytes, setStorageUsageBytes] = useState<number>(0);
+  const [classesCount, setClassesCount] = useState<number>(0);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [s, mods, active, dist, invs] = await Promise.all([
+      const [s, mods, active, dist, invs, sts, sub, bill, bks, lastLogin, storage, classes] = await Promise.all([
         api.getSchoolById(id),
         api.getAvailableModules(),
         api.getSchoolModules(id),
         api.getStudentDistribution(id),
-        api.getSchoolInvoices(id)
+        api.getSchoolInvoices(id),
+        api.getSchoolSettings(id),
+        api.getSchoolSubscriptionDetails(id),
+        api.getSchoolBillingSummary(id),
+        api.getSchoolBackups(id),
+        api.getSchoolLastLogin(id),
+        api.getSchoolStorageUsage(id),
+        api.getSchoolClasses(id)
       ]);
       setSchool(s);
       setAvailableModules(mods);
       try { setActiveModuleIds(new Set(active.map(m => m.moduleId))); } catch { setActiveModuleIds(new Set()); }
       setDistribution(Array.isArray(dist) ? dist : []);
       setInvoices(Array.isArray(invs) ? invs : []);
+      setSettings(sts || null);
+      setSubscription(sub || null);
+      setBillingSummary(bill || null);
+      setBackups(Array.isArray(bks) ? bks : []);
+      setLastLoginAt(lastLogin?.lastLoginAt || null);
+      setStorageUsageBytes(Number(storage?.bytes || 0));
+      setClassesCount(Array.isArray(classes) ? classes.length : 0);
     } catch (e: any) {
       addToast('فشل تحميل بيانات المدرسة.', 'error');
     } finally {
@@ -47,9 +68,9 @@ const SuperAdminSchoolManage: React.FC = () => {
   useEffect(() => { if (id) fetchAll(); }, [id]);
 
   const baseCost = useMemo(() => {
-    const pricing = { pricePerStudent: 1.5 };
-    return (school ? school.students : 0) * pricing.pricePerStudent;
-  }, [school]);
+    const price = subscription?.amount || 0;
+    return price;
+  }, [subscription]);
 
   const modulesCost = useMemo(() => {
     return availableModules.filter(m => activeModuleIds.has(m.id)).reduce((sum, m) => sum + m.monthlyPrice, 0);
@@ -131,8 +152,55 @@ const SuperAdminSchoolManage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard icon={SchoolIcon} title={school.name} value={school.plan} description={school.status} />
         <StatsCard icon={UsersIcon} title="الطلاب" value={String(school.students)} description="عدد الطلاب" />
-        <StatsCard icon={ModuleIcon} title="الوحدات الفعالة" value={String(activeModuleIds.size)} description="عدد الوحدات" />
-        <StatsCard icon={BillingIcon} title="الإجمالي الشهري" value={`$${totalCost.toFixed(2)}`} description="التكلفة التقديرية" />
+        <StatsCard icon={UsersIcon} title="المعلمين" value={String(school.teachers)} description="عدد المعلمين" />
+        <StatsCard icon={ModuleIcon} title="الفصول" value={String(classesCount)} description="عدد الفصول" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard icon={SubscriptionIcon} title="الخطة" value={subscription?.plan || school.plan} description={subscription?.status || school.status} />
+        <StatsCard icon={BillingIcon} title="القيمة الشهرية" value={`$${baseCost.toFixed(2)}`} description="سعر الخطة" />
+        <StatsCard icon={BillingIcon} title="الوحدات الإضافية" value={`$${modulesCost.toFixed(2)}`} description="تكلفة الوحدات" />
+        <StatsCard icon={BillingIcon} title="الإجمالي التقديري" value={`$${totalCost.toFixed(2)}`} description="شهريًا" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+          <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">تفاصيل الاشتراك</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div><div className="text-gray-500">تاريخ البدء</div><div className="text-gray-900 dark:text-white">{subscription?.startDate || '-'}</div></div>
+            <div><div className="text-gray-500">تاريخ التجديد</div><div className="text-gray-900 dark:text-white">{subscription?.renewalDate || '-'}</div></div>
+            <div><div className="text-gray-500">حالة الاشتراك</div><div className="text-gray-900 dark:text-white">{subscription?.status || school.status}</div></div>
+            <div><div className="text-gray-500">الخطة الحالية</div><div className="text-gray-900 dark:text-white">{subscription?.plan || school.plan}</div></div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+          <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">ملخص الفوترة</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div><div className="text-gray-500">إجمالي الفواتير</div><div className="text-gray-900 dark:text-white">{billingSummary?.totalInvoices ?? 0}</div></div>
+            <div><div className="text-gray-500">مدفوعة</div><div className="text-green-600">{billingSummary?.paidCount ?? 0}</div></div>
+            <div><div className="text-gray-500">غير مدفوعة</div><div className="text-yellow-600">{billingSummary?.unpaidCount ?? 0}</div></div>
+            <div><div className="text-gray-500">متأخرة</div><div className="text-red-600">{billingSummary?.overdueCount ?? 0}</div></div>
+            <div className="col-span-2"><div className="text-gray-500">رصيد مستحق</div><div className="text-gray-900 dark:text-white">${(billingSummary?.outstandingAmount ?? 0).toFixed(2)}</div></div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+          <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الاستخدام والنشاط</h3>
+          <div className="grid grid-cols-1 gap-3 text-sm">
+            <div><div className="text-gray-500">آخر تسجيل دخول</div><div className="text-gray-900 dark:text-white">{lastLoginAt ? String(lastLoginAt).toString() : '-'}</div></div>
+            <div><div className="text-gray-500">آخر نسخة احتياطية</div><div className="text-gray-900 dark:text-white">{backups.length ? String(backups[0].createdAt).toString() : '-'}</div></div>
+            <div><div className="text-gray-500">استخدام التخزين</div><div className="text-gray-900 dark:text-white">{(storageUsageBytes/1024/1024).toFixed(2)} MB</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+        <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">هوية المدرسة</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div><div className="text-gray-500">الاسم</div><div className="text-gray-900 dark:text-white">{settings?.schoolName || school.name}</div></div>
+          <div><div className="text-gray-500">المدينة/العنوان</div><div className="text-gray-900 dark:text-white">{settings?.schoolAddress || '-'}</div></div>
+          <div><div className="text-gray-500">البريد</div><div className="text-gray-900 dark:text-white">{settings?.contactEmail || '-'}</div></div>
+          <div><div className="text-gray-500">الهاتف</div><div className="text-gray-900 dark:text-white">{settings?.contactPhone || '-'}</div></div>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
@@ -141,6 +209,15 @@ const SuperAdminSchoolManage: React.FC = () => {
           <div className="flex items-end gap-3">
             <button onClick={activateSubscription} disabled={saving} className="px-4 py-2 bg-teal-600 text-white rounded-lg disabled:bg-teal-400">
               تفعيل الاشتراك
+            </button>
+            <button onClick={async () => { try { await api.updateSchoolOperationalStatus(id, 'SUSPENDED'); addToast('تم إيقاف المدرسة مؤقتًا.', 'success'); } catch { addToast('فشل الإيقاف المؤقت.', 'error'); } }} disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:bg-red-400">
+              إيقاف مؤقت
+            </button>
+            <button onClick={async () => { const msg = window.prompt('اكتب رسالة تنبيه للمدرسة'); if (!msg) return; try { await api.notifySchool(id, msg); addToast('تم إرسال التنبيه.', 'success'); } catch { addToast('فشل إرسال التنبيه.', 'error'); } }} disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-lg disabled:bg-amber-400">
+              إرسال تنبيه
+            </button>
+            <button onClick={async () => { const ok = window.confirm('سيتم حذف المدرسة بشكل غير قابل للاسترجاع مع تعطيل المستخدمين المرتبطين. هل توافق؟'); if (!ok) return; try { await api.deleteSchool(id); addToast('تم حذف المدرسة.', 'success'); navigate('/superadmin/schools'); } catch { addToast('فشل حذف المدرسة.', 'error'); } }} disabled={saving} className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:bg-gray-600">
+              حذف المدرسة
             </button>
           </div>
         </div>
