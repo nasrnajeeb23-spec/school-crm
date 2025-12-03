@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api';
-import { logSuperAdminAction } from '../api/superAdminAuth';
 import { Module, PricingConfig } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import EditModuleModal from '../components/EditModuleModal';
@@ -43,7 +42,7 @@ const FeatureManagement: React.FC = () => {
         setIsSaving(true);
         try {
             await api.updatePricingConfig(pricingConfig);
-            await logSuperAdminAction('platform.pricing.update', { pricePerStudent: pricingConfig.pricePerStudent });
+            await api.logSuperAdminAction('platform.pricing.update', { pricePerStudent: pricingConfig.pricePerStudent });
             addToast('تم حفظ إعدادات التسعير بنجاح.', 'success');
         } catch (error) {
             addToast('فشل حفظ إعدادات التسعير.', 'error');
@@ -57,7 +56,7 @@ const FeatureManagement: React.FC = () => {
             const updatedModule = await api.updateModule(moduleData);
             setModules(prev => prev.map(m => m.id === updatedModule.id ? updatedModule : m));
             setEditingModule(null);
-            await logSuperAdminAction('platform.module.update', { moduleId: updatedModule.id, enabled: updatedModule.isEnabled, monthlyPrice: updatedModule.monthlyPrice });
+            await api.logSuperAdminAction('platform.module.update', { moduleId: updatedModule.id, enabled: updatedModule.isEnabled, monthlyPrice: updatedModule.monthlyPrice });
             addToast('تم تحديث الوحدة بنجاح.', 'success');
         } catch (error) {
             addToast('فشل تحديث الوحدة.', 'error');

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useToast } from '../contexts/ToastContext';
-import { getSecurityPolicies, updateSecurityPolicies } from '../api';
-import { logSuperAdminAction } from '../api/superAdminAuth';
+import { getSecurityPolicies, updateSecurityPolicies, logSuperAdminAction } from '../api';
 
 const SecuritySettings: React.FC = () => {
   const { addToast } = useToast();

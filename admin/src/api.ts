@@ -518,3 +518,10 @@ export const getAuditLogs = async (filters?: {
     
     return await apiCall(`/superadmin/audit-logs?${params.toString()}`, { method: 'GET' });
 };
+
+export const logSuperAdminAction = async (action: string, details: any): Promise<void> => {
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`[AuditLog] ${action}`, details);
+    }
+    return Promise.resolve();
+};

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api';
-import { logSuperAdminAction } from '../api/superAdminAuth';
 import { LandingPageContent, FeatureContent, AdSlideContent } from '../types';
 import { EditIcon } from '../components/icons';
 import { useToast } from '../contexts/ToastContext';
@@ -50,7 +49,7 @@ const ContentManagement: React.FC = () => {
         setIsSaving(true);
         try {
             await api.updateLandingPageContent(content);
-            await logSuperAdminAction('platform.content.update', { sections: Object.keys(content || {}) });
+            await api.logSuperAdminAction('platform.content.update', { sections: Object.keys(content || {}) });
             addToast('تم حفظ المحتوى بنجاح!', 'success');
         } catch (err) {
             console.error(err);
