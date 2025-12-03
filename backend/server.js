@@ -36,6 +36,9 @@ const authEnterpriseRoutes = require('./routes/authEnterprise');
 const authSuperAdminRoutes = require('./routes/authSuperAdmin');
 const analyticsRoutes = require('./routes/analytics');
 const helpRoutes = require('./routes/help');
+const modulesRoutes = require('./routes/modules');
+const pricingRoutes = require('./routes/pricing');
+const billingRoutes = require('./routes/billing');
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
 const fse = require('fs-extra');
@@ -348,6 +351,9 @@ app.use('/api/messaging', messagingRoutes);
 app.use('/api/auth/enterprise', authEnterpriseRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/help', helpRoutes);
+app.use('/api/modules', modulesRoutes);
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/billing', billingRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
@@ -618,7 +624,7 @@ async function syncDatabase(){
   const opts = { force: false };
   
   // Sync models in correct order to avoid foreign key constraint issues
-  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup } = require('./models');
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig } = require('./models');
   
   // Sync independent tables first
   await School.sync(opts);
@@ -644,6 +650,9 @@ async function syncDatabase(){
   await StaffAttendance.sync(isProd ? { force: false } : { alter: true });
   await TeacherAttendance.sync(isProd ? { force: false } : { alter: true });
   await Schedule.sync(isProd ? { force: false } : { alter: true });
+  await Notification.sync(isProd ? { force: false } : { alter: true });
+  await ModuleCatalog.sync(isProd ? { force: false } : { alter: true });
+  await PricingConfig.sync(isProd ? { force: false } : { alter: true });
 }
 syncDatabase()
   .then(async () => {

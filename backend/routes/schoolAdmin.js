@@ -1492,6 +1492,59 @@ router.get('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
+// حالة الاشتراك والوحدات للمدرسة
+router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const { Subscription, SchoolSettings } = require('../models');
+    const sub = await Subscription.findOne({ where: { schoolId } });
+    const settings = await SchoolSettings.findOne({ where: { schoolId } });
+    const allowedModules = Array.isArray(req.app?.locals?.allowedModules) ? req.app.locals.allowedModules : [];
+    const activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
+    const now = Date.now();
+    const endMs = sub?.renewalDate ? new Date(sub.renewalDate).getTime() : (sub?.endDate ? new Date(sub.endDate).getTime() : 0);
+    const isTrial = String(sub?.status || '').toUpperCase() === 'TRIAL';
+    const trialExpired = isTrial && endMs > 0 && now > endMs;
+    return res.success({
+      subscription: {
+        status: sub?.status || 'UNKNOWN',
+        startDate: sub?.startDate || null,
+        endDate: sub?.endDate || null,
+        renewalDate: sub?.renewalDate || null,
+        trialExpired,
+      },
+      modules: {
+        allowed: allowedModules,
+        active: activeModules,
+      }
+    });
+  } catch (e) {
+    console.error(e?.message || e);
+    return res.error(500, 'SERVER_ERROR', 'Server Error');
+  }
+});
+
+// عرض سعر للوحدات المختارة
+router.post('/:schoolId/modules/quote', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const { ModuleCatalog, PricingConfig, School } = require('../models');
+    const p = req.body || {};
+    const moduleIds = Array.isArray(p.moduleIds) ? p.moduleIds.map(String) : [];
+    const period = String(p.period || 'monthly');
+    const modules = await ModuleCatalog.findAll({ where: { id: moduleIds } });
+    const priceConfig = await PricingConfig.findOne({ where: { id: 'default' } });
+    const school = await School.findByPk(schoolId);
+    const students = Number(school?.studentCount || 0);
+    const pricePerStudent = Number(priceConfig?.pricePerStudent || 1.5);
+    const base = students * pricePerStudent;
+    const items = modules.map(m => ({ id: m.id, name: m.name, price: period === 'annual' ? (m.annualPrice ?? m.monthlyPrice * 12) : m.monthlyPrice }));
+    const modulesTotal = items.reduce((s, x) => s + Number(x.price || 0), 0);
+    const total = base + modulesTotal;
+    return res.success({ period, base, items, modulesTotal, total, currency: priceConfig?.currency || 'USD' }, 'Quote generated');
+  } catch (e) { console.error(e?.message || e); return res.error(500, 'SERVER_ERROR', 'Server Error'); }
+});
+
 router.post('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), validate([
   { name: 'stage', required: true, type: 'string' },
 ]), async (req, res) => {

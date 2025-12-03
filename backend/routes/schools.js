@@ -180,6 +180,22 @@ router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN'), requireSameS
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+router.post('/:id/modules/activate', verifyToken, requireRole('SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
+  try {
+    const { Subscription, SchoolSettings } = require('../models');
+    const schoolId = Number(req.params.id);
+    const moduleIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds.map(String) : [];
+    const renewalDate = req.body?.renewalDate ? new Date(req.body.renewalDate) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
+    const settings = await SchoolSettings.findOrCreate({ where: { schoolId }, defaults: { schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true }, activeModules: moduleIds } });
+    const settingsInstance = Array.isArray(settings) ? settings[0] : settings;
+    settingsInstance.activeModules = moduleIds;
+    await settingsInstance.save();
+    const sub = await Subscription.findOne({ where: { schoolId } });
+    if (sub) { sub.status = 'ACTIVE'; sub.renewalDate = renewalDate; await sub.save(); }
+    res.json({ activated: true, activeModules: moduleIds, renewalDate: renewalDate.toISOString() });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
 router.get('/:id/stats/student-distribution', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
     const rows = await Student.findAll({

@@ -30,6 +30,8 @@ const AuditLog = require('./AuditLog');
 const StaffAttendance = require('./StaffAttendance');
 const TeacherAttendance = require('./TeacherAttendance');
 const SecurityPolicy = require('./SecurityPolicy');
+const ModuleCatalog = require('./ModuleCatalog');
+const PricingConfig = require('./PricingConfig');
 const Job = require('./Job');
 const ApiKey = require('./ApiKey');
 const TrialRequest = require('./TrialRequest');
@@ -206,6 +208,8 @@ const db = {
   ApiKey,
   TrialRequest,
   SecurityPolicy,
+  ModuleCatalog,
+  PricingConfig,
 };
 
 module.exports = db;

@@ -4,6 +4,7 @@ import { useAppContext } from './contexts/AppContext';
 import { User, UserRole } from './types';
 import ToastContainer from './components/ToastContainer';
 import ErrorBoundary from './components/ErrorBoundary';
+import TrialBanner from './components/TrialBanner';
 
 // Lazy load pages and layouts for better performance
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
@@ -134,6 +135,7 @@ const App: React.FC = () => {
   return (
     <>
       <ToastContainer />
+      <TrialBanner />
       <ErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الصفحة...</div>}>
           <Routes>

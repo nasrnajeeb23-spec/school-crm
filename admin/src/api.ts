@@ -424,6 +424,16 @@ export const getFeeSetups = async (schoolId: number): Promise<FeeSetup[]> => {
     return unwrap<FeeSetup[]>(data, 'fees', []);
 };
 
+export type SubscriptionState = {
+  subscription: { status: string; startDate: string | null; endDate: string | null; renewalDate: string | null; trialExpired: boolean };
+  modules: { allowed: string[]; active: string[] };
+};
+
+export const getSubscriptionState = async (schoolId: number): Promise<SubscriptionState> => {
+  const data = await apiCall(`/school/${schoolId}/subscription-state`, { method: 'GET' });
+  return unwrap<SubscriptionState>(data);
+};
+
 export const createFeeSetup = async (schoolId: number, payload: Partial<FeeSetup>): Promise<FeeSetup> => {
     return await apiCall(`/school/${schoolId}/fees`, { method: 'POST', body: JSON.stringify(payload) });
 };
@@ -951,6 +961,32 @@ export const getUsersByRole = async (role: string): Promise<any[]> => {
 
 export const getAvailableModules = async (): Promise<Module[]> => {
     return await apiCall('/modules', { method: 'GET' });
+};
+
+export const getSchoolModules = async (schoolId: number): Promise<SchoolModuleSubscription[]> => {
+    return await apiCall(`/schools/${schoolId}/modules`, { method: 'GET' });
+};
+
+export const updateSchoolModules = async (schoolId: number, moduleIds: ModuleId[]): Promise<SchoolModuleSubscription[]> => {
+    return await apiCall(`/schools/${schoolId}/modules`, { method: 'PUT', body: JSON.stringify({ moduleIds }) });
+};
+
+export const submitPaymentProof = async (submission: PaymentProofSubmission): Promise<void> => {
+    await apiCall('/billing/payment-proof', { method: 'POST', body: JSON.stringify({
+        method: submission.method,
+        amount: submission.amount,
+        reference: submission.reference,
+        relatedService: submission.relatedService,
+        schoolName: submission.schoolName,
+    }) });
+};
+
+export const getModulesQuote = async (schoolId: number, moduleIds: ModuleId[], period: 'monthly' | 'annual' = 'monthly'): Promise<{ period: string; base: number; items: Array<{ id: ModuleId; name: string; price: number }>; modulesTotal: number; total: number; currency: string }> => {
+    return await apiCall(`/school/${schoolId}/modules/quote`, { method: 'POST', body: JSON.stringify({ moduleIds, period }) });
+};
+
+export const activateSchoolModules = async (schoolId: number, moduleIds: ModuleId[], renewalDate?: string): Promise<{ activated: boolean; activeModules: ModuleId[]; renewalDate: string }> => {
+    return await apiCall(`/schools/${schoolId}/modules/activate`, { method: 'POST', body: JSON.stringify({ moduleIds, renewalDate }) });
 };
 
 export const generateSelfHostedPackage = async (moduleIds: ModuleId[]): Promise<string> => {
