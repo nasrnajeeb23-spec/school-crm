@@ -10,6 +10,7 @@ import NotificationDropdown from '../components/NotificationDropdown';
 import { useAppContext } from '../contexts/AppContext';
 import * as api from '../api';
 import AccessDenied from '../components/AccessDenied';
+import TrialBanner from '../components/TrialBanner';
 
 // Lazy load pages
 const SchoolDashboard = React.lazy(() => import('../pages/SchoolDashboard'));
@@ -166,6 +167,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
                 </div>
             </div>
+            <TrialBanner />
           
             <Suspense fallback={<div className="text-center p-8">جاري التحميل...</div>}>
                 <Routes>

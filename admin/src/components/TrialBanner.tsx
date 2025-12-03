@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAppContext } from '../contexts/AppContext'
 import { getSubscriptionState, SubscriptionState } from '../api'
 
@@ -6,6 +7,7 @@ export default function TrialBanner() {
   const { currentUser } = useAppContext()
   const [state, setState] = useState<SubscriptionState | null>(null)
   const [visible, setVisible] = useState(true)
+  const location = useLocation()
 
   useEffect(() => {
     let mounted = true
@@ -22,23 +24,23 @@ export default function TrialBanner() {
   }, [currentUser])
 
   if (!visible) return null
+  const path = location?.pathname || ''
+  const onSchoolPages = path.startsWith('/school')
   const isSchoolAdmin = !!currentUser && String(currentUser.role) === 'SchoolAdmin'
   const trialExpired = !!state?.subscription?.trialExpired
-  if (!isSchoolAdmin || !trialExpired) return null
+  if (!onSchoolPages || !isSchoolAdmin || !trialExpired) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-40">
-      <div className="mx-auto max-w-6xl p-3">
-        <div className="rounded-lg border border-amber-300 bg-amber-100 text-amber-900 shadow">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="font-bold">انتهت فترة التجربة لهذه المدرسة</div>
-              <div className="text-sm">فعّل اشتراكك واختر الوحدات التي تحتاجها للاستمرار. الوحدات غير المفعّلة ستبقى مقيدة.</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <a href="/school/modules" className="px-3 py-2 rounded bg-amber-600 text-white">إدارة الوحدات</a>
-              <button onClick={() => setVisible(false)} className="px-3 py-2 rounded border border-amber-400 bg-white text-amber-800">إخفاء</button>
-            </div>
+    <div className="mb-4">
+      <div className="rounded-lg border border-amber-300 bg-amber-100 text-amber-900 shadow">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div>
+            <div className="font-bold">انتهت فترة التجربة لهذه المدرسة</div>
+            <div className="text-sm">فعّل اشتراكك واختر الوحدات التي تحتاجها للاستمرار. الوحدات غير المفعّلة ستبقى مقيدة.</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/school/modules" className="px-3 py-2 rounded bg-amber-600 text-white">إدارة الوحدات</a>
+            <button onClick={() => setVisible(false)} className="px-3 py-2 rounded border border-amber-400 bg-white text-amber-800">إخفاء</button>
           </div>
         </div>
       </div>
