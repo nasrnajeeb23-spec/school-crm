@@ -35,6 +35,7 @@ const messagingRoutes = require('./routes/messaging');
 const authEnterpriseRoutes = require('./routes/authEnterprise');
 const authSuperAdminRoutes = require('./routes/authSuperAdmin');
 const analyticsRoutes = require('./routes/analytics');
+const helpRoutes = require('./routes/help');
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
 const fse = require('fs-extra');
@@ -346,6 +347,7 @@ app.use('/api/superadmin', packageRoutes);
 app.use('/api/messaging', messagingRoutes);
 app.use('/api/auth/enterprise', authEnterpriseRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/help', helpRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
