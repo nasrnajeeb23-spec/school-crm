@@ -35,7 +35,7 @@ const messagingRoutes = require('./routes/messaging');
 const authEnterpriseRoutes = require('./routes/authEnterprise');
 const authSuperAdminRoutes = require('./routes/authSuperAdmin');
 const analyticsRoutes = require('./routes/analytics');
-const cron = require('node-cron');
+const nodeCron = require('node-cron');
 const archiver = require('archiver');
 const fse = require('fs-extra');
 const path = require('path');
@@ -262,7 +262,7 @@ app.locals.scheduleBackupForSchool = async (schoolId, cronExpr) => {
     delete app.locals.cronTasks[sid];
   }
   if (!cronExpr || typeof cronExpr !== 'string') return;
-  const task = cron.schedule(cronExpr, () => {
+  const task = nodeCron.schedule(cronExpr, () => {
     try {
       app.locals.enqueueJob('backup_store', { schoolId }, async (payload) => {
         const archiver = require('archiver');
@@ -322,7 +322,7 @@ app.locals.cleanupOldBackups = async () => {
   } catch {}
 };
 
-cron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch {} }, { scheduled: true });
+nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch {} }, { scheduled: true });
 
 // API Routes
 const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
