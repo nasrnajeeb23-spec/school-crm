@@ -588,7 +588,7 @@ export const getBankAccounts = async (): Promise<BankDetails[]> => {
 };
 
 export const submitPaymentProof = async (submission: Omit<PaymentProofSubmission, 'proofImage'>): Promise<void> => {
-    await apiCall('/payments/proof', {
+    await apiCall('/billing/payment-proof', {
         method: 'POST',
         body: JSON.stringify(submission),
     });
@@ -963,23 +963,7 @@ export const getAvailableModules = async (): Promise<Module[]> => {
     return await apiCall('/modules', { method: 'GET' });
 };
 
-export const getSchoolModules = async (schoolId: number): Promise<SchoolModuleSubscription[]> => {
-    return await apiCall(`/schools/${schoolId}/modules`, { method: 'GET' });
-};
-
-export const updateSchoolModules = async (schoolId: number, moduleIds: ModuleId[]): Promise<SchoolModuleSubscription[]> => {
-    return await apiCall(`/schools/${schoolId}/modules`, { method: 'PUT', body: JSON.stringify({ moduleIds }) });
-};
-
-export const submitPaymentProof = async (submission: PaymentProofSubmission): Promise<void> => {
-    await apiCall('/billing/payment-proof', { method: 'POST', body: JSON.stringify({
-        method: submission.method,
-        amount: submission.amount,
-        reference: submission.reference,
-        relatedService: submission.relatedService,
-        schoolName: submission.schoolName,
-    }) });
-};
+// Removed duplicated functions (getSchoolModules, updateSchoolModules, submitPaymentProof)
 
 export const getModulesQuote = async (schoolId: number, moduleIds: ModuleId[], period: 'monthly' | 'annual' = 'monthly'): Promise<{ period: string; base: number; items: Array<{ id: ModuleId; name: string; price: number }>; modulesTotal: number; total: number; currency: string }> => {
     return await apiCall(`/school/${schoolId}/modules/quote`, { method: 'POST', body: JSON.stringify({ moduleIds, period }) });
