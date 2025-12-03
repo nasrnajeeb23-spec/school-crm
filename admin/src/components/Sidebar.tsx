@@ -40,7 +40,6 @@ const Sidebar: React.FC = () => {
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: DashboardIcon, path: '/superadmin/dashboard' },
     { id: 'schools', label: 'إدارة المدارس', icon: SchoolIcon, path: '/superadmin/schools' },
-    { id: 'schools-create', label: 'إنشاء مدرسة', icon: SchoolIcon, path: '/superadmin/schools_create' },
     { id: 'school-admins', label: 'مدراء المدارس', icon: UsersIcon, path: '/superadmin/school-admins' },
     { id: 'superadmin-team', label: 'فريق المدير العام', icon: ShieldIcon, path: '/superadmin/team' },
     { id: 'analytics', label: 'التحليلات', icon: DashboardIcon, path: '/superadmin/analytics' },

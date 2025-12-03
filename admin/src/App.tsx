@@ -36,7 +36,6 @@ const SsoSettings = React.lazy(() => import('./pages/SsoSettings'));
 const TaskCenter = React.lazy(() => import('./pages/TaskCenter'));
 const MfaSettings = React.lazy(() => import('./pages/MfaSettings'));
 const ReportsCenter = React.lazy(() => import('./pages/ReportsCenter'));
-const CreateSchool = React.lazy(() => import('./pages/CreateSchool'));
 const TrialSignupPublic = React.lazy(() => import('./pages/TrialSignupPublic'));
 const OnboardingRequests = React.lazy(() => import('./pages/OnboardingRequests'));
 const SuperAdminSchoolManage = React.lazy(() => import('./pages/SuperAdminSchoolManage'));
@@ -169,7 +168,6 @@ const App: React.FC = () => {
               <Route path="tasks" element={<TaskCenter />} />
               <Route path="mfa" element={<MfaSettings />} />
               <Route path="reports_center" element={<ReportsCenter />} />
-              <Route path="schools_create" element={<CreateSchool />} />
               <Route path="license" element={<LicenseManagement />} />
               <Route path="profile" element={<UserProfile />} />
             </Route>

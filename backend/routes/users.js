@@ -55,22 +55,37 @@ module.exports = router;
 router.get('/by-role', verifyToken, async (req, res) => {
   try {
     const userRole = String(req.user.role || '').toUpperCase();
-    if (!['SCHOOLADMIN','SCHOOL_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
-    const role = String(req.query.role || '').toUpperCase();
+    if (!['SCHOOLADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
+    const roleParam = String(req.query.role || '').toUpperCase();
+    const role = roleParam === 'SCHOOLADMIN' ? 'SCHOOL_ADMIN' : roleParam;
     const schoolId = req.query.schoolId ? Number(req.query.schoolId) : null;
     if (userRole.startsWith('SCHOOL') && !schoolId) return res.status(400).json({ msg: 'schoolId is required' });
     if (userRole.startsWith('SCHOOL') && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
-    if (!['TEACHER','PARENT'].includes(role)) return res.status(400).json({ msg: 'Invalid role' });
+    if (!['TEACHER','PARENT','SCHOOL_ADMIN'].includes(role)) return res.status(400).json({ msg: 'Invalid role' });
     if (role === 'TEACHER') {
       const rows = await Teacher.findAll({ where: schoolId ? { schoolId } : {}, order: [['name','ASC']] });
       return res.json(rows.map(t => ({ id: String(t.id), name: t.name })));
-    } else {
+    } else if (role === 'PARENT') {
       const parents = await Parent.findAll({ order: [['name','ASC']] });
       if (!schoolId) return res.json(parents.map(p => ({ id: String(p.id), name: p.name })));
       const studentParents = await Student.findAll({ where: { schoolId }, attributes: ['parentId'] });
       const parentIds = Array.from(new Set(studentParents.map(sp => sp.parentId).filter(Boolean)));
       const filtered = parents.filter(p => parentIds.includes(p.id));
       return res.json(filtered.map(p => ({ id: String(p.id), name: p.name })));
+    } else {
+      const { User } = require('../models');
+      const where = schoolId ? { schoolId } : {};
+      const rows = await User.findAll({ where, order: [['createdAt','DESC']] });
+      const admins = rows.filter(u => {
+        const r = String(u.role || '').toUpperCase();
+        return r === 'SCHOOLADMIN' || r === 'SCHOOL_ADMIN';
+      });
+      const list = admins.map(u => {
+        const j = u.toJSON();
+        delete j.password;
+        return { id: Number(j.id), name: j.name, email: j.email, schoolId: Number(j.schoolId || 0), isActive: !!j.isActive, createdAt: j.createdAt };
+      });
+      return res.json(list);
     }
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
