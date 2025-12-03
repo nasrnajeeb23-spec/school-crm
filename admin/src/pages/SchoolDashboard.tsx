@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatsCard from '../components/StatsCard';
 import { StudentsIcon, UsersIcon, AttendanceIcon, PastDueIcon } from '../components/icons';
-import { School, InvoiceStatus, AttendanceStatus, Class } from '../types';
+import { School, InvoiceStatus, AttendanceStatus, Class, ModuleId } from '../types';
 import * as api from '../api';
 import UpcomingEvents from '../components/UpcomingEvents';
 import StatsCardSkeleton from '../components/StatsCardSkeleton';
@@ -14,6 +14,7 @@ import { useToast } from '../contexts/ToastContext';
 
 interface SchoolDashboardProps {
     school: School;
+    activeModules?: ModuleId[];
 }
 
 interface DistributionData {
@@ -21,7 +22,7 @@ interface DistributionData {
   value: number;
 }
 
-const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
+const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school, activeModules }) => {
     const [overdueInvoices, setOverdueInvoices] = useState(0);
     const [distributionData, setDistributionData] = useState<DistributionData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,12 +34,21 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                 const [invoicesData, studentDistributionData, classes] = await Promise.all([
-                    api.getSchoolInvoices(school.id),
+                const [studentDistributionData, classes] = await Promise.all([
                     api.getStudentDistribution(school.id),
                     api.getSchoolClasses(school.id),
                 ]);
-                setOverdueInvoices(invoicesData.filter(inv => inv.status === InvoiceStatus.Overdue).length);
+                const hasFinance = Array.isArray(activeModules) && activeModules.includes(ModuleId.Finance);
+                if (hasFinance) {
+                  try {
+                    const invoicesData = await api.getSchoolInvoices(school.id);
+                    setOverdueInvoices(invoicesData.filter(inv => inv.status === InvoiceStatus.Overdue).length);
+                  } catch (e) {
+                    setOverdueInvoices(0);
+                  }
+                } else {
+                  setOverdueInvoices(0);
+                }
                 setDistributionData(studentDistributionData);
                 const today = new Date().toISOString().split('T')[0];
                 let total = 0;

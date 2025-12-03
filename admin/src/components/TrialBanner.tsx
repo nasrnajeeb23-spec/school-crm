@@ -13,8 +13,9 @@ export default function TrialBanner() {
     let mounted = true
     async function load() {
       try {
-        if (!currentUser || !('schoolId' in currentUser)) return
-        const s = await getSubscriptionState((currentUser as any).schoolId)
+        const sid = Number((currentUser as any)?.schoolId || 0)
+        if (!currentUser || !sid) return
+        const s = await getSubscriptionState(sid)
         if (!mounted) return
         setState(s)
       } catch {}

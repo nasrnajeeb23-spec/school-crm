@@ -51,7 +51,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
             try { bodyJson = await response.json(); } catch {
               try { bodyText = await response.text(); } catch {}
             }
-            const msg = bodyJson?.msg || bodyJson?.error || bodyText || '';
+            const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
             const statusText = response.statusText ? ` ${response.statusText}` : '';
             if (response.status === 401) {
               try {
