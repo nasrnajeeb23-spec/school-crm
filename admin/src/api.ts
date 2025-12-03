@@ -96,6 +96,23 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     }
 };
 
+// مساعد لاستخراج البيانات القياسية من استجابات الاستجابة الموحدة
+const unwrap = <T = any>(payload: any, key?: string, fallback: T = ([] as unknown as T)): T => {
+  try {
+    if (payload && typeof payload === 'object' && 'success' in payload) {
+      const data = (payload as any).data;
+      if (key) {
+        const v = data ? data[key] : undefined;
+        return (v !== undefined ? v : fallback) as T;
+      }
+      return (data !== undefined ? data : fallback) as T;
+    }
+    return (payload !== undefined ? payload : fallback) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 // ==================== Authentication APIs ====================
 
 export const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<User> => {
@@ -184,7 +201,8 @@ export const updateSchool = async (id: number, schoolData: Partial<School>): Pro
 // ==================== Student APIs ====================
 
 export const getStudents = async (schoolId: number): Promise<Student[]> => {
-    return await apiCall(`/school/${schoolId}/students`, { method: 'GET' });
+    const data = await apiCall(`/school/${schoolId}/students`, { method: 'GET' });
+    return unwrap<Student[]>(data, 'students', []);
 };
 
 export const getStudent = async (id: string): Promise<Student> => {
@@ -212,7 +230,8 @@ export const deleteStudent = async (id: string): Promise<void> => {
 // ==================== Teacher APIs ====================
 
 export const getTeachers = async (schoolId: number): Promise<Teacher[]> => {
-    return await apiCall(`/school/${schoolId}/teachers`, { method: 'GET' });
+    const data = await apiCall(`/school/${schoolId}/teachers`, { method: 'GET' });
+    return unwrap<Teacher[]>(data, 'teachers', []);
 };
 
 export const getTeacher = async (id: string): Promise<Teacher> => {
@@ -351,7 +370,20 @@ export const getInvoices = async (schoolId: number): Promise<Invoice[]> => {
 };
 
 export const getSchoolInvoices = async (schoolId: number): Promise<Invoice[]> => {
-    return await getInvoices(schoolId);
+    try {
+      const data = await getInvoices(schoolId);
+      return Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (/HTTP\s*403/i.test(msg)) {
+        const toast = (typeof window !== 'undefined' ? (window as any).__addToast : null);
+        if (typeof toast === 'function') {
+          toast('المالية غير متاحة: يرجى تفعيل الاشتراك أو تمديد التجربة.', 'warning');
+        }
+        return [] as Invoice[];
+      }
+      throw e;
+    }
 };
 
 export const getStudentDistribution = async (schoolId: number): Promise<{ name: string, value: number }[]> => {
@@ -388,7 +420,8 @@ export const addSchoolExpense = async (schoolId: number, expenseData: NewExpense
 };
 
 export const getFeeSetups = async (schoolId: number): Promise<FeeSetup[]> => {
-    return await apiCall(`/school/${schoolId}/fees`, { method: 'GET' });
+    const data = await apiCall(`/school/${schoolId}/fees`, { method: 'GET' });
+    return unwrap<FeeSetup[]>(data, 'fees', []);
 };
 
 export const createFeeSetup = async (schoolId: number, payload: Partial<FeeSetup>): Promise<FeeSetup> => {
@@ -485,13 +518,16 @@ export const getConversations = async (userId?: string): Promise<Conversation[]>
     const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
     const query = schoolId ? `?schoolId=${schoolId}` : '';
     if (userId) {
-        return await apiCall(`/messaging/conversations/${userId}`, { method: 'GET' });
+        const data = await apiCall(`/messaging/conversations/${userId}`, { method: 'GET' });
+        return unwrap<Conversation[]>(data, 'conversations', []);
     }
-    return await apiCall(`/messaging/conversations${query}`, { method: 'GET' });
+    const data = await apiCall(`/messaging/conversations${query}`, { method: 'GET' });
+    return unwrap<Conversation[]>(data, 'conversations', []);
 };
 
 export const getMessages = async (conversationId: string): Promise<Message[]> => {
-    return await apiCall(`/messaging/conversations/${conversationId}/messages`, { method: 'GET' });
+    const data = await apiCall(`/messaging/conversations/${conversationId}/messages`, { method: 'GET' });
+    return unwrap<Message[]>(data, 'messages', []);
 };
 
 export const sendMessage = async (messageData: Partial<Message>): Promise<Message> => {
