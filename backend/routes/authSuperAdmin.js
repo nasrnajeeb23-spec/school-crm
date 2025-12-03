@@ -26,8 +26,30 @@ try {
     redisClient.connect().catch(() => { redisClient = null; });
   }
 } catch {}
-const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
-const MAX_ATTEMPTS = 3;
+const DEFAULT_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_MAX_ATTEMPTS = 3;
+
+async function getSecurityPolicies(app) {
+  const defaults = {
+    enforceMfaForAdmins: true,
+    passwordMinLength: 10,
+    lockoutThreshold: DEFAULT_MAX_ATTEMPTS,
+    allowedIpRanges: [],
+    sessionMaxAgeHours: 24,
+  };
+  try {
+    const redis = app && app.locals && app.locals.redisClient;
+    if (redis && typeof redis.get === 'function') {
+      const val = await redis.get('security:policies');
+      if (val) {
+        const cfg = JSON.parse(val);
+        return { ...defaults, ...cfg };
+      }
+    }
+  } catch {}
+  const localCfg = (app && app.locals && app.locals.securityPolicies) || {};
+  return { ...defaults, ...localCfg };
+}
 
 // Helper function to get client IP
 const getClientIP = (req) => {
@@ -116,7 +138,7 @@ const logSuperAdminAction = async (action, details, req) => {
 };
 
 // Check rate limiting (supports Redis if available)
-const checkRateLimit = async (identifier) => {
+const checkRateLimit = async (identifier, maxAttempts = DEFAULT_MAX_ATTEMPTS, lockoutMs = DEFAULT_LOCKOUT_DURATION) => {
   if (redisClient) {
     try {
       const lockKey = `sa:login:${identifier}:lock`;
@@ -131,9 +153,9 @@ const checkRateLimit = async (identifier) => {
   }
   const now = Date.now();
   const attempts = loginAttempts.get(identifier);
-  if (attempts && attempts.count >= MAX_ATTEMPTS) {
+  if (attempts && attempts.count >= maxAttempts) {
     const timeDiff = now - attempts.lastAttempt;
-    if (timeDiff < LOCKOUT_DURATION) {
+    if (timeDiff < lockoutMs) {
       const remainingTime = Math.ceil((LOCKOUT_DURATION - timeDiff) / 1000);
       return { allowed: false, remainingTime, attempts: attempts.count };
     } else {
@@ -144,15 +166,15 @@ const checkRateLimit = async (identifier) => {
 };
 
 // Increment rate limit counter (supports Redis if available)
-const incrementRateLimit = async (identifier) => {
+const incrementRateLimit = async (identifier, maxAttempts = DEFAULT_MAX_ATTEMPTS, lockoutMs = DEFAULT_LOCKOUT_DURATION) => {
   if (redisClient) {
     try {
       const countKey = `sa:login:${identifier}:count`;
       const lockKey = `sa:login:${identifier}:lock`;
       const attempts = await redisClient.incr(countKey);
       await redisClient.set(`sa:login:${identifier}:last`, String(Date.now()));
-      if (attempts >= MAX_ATTEMPTS) {
-        const seconds = Math.ceil(LOCKOUT_DURATION / 1000);
+      if (attempts >= maxAttempts) {
+        const seconds = Math.ceil(lockoutMs / 1000);
         await redisClient.setEx(lockKey, seconds, '1');
       }
       return attempts;
@@ -182,7 +204,7 @@ const clearRateLimit = async (identifier) => {
 // @access  Public (with IP restrictions)
 router.post('/login', [
   body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }),
+  body('password').isString(),
   body('ipAddress').optional().isIP(),
   body('userAgent').optional().isString(),
   body('timestamp').optional().isInt()
@@ -227,8 +249,13 @@ router.post('/login', [
       });
     }
 
+    // Central security policies
+    const policies = await getSecurityPolicies(req.app);
+    const maxAttempts = Number(policies.lockoutThreshold || DEFAULT_MAX_ATTEMPTS) || DEFAULT_MAX_ATTEMPTS;
+    const lockoutMs = DEFAULT_LOCKOUT_DURATION;
+
     // Rate limiting check
-    const rateLimit = await checkRateLimit(email);
+    const rateLimit = await checkRateLimit(email, maxAttempts, lockoutMs);
     if (!rateLimit.allowed) {
       await logSuperAdminAction('login.rate_limited', {
         email,
@@ -268,10 +295,16 @@ router.post('/login', [
       });
     }
 
+    // Enforce password policy (length)
+    if (typeof password === 'string' && password.length < Number(policies.passwordMinLength || 10)) {
+      await logSuperAdminAction('login.policy_block', { userEmail: email, reason: 'Password too short', minLength: policies.passwordMinLength }, req);
+      return res.status(400).json({ success: false, message: `Password does not meet minimum length (${policies.passwordMinLength}). Please reset your password.` });
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      const attempts = await incrementRateLimit(email);
+      const attempts = await incrementRateLimit(email, maxAttempts, lockoutMs);
       
       await logSuperAdminAction('login.failed', {
         userId: user.id,
@@ -284,12 +317,12 @@ router.post('/login', [
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
-        remainingAttempts: MAX_ATTEMPTS - attempts
+        remainingAttempts: Math.max(0, maxAttempts - attempts)
       });
     }
 
     // Check if MFA is required
-    const requiresMfa = (String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification;
+    const requiresMfa = ((String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification || (policies.enforceMfaForAdmins === true));
     const tempToken = requiresMfa ? 
       jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) : 
       undefined;
@@ -560,6 +593,97 @@ router.post('/superadmin/logout', verifyToken, async (req, res) => {
       message: 'Internal server error during logout'
     });
   }
+});
+
+router.post('/change-password', verifyToken, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body || {};
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Invalid input' });
+    }
+    const user = await User.findByPk(req.user.id);
+    if (!user || String(user.role).toUpperCase() !== 'SUPERADMIN') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const policies = await getSecurityPolicies(req.app);
+    if (String(newPassword).length < Number(policies.passwordMinLength || 10)) {
+      return res.status(400).json({ success: false, message: `Password must be at least ${policies.passwordMinLength} characters` });
+    }
+    const valid = await bcrypt.compare(oldPassword, user.password);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: 'Invalid current password' });
+    }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashed });
+    await AuditLog.create({ action: 'superadmin.password.change', userId: user.id, userEmail: user.email, ipAddress: req.headers['x-forwarded-for'] || req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({}), timestamp: new Date(), riskLevel: 'low' });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/request-reset', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+    const user = await User.findOne({ where: { email, role: 'SuperAdmin' } });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const token = jwt.sign({ userId: user.id, type: 'reset' }, JWT_SECRET, { expiresIn: '10m' });
+    if (req.app.locals.redisClient) {
+      await req.app.locals.redisClient.setEx(`sa:reset:${user.id}`, 600, token).catch(() => {});
+    }
+    res.json({ success: true, resetToken: token });
+  } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
+});
+
+router.post('/reset', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body || {};
+    if (!token || !newPassword) return res.status(400).json({ success: false, message: 'Invalid input' });
+    let decoded;
+    try { decoded = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ success: false, message: 'Invalid or expired token' }); }
+    if (decoded.type !== 'reset') return res.status(401).json({ success: false, message: 'Invalid token type' });
+    const user = await User.findByPk(decoded.userId);
+    if (!user || user.role !== 'SuperAdmin') return res.status(404).json({ success: false, message: 'User not found' });
+    const policies = await getSecurityPolicies(req.app);
+    if (String(newPassword).length < Number(policies.passwordMinLength || 10)) {
+      return res.status(400).json({ success: false, message: `Password must be at least ${policies.passwordMinLength} characters` });
+    }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashed });
+    await AuditLog.create({ action: 'superadmin.password.reset', userId: user.id, userEmail: user.email, ipAddress: req.headers['x-forwarded-for'] || req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({}), timestamp: new Date(), riskLevel: 'medium' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
+});
+
+// MFA management
+router.post('/mfa/setup', verifyToken, async (req, res) => {
+  try {
+    if (String(req.user.role).toUpperCase() !== 'SUPERADMIN') return res.status(403).json({ success: false, message: 'Access denied' });
+    const secret = speakeasy.generateSecret({ length: 20, name: 'SchoolSaaS' });
+    res.json({ success: true, base32: secret.base32, otpauthUrl: secret.otpauth_url });
+  } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
+});
+
+router.post('/mfa/enable', verifyToken, async (req, res) => {
+  try {
+    const { secret, code } = req.body || {};
+    const user = await User.findByPk(req.user.id);
+    if (!user || String(user.role).toUpperCase() !== 'SUPERADMIN') return res.status(403).json({ success: false, message: 'Access denied' });
+    const ok = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window: 1 });
+    if (!ok) return res.status(401).json({ success: false, message: 'Invalid code' });
+    await user.update({ mfaSecret: secret, mfaEnabled: true });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
+});
+
+router.post('/mfa/disable', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user || String(user.role).toUpperCase() !== 'SUPERADMIN') return res.status(403).json({ success: false, message: 'Access denied' });
+    await user.update({ mfaEnabled: false });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
 });
 
 module.exports = router;

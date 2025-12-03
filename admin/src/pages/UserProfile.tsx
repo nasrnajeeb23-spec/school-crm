@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UpdatableUserData } from '../types';
 import { useToast } from '../contexts/ToastContext';
+import { changeSuperAdminPassword } from '../api';
 import { useAppContext } from '../contexts/AppContext';
 
 const UserProfile: React.FC = () => {
@@ -30,20 +31,21 @@ const UserProfile: React.FC = () => {
 
     const handlePasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newPassword.length < 6) {
-            addToast('يجب أن تكون كلمة المرور الجديدة 6 أحرف على الأقل.', 'warning');
-            return;
-        }
+        if (newPassword.length < 6) { addToast('يجب أن تكون كلمة المرور الجديدة 6 أحرف على الأقل.', 'warning'); return; }
         if (newPassword !== confirmPassword) {
             addToast('كلمتا المرور الجديدتان غير متطابقتين.', 'error');
             return;
         }
         setIsPasswordSaving(true);
-        const success = await updateProfile({ currentPassword, newPassword });
-        if (success) {
+        try {
+            await changeSuperAdminPassword(currentPassword, newPassword);
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
+            addToast('تم تغيير كلمة المرور بنجاح.', 'success');
+        } catch (err: any) {
+            const msg = String(err?.message || '');
+            addToast(msg.includes('401') ? 'كلمة المرور الحالية غير صحيحة.' : 'فشل تغيير كلمة المرور.', 'error');
         }
         setIsPasswordSaving(false);
     };

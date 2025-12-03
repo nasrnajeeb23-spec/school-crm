@@ -29,6 +29,10 @@ const Message = require('./Message');
 const AuditLog = require('./AuditLog');
 const StaffAttendance = require('./StaffAttendance');
 const TeacherAttendance = require('./TeacherAttendance');
+const SecurityPolicy = require('./SecurityPolicy');
+const Job = require('./Job');
+const ApiKey = require('./ApiKey');
+const TrialRequest = require('./TrialRequest');
 
 
 // Define associations
@@ -198,6 +202,10 @@ const db = {
   StaffAttendance,
   TeacherAttendance,
   FeeSetup,
+  Job,
+  ApiKey,
+  TrialRequest,
+  SecurityPolicy,
 };
 
 module.exports = db;
@@ -225,3 +233,5 @@ School.hasMany(TeacherAttendance, { foreignKey: 'schoolId' });
 TeacherAttendance.belongsTo(School, { foreignKey: 'schoolId' });
 Teacher.hasMany(TeacherAttendance, { foreignKey: 'teacherId' });
 TeacherAttendance.belongsTo(Teacher, { foreignKey: 'teacherId' });
+School.hasMany(Job, { foreignKey: 'schoolId' });
+Job.belongsTo(School, { foreignKey: 'schoolId' });

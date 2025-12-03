@@ -40,6 +40,7 @@ const Sidebar: React.FC = () => {
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: DashboardIcon, path: '/superadmin/dashboard' },
     { id: 'schools', label: 'إدارة المدارس', icon: SchoolIcon, path: '/superadmin/schools' },
+    { id: 'schools-create', label: 'إنشاء مدرسة', icon: SchoolIcon, path: '/superadmin/schools_create' },
     { id: 'school-admins', label: 'مدراء المدارس', icon: UsersIcon, path: '/superadmin/school-admins' },
     { id: 'superadmin-team', label: 'فريق المدير العام', icon: ShieldIcon, path: '/superadmin/team' },
     { id: 'analytics', label: 'التحليلات', icon: DashboardIcon, path: '/superadmin/analytics' },
@@ -49,6 +50,7 @@ const Sidebar: React.FC = () => {
     { id: 'audit-logs', label: 'سجلات التدقيق', icon: ShieldIcon, path: '/superadmin/audit-logs' },
     { id: 'license', label: 'إدارة التراخيص', icon: ModuleIcon, path: '/superadmin/license' },
     { id: 'content', label: 'إدارة المحتوى', icon: ContentIcon, path: '/superadmin/content' },
+    { id: 'onboarding', label: 'طلبات التجربة', icon: UsersIcon, path: '/superadmin/onboarding' },
     { id: 'usage_limits', label: 'حدود الاستخدام', icon: UsageLimitsIcon, path: '/superadmin/usage_limits' },
     { id: 'permissions', label: 'الصلاحيات والأدوار', icon: PermissionsIcon, path: '/superadmin/permissions' },
     { id: 'security', label: 'الأمان', icon: ShieldIcon, path: '/superadmin/security' },
@@ -56,6 +58,8 @@ const Sidebar: React.FC = () => {
     { id: 'api-keys', label: 'مفاتيح API', icon: ShieldIcon, path: '/superadmin/api-keys' },
     { id: 'sso', label: 'SSO', icon: ShieldIcon, path: '/superadmin/sso' },
     { id: 'tasks', label: 'مركز المهام', icon: DashboardIcon, path: '/superadmin/tasks' },
+    { id: 'mfa', label: 'MFA', icon: ShieldIcon, path: '/superadmin/mfa' },
+    { id: 'reports-center', label: 'مركز التقارير', icon: DashboardIcon, path: '/superadmin/reports_center' },
   ];
 
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-2 rounded-lg transition-colors duration-200";

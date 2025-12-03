@@ -55,7 +55,7 @@ module.exports = router;
 router.get('/by-role', verifyToken, async (req, res) => {
   try {
     const userRole = String(req.user.role || '').toUpperCase();
-    if (!['SCHOOLADMIN','SUPERADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
+    if (!['SCHOOLADMIN','SCHOOL_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
     const role = String(req.query.role || '').toUpperCase();
     const schoolId = req.query.schoolId ? Number(req.query.schoolId) : null;
     if (userRole.startsWith('SCHOOL') && !schoolId) return res.status(400).json({ msg: 'schoolId is required' });

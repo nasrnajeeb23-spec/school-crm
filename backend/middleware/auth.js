@@ -21,6 +21,29 @@ async function verifyToken(req, res, next) {
     const tv = Number(u.tokenVersion || 0);
     const ptv = Number(payload.tokenVersion || 0);
     if (tv !== ptv) return res.status(401).json({ msg: 'Token revoked' });
+    // Enforce central security policies for SuperAdmin
+    const policies = (req.app && req.app.locals && req.app.locals.securityPolicies) || null;
+    const roleKey = String(u.role || '').toUpperCase().replace(/[^A-Z]/g, '');
+    const isSuper = roleKey === 'SUPERADMIN';
+    if (policies && isSuper) {
+      // Enforce MFA: require token type issued after MFA
+      if (policies.enforceMfaForAdmins && String(payload.type || '') !== 'superadmin') {
+        return res.status(401).json({ msg: 'MFA required' });
+      }
+      // Enforce allowed IP ranges if configured
+      const ranges = Array.isArray(policies.allowedIpRanges) ? policies.allowedIpRanges : [];
+      if (ranges.length > 0) {
+        const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString();
+        const ok = ranges.some(r => ip.startsWith(r));
+        if (!ok) return res.status(403).json({ msg: 'IP not allowed' });
+      }
+      // Enforce session max age if set (override JWT exp)
+      const maxH = Number(policies.sessionMaxAgeHours || 0);
+      if (maxH > 0 && payload.iat) {
+        const ageSec = Math.floor(Date.now() / 1000) - Number(payload.iat);
+        if (ageSec > maxH * 3600) return res.status(401).json({ msg: 'Session expired' });
+      }
+    }
     next();
   } catch (err) {
     return res.status(401).json({ msg: 'Invalid or expired token' });

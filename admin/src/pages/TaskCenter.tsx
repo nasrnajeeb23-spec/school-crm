@@ -27,6 +27,10 @@ const TaskCenter: React.FC = () => {
   };
 
   useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    const t = setInterval(() => { fetchAll(); }, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   const toggleSchool = (id: number) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -100,6 +104,7 @@ const TaskCenter: React.FC = () => {
                   <th className="px-6 py-3">المدرسة</th>
                   <th className="px-6 py-3">الإنشاء</th>
                   <th className="px-6 py-3">آخر تحديث</th>
+                  <th className="px-6 py-3">تنزيل</th>
                 </tr>
               </thead>
               <tbody>
@@ -110,6 +115,21 @@ const TaskCenter: React.FC = () => {
                     <td className="px-6 py-4">#{j.schoolId}</td>
                     <td className="px-6 py-4" dir="ltr">{j.createdAt}</td>
                     <td className="px-6 py-4" dir="ltr">{j.updatedAt || '-'}</td>
+                    <td className="px-6 py-4">
+                      {j.status === 'completed' ? (
+                        <button onClick={async () => {
+                          try {
+                            const blob = await import('../api').then(m => m.downloadJobCsv(j.id));
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url; a.download = `job_${j.id}.csv`; a.click();
+                            setTimeout(() => URL.revokeObjectURL(url), 2000);
+                          } catch {}
+                        }} className="px-3 py-1 bg-teal-600 text-white rounded-md hover:bg-teal-700">CSV</button>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

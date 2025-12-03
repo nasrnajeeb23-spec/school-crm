@@ -34,6 +34,11 @@ const Analytics = React.lazy(() => import('./pages/Analytics'));
 const ApiKeys = React.lazy(() => import('./pages/ApiKeys'));
 const SsoSettings = React.lazy(() => import('./pages/SsoSettings'));
 const TaskCenter = React.lazy(() => import('./pages/TaskCenter'));
+const MfaSettings = React.lazy(() => import('./pages/MfaSettings'));
+const ReportsCenter = React.lazy(() => import('./pages/ReportsCenter'));
+const CreateSchool = React.lazy(() => import('./pages/CreateSchool'));
+const TrialSignupPublic = React.lazy(() => import('./pages/TrialSignupPublic'));
+const OnboardingRequests = React.lazy(() => import('./pages/OnboardingRequests'));
 
 // School Admin Pages
 const SchoolDashboard = React.lazy(() => import('./pages/SchoolDashboard'));
@@ -134,6 +139,7 @@ const App: React.FC = () => {
           <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/apps" element={<AppsPage />} />
+          <Route path="/join" element={<TrialSignupPublic />} />
           <Route path="/login" element={<LoginPage mode="default" />} />
           <Route path="/superadmin/login" element={<LoginPage mode="superadmin" />} />
 
@@ -149,6 +155,7 @@ const App: React.FC = () => {
               <Route path="billing" element={<Billing />} />
               <Route path="modules" element={<FeatureManagement />} />
               <Route path="content" element={<ContentManagement />} />
+              <Route path="onboarding" element={<OnboardingRequests />} />
               <Route path="usage_limits" element={<UsageLimits />} />
               <Route path="permissions" element={<RolesList />} />
               <Route path="audit-logs" element={<AuditLogs />} />
@@ -158,6 +165,9 @@ const App: React.FC = () => {
               <Route path="api-keys" element={<ApiKeys />} />
               <Route path="sso" element={<SsoSettings />} />
               <Route path="tasks" element={<TaskCenter />} />
+              <Route path="mfa" element={<MfaSettings />} />
+              <Route path="reports_center" element={<ReportsCenter />} />
+              <Route path="schools_create" element={<CreateSchool />} />
               <Route path="license" element={<LicenseManagement />} />
               <Route path="profile" element={<UserProfile />} />
             </Route>

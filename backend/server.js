@@ -200,6 +200,7 @@ try {
       client.on('error', (err) => { try { logger.warn('Redis client error'); } catch {} });
       client.connect().catch(() => {});
       sessionConfig.store = new RedisStore({ client });
+      app.locals.redisClient = client;
       try { logger.info('Session store: Redis'); } catch {}
     } catch {}
   }
@@ -231,23 +232,97 @@ if (licenseKey) {
 }
 app.locals.allowedModules = allowedModules;
 
-app.locals.jobs = Object.create(null);
+const { Job } = require('./models');
+const cron = require('node-cron');
 app.locals.enqueueJob = (name, payload, executor) => {
   const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-  app.locals.jobs[id] = { id, name, status: 'queued', createdAt: Date.now() };
+  Job.create({ id, name, status: 'queued', schoolId: Number(payload.schoolId || 0) }).catch(() => {});
   setImmediate(async () => {
-    app.locals.jobs[id].status = 'running';
     try {
+      await Job.update({ status: 'running', updatedAt: new Date() }, { where: { id } });
       const result = await executor(payload);
-      app.locals.jobs[id].status = 'completed';
-      app.locals.jobs[id].result = result || true;
+      await Job.update({ status: 'completed', updatedAt: new Date() }, { where: { id } });
+      const redis = app.locals.redisClient;
+      if (redis) {
+        if (result && result.csv) await redis.setEx(`job:${id}:csv`, 3600, result.csv.toString());
+        if (result && result.zip) await redis.setEx(`job:${id}:zip`, 3600, result.zip.toString('base64'));
+      }
     } catch (e) {
-      app.locals.jobs[id].status = 'failed';
-      app.locals.jobs[id].error = e && e.message ? e.message : 'error';
+      await Job.update({ status: 'failed', updatedAt: new Date() }, { where: { id } }).catch(() => {});
     }
   });
   return id;
 };
+
+app.locals.cronTasks = Object.create(null);
+app.locals.scheduleBackupForSchool = async (schoolId, cronExpr) => {
+  const sid = String(schoolId);
+  if (app.locals.cronTasks[sid]) {
+    try { app.locals.cronTasks[sid].stop(); } catch {}
+    delete app.locals.cronTasks[sid];
+  }
+  if (!cronExpr || typeof cronExpr !== 'string') return;
+  const task = cron.schedule(cronExpr, () => {
+    try {
+      app.locals.enqueueJob('backup_store', { schoolId }, async (payload) => {
+        const archiver = require('archiver');
+        const { PassThrough } = require('stream');
+        const out = new PassThrough();
+        const chunks = [];
+        out.on('data', (d) => chunks.push(d));
+        const zipDone = new Promise((resolve, reject) => {
+          out.on('end', () => resolve(Buffer.concat(chunks)));
+          out.on('error', reject);
+        });
+        const zip = archiver('zip', { zlib: { level: 9 } });
+        zip.pipe(out);
+        const { School, Subscription, Plan } = require('./models');
+        const school = await School.findByPk(schoolId, { attributes: ['id','name'], raw: true }).catch(() => null);
+        const subs = await Subscription.findAll({ include: [{ model: Plan, attributes: ['name','price'] }], where: { schoolId }, raw: true }).catch(() => []);
+        zip.append(JSON.stringify({ school, subscriptions: subs }, null, 2), { name: 'data.json' });
+        const header = ['SubscriptionId','Plan','Status','Price'].join(',');
+        const body = (subs || []).map(r => [r.id, r['Plan.name'], r.status, r['Plan.price'] || 0].join(',')).join('\n');
+        zip.append(header + '\n' + body, { name: 'subscriptions.csv' });
+        await zip.finalize();
+        const buffer = await zipDone;
+        return { ok: true, jobType: 'backup_store', schoolId, zip: buffer };
+      });
+    } catch {}
+  }, { scheduled: true });
+  app.locals.cronTasks[sid] = task;
+};
+
+app.locals.reloadBackupSchedules = async () => {
+  const redis = app.locals.redisClient;
+  if (!redis) return;
+  try {
+    const schoolsSetKey = 'backup:schedule:set';
+    const schools = await redis.sMembers(schoolsSetKey).catch(() => []);
+    for (const sid of (schools || [])) {
+      const expr = await redis.get(`backup:schedule:${sid}`).catch(() => null);
+      await app.locals.scheduleBackupForSchool(Number(sid), expr);
+    }
+  } catch {}
+};
+
+app.locals.cleanupOldBackups = async () => {
+  const redis = app.locals.redisClient;
+  try {
+    const daysStr = redis ? await redis.get('backup:retention:days').catch(() => null) : null;
+    const days = Number(daysStr || 30) || 30;
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const { Job } = require('./models');
+    const outdated = await Job.findAll({ where: { status: 'completed', updatedAt: { [require('sequelize').Op.lt]: cutoff } }, raw: true }).catch(() => []);
+    for (const j of outdated) {
+      if (redis) {
+        await redis.del(`job:${j.id}:csv`).catch(() => {});
+        await redis.del(`job:${j.id}:zip`).catch(() => {});
+      }
+    }
+  } catch {}
+};
+
+cron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch {} }, { scheduled: true });
 
 // API Routes
 const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
@@ -272,7 +347,7 @@ app.use('/api/analytics', analyticsRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
-// Aliases without "/api" to support frontend fallback requests
+تقرير// Aliases without "/api" to support frontend fallback requests
 app.use('/superadmin', superadminRoutes);
 app.use('/dashboard', analyticsRoutes);
 app.use('/public', schoolsRoutes);

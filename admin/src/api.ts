@@ -34,7 +34,7 @@ const authHeaders = () => {
 };
 
 // دالة مساعدة للاتصال بالـ API
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             ...options,
@@ -837,6 +837,35 @@ export const triggerJobForSchools = async (payload: { schoolIds: number[]; jobTy
     return await apiCall('/superadmin/jobs/trigger', { method: 'POST', body: JSON.stringify(payload) });
 };
 
+export const getJobById = async (jobId: string): Promise<any> => {
+    return await apiCall(`/superadmin/jobs/${encodeURIComponent(jobId)}`, { method: 'GET' });
+};
+
+export const downloadJobCsv = async (jobId: string): Promise<Blob> => {
+    const base = API_BASE_URL.replace(/\/$/, '');
+    const url = `${base}/superadmin/jobs/${encodeURIComponent(jobId)}/download`;
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '';
+    const resp = await fetch(url, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
+    const blob = await resp.blob();
+    return blob;
+};
+
+export const changeSuperAdminPassword = async (oldPassword: string, newPassword: string): Promise<void> => {
+    await apiCall('/auth/superadmin/change-password', { method: 'POST', body: JSON.stringify({ oldPassword, newPassword }) });
+};
+
+export const mfaSetupSuperAdmin = async (): Promise<{ base32: string; otpauthUrl: string }> => {
+    return await apiCall('/auth/superadmin/mfa/setup', { method: 'POST', body: JSON.stringify({}) });
+};
+
+export const mfaEnableSuperAdmin = async (secret: string, code: string): Promise<void> => {
+    await apiCall('/auth/superadmin/mfa/enable', { method: 'POST', body: JSON.stringify({ secret, code }) });
+};
+
+export const mfaDisableSuperAdmin = async (): Promise<void> => {
+    await apiCall('/auth/superadmin/mfa/disable', { method: 'POST', body: JSON.stringify({}) });
+};
+
 export const getRoutes = async (schoolId: number): Promise<Route[]> => {
     return await apiCall(`/transportation/${schoolId}/routes`, { method: 'GET' });
 };
@@ -973,6 +1002,14 @@ export const getDashboardStats = async (): Promise<any> => {
             usageBySchool,
         };
     }
+};
+
+export const getMetricsSummary = async (): Promise<{ memory: { rssMB: number; heapUsedMB: number }; uptimeSec: number; totals: { schools: number; activeSubscriptions: number } }> => {
+    return await apiCall('/superadmin/metrics/summary', { method: 'GET' });
+};
+
+export const getKpis = async (): Promise<{ activeSubscriptions: number; mrr: number; arpu: number; churnRate: number }> => {
+    return await apiCall('/superadmin/analytics/kpi', { method: 'GET' });
 };
 
 export const addSchool = async (data: NewSchoolData): Promise<School> => {

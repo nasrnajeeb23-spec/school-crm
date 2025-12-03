@@ -28,6 +28,13 @@ const Subscription = sequelize.define('Subscription', {
   // Foreign keys are added via associations in models/index.js
   // schoolId
   // planId
+}, {
+  indexes: [
+    { name: 'idx_subscription_status', fields: ['status'] },
+    { name: 'idx_subscription_school', fields: ['schoolId'] },
+    { name: 'idx_subscription_plan', fields: ['planId'] },
+    { name: 'idx_subscription_renewal', fields: ['renewalDate'] }
+  ]
 });
 
 module.exports = Subscription;

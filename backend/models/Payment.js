@@ -25,6 +25,11 @@ const Payment = sequelize.define('Payment', {
     allowNull: true,
   },
   // Foreign key for Invoice
+}, {
+  indexes: [
+    { name: 'idx_payment_date', fields: ['paymentDate'] },
+    { name: 'idx_invoice_id', fields: ['invoiceId'] }
+  ]
 });
 
 module.exports = Payment;
