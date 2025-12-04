@@ -14,6 +14,7 @@ interface AppContextType {
   logout: () => void;
   trialSignup: (data: NewTrialRequestData) => Promise<boolean>;
   updateProfile: (data: UpdatableUserData) => Promise<boolean>;
+  completeLoginWithToken: (token: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -116,6 +117,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addToast('البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
     return false;
   };
+  const completeLoginWithToken = async (token: string): Promise<boolean> => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', token);
+      }
+      const me = await api.getCurrentUser();
+      if (me) {
+        setCurrentUser(me as User);
+        if ((me as any).schoolId) {
+          try { localStorage.setItem('current_school_id', String((me as any).schoolId)); } catch {}
+        }
+        addToast(`أهلاً بك مرة أخرى، ${me.name}!`, 'success');
+        return true;
+      }
+    } catch {}
+    return false;
+  };
   
   const trialSignup = async (data: NewTrialRequestData): Promise<boolean> => {
     console.log('Starting trial signup with data:', data);
@@ -172,6 +190,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     logout,
     trialSignup,
     updateProfile,
+    completeLoginWithToken,
   };
 
   if (typeof window !== 'undefined') {
