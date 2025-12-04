@@ -1379,20 +1379,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                       ))}
                     </div>
                   </div>
-                  <div>
-                    <label htmlFor="registrationFee" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رسوم التسجيل (إن وجدت)</label>
-                    <input type="number" min="0" name="registrationFee" id="registrationFee" value={(settings.admissionForm?.registrationFee ?? 0).toString()} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, registrationFee: Number(e.target.value) } } : null)} className={inputStyle} />
-                  </div>
-                  <div>
-                    <label htmlFor="registrationFeeDueDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300">أيام حتى الاستحقاق</label>
-                    <input type="number" min="0" name="registrationFeeDueDays" id="registrationFeeDueDays" value={(settings.admissionForm?.registrationFeeDueDays ?? 7).toString()} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, registrationFeeDueDays: Number(e.target.value) } } : null)} className={inputStyle} />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={settings.admissionForm?.autoGenerateRegistrationInvoice ?? true} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, autoGenerateRegistrationInvoice: e.target.checked } } : null)} className="form-checkbox h-5 w-5 text-teal-600" />
-                      <span className="text-gray-700 dark:text-gray-300">إنشاء فاتورة رسوم التسجيل تلقائياً</span>
-                    </label>
-                  </div>
+                  
                   <div>
                     <label className="flex items-center gap-2">
                       <input type="checkbox" checked={settings.admissionForm?.consentFormRequired || false} onChange={(e) => setSettings(prev => prev ? { ...prev, admissionForm: { ...prev.admissionForm, consentFormRequired: e.target.checked } } : null)} className="form-checkbox h-5 w-5 text-teal-600" />

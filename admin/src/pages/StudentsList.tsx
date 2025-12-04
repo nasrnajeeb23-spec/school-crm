@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Student, StudentStatus, NewStudentData, SchoolSettings, Class } from '../types';
+import { Student, StudentStatus, NewStudentData, Class } from '../types';
 import * as api from '../api';
 import StudentFormModal from '../components/StudentFormModal';
 import { PlusIcon, UsersIcon } from '../components/icons';
@@ -36,7 +36,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
   const [genIncludeUniform, setGenIncludeUniform] = useState<boolean>(true);
   const [genIncludeActivities, setGenIncludeActivities] = useState<boolean>(true);
   const [genDiscounts, setGenDiscounts] = useState<string[]>([]);
-  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
+  
 
   useEffect(() => {
     setLoading(true);
@@ -48,7 +48,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
     }).finally(() => {
         setLoading(false);
     });
-    api.getSchoolSettings(schoolId).then(setSchoolSettings).catch(() => setSchoolSettings(null));
+    
     api.getSchoolClasses(schoolId).then(setClasses).catch(() => setClasses([]));
   }, [schoolId, addToast]);
   
@@ -71,19 +71,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
           }
         }
 
-        if ((schoolSettings?.admissionForm?.registrationFee || 0) > 0 && (schoolSettings?.admissionForm?.autoGenerateRegistrationInvoice ?? true)) {
-          try {
-            const baseDateStr = studentData.admissionDate || new Date().toISOString().split('T')[0];
-            const base = new Date(baseDateStr);
-            const addDays = Number(schoolSettings?.admissionForm?.registrationFeeDueDays ?? 7);
-            base.setDate(base.getDate() + addDays);
-            const dueStr = base.toISOString().split('T')[0];
-            await api.addInvoice(schoolId, { studentId: newStudent.id, dueDate: dueStr, items: [{ description: 'رسوم التسجيل', amount: Number(schoolSettings?.admissionForm?.registrationFee || 0) }] });
-            addToast('تم إنشاء فاتورة رسوم التسجيل تلقائياً.', 'info');
-          } catch (invErr) {
-            console.warn('Registration fee invoice failed:', invErr);
-          }
-        }
+        
 
         try {
           const parent = await api.upsertSchoolParent(schoolId, {
