@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api';
-import { SchoolSettings, StudentStatus, ModuleId } from '../types';
+import { SchoolSettings, StudentStatus } from '../types';
 import { useToast } from '../contexts/ToastContext';
 
 interface SettingsProps {
@@ -12,14 +12,10 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { addToast } = useToast();
-  const [genSelecting, setGenSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;teachers:boolean;parents:boolean;staff:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,teachers:true,parents:true,staff:true,grades:true,attendance:false,schedule:false,fees:true});
-  const [importState, setImportState] = useState<{students:any[];classes:any[];subjects:any[];classSubjectTeachers:any[];teachers:any[];parents:any[];staff:any[];grades:any[];attendance:any[];schedule:any[];fees:any[];logs:string[]}>({students:[],classes:[],subjects:[],classSubjectTeachers:[],teachers:[],parents:[],staff:[],grades:[],attendance:[],schedule:[],fees:[],logs:[]});
-  const [importPreview, setImportPreview] = useState<{students:{valid:number;invalid:number;errors:string[]};classes:{valid:number;invalid:number;errors:string[]};subjects:{valid:number;invalid:number;errors:string[]};classSubjectTeachers:{valid:number;invalid:number;errors:string[]};teachers:{valid:number;invalid:number;errors:string[]};parents:{valid:number;invalid:number;errors:string[]};staff:{valid:number;invalid:number;errors:string[]};grades:{valid:number;invalid:number;errors:string[]};attendance:{valid:number;invalid:number;errors:string[]};schedule:{valid:number;invalid:number;errors:string[]};fees:{valid:number;invalid:number;errors:string[]}}>({students:{valid:0,invalid:0,errors:[]},classes:{valid:0,invalid:0,errors:[]},subjects:{valid:0,invalid:0,errors:[]},classSubjectTeachers:{valid:0,invalid:0,errors:[]},teachers:{valid:0,invalid:0,errors:[]},parents:{valid:0,invalid:0,errors:[]},staff:{valid:0,invalid:0,errors:[]},grades:{valid:0,invalid:0,errors:[]},attendance:{valid:0,invalid:0,errors:[]},schedule:{valid:0,invalid:0,errors:[]},fees:{valid:0,invalid:0,errors:[]}});
+  const [genSelecting, setGenSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;teachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,teachers:true,grades:true,attendance:false,schedule:false,fees:true});
+  const [importState, setImportState] = useState<{students:any[];classes:any[];subjects:any[];classSubjectTeachers:any[];grades:any[];attendance:any[];schedule:any[];fees:any[];logs:string[]}>({students:[],classes:[],subjects:[],classSubjectTeachers:[],grades:[],attendance:[],schedule:[],fees:[],logs:[]});
+  const [importPreview, setImportPreview] = useState<{students:{valid:number;invalid:number;errors:string[]};classes:{valid:number;invalid:number;errors:string[]};subjects:{valid:number;invalid:number;errors:string[]};classSubjectTeachers:{valid:number;invalid:number;errors:string[]};grades:{valid:number;invalid:number;errors:string[]};attendance:{valid:number;invalid:number;errors:string[]};schedule:{valid:number;invalid:number;errors:string[]};fees:{valid:number;invalid:number;errors:string[]}}>({students:{valid:0,invalid:0,errors:[]},classes:{valid:0,invalid:0,errors:[]},subjects:{valid:0,invalid:0,errors:[]},classSubjectTeachers:{valid:0,invalid:0,errors:[]},grades:{valid:0,invalid:0,errors:[]},attendance:{valid:0,invalid:0,errors:[]},schedule:{valid:0,invalid:0,errors:[]},fees:{valid:0,invalid:0,errors:[]}});
   const [importProcessing, setImportProcessing] = useState(false);
-  const [activeModules, setActiveModules] = useState<string[]>([]);
-  const hasAcademic = activeModules.includes(ModuleId.AcademicManagement);
-  const hasFinance = activeModules.includes(ModuleId.Finance);
-  const [activeTab, setActiveTab] = useState<'general'|'data'|'backup'>('general');
 
   useEffect(() => {
     setLoading(true);
@@ -30,15 +26,11 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     }).finally(() => {
         setLoading(false);
     });
-    api.getSchoolModules(schoolId).then(mods => {
-      const arr = Array.isArray(mods) ? mods.map((m: any) => m.moduleId || m.id).filter(Boolean) : [];
-      setActiveModules(arr);
-    }).catch(() => {});
   }, [schoolId]);
 
-  const [exportSelecting, setExportSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean;staff:boolean;settings:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true,staff:true,settings:true});
+  const [exportSelecting, setExportSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true});
   const [exportFilters, setExportFilters] = useState<{className:string;date:string;subjectName:string}>({className:'',date:'',subjectName:''});
-  const [backupSelecting, setBackupSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean;staff:boolean;settings:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true,staff:true,settings:true});
+  const [backupSelecting, setBackupSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true});
   const [backupConfig, setBackupConfig] = useState<{enabledDaily:boolean;dailyTime:string;enabledMonthly:boolean;monthlyDay:number;monthlyTime:string;retainDays:number;types?:string[]}>({enabledDaily:false,dailyTime:'02:00',enabledMonthly:false,monthlyDay:1,monthlyTime:'03:00',retainDays:30,types:[]});
   const [backupsList, setBackupsList] = useState<any[]>([]);
 
@@ -221,23 +213,6 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     return head + '\n' + body + (body ? '\n' : '');
   };
 
-  const exportSettingsJSON = async () => {
-    const data = await api.getSchoolSettings(schoolId);
-    const blob = new Blob([JSON.stringify(data || {}, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `SchoolSettings_${new Date().toISOString().slice(0,19).replace(/[:]/g,'-')}.json`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-  };
-
-  const importSettingsJSON = async (file: File) => {
-    try {
-      const text = await file.text();
-      const obj = JSON.parse(text);
-      await api.updateSchoolSettings(schoolId, obj);
-      setSettings(obj);
-      addToast('تم استيراد إعدادات المدرسة بنجاح.', 'success');
-    } catch { addToast('فشل استيراد إعدادات المدرسة.', 'error'); }
-  };
-
   const downloadCSV = (filename: string, csv: string) => {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -290,24 +265,6 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     const csv = toCSV(base, []);
     downloadCSV('Students.csv', csv);
   };
-  const buildTeachersTemplate = () => {
-    const headers = ['name','email','phone','subjectSpecialty','isActive'];
-    const rows: any[] = [{ name: 'مثال: أحمد علي', email: 'teacher@example.com', phone: '+966500000000', subjectSpecialty: 'رياضيات', isActive: 'true' }];
-    const csv = toCSV(headers, rows);
-    downloadCSV('Teachers.csv', csv);
-  };
-  const buildParentsTemplate = () => {
-    const headers = ['name','email','phone','studentId'];
-    const rows: any[] = [{ name: 'مثال: وليد عبد الله', email: 'parent@example.com', phone: '+966500000001', studentId: 'std_001' }];
-    const csv = toCSV(headers, rows);
-    downloadCSV('Parents.csv', csv);
-  };
-  const buildStaffTemplate = () => {
-    const headers = ['name','email','phone','role','department','isActive'];
-    const rows: any[] = [{ name: 'مثال: موظف إداري', email: 'staff@example.com', phone: '+966500000002', role: 'Admin', department: 'شؤون الطلاب', isActive: 'true' }];
-    const csv = toCSV(headers, rows);
-    downloadCSV('Staff.csv', csv);
-  };
 
   const buildClassesTemplate = () => {
     const headers = ['gradeLevel','section','capacity','homeroomTeacherName'];
@@ -358,13 +315,11 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       if (genSelecting.classes) buildClassesTemplate();
       if (genSelecting.subjects) buildSubjectsTemplate();
       if (genSelecting.classSubjectTeachers) buildClassSubjectTeachersTemplate();
-      if (genSelecting.teachers) { await buildRefTeachers(); buildTeachersTemplate(); }
-      if (genSelecting.parents) buildParentsTemplate();
-      if (genSelecting.staff) buildStaffTemplate();
+      if (genSelecting.teachers) await buildRefTeachers();
       if (genSelecting.grades) buildGradesTemplate();
-      if (genSelecting.attendance && hasAcademic) buildAttendanceTemplate();
-      if (genSelecting.schedule && hasAcademic) buildScheduleTemplate();
-      if (genSelecting.fees && hasFinance) buildFeesTemplate();
+      if (genSelecting.attendance) buildAttendanceTemplate();
+      if (genSelecting.schedule) buildScheduleTemplate();
+      if (genSelecting.fees) buildFeesTemplate();
       buildRefStagesGrades();
       buildRefWorkingDays();
       buildRefTerms();
@@ -498,38 +453,26 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     const csv = toCSV(['parentId','name','email','phone','studentId'], rows);
     downloadCSV('Export_Parents.csv', csv);
   };
-  const exportStaffCSV = async () => {
-    const list = await api.getSchoolStaff(schoolId);
-    const rows = (list||[]).map((s: any) => ({ staffId: s.id, name: s.name, email: s.email||'', phone: s.phone||'', role: s.role||'', department: s.department||'', isActive: s.isActive?'true':'false' }));
-    const csv = toCSV(['staffId','name','email','phone','role','department','isActive'], rows);
-    downloadCSV('Export_Staff.csv', csv);
-  };
 
   const handleExportSelected = async () => {
     try {
       if (exportSelecting.students) await exportStudentsCSV();
       if (exportSelecting.classes) await exportClassesCSV();
-      if (hasAcademic && exportSelecting.subjects) await exportSubjectsCSV();
-      if (hasAcademic && exportSelecting.classSubjectTeachers) await exportClassSubjectTeachersCSV();
-      if (hasAcademic && exportSelecting.grades) await exportGradesCSV();
-      if (hasAcademic && exportSelecting.attendance) await exportAttendanceCSV();
-      if (hasAcademic && exportSelecting.schedule) await exportScheduleCSV();
-      if (hasFinance && exportSelecting.fees) await exportFeesCSV();
+      if (exportSelecting.subjects) await exportSubjectsCSV();
+      if (exportSelecting.classSubjectTeachers) await exportClassSubjectTeachersCSV();
+      if (exportSelecting.grades) await exportGradesCSV();
+      if (exportSelecting.attendance) await exportAttendanceCSV();
+      if (exportSelecting.schedule) await exportScheduleCSV();
+      if (exportSelecting.fees) await exportFeesCSV();
       if (exportSelecting.teachers) await exportTeachersCSV();
       if (exportSelecting.parents) await exportParentsCSV();
-      if (exportSelecting.staff) await exportStaffCSV();
-      if (exportSelecting.settings) await exportSettingsJSON();
       addToast('تم تصدير البيانات المحددة.', 'success');
     } catch { addToast('فشل تصدير البيانات.', 'error'); }
   };
 
   const handleDownloadZipSelected = async () => {
     try {
-      let types = Object.entries(backupSelecting).filter(([,v]) => !!v).map(([k]) => k);
-      if (!hasAcademic) types = types.filter(t => !['subjects','classSubjectTeachers','grades','attendance','schedule'].includes(t));
-      if (!hasFinance) types = types.filter(t => t !== 'fees');
-      const supported = new Set(['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents']);
-      types = types.filter(t => supported.has(t));
+      const types = Object.entries(backupSelecting).filter(([,v]) => !!v).map(([k]) => k);
       const blob = await api.downloadBackupZip(schoolId, { types, filters: exportFilters });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -617,26 +560,8 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     if (/^حاضر$/i.test(v) || /^Present$/i.test(v)) return 'Present';
     if (/^غائب$/i.test(v) || /^Absent$/i.test(v)) return 'Absent';
     if (/^متأخر$/i.test(v) || /^Late$/i.test(v)) return 'Late';
-    if (/^مُعفى$/i.test(v) || /^بعذر$/i.test(v) || /^Excused$/i.test(v)) return 'Excused';
+    if (/^مُعفى$/i.test(v) || /^Excused$/i.test(v)) return 'Excused';
     return 'Present';
-  };
-
-  const downloadPreviewErrors = () => {
-    const entries: any[] = [];
-    const add = (type: string, arr: string[]) => { (arr||[]).forEach(m => entries.push({ type, message: m })); };
-    add('students', importPreview.students.errors);
-    add('classes', importPreview.classes.errors);
-    add('subjects', importPreview.subjects.errors);
-    add('classSubjectTeachers', importPreview.classSubjectTeachers.errors);
-    add('grades', importPreview.grades.errors);
-    add('attendance', importPreview.attendance.errors);
-    add('schedule', importPreview.schedule.errors);
-    add('fees', importPreview.fees.errors);
-    add('teachers', (importPreview as any).teachers?.errors || []);
-    add('parents', (importPreview as any).parents?.errors || []);
-    add('staff', (importPreview as any).staff?.errors || []);
-    const csv = toCSV(['type','message'], entries);
-    downloadCSV(`Preview_Errors_${new Date().toISOString().slice(0,19).replace(/[:]/g,'-')}.csv`, csv);
   };
 
   const mapPaymentPlan = (s: string) => {
@@ -949,82 +874,6 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
   };
 
-  const importTeachers = async (rows: any[]) => {
-    const logs: string[] = [];
-    try {
-      const existing = await api.getSchoolTeachers(schoolId);
-      const byPhone: Record<string, any> = {};
-      const byName: Record<string, any> = {};
-      for (const t of existing) { byPhone[String(t.phone||'').trim()] = t; byName[String(t.name||'').trim()] = t; }
-      for (const r of rows) {
-        try {
-          const name = String(r.name||'').trim();
-          const email = String(r.email||'').trim();
-          const phone = String(r.phone||'').trim();
-          const subject = String(r.subject||r.subjectSpecialty||'').trim();
-          const active = String(r.isActive||'').trim();
-          const isActive = active ? /^(true|1|نعم)$/i.test(active) : true;
-          const found = (phone && byPhone[phone]) || (name && byName[name]) || null;
-          if (found) {
-            await api.updateTeacher(found.id, { name, email, phone, subject, isActive });
-            logs.push(`تم تحديث معلم: ${name}`);
-          } else {
-            await api.addSchoolTeacher(schoolId, { name, email, phone, subject, isActive });
-            logs.push(`تم إنشاء معلم: ${name}`);
-          }
-        } catch { logs.push(`فشل معالجة معلم: ${r.name||''}`); }
-      }
-    } catch { logs.push('تعذر تحميل قائمة المعلمين'); }
-    setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
-  };
-
-  const importParents = async (rows: any[]) => {
-    const logs: string[] = [];
-    try {
-      for (const r of rows) {
-        try {
-          const name = String(r.name||'').trim();
-          const email = String(r.email||'').trim();
-          const phone = String(r.phone||'').trim();
-          const studentId = String(r.studentId||'').trim();
-          await api.upsertSchoolParent(schoolId, { name, email, phone, studentId });
-          logs.push(`تم ربط ولي أمر: ${name}`);
-        } catch { logs.push(`فشل معالجة ولي أمر: ${r.name||''}`); }
-      }
-    } catch { logs.push('تعذر تنفيذ استيراد أولياء الأمور'); }
-    setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
-  };
-
-  const importStaff = async (rows: any[]) => {
-    const logs: string[] = [];
-    try {
-      const existing = await api.getSchoolStaff(schoolId);
-      const byPhone: Record<string, any> = {};
-      const byName: Record<string, any> = {};
-      for (const s of existing) { byPhone[String(s.phone||'').trim()] = s; byName[String(s.name||'').trim()] = s; }
-      for (const r of rows) {
-        try {
-          const name = String(r.name||'').trim();
-          const email = String(r.email||'').trim();
-          const phone = String(r.phone||'').trim();
-          const role = String(r.role||'').trim();
-          const department = String(r.department||'').trim();
-          const active = String(r.isActive||'').trim();
-          const isActive = active ? /^(true|1|نعم)$/i.test(active) : true;
-          const found = (phone && byPhone[phone]) || (name && byName[name]) || null;
-          if (found) {
-            await api.updateSchoolStaff(schoolId, found.id, { name, email, phone, role, department, isActive });
-            logs.push(`تم تحديث موظف: ${name}`);
-          } else {
-            await api.addSchoolStaff(schoolId, { name, email, phone, role, department, isActive });
-            logs.push(`تم إنشاء موظف: ${name}`);
-          }
-        } catch { logs.push(`فشل معالجة موظف: ${r.name||''}`); }
-      }
-    } catch { logs.push('تعذر تحميل قائمة الموظفين'); }
-    setImportState(prev => ({ ...prev, logs: [...prev.logs, ...logs] }));
-  };
-
   const validateAll = async () => {
     try {
       const [classes, students, teachers] = await Promise.all([
@@ -1043,19 +892,9 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
         const parentOk = !!(String(r.parentPhone||'').trim() || String(r.parentEmail||'').trim() || String(r.parentName||'').trim());
         const cls = String(r.className||'').trim();
         const clsOk = !cls || classNames.has(cls);
-        const email = String(r.parentEmail||'').trim();
-        const phone = String(r.parentPhone||'').trim();
-        const nid = String(r.nationalId||'').trim();
-        const dob = String(r.dateOfBirth||'').trim();
-        const gender = String(r.gender||'').trim();
-        const emailOk = !email || /^\S+@\S+\.\S+$/.test(email);
-        const phoneOk = !phone || /^[0-9+\-\s]{7,}$/.test(phone);
-        const nidOk = !nid || /^\d{8,}$/.test(nid);
-        const dobOk = !dob || /^\d{4}-\d{2}-\d{2}$/.test(dob);
-        const genderOk = !gender || (gender === 'ذكر' || gender === 'أنثى');
-        if (nameOk && parentOk && clsOk && emailOk && phoneOk && nidOk && dobOk && genderOk) studentsValid++; else {
+        if (nameOk && parentOk && clsOk) studentsValid++; else {
           studentsInvalid++;
-          const errs = [!nameOk ? 'اسم الطالب مفقود' : '', !parentOk ? 'بيانات ولي الأمر ناقصة' : '', (!clsOk ? `فصل غير موجود: ${cls}` : ''), (!emailOk ? 'بريد ولي الأمر غير صالح' : ''), (!phoneOk ? 'هاتف ولي الأمر غير صالح' : ''), (!nidOk ? 'رقم الهوية غير صالح' : ''), (!dobOk ? 'تاريخ ميلاد غير صحيح (YYYY-MM-DD)' : ''), (!genderOk ? 'جنس غير صحيح' : '')].filter(Boolean).join(' — ');
+          const errs = [!nameOk ? 'اسم الطالب مفقود' : '', !parentOk ? 'بيانات ولي الأمر ناقصة' : '', (!clsOk ? `فصل غير موجود: ${cls}` : '')].filter(Boolean).join(' — ');
           studentsErrors.push(`${r.name || 'سجل'}: ${errs}`);
         }
       }
@@ -1074,14 +913,10 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
         const sid = String(r.studentId||'').trim();
         const subj = String(r.subjectName||'').trim();
         const numsOk = ['homework','quiz','midterm','final'].every(k => String(r[k]||'').trim() === '' || !isNaN(Number(r[k])));
-        let subjectOk = !!subj;
-        const clsObj = classes.find((c: any) => `${c.gradeLevel} (${c.section||'أ'})` === cls);
-        const subjList = Array.isArray((clsObj as any)?.subjects) ? (clsObj as any).subjects : [];
-        if (subjList.length > 0) subjectOk = subjList.includes(subj);
-        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && subjectOk && numsOk;
+        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && !!subj && numsOk;
         if (ok) gradesValid++; else {
           gradesInvalid++;
-          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) ? `طالب غير موجود: ${sid}` : '', !subj ? 'مادة مفقودة' : (subjectOk ? '' : 'المادة ليست ضمن مواد الفصل'), !numsOk ? 'قيم درجات غير رقمية' : ''].filter(Boolean).join(' — ');
+          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) ? `طالب غير موجود: ${sid}` : '', !subj ? 'مادة مفقودة' : '', !numsOk ? 'قيم درجات غير رقمية' : ''].filter(Boolean).join(' — ');
           gradesErrors.push(`سجل درجات: ${errs}`);
         }
       }
@@ -1102,62 +937,6 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
           attendanceErrors.push(`سجل حضور: ${errs}`);
         }
       }
-      const teachersErrors: string[] = [];
-      let teachersValid = 0, teachersInvalid = 0;
-      for (const r of importState.teachers) {
-        const name = String(r.name||'').trim();
-        const email = String(r.email||'').trim();
-        const phone = String(r.phone||'').trim();
-        const subject = String(r.subject||r.subjectSpecialty||'').trim();
-        const emailOk = !email || /^\S+@\S+\.\S+$/.test(email);
-        const phoneOk = !phone || /^[0-9+\-\s]{7,}$/.test(phone);
-        const ok = !!name && emailOk && phoneOk && !!subject;
-        if (ok) teachersValid++; else {
-          teachersInvalid++;
-          const errs = [!name ? 'اسم معلم مفقود' : '', !subject ? 'تخصص/مادة مفقودة' : '', (!emailOk ? 'بريد غير صالح' : ''), (!phoneOk ? 'هاتف غير صالح' : '')].filter(Boolean).join(' — ');
-          teachersErrors.push(`سجل معلم: ${errs}`);
-        }
-      }
-
-      const parentsErrors: string[] = [];
-      let parentsValid = 0, parentsInvalid = 0;
-      for (const r of importState.parents) {
-        const name = String(r.name||'').trim();
-        const email = String(r.email||'').trim();
-        const phone = String(r.phone||'').trim();
-        const emailOk = !email || /^\S+@\S+\.\S+$/.test(email);
-        const phoneOk = !phone || /^[0-9+\-\s]{7,}$/.test(phone);
-        const ok = !!name && (emailOk || phoneOk);
-        if (ok) parentsValid++; else {
-          parentsInvalid++;
-          const errs = [!name ? 'اسم ولي أمر مفقود' : '', (!emailOk ? 'بريد غير صالح' : ''), (!phoneOk ? 'هاتف غير صالح' : '')].filter(Boolean).join(' — ');
-          parentsErrors.push(`سجل ولي أمر: ${errs}`);
-        }
-      }
-
-      const staffErrors: string[] = [];
-      let staffValid = 0, staffInvalid = 0;
-      for (const r of importState.staff) {
-        const name = String(r.name||'').trim();
-        const email = String(r.email||'').trim();
-        const phone = String(r.phone||'').trim();
-        const role = String(r.role||'').trim();
-        const emailOk = !email || /^\S+@\S+\.\S+$/.test(email);
-        const phoneOk = !phone || /^[0-9+\-\s]{7,}$/.test(phone);
-        const ok = !!name && !!role && emailOk && phoneOk;
-        if (ok) staffValid++; else {
-          staffInvalid++;
-          const errs = [!name ? 'اسم موظف مفقود' : '', !role ? 'الدور مفقود' : '', (!emailOk ? 'بريد غير صالح' : ''), (!phoneOk ? 'هاتف غير صالح' : '')].filter(Boolean).join(' — ');
-          staffErrors.push(`سجل موظف: ${errs}`);
-        }
-      }
-
-      setImportPreview(prev => ({
-        ...prev,
-        teachers: { valid: teachersValid, invalid: teachersInvalid, errors: teachersErrors },
-        parents: { valid: parentsValid, invalid: parentsInvalid, errors: parentsErrors },
-        staff: { valid: staffValid, invalid: staffInvalid, errors: staffErrors },
-      }));
     } catch {
       addToast('تعذر إجراء التحقق.', 'error');
     }
@@ -1194,19 +973,9 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
         const kCsvPhone = norm(r.name || '') + '|' + String(r.parentPhone || '');
         const dupDobCount = importState.students.filter(x => norm(x.name||'') + '|' + String(x.dateOfBirth||'') === kCsvDob).length;
         const dupPhoneCount = importState.students.filter(x => norm(x.name||'') + '|' + String(x.parentPhone||'') === kCsvPhone).length;
-        const email = String(r.parentEmail||'').trim();
-        const phone = String(r.parentPhone||'').trim();
-        const nid = String(r.nationalId||'').trim();
-        const dob = String(r.dateOfBirth||'').trim();
-        const gender = String(r.gender||'').trim();
-        const emailOk = !email || /^\S+@\S+\.\S+$/.test(email);
-        const phoneOk = !phone || /^[0-9+\-\s]{7,}$/.test(phone);
-        const nidOk = !nid || /^\d{8,}$/.test(nid);
-        const dobOk = !dob || /^\d{4}-\d{2}-\d{2}$/.test(dob);
-        const genderOk = !gender || (gender === 'ذكر' || gender === 'أنثى');
-        if (nameOk && parentOk && clsOk && emailOk && phoneOk && nidOk && dobOk && genderOk) studentsValid++; else {
+        if (nameOk && parentOk && clsOk) studentsValid++; else {
           studentsInvalid++;
-          const errs = [!nameOk ? 'اسم الطالب مفقود' : '', !parentOk ? 'بيانات ولي الأمر ناقصة' : '', (!clsOk ? `فصل غير موجود: ${cls}` : ''), (dupDobCount>1 ? `تكرار في الملف (الاسم+تاريخ الميلاد)` : ''), (dupPhoneCount>1 ? `تكرار في الملف (الاسم+هاتف ولي الأمر)` : ''), (!emailOk ? 'بريد ولي الأمر غير صالح' : ''), (!phoneOk ? 'هاتف ولي الأمر غير صالح' : ''), (!nidOk ? 'رقم الهوية غير صالح' : ''), (!dobOk ? 'تاريخ ميلاد غير صحيح (YYYY-MM-DD)' : ''), (!genderOk ? 'جنس غير صحيح' : '')].filter(Boolean).join(' — ');
+          const errs = [!nameOk ? 'اسم الطالب مفقود' : '', !parentOk ? 'بيانات ولي الأمر ناقصة' : '', (!clsOk ? `فصل غير موجود: ${cls}` : ''), (dupDobCount>1 ? `تكرار في الملف (الاسم+تاريخ الميلاد)` : ''), (dupPhoneCount>1 ? `تكرار في الملف (الاسم+هاتف ولي الأمر)` : '')].filter(Boolean).join(' — ');
           studentsErrors.push(`${r.name || 'سجل'}: ${errs}`);
         }
       }
@@ -1225,17 +994,13 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
         const sid = String(r.studentId||'').trim();
         const subj = String(r.subjectName||'').trim();
         const numsOk = ['homework','quiz','midterm','final'].every(k => String(r[k]||'').trim() === '' || !isNaN(Number(r[k])));
-        let subjectOk = !!subj;
-        const clsObj = classes.find((c: any) => `${c.gradeLevel} (${c.section||'أ'})` === cls);
-        const subjList = Array.isArray((clsObj as any)?.subjects) ? (clsObj as any).subjects : [];
-        if (subjList.length > 0) subjectOk = subjList.includes(subj);
-        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && subjectOk && numsOk;
+        const ok = (!!cls && classNames.has(cls)) && (!!sid && studentIds.has(sid)) && !!subj && numsOk;
         if (ok) gradesValid++; else {
           gradesInvalid++;
           const k1 = norm(r.studentName || '') + '|' + String(r.dateOfBirth || '');
           const k2 = norm(r.studentName || '') + '|' + String(r.parentPhone || '');
           const amb = (!sid && ((byNameDobMap[k1]||[]).length>1 || (byNamePhoneMap[k2]||[]).length>1)) ? 'تطابق غامض في تحديد الطالب' : '';
-          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) && !amb ? `طالب غير موجود: ${sid || r.studentName || ''}` : '', amb, !subj ? 'مادة مفقودة' : (subjectOk ? '' : 'المادة ليست ضمن مواد الفصل'), !numsOk ? 'قيم درجات غير رقمية' : ''].filter(Boolean).join(' — ');
+          const errs = [!classNames.has(cls) ? `فصل غير موجود: ${cls}` : '', !studentIds.has(sid) && !amb ? `طالب غير موجود: ${sid || r.studentName || ''}` : '', amb, !subj ? 'مادة مفقودة' : '', !numsOk ? 'قيم درجات غير رقمية' : ''].filter(Boolean).join(' — ');
           gradesErrors.push(`سجل درجات: ${errs}`);
         }
       }
@@ -1316,19 +1081,16 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
         }
       }
 
-        setImportPreview({
-          students: { valid: studentsValid, invalid: studentsInvalid, errors: studentsErrors },
-          classes: { valid: classesValid, invalid: classesInvalid, errors: classesErrors },
-          subjects: { valid: subjectsValid, invalid: subjectsInvalid, errors: subjectsErrors },
-          classSubjectTeachers: { valid: cstValid, invalid: cstInvalid, errors: cstErrors },
-          grades: { valid: gradesValid, invalid: gradesInvalid, errors: gradesErrors },
-          attendance: { valid: attendanceValid, invalid: attendanceInvalid, errors: attendanceErrors },
-          schedule: { valid: scheduleValid, invalid: scheduleInvalid, errors: scheduleErrors },
-          fees: { valid: feesValid, invalid: feesInvalid, errors: feesErrors },
-          teachers: { valid: 0, invalid: 0, errors: [] },
-          parents: { valid: 0, invalid: 0, errors: [] },
-          staff: { valid: 0, invalid: 0, errors: [] },
-        });
+      setImportPreview({
+        students: { valid: studentsValid, invalid: studentsInvalid, errors: studentsErrors },
+        classes: { valid: classesValid, invalid: classesInvalid, errors: classesErrors },
+        subjects: { valid: subjectsValid, invalid: subjectsInvalid, errors: subjectsErrors },
+        classSubjectTeachers: { valid: cstValid, invalid: cstInvalid, errors: cstErrors },
+        grades: { valid: gradesValid, invalid: gradesInvalid, errors: gradesErrors },
+        attendance: { valid: attendanceValid, invalid: attendanceInvalid, errors: attendanceErrors },
+        schedule: { valid: scheduleValid, invalid: scheduleInvalid, errors: scheduleErrors },
+        fees: { valid: feesValid, invalid: feesInvalid, errors: feesErrors },
+      });
     } catch {
       addToast('تعذر إجراء التحقق.', 'error');
     }
@@ -1336,12 +1098,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
 
   return (
     <div className="mt-6 space-y-6">
-      <div className="mb-4 flex gap-2">
-        <button aria-label="الإعدادات العامة" onClick={() => setActiveTab('general')} className={`px-4 py-2 rounded-md ${activeTab==='general'?'bg-teal-600 text-white':'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-200'}`}>عام المدرسة</button>
-        <button aria-label="إدارة البيانات" onClick={() => setActiveTab('data')} className={`px-4 py-2 rounded-md ${activeTab==='data'?'bg-teal-600 text-white':'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-200'}`}>إدارة البيانات (CSV)</button>
-        <button aria-label="النسخ الاحتياطي" onClick={() => setActiveTab('backup')} className={`px-4 py-2 rounded-md ${activeTab==='backup'?'bg-teal-600 text-white':'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-200'}`}>النسخ الاحتياطي</button>
-      </div>
-      {activeTab === 'general' && (<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">الإعدادات العامة للمدرسة</h3>
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1500,19 +1257,19 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       </div>
     </div>
 
-      {activeTab === 'backup' && (<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">النسخ الاحتياطي والتصدير المضغوط</h3>
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-300">اختر أنواع البيانات للحزمة، ويمكنك استخدام نفس المرشحات.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.students} onChange={e => setBackupSelecting(prev => ({ ...prev, students: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>طلاب</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.classes} onChange={e => setBackupSelecting(prev => ({ ...prev, classes: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>فصول</span></label>
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.subjects} onChange={e => setBackupSelecting(prev => ({ ...prev, subjects: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>مواد</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.classSubjectTeachers} onChange={e => setBackupSelecting(prev => ({ ...prev, classSubjectTeachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>ربط المادة بالمعلم</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.grades} onChange={e => setBackupSelecting(prev => ({ ...prev, grades: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>درجات</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.attendance} onChange={e => setBackupSelecting(prev => ({ ...prev, attendance: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>حضور</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.schedule} onChange={e => setBackupSelecting(prev => ({ ...prev, schedule: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>الجدول الدراسي</span></label>}
-            {hasFinance && <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.fees} onChange={e => setBackupSelecting(prev => ({ ...prev, fees: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>الرسوم</span></label>}
+            <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.subjects} onChange={e => setBackupSelecting(prev => ({ ...prev, subjects: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>مواد</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.classSubjectTeachers} onChange={e => setBackupSelecting(prev => ({ ...prev, classSubjectTeachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>ربط المادة بالمعلم</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.grades} onChange={e => setBackupSelecting(prev => ({ ...prev, grades: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>درجات</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.attendance} onChange={e => setBackupSelecting(prev => ({ ...prev, attendance: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>حضور</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.schedule} onChange={e => setBackupSelecting(prev => ({ ...prev, schedule: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>الجدول الدراسي</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.fees} onChange={e => setBackupSelecting(prev => ({ ...prev, fees: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>الرسوم</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.teachers} onChange={e => setBackupSelecting(prev => ({ ...prev, teachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>المعلمين</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={backupSelecting.parents} onChange={e => setBackupSelecting(prev => ({ ...prev, parents: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>أولياء الأمور</span></label>
           </div>
@@ -1584,7 +1341,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
             )}
           </div>
         </div>
-      </div>)}
+      </div>
 
             <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
                 <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">إعداد نماذج التسجيل</h4>
@@ -1664,25 +1421,23 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                 </button>
             </div>
         </form>
-      </div>)}
+      </div>
 
-      {activeTab === 'data' && (<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">تصدير البيانات</h3>
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-300">اختر ما تريد تصديره ويمكنك التصفية باسم الفصل أو تاريخ الحضور.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.students} onChange={e => setExportSelecting(prev => ({ ...prev, students: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الطلاب</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.classes} onChange={e => setExportSelecting(prev => ({ ...prev, classes: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الفصول</span></label>
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.subjects} onChange={e => setExportSelecting(prev => ({ ...prev, subjects: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير المواد</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.classSubjectTeachers} onChange={e => setExportSelecting(prev => ({ ...prev, classSubjectTeachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير ربط المادة بالمعلم</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.grades} onChange={e => setExportSelecting(prev => ({ ...prev, grades: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الدرجات</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.attendance} onChange={e => setExportSelecting(prev => ({ ...prev, attendance: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الحضور</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.schedule} onChange={e => setExportSelecting(prev => ({ ...prev, schedule: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الجدول الدراسي</span></label>}
-            {hasFinance && <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.fees} onChange={e => setExportSelecting(prev => ({ ...prev, fees: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الرسوم</span></label>}
+            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.subjects} onChange={e => setExportSelecting(prev => ({ ...prev, subjects: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير المواد</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.classSubjectTeachers} onChange={e => setExportSelecting(prev => ({ ...prev, classSubjectTeachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير ربط المادة بالمعلم</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.grades} onChange={e => setExportSelecting(prev => ({ ...prev, grades: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الدرجات</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.attendance} onChange={e => setExportSelecting(prev => ({ ...prev, attendance: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الحضور</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.schedule} onChange={e => setExportSelecting(prev => ({ ...prev, schedule: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الجدول الدراسي</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.fees} onChange={e => setExportSelecting(prev => ({ ...prev, fees: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الرسوم</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.teachers} onChange={e => setExportSelecting(prev => ({ ...prev, teachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير المعلمين</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.parents} onChange={e => setExportSelecting(prev => ({ ...prev, parents: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير أولياء الأمور</span></label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.staff} onChange={e => setExportSelecting(prev => ({ ...prev, staff: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير الموظفين</span></label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={exportSelecting.settings} onChange={e => setExportSelecting(prev => ({ ...prev, settings: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>تصدير إعدادات المدرسة (JSON)</span></label>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -1698,37 +1453,34 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
               <input type="text" value={exportFilters.subjectName} onChange={e => setExportFilters(prev => ({ ...prev, subjectName: e.target.value }))} className={inputStyle} />
             </div>
           </div>
-          <div className="flex gap-3">
+          <div>
             <button type="button" onClick={handleExportSelected} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">تصدير البيانات المحددة</button>
-            <button type="button" onClick={exportSettingsJSON} className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800">تصدير إعدادات المدرسة (JSON)</button>
           </div>
         </div>
-      </div>)}
+      </div>
 
-      {activeTab === 'data' && (<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">توليد قوالب الاستيراد الذكية</h3>
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-300">سيتم توليد القوالب وفق إعدادات مدرستك الحالية.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.students} onChange={e => setGenSelecting(prev => ({ ...prev, students: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الطلاب</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.classes} onChange={e => setGenSelecting(prev => ({ ...prev, classes: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الفصول</span></label>
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.subjects} onChange={e => setGenSelecting(prev => ({ ...prev, subjects: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب المواد</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.classSubjectTeachers} onChange={e => setGenSelecting(prev => ({ ...prev, classSubjectTeachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب ربط المادة بالمعلم</span></label>}
+            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.subjects} onChange={e => setGenSelecting(prev => ({ ...prev, subjects: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب المواد</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.classSubjectTeachers} onChange={e => setGenSelecting(prev => ({ ...prev, classSubjectTeachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب ربط المادة بالمعلم</span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.teachers} onChange={e => setGenSelecting(prev => ({ ...prev, teachers: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قائمة المعلمين (مرجع)</span></label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.parents} onChange={e => setGenSelecting(prev => ({ ...prev, parents: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب أولياء الأمور</span></label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.staff} onChange={e => setGenSelecting(prev => ({ ...prev, staff: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الموظفين</span></label>
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.grades} onChange={e => setGenSelecting(prev => ({ ...prev, grades: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الدرجات</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.attendance} onChange={e => setGenSelecting(prev => ({ ...prev, attendance: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الحضور</span></label>}
-            {hasAcademic && <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.schedule} onChange={e => setGenSelecting(prev => ({ ...prev, schedule: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الجدول الدراسي</span></label>}
-            {hasFinance && <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.fees} onChange={e => setGenSelecting(prev => ({ ...prev, fees: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الرسوم</span></label>}
+            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.grades} onChange={e => setGenSelecting(prev => ({ ...prev, grades: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الدرجات</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.attendance} onChange={e => setGenSelecting(prev => ({ ...prev, attendance: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الحضور</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.schedule} onChange={e => setGenSelecting(prev => ({ ...prev, schedule: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الجدول الدراسي</span></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={genSelecting.fees} onChange={e => setGenSelecting(prev => ({ ...prev, fees: e.target.checked }))} className="form-checkbox h-5 w-5 text-teal-600" /><span>قالب الرسوم</span></label>
           </div>
           <div>
             <button type="button" onClick={handleGenerateTemplates} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">توليد القوالب المحددة</button>
           </div>
         </div>
-      </div>)}
+      </div>
 
-      {activeTab === 'data' && (<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">استيراد سريع للفصل الحالي</h3>
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1740,41 +1492,29 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الفصول (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, classes: rows })); }} className="mt-1 block w-full" />
             </div>
-            {hasAcademic && <div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف المواد (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, subjects: rows })); }} className="mt-1 block w-full" />
-            </div>}
-            {hasAcademic && <div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الدرجات (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, grades: rows })); }} className="mt-1 block w-full" />
-            </div>}
-            {hasAcademic && <div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الحضور (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, attendance: rows })); }} className="mt-1 block w-full" />
-            </div>}
-            {hasAcademic && <div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الجدول (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, schedule: rows })); }} className="mt-1 block w-full" />
-            </div>}
-            {hasFinance && <div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الرسوم (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, fees: rows })); }} className="mt-1 block w-full" />
-            </div>}
-            {hasAcademic && <div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف ربط المادة بالمعلم (CSV)</label>
               <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, classSubjectTeachers: rows })); }} className="mt-1 block w-full" />
-            </div>}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف المعلمين (CSV)</label>
-              <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, teachers: rows })); }} className="mt-1 block w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف أولياء الأمور (CSV)</label>
-              <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, parents: rows })); }} className="mt-1 block w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ملف الموظفين (CSV)</label>
-              <input type="file" accept=".csv" onChange={async e => { const f=e.target.files?.[0]; if(!f) return; const text=await f.text(); const {rows}=parseCSVText(text); setImportState(prev=>({ ...prev, staff: rows })); }} className="mt-1 block w-full" />
             </div>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
@@ -1787,13 +1527,9 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
             <span>حضور: {importState.attendance.length}</span>
             <span>جدول: {importState.schedule.length}</span>
             <span>رسوم: {importState.fees.length}</span>
-            <span>معلمين: {importState.teachers.length}</span>
-            <span>أولياء أمور: {importState.parents.length}</span>
-            <span>موظفون: {importState.staff.length}</span>
           </div>
-          <div className="mt-3 flex gap-3">
-            <button type="button" aria-label="تحقق الملفات المختارة" onClick={async ()=>{ await validateAllPreview(); addToast('تم فحص الملفات.', 'info'); }} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800">تحقق الملفات المختارة</button>
-            <button type="button" aria-label="تحميل جميع الأخطاء" onClick={downloadPreviewErrors} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">تحميل جميع الأخطاء</button>
+          <div className="mt-3">
+            <button type="button" onClick={async ()=>{ await validateAllPreview(); addToast('تم فحص الملفات.', 'info'); }} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800">تحقق الملفات المختارة</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mt-4">
             <div>
@@ -1828,37 +1564,22 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
               <div className="font-semibold">ربط مواد/معلمين: صالح {importPreview.classSubjectTeachers.valid} | غير صالح {importPreview.classSubjectTeachers.invalid}</div>
               {importPreview.classSubjectTeachers.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
             </div>
-            <div>
-              <div className="font-semibold">معلمين: صالح {importPreview.teachers.valid} | غير صالح {importPreview.teachers.invalid}</div>
-              {importPreview.teachers.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
-            </div>
-            <div>
-              <div className="font-semibold">أولياء أمور: صالح {importPreview.parents.valid} | غير صالح {importPreview.parents.invalid}</div>
-              {importPreview.parents.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
-            </div>
-            <div>
-              <div className="font-semibold">موظفون: صالح {importPreview.staff.valid} | غير صالح {importPreview.staff.invalid}</div>
-              {importPreview.staff.errors.slice(0,10).map((e,i)=>(<div key={i} className="text-red-600 dark:text-red-400">{e}</div>))}
-            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <button type="button" disabled={importProcessing||importState.classes.length===0} onClick={async ()=>{ setImportProcessing(true); await importClasses(importState.classes); setImportProcessing(false); addToast('تم استيراد الفصول.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الفصول</button>
             <button type="button" disabled={importProcessing||importState.students.length===0} onClick={async ()=>{ setImportProcessing(true); await importStudents(importState.students); setImportProcessing(false); addToast('تم استيراد الطلاب.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الطلاب</button>
-            {hasAcademic && <button type="button" disabled={importProcessing||importState.subjects.length===0} onClick={async ()=>{ setImportProcessing(true); await importSubjects(importState.subjects); setImportProcessing(false); addToast('تم استيراد المواد.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد المواد</button>}
-            {hasAcademic && <button type="button" disabled={importProcessing||importState.grades.length===0} onClick={async ()=>{ setImportProcessing(true); await importGrades(importState.grades); setImportProcessing(false); addToast('تم استيراد الدرجات.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد الدرجات</button>}
-            {hasAcademic && <button type="button" disabled={importProcessing||importState.attendance.length===0} onClick={async ()=>{ setImportProcessing(true); await importAttendance(importState.attendance); setImportProcessing(false); addToast('تم استيراد الحضور.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الحضور</button>}
-            {hasAcademic && <button type="button" disabled={importProcessing||importState.schedule.length===0} onClick={async ()=>{ setImportProcessing(true); await importSchedule(importState.schedule); setImportProcessing(false); addToast('تم استيراد الجدول.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الجدول</button>}
-            {hasFinance && <button type="button" disabled={importProcessing||importState.fees.length===0} onClick={async ()=>{ setImportProcessing(true); await importFees(importState.fees); setImportProcessing(false); addToast('تم استيراد الرسوم.', 'success'); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-400">استيراد الرسوم</button>}
-            {hasAcademic && <button type="button" disabled={importProcessing||importState.classSubjectTeachers.length===0} onClick={async ()=>{ setImportProcessing(true); await importClassSubjectTeachers(importState.classSubjectTeachers); setImportProcessing(false); addToast('تم ربط المواد بالمعلمين.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد ربط المادة بالمعلم</button>}
-            <button type="button" disabled={importProcessing||importState.teachers.length===0} onClick={async ()=>{ setImportProcessing(true); await importTeachers(importState.teachers); setImportProcessing(false); addToast('تم استيراد المعلمين.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد المعلمين</button>
-            <button type="button" disabled={importProcessing||importState.parents.length===0} onClick={async ()=>{ setImportProcessing(true); await importParents(importState.parents); setImportProcessing(false); addToast('تم استيراد أولياء الأمور.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد أولياء الأمور</button>
-            <button type="button" disabled={importProcessing||importState.staff.length===0} onClick={async ()=>{ setImportProcessing(true); await importStaff(importState.staff); setImportProcessing(false); addToast('تم استيراد الموظفين.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد الموظفين</button>
+            <button type="button" disabled={importProcessing||importState.subjects.length===0} onClick={async ()=>{ setImportProcessing(true); await importSubjects(importState.subjects); setImportProcessing(false); addToast('تم استيراد المواد.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد المواد</button>
+            <button type="button" disabled={importProcessing||importState.grades.length===0} onClick={async ()=>{ setImportProcessing(true); await importGrades(importState.grades); setImportProcessing(false); addToast('تم استيراد الدرجات.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد الدرجات</button>
+            <button type="button" disabled={importProcessing||importState.attendance.length===0} onClick={async ()=>{ setImportProcessing(true); await importAttendance(importState.attendance); setImportProcessing(false); addToast('تم استيراد الحضور.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الحضور</button>
+            <button type="button" disabled={importProcessing||importState.schedule.length===0} onClick={async ()=>{ setImportProcessing(true); await importSchedule(importState.schedule); setImportProcessing(false); addToast('تم استيراد الجدول.', 'success'); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400">استيراد الجدول</button>
+            <button type="button" disabled={importProcessing||importState.fees.length===0} onClick={async ()=>{ setImportProcessing(true); await importFees(importState.fees); setImportProcessing(false); addToast('تم استيراد الرسوم.', 'success'); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-400">استيراد الرسوم</button>
+            <button type="button" disabled={importProcessing||importState.classSubjectTeachers.length===0} onClick={async ()=>{ setImportProcessing(true); await importClassSubjectTeachers(importState.classSubjectTeachers); setImportProcessing(false); addToast('تم ربط المواد بالمعلمين.', 'success'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">استيراد ربط المادة بالمعلم</button>
           </div>
           <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto text-sm">
             {importState.logs.length === 0 ? <div className="text-gray-500">لا توجد سجلات بعد.</div> : importState.logs.map((l,i)=>(<div key={i} className="text-gray-700 dark:text-gray-300">{l}</div>))}
           </div>
         </div>
-      </div>)}
+      </div>
     </div>
   );
 };
