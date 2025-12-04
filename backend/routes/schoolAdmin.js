@@ -1383,9 +1383,17 @@ router.get('/:schoolId/parent-requests', verifyToken, requireRole('SCHOOL_ADMIN'
       order: [['createdAt','DESC']]
     });
     const statusMap = { 'Pending': 'قيد الانتظار', 'Approved': 'موافق عليه', 'Rejected': 'مرفوض' };
-    const list = rows.filter(r => String(r.Parent?.schoolId || '') === String(req.params.schoolId)).map(r => ({ id: String(r.id), title: r.title, description: r.description, status: statusMap[r.status] || 'قيد الانتظار', parentId: String(r.Parent.id), parentName: r.Parent.name, parentEmail: r.Parent.email, parentPhone: r.Parent.phone, createdAt: r.createdAt.toISOString().split('T')[0] }));
+    let list = [];
+    try {
+      list = rows
+        .filter(r => String(r.Parent?.schoolId || '') === String(req.params.schoolId))
+        .map(r => ({ id: String(r.id), title: r.title, description: r.description, status: statusMap[r.status] || 'قيد الانتظار', parentId: String(r.Parent.id), parentName: r.Parent.name, parentEmail: r.Parent.email, parentPhone: r.Parent.phone, createdAt: (r.createdAt instanceof Date ? r.createdAt.toISOString().split('T')[0] : String(r.createdAt).toString()) }));
+    } catch (mapErr) {
+      try { console.error('Parent requests mapping error:', mapErr?.message || mapErr); } catch {}
+      list = [];
+    }
     res.json(list);
-  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+  } catch (e) { console.error(e.message); res.json([]); }
 });
 
 router.put('/:schoolId/parent-requests/:id/approve', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {

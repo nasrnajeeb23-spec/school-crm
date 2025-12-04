@@ -118,6 +118,25 @@ function requireSameSchoolParam(paramName = 'schoolId') {
 function requirePermission(...requiredPerms) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ msg: 'Unauthenticated' });
+    const normalizeRole = (role) => {
+      if (!role) return '';
+      const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
+      const map = {
+        SUPERADMIN: 'SUPER_ADMIN',
+        SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL',
+        SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL',
+        SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
+        SCHOOLADMIN: 'SCHOOL_ADMIN',
+        TEACHER: 'TEACHER',
+        PARENT: 'PARENT'
+      };
+      return map[key] || String(role).toUpperCase();
+    };
+
+    const userRole = normalizeRole(req.user.role);
+    const superAdminRoles = ['SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'];
+    if (superAdminRoles.includes(userRole)) return next();
+
     const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
     const ok = requiredPerms.some(p => perms.includes(p));
     if (!ok) { try { const logger = req.app && req.app.locals && req.app.locals.logger; if (logger) logger.warn('access_denied_permission', { userId: req.user.id, role: req.user.role, requiredPerms, path: req.originalUrl || req.url }); } catch {} return res.status(403).json({ msg: 'Insufficient permissions' }); }

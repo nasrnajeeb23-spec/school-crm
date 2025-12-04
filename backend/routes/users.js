@@ -54,8 +54,17 @@ module.exports = router;
  
 router.get('/by-role', verifyToken, async (req, res) => {
   try {
-    const userRole = String(req.user.role || '').toUpperCase();
-    if (!['SCHOOLADMIN','SCHOOL_ADMIN','SUPER_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
+    const normalizeRole = (role) => {
+      if (!role) return '';
+      const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
+      const map = {
+        SUPERADMIN: 'SUPER_ADMIN',
+        SCHOOLADMIN: 'SCHOOL_ADMIN'
+      };
+      return map[key] || String(role).toUpperCase();
+    };
+    const userRole = normalizeRole(req.user.role);
+    if (!['SCHOOL_ADMIN','SUPER_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
     const roleParam = String(req.query.role || '').toUpperCase();
     const role = roleParam === 'SCHOOLADMIN' ? 'SCHOOL_ADMIN' : roleParam;
     const schoolId = req.query.schoolId ? Number(req.query.schoolId) : null;
