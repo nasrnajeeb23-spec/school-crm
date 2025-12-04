@@ -251,10 +251,18 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
+router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
     const schoolId = Number(req.params.id);
-    const moduleIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds : [];
+    const requestedIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds : [];
+    const catalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
+    const byId = new Map(catalog.map(m => [String(m.id), m]));
+    const role = String(req.user?.role || '').toUpperCase();
+    const isSchoolAdmin = role.includes('SCHOOL') && role.includes('ADMIN');
+    const moduleIds = isSchoolAdmin ? requestedIds.filter(id => {
+      const m = byId.get(String(id));
+      return m && m.isCore === true;
+    }) : requestedIds;
     const settings = await SchoolSettings.findOrCreate({ where: { schoolId }, defaults: { schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } } });
     const settingsInstance = Array.isArray(settings) ? settings[0] : settings;
     settingsInstance.activeModules = moduleIds;

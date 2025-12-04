@@ -1152,7 +1152,7 @@ export const updateModule = async (moduleData: Module): Promise<Module> => {
     return await apiCall(`/modules/${moduleData.id}`, { method: 'PUT', body: JSON.stringify(moduleData) });
 };
 
-export const createModule = async (moduleData: Module): Promise<{ id: string }> => {
+export const createModule = async (moduleData: Module): Promise<Module> => {
     return await apiCall('/modules', { method: 'POST', body: JSON.stringify(moduleData) });
 };
 

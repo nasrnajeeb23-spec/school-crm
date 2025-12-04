@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-import { School, Module, ModuleId, PaymentProofSubmission, PaymentMethod } from '../types';
+import { School, Module, ModuleId, PaymentProofSubmission, PaymentMethod, PricingConfig } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { CheckIcon } from '../components/icons';
 import PaymentProofModal from '../components/PaymentProofModal';
@@ -14,6 +14,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const [availableModules, setAvailableModules] = useState<Module[]>([]);
     const [activeModuleIds, setActiveModuleIds] = useState<Set<ModuleId>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
     const [moduleToActivate, setModuleToActivate] = useState<Module | null>(null);
     const { addToast } = useToast();
     const { currentUser } = useAppContext();
@@ -23,10 +24,12 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         setLoading(true);
         Promise.all([
             api.getAvailableModules(),
-            api.getSchoolModules(school.id)
-        ]).then(([available, active]) => {
+            api.getSchoolModules(school.id),
+            api.getPricingConfig()
+        ]).then(([available, active, pricing]) => {
             setAvailableModules(available);
             setActiveModuleIds(new Set(active.map(m => m.moduleId)));
+            setPricingConfig(pricing);
         }).catch(err => {
             console.error("Failed to fetch modules data:", err);
             addToast("فشل تحميل بيانات الوحدات.", 'error');
@@ -52,7 +55,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     };
 
     const handleToggleModule = async (module: Module, enable: boolean) => {
-        if (!canManageModules) {
+        if (!canManageModules && !module.isCore) {
             addToast('هذه العملية تتطلب موافقة المدير العام للمنصة.', 'error');
             return;
         }
@@ -68,14 +71,14 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     };
 
     const { baseCost, modulesCost, totalCost } = useMemo(() => {
-        const pricing = { pricePerStudent: 1.5 }; // This should come from API in a real app
-        const baseCost = school.students * pricing.pricePerStudent;
+        const pricePerStudent = pricingConfig?.pricePerStudent ?? 1.5;
+        const baseCost = school.students * pricePerStudent;
         const modulesCost = availableModules
             .filter(m => activeModuleIds.has(m.id))
             .reduce((total, m) => total + m.monthlyPrice, 0);
         const totalCost = baseCost + modulesCost;
         return { baseCost, modulesCost, totalCost };
-    }, [school.students, availableModules, activeModuleIds]);
+    }, [school.students, availableModules, activeModuleIds, pricingConfig]);
     
     if (loading) {
         return <p className="text-center p-8">جاري تحميل الوحدات...</p>;
@@ -100,7 +103,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white">ملخص الاشتراك الحالي</h3>
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                         <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">التكلفة الأساسية ({school.students} طالب × ${1.5})</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">التكلفة الأساسية ({school.students} طالب × ${pricingConfig?.pricePerStudent ?? 1.5})</p>
                             <p className="text-2xl font-bold text-gray-900 dark:text-white">${baseCost.toFixed(2)}</p>
                         </div>
                         <div>
@@ -154,32 +157,19 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                 </div>
                                 <div className="mt-4 text-center">
                                     {activeModuleIds.has(module.id) ? (
-                                        canManageModules ? (
-                                            <button
-                                                onClick={() => handleToggleModule(module, false)}
-                                                className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                            >
-                                                تعطيل
-                                            </button>
-                                        ) : (
-                                            <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center justify-center">
-                                                <CheckIcon className="w-5 h-5 ml-2" />
-                                                مفعلة
-                                            </div>
-                                        )
+                                        <button
+                                            onClick={() => handleToggleModule(module, false)}
+                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                        >
+                                            تعطيل
+                                        </button>
                                     ) : (
-                                        canManageModules ? (
-                                            <button
-                                                onClick={() => handleToggleModule(module, true)}
-                                                className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-                                            >
-                                                تفعيل
-                                            </button>
-                                        ) : (
-                                            <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                                                يتطلب موافقة المدير العام
-                                            </div>
-                                        )
+                                        <button
+                                            onClick={() => handleToggleModule(module, true)}
+                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                                        >
+                                            تفعيل
+                                        </button>
                                     )}
                                 </div>
                             </div>
