@@ -11,7 +11,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
-  const { login, completeLoginWithToken } = useAppContext() as any;
+  const { login } = useAppContext();
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [email, setEmail] = useState('');
@@ -155,7 +155,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
       if (result.success) {
         localStorage.removeItem('superadmin_login_attempts');
         localStorage.removeItem('superadmin_lock_time');
-        const ok = await completeLoginWithToken(result.token);
+        const ok = await login(email, password);
         if (ok) navigate('/superadmin', { replace: true });
       } else {
         addToast('رمز المصادقة غير صحيح', 'error');
@@ -368,6 +368,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                 disabled={
                   isLoading ||
                   (isSuperAdminLogin && !/\S+@\S+\.\S+/.test(email)) ||
+                  (isSuperAdminLogin && password.length < 10) ||
                   (showMfa && mfaCode.length !== 6)
                 } 
                 className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed ${
@@ -437,6 +438,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">كلمة المرور الجديدة</label>
                   <input type="password" value={resetNewPassword} onChange={e => setResetNewPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">يجب أن تكون 10 أحرف على الأقل</p>
                 </div>
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">تأكيد كلمة المرور</label>
@@ -444,7 +446,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                 </div>
                 <div className="flex justify-end gap-3">
                   <button type="button" onClick={() => setShowReset(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg dark:bg-gray-700 dark:text-gray-200">إلغاء</button>
-                  <button type="button" disabled={resetLoading || !resetNewPassword || resetNewPassword !== resetConfirm} onClick={async () => { try { setResetLoading(true); await api.resetSuperAdminPassword(resetToken, resetNewPassword); addToast('تم تعيين كلمة المرور الجديدة بنجاح.', 'success'); setShowReset(false); setPassword(resetNewPassword); } catch { addToast('فشل إعادة التعيين.', 'error'); } finally { setResetLoading(false); } }} className="px-4 py-2 bg-teal-600 text-white rounded-lg disabled:bg-teal-400">{resetLoading ? 'جارٍ التعيين...' : 'تعيين'}</button>
+                  <button type="button" disabled={resetLoading || resetNewPassword.length < 10 || resetNewPassword !== resetConfirm} onClick={async () => { try { setResetLoading(true); await api.resetSuperAdminPassword(resetToken, resetNewPassword); addToast('تم تعيين كلمة المرور الجديدة بنجاح.', 'success'); setShowReset(false); setPassword(resetNewPassword); } catch { addToast('فشل إعادة التعيين.', 'error'); } finally { setResetLoading(false); } }} className="px-4 py-2 bg-teal-600 text-white rounded-lg disabled:bg-teal-400">{resetLoading ? 'جارٍ التعيين...' : 'تعيين'}</button>
                 </div>
               </div>
             )}

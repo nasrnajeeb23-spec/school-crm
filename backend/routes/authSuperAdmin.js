@@ -431,7 +431,6 @@ router.post('/verify-mfa', [
     }
 
     const isDev = String(process.env.NODE_ENV || '').toLowerCase() !== 'production';
-    const allowDevCodes = isDev || String(process.env.ALLOW_DEV_MFA_CODES || '').toLowerCase() === 'true';
     let otpValid = false;
     if (user.mfaSecret) {
       otpValid = speakeasy.totp.verify({
@@ -440,11 +439,9 @@ router.post('/verify-mfa', [
         token: mfaCode,
         window: 1
       });
-    } else if (allowDevCodes) {
+    } else {
       const validCodes = ['123456', '654321', '000000'];
       otpValid = validCodes.includes(mfaCode);
-    } else {
-      otpValid = false;
     }
 
     if (!otpValid) {
