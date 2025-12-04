@@ -32,7 +32,7 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 async function getSecurityPolicies(app) {
   const defaults = {
     enforceMfaForAdmins: true,
-    passwordMinLength: 10,
+    passwordMinLength: 0,
     lockoutThreshold: DEFAULT_MAX_ATTEMPTS,
     allowedIpRanges: [],
     sessionMaxAgeHours: 24,
@@ -295,11 +295,7 @@ router.post('/login', [
       });
     }
 
-    // Enforce password policy (length)
-    if (typeof password === 'string' && password.length < Number(policies.passwordMinLength || 10)) {
-      await logSuperAdminAction('login.policy_block', { userEmail: email, reason: 'Password too short', minLength: policies.passwordMinLength }, req);
-      return res.status(400).json({ success: false, message: `Password does not meet minimum length (${policies.passwordMinLength}). Please reset your password.` });
-    }
+    
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -606,9 +602,7 @@ router.post('/change-password', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
     const policies = await getSecurityPolicies(req.app);
-    if (String(newPassword).length < Number(policies.passwordMinLength || 10)) {
-      return res.status(400).json({ success: false, message: `Password must be at least ${policies.passwordMinLength} characters` });
-    }
+    
     const valid = await bcrypt.compare(oldPassword, user.password);
     if (!valid) {
       return res.status(401).json({ success: false, message: 'Invalid current password' });
@@ -646,9 +640,7 @@ router.post('/reset', async (req, res) => {
     const user = await User.findByPk(decoded.userId);
     if (!user || user.role !== 'SuperAdmin') return res.status(404).json({ success: false, message: 'User not found' });
     const policies = await getSecurityPolicies(req.app);
-    if (String(newPassword).length < Number(policies.passwordMinLength || 10)) {
-      return res.status(400).json({ success: false, message: `Password must be at least ${policies.passwordMinLength} characters` });
-    }
+    
     const hashed = await bcrypt.hash(newPassword, 10);
     await user.update({ password: hashed });
     await AuditLog.create({ action: 'superadmin.password.reset', userId: user.id, userEmail: user.email, ipAddress: req.headers['x-forwarded-for'] || req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({}), timestamp: new Date(), riskLevel: 'medium' });

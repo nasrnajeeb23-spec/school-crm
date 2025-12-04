@@ -110,14 +110,14 @@ router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req
 // Security policies (central)
 router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const defaults = { enforceMfaForAdmins: true, passwordMinLength: 10, lockoutThreshold: 3, allowedIpRanges: [], sessionMaxAgeHours: 24 };
+    const defaults = { enforceMfaForAdmins: true, passwordMinLength: 0, lockoutThreshold: 3, allowedIpRanges: [], sessionMaxAgeHours: 24 };
     let dbPolicy = await SecurityPolicy.findOne();
     if (!dbPolicy) {
       dbPolicy = await SecurityPolicy.create({ ...defaults, allowedIpRanges: JSON.stringify(defaults.allowedIpRanges) });
     }
     const cfg = {
       enforceMfaForAdmins: !!dbPolicy.enforceMfaForAdmins,
-      passwordMinLength: Number(dbPolicy.passwordMinLength || 10),
+      passwordMinLength: Number(dbPolicy.passwordMinLength || 0),
       lockoutThreshold: Number(dbPolicy.lockoutThreshold || 3),
       allowedIpRanges: (() => { try { return JSON.parse(dbPolicy.allowedIpRanges || '[]'); } catch { return []; } })(),
       sessionMaxAgeHours: Number(dbPolicy.sessionMaxAgeHours || 24),
@@ -134,14 +134,14 @@ router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async 
     let dbPolicy = await SecurityPolicy.findOne();
     const prev = dbPolicy ? {
       enforceMfaForAdmins: !!dbPolicy.enforceMfaForAdmins,
-      passwordMinLength: Number(dbPolicy.passwordMinLength || 10),
+      passwordMinLength: Number(dbPolicy.passwordMinLength || 0),
       lockoutThreshold: Number(dbPolicy.lockoutThreshold || 3),
       allowedIpRanges: (() => { try { return JSON.parse(dbPolicy.allowedIpRanges || '[]'); } catch { return []; } })(),
       sessionMaxAgeHours: Number(dbPolicy.sessionMaxAgeHours || 24),
-    } : { enforceMfaForAdmins: true, passwordMinLength: 10, lockoutThreshold: 3, allowedIpRanges: [], sessionMaxAgeHours: 24 };
+    } : { enforceMfaForAdmins: true, passwordMinLength: 0, lockoutThreshold: 3, allowedIpRanges: [], sessionMaxAgeHours: 24 };
     const merged = {
       enforceMfaForAdmins: typeof payload.enforceMfaForAdmins === 'boolean' ? payload.enforceMfaForAdmins : (prev.enforceMfaForAdmins ?? true),
-      passwordMinLength: Number(payload.passwordMinLength ?? (prev.passwordMinLength ?? 10)) || 10,
+      passwordMinLength: Number(payload.passwordMinLength ?? (prev.passwordMinLength ?? 0)) || 0,
       lockoutThreshold: Number(payload.lockoutThreshold ?? (prev.lockoutThreshold ?? 3)) || 3,
       allowedIpRanges: Array.isArray(payload.allowedIpRanges) ? payload.allowedIpRanges : (prev.allowedIpRanges ?? []),
       sessionMaxAgeHours: Number(payload.sessionMaxAgeHours ?? (prev.sessionMaxAgeHours ?? 24)) || 24,
