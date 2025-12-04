@@ -184,9 +184,10 @@ export interface Module {
     name: string;
     description: string;
     monthlyPrice: number;
-    oneTimePrice?: number; // Price for self-hosted purchase
+    oneTimePrice?: number;
     isEnabled: boolean;
     isCore?: boolean;
+    currency?: string;
 }
 
 export interface SchoolModuleSubscription {

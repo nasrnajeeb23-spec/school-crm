@@ -27,7 +27,7 @@ export default function TrialBanner() {
   if (!visible) return null
   const path = location?.pathname || ''
   const onSchoolPages = path.startsWith('/school')
-  const isSchoolAdmin = !!currentUser && String(currentUser.role) === 'SchoolAdmin'
+  const isSchoolAdmin = !!currentUser && String(currentUser.role).toUpperCase() === 'SCHOOL_ADMIN'
   const trialExpired = !!state?.subscription?.trialExpired
   if (!onSchoolPages || !isSchoolAdmin || !trialExpired) return null
 

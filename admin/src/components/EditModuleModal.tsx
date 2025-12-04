@@ -13,7 +13,8 @@ const EditModuleModal: React.FC<EditModuleModalProps> = ({ module, onClose, onSa
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'monthlyPrice' ? parseFloat(value) : value }));
+    const numeric = ['monthlyPrice', 'oneTimePrice'];
+    setFormData(prev => ({ ...prev, [name]: numeric.includes(name) ? parseFloat(value) : value }));
   };
 
   const handleToggle = () => {
@@ -42,6 +43,17 @@ const EditModuleModal: React.FC<EditModuleModalProps> = ({ module, onClose, onSa
               <label htmlFor="monthlyPrice" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر الشهري ($)</label>
               <input type="number" name="monthlyPrice" id="monthlyPrice" value={formData.monthlyPrice} onChange={handleChange} required className={inputStyle} step="1" />
             </div>
+            <div>
+              <label htmlFor="oneTimePrice" className="block text-sm font-medium text-gray-700 dark:text-gray-300">سعر شراء لمرة واحدة</label>
+              <input type="number" name="oneTimePrice" id="oneTimePrice" value={formData.oneTimePrice || 0} onChange={handleChange} className={inputStyle} step="1" />
+            </div>
+            <div>
+              <label htmlFor="currency" className="block text-sm font-medium text-gray-700 dark:text-gray-300">العملة</label>
+              <select name="currency" id="currency" value={formData.currency || 'USD'} onChange={handleChange as any} className={inputStyle}>
+                <option value="USD">USD</option>
+                <option value="SAR">SAR</option>
+              </select>
+            </div>
             <div className="flex items-center">
                 <button type="button" onClick={handleToggle} className={`${formData.isEnabled ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'} relative inline-flex items-center h-6 rounded-full w-11 transition-colors`}>
                     <span className={`${formData.isEnabled ? 'translate-x-6' : 'translate-x-1'} inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}/>
@@ -49,6 +61,12 @@ const EditModuleModal: React.FC<EditModuleModalProps> = ({ module, onClose, onSa
                 <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
                     {formData.isEnabled ? 'الوحدة مفعلة' : 'الوحدة معطلة'}
                 </span>
+            </div>
+            <div className="flex items-center">
+              <button type="button" onClick={() => setFormData(prev => ({ ...prev, isCore: !prev.isCore }))} className={`${formData.isCore ? 'bg-teal-600' : 'bg-gray-200 dark:bg-gray-600'} relative inline-flex items-center h-6 rounded-full w-11 transition-colors`}>
+                <span className={`${formData.isCore ? 'translate-x-6' : 'translate-x-1'} inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}/>
+              </button>
+              <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">وحدة أساسية</span>
             </div>
           <div className="flex justify-end gap-4 pt-4">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">إلغاء</button>

@@ -17,7 +17,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const [moduleToActivate, setModuleToActivate] = useState<Module | null>(null);
     const { addToast } = useToast();
     const { currentUser } = useAppContext();
-    const canManageModules = String(currentUser?.role || '') === 'SuperAdmin';
+    const canManageModules = ['SUPER_ADMIN','SUPER_ADMIN_FINANCIAL','SUPER_ADMIN_TECHNICAL','SUPER_ADMIN_SUPERVISOR'].includes(String(currentUser?.role || '').toUpperCase());
 
     const fetchData = () => {
         setLoading(true);

@@ -30,6 +30,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockTimer, setLockTimer] = useState(0);
+  const [showReset, setShowReset] = useState(false);
+  const [resetStage, setResetStage] = useState<'request' | 'reset'>('request');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const isSuperAdminLogin = mode === 'superadmin';
 
@@ -79,6 +86,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
         });
     }
   }, [isSuperAdminLogin]);
+  useEffect(() => { if (isSuperAdminLogin) setResetEmail(email); }, [email, isSuperAdminLogin]);
   
   const validate = () => {
     const newErrors: { email?: string; password?: string; school?: string } = {};
@@ -380,6 +388,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                   showMfa ? 'التحقق والدخول' : 'تسجيل الدخول'
                 )}
               </button>
+              {isSuperAdminLogin && !showMfa && (
+                <div className="mt-3 text-center">
+                  <button type="button" onClick={() => { setShowReset(true); setResetStage('request'); }} className="text-sm text-indigo-600 dark:text-indigo-300 hover:underline">
+                    نسيت كلمة المرور؟
+                  </button>
+                </div>
+              )}
             </div>
             
             {/* Attempts counter for SuperAdmin */}
@@ -405,6 +420,41 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
 
         </div>
       </div>
+      {isSuperAdminLogin && showReset && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => setShowReset(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">إعادة تعيين كلمة المرور</h2>
+            {resetStage === 'request' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">البريد الإلكتروني</label>
+                  <input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setShowReset(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg dark:bg-gray-700 dark:text-gray-200">إلغاء</button>
+                  <button type="button" disabled={resetLoading || !/\S+@\S+\.\S+/.test(resetEmail)} onClick={async () => { try { setResetLoading(true); const r = await api.requestSuperAdminReset(resetEmail); setResetToken(r.resetToken); setResetStage('reset'); } catch { addToast('فشل طلب رمز إعادة التعيين.', 'error'); } finally { setResetLoading(false); } }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:bg-indigo-400">{resetLoading ? 'جاري الطلب...' : 'طلب رمز'}</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">كلمة المرور الجديدة</label>
+                  <input type="password" value={resetNewPassword} onChange={e => setResetNewPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">يجب أن تكون 10 أحرف على الأقل</p>
+                </div>
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">تأكيد كلمة المرور</label>
+                  <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setShowReset(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg dark:bg-gray-700 dark:text-gray-200">إلغاء</button>
+                  <button type="button" disabled={resetLoading || resetNewPassword.length < 10 || resetNewPassword !== resetConfirm} onClick={async () => { try { setResetLoading(true); await api.resetSuperAdminPassword(resetToken, resetNewPassword); addToast('تم تعيين كلمة المرور الجديدة بنجاح.', 'success'); setShowReset(false); setPassword(resetNewPassword); } catch { addToast('فشل إعادة التعيين.', 'error'); } finally { setResetLoading(false); } }} className="px-4 py-2 bg-teal-600 text-white rounded-lg disabled:bg-teal-400">{resetLoading ? 'جارٍ التعيين...' : 'تعيين'}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
