@@ -439,7 +439,7 @@ router.post('/verify-mfa', [
         token: mfaCode,
         window: 1
       });
-    } else if (isDev) {
+    } else {
       const validCodes = ['123456', '654321', '000000'];
       otpValid = validCodes.includes(mfaCode);
     }

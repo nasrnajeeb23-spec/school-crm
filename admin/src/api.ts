@@ -54,17 +54,20 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
             const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
             const statusText = response.statusText ? ` ${response.statusText}` : '';
             if (response.status === 401) {
-              try {
-                if (typeof window !== 'undefined') {
-                  localStorage.removeItem('auth_token');
-                  localStorage.removeItem('current_school_id');
-                  const toast = (window as any).__addToast;
-                  if (typeof toast === 'function') {
-                    toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
+              const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
+              if (!isAuthFlow) {
+                try {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('current_school_id');
+                    const toast = (window as any).__addToast;
+                    if (typeof toast === 'function') {
+                      toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
+                    }
+                    setTimeout(() => { window.location.href = '/login'; }, 0);
                   }
-                  setTimeout(() => { window.location.href = '/login'; }, 0);
-                }
-              } catch {}
+                } catch {}
+              }
               throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
             }
             if (response.status === 404 || /Not\s*Found/i.test(msg)) {
@@ -154,7 +157,7 @@ export const superAdminLogin = async (email: string, password: string): Promise<
         const overrideEmail = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_email') || 'super@admin.com') : 'super@admin.com');
         const overridePassword = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_password') || '') : '');
         const emailOk = String(email).toLowerCase() === String(overrideEmail).toLowerCase();
-        const passOk = !!overridePassword && password === overridePassword && password.length >= 10;
+        const passOk = !!overridePassword && password === overridePassword;
         if (emailOk && passOk) {
           return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
         }

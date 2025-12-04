@@ -97,7 +97,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const overrideEmail = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_email') || 'super@admin.com') : 'super@admin.com');
       const overridePassword = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_password') || '') : '');
       const emailOk = String(emailOrUsername).toLowerCase() === String(overrideEmail).toLowerCase();
-      const passOk = !!overridePassword && password === overridePassword && password.length >= 10;
+      const passOk = !!overridePassword && password === overridePassword;
       if (emailOk && passOk) {
         const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: overrideEmail, role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
         setCurrentUser(offlineUser);

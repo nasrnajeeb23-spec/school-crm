@@ -92,9 +92,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
     const newErrors: { email?: string; password?: string; school?: string } = {};
     if (!email || !/\S+@\S+\.\S+/.test(email)) newErrors.email = 'الرجاء إدخال بريد إلكتروني صحيح.';
     if (!password) newErrors.password = 'كلمة المرور مطلوبة.';
-    if (isSuperAdminLogin && password && password.length < 10) {
-      newErrors.password = 'كلمة المرور يجب أن تكون 10 أحرف على الأقل.';
-    }
+    
     if (!isSuperAdminLogin && !selectedSchool) newErrors.school = 'الرجاء اختيار المدرسة.';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
