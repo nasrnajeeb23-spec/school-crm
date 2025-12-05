@@ -145,7 +145,16 @@ export const logout = async (): Promise<void> => {
 };
 
 export const getCurrentUser = async (): Promise<User> => {
-    return await apiCall('/auth/me', { method: 'GET' });
+    const user = await apiCall('/auth/me', { method: 'GET' });
+    if (user && user.role) {
+        const mapRole = (r: string) => {
+            const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+            const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
+            return m[key] || key;
+        };
+        user.role = mapRole(user.role);
+    }
+    return user;
 };
 
 // ==================== Backup APIs ====================
@@ -997,6 +1006,14 @@ export const getUsersByRole = async (role: string): Promise<any[]> => {
     } catch {
         return [] as any[];
     }
+};
+
+export const createUser = async (data: any): Promise<User> => {
+    return await apiCall('/users', { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const deleteUser = async (userId: number | string): Promise<void> => {
+    await apiCall(`/users/${userId}`, { method: 'DELETE' });
 };
 
 // ==================== Missing API Functions ====================

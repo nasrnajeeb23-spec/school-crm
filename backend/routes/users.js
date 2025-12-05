@@ -13,6 +13,58 @@ function isStrongPassword(pwd){
   return lengthOk && upper && lower && digit && special;
 }
 
+// @route   POST api/users
+// @desc    Create a new user (SuperAdmin only for SchoolAdmin role)
+// @access  Private (SuperAdmin)
+router.post('/', verifyToken, async (req, res) => {
+  try {
+    const { name, email, password, role, schoolId, phone } = req.body;
+    
+    // Check permissions
+    const creatorRole = String(req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (creatorRole !== 'SUPERADMIN' && creatorRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+
+    // Validate input
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ msg: 'Please provide all required fields' });
+    }
+
+    // Check if user exists
+    let user = await User.findOne({ where: { email } });
+    if (user) {
+      return res.status(400).json({ msg: 'User already exists' });
+    }
+
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({ msg: 'Password is too weak. Must be at least 10 characters with uppercase, lowercase, number, and special character.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      schoolId: schoolId ? parseInt(schoolId) : null,
+      phone,
+      isActive: true,
+      isVerified: true
+    });
+
+    const userJson = user.toJSON();
+    delete userJson.password;
+
+    res.json(userJson);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 router.put('/:id', verifyToken, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

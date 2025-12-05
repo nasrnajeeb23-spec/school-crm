@@ -3,6 +3,7 @@ import { User } from '../types';
 import * as api from '../api';
 import { UsersIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon } from '../components/icons';
 import { useToast } from '../contexts/ToastContext';
+import AddSchoolAdminModal from '../components/AddSchoolAdminModal';
 
 const SchoolAdminsList: React.FC = () => {
   const [admins, setAdmins] = useState<User[]>([]);
@@ -10,6 +11,7 @@ const SchoolAdminsList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSchool, setSelectedSchool] = useState('');
   const [schools, setSchools] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -52,6 +54,17 @@ const SchoolAdminsList: React.FC = () => {
     }
   };
 
+  const handleCreateAdmin = async (data: any) => {
+    try {
+      await api.createUser(data);
+      addToast('تم إضافة المدير بنجاح', 'success');
+      setIsModalOpen(false);
+      fetchData();
+    } catch (error: any) {
+      addToast(error.message || 'فشل إضافة المدير', 'error');
+    }
+  };
+
   if (loading) {
     return <div className="text-center p-8">جاري تحميل بيانات مدراء المدارس...</div>;
   }
@@ -66,13 +79,21 @@ const SchoolAdminsList: React.FC = () => {
           </p>
         </div>
         <button 
-          onClick={() => {/* TODO: Add create modal */}}
+          onClick={() => setIsModalOpen(true)}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
         >
           <PlusIcon className="w-4 h-4" />
           إضافة مدير مدرسة
         </button>
       </div>
+
+      {isModalOpen && (
+        <AddSchoolAdminModal 
+          onClose={() => setIsModalOpen(false)} 
+          onSave={handleCreateAdmin} 
+          schools={schools} 
+        />
+      )}
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">

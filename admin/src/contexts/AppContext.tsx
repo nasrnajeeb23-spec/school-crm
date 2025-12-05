@@ -60,10 +60,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (!token) { setHydrating(false); return; }
+    
     let cancelled = false;
     (async () => {
-      const delays = [500, 1500, 3000, 5000, 8000, 12000, 15000];
+      // Try immediately first
+      try {
+        const me = await api.getCurrentUser();
+        if (me && !cancelled) {
+          setCurrentUser(me as User);
+          if ((me as any).schoolId) {
+            try { localStorage.setItem('current_school_id', String((me as any).schoolId)); } catch {}
+          }
+          setHydrating(false);
+          return;
+        }
+      } catch (err: any) {
+        // If 401/403, stop immediately (invalid token)
+        if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
+          if (!cancelled) setHydrating(false);
+          return;
+        }
+      }
+
+      // Retry only on network errors or server errors
+      const delays = [1000, 2000, 4000]; 
       for (let i = 0; i < delays.length && !cancelled; i++) {
+        await new Promise(r => setTimeout(r, delays[i]));
+        if (cancelled) break;
+        
         try {
           const me = await api.getCurrentUser();
           if (me) {
@@ -73,8 +97,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             break;
           }
-        } catch {}
-        await new Promise(r => setTimeout(r, delays[i]));
+        } catch (err: any) {
+           // Stop on auth error
+           if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
+             break;
+           }
+        }
       }
       if (!cancelled) setHydrating(false);
     })();
