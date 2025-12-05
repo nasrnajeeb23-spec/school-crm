@@ -1264,21 +1264,7 @@ export const deleteBehaviorRecord = async (schoolId: number, recordId: number): 
     await apiCall(`/school/${schoolId}/behavior/${recordId}`, { method: 'DELETE' });
 };
 
-export const getSchoolStaff = async (schoolId: number): Promise<User[]> => {
-    return await apiCall(`/school/${schoolId}/staff`, { method: 'GET' });
-};
 
-export const addSchoolStaff = async (schoolId: number, data: any): Promise<User> => {
-    return await apiCall(`/school/${schoolId}/staff`, { method: 'POST', body: JSON.stringify(data) });
-};
-
-export const updateSchoolStaff = async (schoolId: number, staffId: string, data: any): Promise<User> => {
-    return await apiCall(`/school/${schoolId}/staff/${staffId}`, { method: 'PUT', body: JSON.stringify(data) });
-};
-
-export const deleteSchoolStaff = async (schoolId: number, staffId: string): Promise<void> => {
-    await apiCall(`/school/${schoolId}/staff/${staffId}`, { method: 'DELETE' });
-};
 
 export const getTeachersAttendance = async (schoolId: number, date: string): Promise<any[]> => {
     return await apiCall(`/school/${schoolId}/teachers/attendance?date=${date}`, { method: 'GET' });
