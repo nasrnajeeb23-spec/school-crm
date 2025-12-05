@@ -1263,6 +1263,14 @@ export const deleteBehaviorRecord = async (schoolId: number, recordId: number): 
     await apiCall(`/school/${schoolId}/behavior/${recordId}`, { method: 'DELETE' });
 };
 
+export const getTeachersAttendance = async (schoolId: number, date: string): Promise<any[]> => {
+    return await apiCall(`/school/${schoolId}/teachers/attendance?date=${date}`, { method: 'GET' });
+};
+
+export const saveTeachersAttendance = async (schoolId: number, date: string, records: { teacherId: number, status: AttendanceStatus }[]): Promise<void> => {
+    await apiCall(`/school/${schoolId}/teachers/attendance`, { method: 'POST', body: JSON.stringify({ date, records }) });
+};
+
 // تصدير جميع الدوال
 export default {
     login,

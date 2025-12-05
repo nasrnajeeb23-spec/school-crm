@@ -2028,4 +2028,62 @@ router.delete('/:schoolId/behavior/:recordId', verifyToken, requireSameSchoolPar
   }
 });
 
+// ==================== Teachers Attendance APIs ====================
+
+// @route   GET api/school/:schoolId/teachers/attendance
+// @desc    Get teachers attendance for a specific date
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/teachers/attendance', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const { date } = req.query;
+
+    if (!date) return res.status(400).json({ msg: 'Date parameter is required' });
+
+    const attendance = await TeacherAttendance.findAll({
+      where: { schoolId, date },
+      include: [{
+        model: Teacher,
+        attributes: ['id', 'name', 'subject']
+      }]
+    });
+
+    res.json(attendance);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST api/school/:schoolId/teachers/attendance
+// @desc    Save teachers attendance
+// @access  Private (SchoolAdmin)
+router.post('/:schoolId/teachers/attendance', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const { date, records } = req.body; // records: [{ teacherId, status }]
+
+    if (!date || !records || !Array.isArray(records)) {
+      return res.status(400).json({ msg: 'Invalid data' });
+    }
+
+    const operations = records.map(record => {
+      return TeacherAttendance.upsert({
+        schoolId,
+        teacherId: record.teacherId,
+        date,
+        status: record.status,
+        id: `${schoolId}-${record.teacherId}-${date}` // Custom ID to ensure uniqueness per day
+      });
+    });
+
+    await Promise.all(operations);
+
+    res.json({ msg: 'Attendance saved successfully' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;

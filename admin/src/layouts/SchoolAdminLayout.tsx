@@ -30,6 +30,7 @@ const Settings = React.lazy(() => import('../pages/Settings'));
 const Calendar = React.lazy(() => import('../pages/Calendar'));
 const UserProfile = React.lazy(() => import('../pages/UserProfile'));
 const StaffManagement = React.lazy(() => import('../pages/StaffManagement'));
+const TeachersAttendance = React.lazy(() => import('../pages/TeachersAttendance'));
 const Transportation = React.lazy(() => import('../pages/Transportation'));
 const ModulesPage = React.lazy(() => import('../pages/ModulesPage'));
 const SchoolParentRequests = React.lazy(() => import('../pages/SchoolParentRequests'));
@@ -177,6 +178,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="students/:studentId" element={<ProtectedPage permission={Permission.MANAGE_STUDENTS}><StudentProfile schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
                     <Route path="teachers" element={<ProtectedPage permission={Permission.MANAGE_TEACHERS}><TeachersList schoolId={school.id} /></ProtectedPage>} />
                     <Route path="teachers/:teacherId" element={<ProtectedPage permission={Permission.MANAGE_TEACHERS}><TeacherProfile schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
+                    <Route path="teachers/attendance" element={<ProtectedPage permission={Permission.MANAGE_ATTENDANCE}><TeachersAttendance schoolId={school.id} /></ProtectedPage>} />
                     <Route path="parents" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><ParentsList schoolId={school.id} /></ProtectedPage>} />
                     <Route path="staff" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffManagement schoolId={school.id} /></ProtectedPage>} />
                     <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} /></ProtectedPage>} />
