@@ -6,6 +6,7 @@ import {
     PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord
 } from './types';
 
+
 // 🔗 ضبط عنوان الـ API للإنتاج/التطوير بشكل مرن
 // الأولوية: متغير بيئة مُحقن أثناء البناء -> Vite import.meta.env (إن وجد) -> localStorage(api_base) -> الافتراضي
 const API_BASE_URL = (
@@ -1263,12 +1264,36 @@ export const deleteBehaviorRecord = async (schoolId: number, recordId: number): 
     await apiCall(`/school/${schoolId}/behavior/${recordId}`, { method: 'DELETE' });
 };
 
+export const getSchoolStaff = async (schoolId: number): Promise<User[]> => {
+    return await apiCall(`/school/${schoolId}/staff`, { method: 'GET' });
+};
+
+export const addSchoolStaff = async (schoolId: number, data: any): Promise<User> => {
+    return await apiCall(`/school/${schoolId}/staff`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const updateSchoolStaff = async (schoolId: number, staffId: string, data: any): Promise<User> => {
+    return await apiCall(`/school/${schoolId}/staff/${staffId}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
+export const deleteSchoolStaff = async (schoolId: number, staffId: string): Promise<void> => {
+    await apiCall(`/school/${schoolId}/staff/${staffId}`, { method: 'DELETE' });
+};
+
 export const getTeachersAttendance = async (schoolId: number, date: string): Promise<any[]> => {
     return await apiCall(`/school/${schoolId}/teachers/attendance?date=${date}`, { method: 'GET' });
 };
 
 export const saveTeachersAttendance = async (schoolId: number, date: string, records: { teacherId: number, status: AttendanceStatus }[]): Promise<void> => {
     await apiCall(`/school/${schoolId}/teachers/attendance`, { method: 'POST', body: JSON.stringify({ date, records }) });
+};
+
+export const getStaffAttendance = async (schoolId: number, date: string): Promise<any[]> => {
+    return await apiCall(`/school/${schoolId}/staff-attendance?date=${date}`, { method: 'GET' });
+};
+
+export const saveStaffAttendance = async (schoolId: number, date: string, records: { userId: number, status: AttendanceStatus }[]): Promise<void> => {
+    await apiCall(`/school/${schoolId}/staff-attendance`, { method: 'POST', body: JSON.stringify({ date, records }) });
 };
 
 // تصدير جميع الدوال

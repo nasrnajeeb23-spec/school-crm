@@ -2086,4 +2086,177 @@ router.post('/:schoolId/teachers/attendance', verifyToken, requireSameSchoolPara
   }
 });
 
+// ==================== Staff Management APIs ====================
+
+// @route   GET api/school/:schoolId/staff
+// @desc    Get all staff members (non-teachers) for a specific school
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const staff = await User.findAll({
+      where: { 
+        schoolId,
+        role: { [Op.notIn]: ['SCHOOL_ADMIN', 'TEACHER', 'PARENT', 'STUDENT', 'SUPER_ADMIN'] }
+      },
+      attributes: { exclude: ['password'] },
+      order: [['name', 'ASC']]
+    });
+    res.json(staff);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST api/school/:schoolId/staff
+// @desc    Add a new staff member
+// @access  Private (SchoolAdmin)
+router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const { name, email, role, phone, department, bankAccount } = req.body;
+
+    // Check if user exists
+    let user = await User.findOne({ where: { email } });
+    if (user) {
+      return res.status(400).json({ msg: 'User already exists' });
+    }
+
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(tempPassword, salt);
+
+    user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: 'STAFF', // Generic role for DB, specific role in schoolRole
+      schoolRole: role,
+      schoolId,
+      phone,
+      department,
+      bankAccount,
+      isActive: true
+    });
+
+    const userJson = user.toJSON();
+    delete userJson.password;
+    userJson.tempPassword = tempPassword; // Return temp password for admin to share
+
+    res.status(201).json(userJson);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   PUT api/school/:schoolId/staff/:id
+// @desc    Update staff member
+// @access  Private (SchoolAdmin)
+router.put('/:schoolId/staff/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const userId = parseInt(req.params.id);
+    const { name, email, role, phone, department, bankAccount, isActive } = req.body;
+
+    let user = await User.findOne({ where: { id: userId, schoolId } });
+    if (!user) return res.status(404).json({ msg: 'Staff not found' });
+
+    user.name = name || user.name;
+    user.email = email || user.email;
+    user.schoolRole = role || user.schoolRole;
+    user.phone = phone || user.phone;
+    user.department = department || user.department;
+    user.bankAccount = bankAccount || user.bankAccount;
+    if (isActive !== undefined) user.isActive = isActive;
+
+    await user.save();
+
+    const userJson = user.toJSON();
+    delete userJson.password;
+    res.json(userJson);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   DELETE api/school/:schoolId/staff/:id
+// @desc    Delete staff member
+// @access  Private (SchoolAdmin)
+router.delete('/:schoolId/staff/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const userId = parseInt(req.params.id);
+
+    const user = await User.findOne({ where: { id: userId, schoolId } });
+    if (!user) return res.status(404).json({ msg: 'Staff not found' });
+
+    await user.destroy();
+    res.json({ msg: 'Staff member removed' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// ==================== Staff Attendance APIs ====================
+
+// @route   GET api/school/:schoolId/staff-attendance
+// @desc    Get staff attendance for a specific date
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/staff-attendance', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const { date } = req.query;
+
+    if (!date) return res.status(400).json({ msg: 'Date parameter is required' });
+
+    const attendance = await StaffAttendance.findAll({
+      where: { schoolId, date },
+      include: [{
+        model: User,
+        attributes: ['id', 'name', 'role', 'schoolRole']
+      }]
+    });
+
+    res.json(attendance);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST api/school/:schoolId/staff-attendance
+// @desc    Save staff attendance
+// @access  Private (SchoolAdmin)
+router.post('/:schoolId/staff-attendance', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const { date, records } = req.body; // records: [{ userId, status }]
+
+    if (!date || !records || !Array.isArray(records)) {
+      return res.status(400).json({ msg: 'Invalid data' });
+    }
+
+    const operations = records.map(record => {
+      return StaffAttendance.upsert({
+        schoolId,
+        userId: record.userId,
+        date,
+        status: record.status,
+        id: `${schoolId}-${record.userId}-${date}` // Custom ID to ensure uniqueness per day
+      });
+    });
+
+    await Promise.all(operations);
+
+    res.json({ msg: 'Attendance saved successfully' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;

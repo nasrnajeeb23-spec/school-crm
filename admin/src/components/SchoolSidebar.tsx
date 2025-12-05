@@ -25,6 +25,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
     { id: 'teachers_attendance', label: 'حضور المعلمين', icon: AttendanceIcon, requiredPermission: Permission.MANAGE_ATTENDANCE, path: `${basePath}/teachers/attendance` },
     { id: 'parents', label: 'أولياء الأمور', icon: ParentsIcon, requiredPermission: Permission.MANAGE_PARENTS, path: `${basePath}/parents` },
     { id: 'staff', label: 'الموظفون', icon: UsersIcon, requiredPermission: Permission.MANAGE_STAFF, path: `${basePath}/staff` },
+    { id: 'staff_attendance', label: 'حضور الموظفين', icon: AttendanceIcon, requiredPermission: Permission.MANAGE_STAFF, path: `${basePath}/staff/attendance` },
     { id: 'classes', label: 'الفصول', icon: ClassesIcon, requiredPermission: Permission.MANAGE_CLASSES, path: `${basePath}/classes` },
     { id: 'transportation', label: 'النقل المدرسي', icon: BusIcon, requiredPermission: Permission.MANAGE_TRANSPORTATION, requiredModule: ModuleId.Transportation, path: `${basePath}/transportation` },
     { id: 'attendance', label: 'الحضور والغياب', icon: AttendanceIcon, requiredPermission: Permission.MANAGE_ATTENDANCE, path: `${basePath}/attendance` },
