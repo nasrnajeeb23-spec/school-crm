@@ -1959,7 +1959,7 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
 router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
-    const studentId = parseInt(req.params.studentId);
+    const studentId = req.params.studentId;
     
     // Additional check for Parent role to ensure they only access their own children
     if (req.user.role === 'PARENT') {
@@ -1987,7 +1987,7 @@ router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireSameSc
 router.post('/:schoolId/students/:studentId/behavior', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'TEACHER'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
-    const studentId = parseInt(req.params.studentId);
+    const studentId = req.params.studentId;
     const { type, title, description, date, actionTaken, severity } = req.body;
 
     const record = await BehaviorRecord.create({

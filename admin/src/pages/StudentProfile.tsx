@@ -73,21 +73,13 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
   useEffect(() => {
     if (!studentId) return;
     
-    const parsedStudentId = parseInt(studentId);
-    if (isNaN(parsedStudentId)) {
-        console.error("Invalid student ID:", studentId);
-        addToast("رقم الطالب غير صحيح.", 'error');
-        setLoading(false);
-        return;
-    }
-
     setLoading(true);
     Promise.all([
         // In a real app, you would fetch the specific student by ID.
         // For this mock, we find them in the full list.
         api.getSchoolStudents(schoolId).then(students => students.find(s => s.id === studentId)),
         api.getStudentDetails(schoolId, studentId),
-        api.getBehaviorRecords(schoolId, parsedStudentId)
+        api.getBehaviorRecords(schoolId, studentId)
     ]).then(([studentDetails, data, behavior]) => {
         if (studentDetails) setStudent(studentDetails);
         setStudentData(data);
@@ -118,7 +110,7 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
     e.preventDefault();
     if (!student || !newBehavior.title) return;
     try {
-      const added = await api.addBehaviorRecord(schoolId, parseInt(student.id), newBehavior);
+      const added = await api.addBehaviorRecord(schoolId, student.id, newBehavior);
       setBehaviorRecords(prev => [added, ...prev]);
       setIsBehaviorModalOpen(false);
       setNewBehavior({ type: 'Negative', severity: 'Low', date: new Date().toISOString().split('T')[0], title: '', description: '', actionTaken: '' });

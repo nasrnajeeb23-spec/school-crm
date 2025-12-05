@@ -16,7 +16,7 @@ const BehaviorRecord = sequelize.define('BehaviorRecord', {
     }
   },
   studentId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     allowNull: false,
     references: {
       model: 'Students',

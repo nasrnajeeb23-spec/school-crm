@@ -297,7 +297,7 @@ export interface SchoolEvent {
 export interface BehaviorRecord {
   id: number;
   schoolId: number;
-  studentId: number;
+  studentId: string;
   type: 'Positive' | 'Negative';
   title: string;
   description?: string;

@@ -1251,11 +1251,11 @@ export const getJobStatus = async (schoolId: number, jobId: string): Promise<{ i
     return await apiCall(`/school/${schoolId}/jobs/${jobId}`, { method: 'GET' });
 };
 
-export const getBehaviorRecords = async (schoolId: number, studentId: number): Promise<BehaviorRecord[]> => {
+export const getBehaviorRecords = async (schoolId: number, studentId: string | number): Promise<BehaviorRecord[]> => {
     return await apiCall(`/school/${schoolId}/students/${studentId}/behavior`, { method: 'GET' });
 };
 
-export const addBehaviorRecord = async (schoolId: number, studentId: number, data: Partial<BehaviorRecord>): Promise<BehaviorRecord> => {
+export const addBehaviorRecord = async (schoolId: number, studentId: string | number, data: Partial<BehaviorRecord>): Promise<BehaviorRecord> => {
     return await apiCall(`/school/${schoolId}/students/${studentId}/behavior`, { method: 'POST', body: JSON.stringify(data) });
 };
 
