@@ -192,10 +192,23 @@ const FeatureManagement: React.FC = () => {
                                                 {module.isEnabled ? 'مفعل' : 'معطل'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 flex items-center gap-4">
                                             <button onClick={() => setEditingModule(module)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline flex items-center">
                                                 <EditIcon className="w-4 h-4 ml-1" />
                                                 تعديل
+                                            </button>
+                                            <button onClick={async () => {
+                                                if (!window.confirm('هل أنت متأكد من حذف هذه الوحدة؟')) return;
+                                                try {
+                                                    await api.deleteModule(module.id as ModuleId);
+                                                    await logSuperAdminAction('platform.module.delete', { moduleId: module.id });
+                                                    addToast('تم حذف الوحدة.', 'success');
+                                                    fetchData();
+                                                } catch {
+                                                    addToast('فشل حذف الوحدة.', 'error');
+                                                }
+                                            }} className="font-medium text-red-600 dark:text-red-500 hover:underline">
+                                                حذف
                                             </button>
                                         </td>
                                     </tr>

@@ -1156,6 +1156,10 @@ export const createModule = async (moduleData: Module): Promise<Module> => {
     return await apiCall('/modules', { method: 'POST', body: JSON.stringify(moduleData) });
 };
 
+export const deleteModule = async (moduleId: ModuleId): Promise<void> => {
+    await apiCall(`/modules/${moduleId}`, { method: 'DELETE' });
+};
+
 export const getRoles = async (): Promise<Role[]> => {
     return await apiCall('/roles', { method: 'GET' });
 };

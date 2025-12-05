@@ -229,8 +229,15 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
   try {
     const schoolId = Number(req.params.id);
     const allowedGlobal = req.app?.locals?.allowedModules || [];
-    const catalog = req.app?.locals?.modulesCatalog || [];
-    const catalogIds = catalog.map(m => m.id);
+    let catalogIds = [];
+    try {
+      const { ModuleCatalog } = require('../models');
+      const rows = await ModuleCatalog.findAll({ attributes: ['id'], where: { isEnabled: true } });
+      catalogIds = rows.map(r => r.id);
+      if (!Array.isArray(req.app?.locals?.modulesCatalog) || req.app.locals.modulesCatalog.length === 0) {
+        req.app.locals.modulesCatalog = rows.map(r => ({ id: r.id }));
+      }
+    } catch {}
     const settings = await SchoolSettings.findOne({ where: { schoolId } });
     const sub = await Subscription.findOne({ where: { schoolId } });
     const now = new Date();
@@ -255,8 +262,12 @@ router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN
   try {
     const schoolId = Number(req.params.id);
     const requestedIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds : [];
-    const catalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
-    const byId = new Map(catalog.map(m => [String(m.id), m]));
+    let byId = new Map();
+    try {
+      const { ModuleCatalog } = require('../models');
+      const rows = await ModuleCatalog.findAll();
+      byId = new Map(rows.map(m => [String(m.id), m.toJSON()]));
+    } catch {}
     const role = String(req.user?.role || '').toUpperCase();
     const isSchoolAdmin = role.includes('SCHOOL') && role.includes('ADMIN');
     const moduleIds = isSchoolAdmin ? requestedIds.filter(id => {
