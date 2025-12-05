@@ -54,7 +54,8 @@ const BehaviorRecord = sequelize.define('BehaviorRecord', {
     defaultValue: 'Low'
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  tableName: 'BehaviorRecordsV2'
 });
 
 module.exports = BehaviorRecord;
