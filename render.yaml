@@ -7,7 +7,7 @@ staticSites:
       - key: REACT_APP_HASH_ROUTER
         value: "false"
       - key: REACT_APP_API_URL
-        value: https://school-crm-backend.onrender.com/api
+        value: https://school-crschool-crm-backendm.onrender.com/api
 
 services:
   - type: web
@@ -20,5 +20,3 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
-      - key: PORT
-        value: 5000
