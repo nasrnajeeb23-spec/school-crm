@@ -1,5 +1,5 @@
-import React, { Suspense } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import React, { Suspense, useEffect } from 'react';
+import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from './contexts/AppContext';
 import { User, UserRole } from './types';
 import ToastContainer from './components/ToastContainer';
@@ -129,7 +129,30 @@ const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }
 
 
 const App: React.FC = () => {
-  const { currentUser } = useAppContext();
+  const { currentUser, hydrating } = useAppContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const path = location.pathname || '';
+    const protectedPath = /^\/(school|teacher|parent|superadmin)/.test(path);
+    if (currentUser && protectedPath) {
+      try { localStorage.setItem('last_route', path); } catch {}
+    }
+  }, [currentUser, location.pathname]);
+
+  useEffect(() => {
+    if (!hydrating && currentUser) {
+      const path = location.pathname || '';
+      const onPublic = path === '/' || path === '/login' || path === '/superadmin/login';
+      if (onPublic) {
+        try {
+          const last = localStorage.getItem('last_route') || '';
+          if (last && last !== path) navigate(last, { replace: true });
+        } catch {}
+      }
+    }
+  }, [hydrating, currentUser]);
 
   return (
     <>

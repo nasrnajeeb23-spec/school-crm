@@ -60,18 +60,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (!token) { setHydrating(false); return; }
+    let cancelled = false;
     (async () => {
-      try {
-        const me = await api.getCurrentUser();
-        if (me) {
-          setCurrentUser(me as User);
-          if ((me as any).schoolId) {
-            try { localStorage.setItem('current_school_id', String((me as any).schoolId)); } catch {}
+      const delays = [500, 1500, 3000, 5000, 8000, 12000, 15000];
+      for (let i = 0; i < delays.length && !cancelled; i++) {
+        try {
+          const me = await api.getCurrentUser();
+          if (me) {
+            setCurrentUser(me as User);
+            if ((me as any).schoolId) {
+              try { localStorage.setItem('current_school_id', String((me as any).schoolId)); } catch {}
+            }
+            break;
           }
-        }
-      } catch {}
-      setHydrating(false);
+        } catch {}
+        await new Promise(r => setTimeout(r, delays[i]));
+      }
+      if (!cancelled) setHydrating(false);
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<boolean> => {

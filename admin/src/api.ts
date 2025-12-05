@@ -55,7 +55,10 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
             const statusText = response.statusText ? ` ${response.statusText}` : '';
             if (response.status === 401) {
               const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
-              if (!isAuthFlow) {
+              const isSilentCheck = endpoint === '/auth/me';
+              const hadToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
+              const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
+              if (!isAuthFlow && !isSilentCheck && hadToken && onProtectedRoute) {
                 try {
                   if (typeof window !== 'undefined') {
                     localStorage.removeItem('auth_token');

@@ -124,7 +124,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
           localStorage.removeItem('superadmin_login_attempts');
           localStorage.removeItem('superadmin_lock_time');
           const ok = await login(loginIdentifier, password);
-          if (ok) navigate('/superadmin', { replace: true });
+          if (ok) {
+            let target = '/superadmin';
+            try {
+              const last = localStorage.getItem('last_route') || '';
+              if (last && last.startsWith('/superadmin')) target = last;
+            } catch {}
+            navigate(target, { replace: true });
+          }
         } else {
           handleLoginError(result.message);
         }
@@ -133,7 +140,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
       }
     } else {
       const ok = await login(email, password, selectedSchool ? Number(selectedSchool) : undefined);
-      if (ok) navigate('/school', { replace: true });
+      if (ok) {
+        let target = '/school';
+        try {
+          const last = localStorage.getItem('last_route') || '';
+          if (last && last.startsWith('/school')) target = last;
+        } catch {}
+        navigate(target, { replace: true });
+      }
     }
     
     setIsLoading(false);
