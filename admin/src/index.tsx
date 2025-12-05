@@ -28,15 +28,8 @@ if (typeof window !== 'undefined') {
       let candidate = '';
       if (host.endsWith('.onrender.com')) {
         const sub = host.split('.onrender.com')[0];
-        const map: Record<string, string> = {
-          'school-crm-admin': 'https://school-crschool-crm-backendm.onrender.com/api'
-        };
-        if (map[sub]) {
-          candidate = map[sub];
-        } else {
-          let back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
-          candidate = `https://${back}.onrender.com/api`;
-        }
+        const back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
+        candidate = `https://${back}.onrender.com/api`;
       }
       localStorage.setItem(key, candidate || 'http://localhost:5000/api');
     } else if (!hasApi(cur)) {
@@ -48,7 +41,7 @@ if (typeof window !== 'undefined') {
 const container = document.getElementById('root');
 if (container) {
   const isRenderHost = typeof window !== 'undefined' && /\.onrender\.com$/i.test(window.location.hostname || '');
-  const useHash = (!isRenderHost && (process.env.REACT_APP_HASH_ROUTER === 'true'));
+  const useHash = ((process.env.REACT_APP_HASH_ROUTER === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
   const root = ReactDOM.createRoot(container);
   root.render(
     <React.StrictMode>
