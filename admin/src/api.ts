@@ -1189,10 +1189,6 @@ export const generateLicenseKey = async (payload: { schoolId: number; modules: M
     return response?.licenseKey || '';
 };
 
-export const deleteUser = async (userId: string | number): Promise<void> => {
-    await apiCall(`/users/${userId}`, { method: 'DELETE' });
-};
-
 export const createSuperAdminTeamMember = async (memberData: any): Promise<User> => {
     return await apiCall('/superadmin/team', { method: 'POST', body: JSON.stringify(memberData) });
 };
