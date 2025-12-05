@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog } = require('../models');
+const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
@@ -1949,6 +1949,83 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
     }
     res.status(201).json({ createdCount: created.length, invoices: created });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// ==================== Behavior Records APIs ====================
+
+// @route   GET api/school/:schoolId/students/:studentId/behavior
+// @desc    Get behavior records for a student
+// @access  Private (SchoolAdmin, Teacher, Parent)
+router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const studentId = parseInt(req.params.studentId);
+    
+    // Additional check for Parent role to ensure they only access their own children
+    if (req.user.role === 'PARENT') {
+       const student = await Student.findOne({ where: { id: studentId, schoolId } });
+       if (!student || student.parentId !== req.user.parentId) {
+           return res.status(403).json({ msg: 'Access denied' });
+       }
+    }
+
+    const records = await BehaviorRecord.findAll({
+      where: { schoolId, studentId },
+      order: [['date', 'DESC'], ['createdAt', 'DESC']]
+    });
+
+    res.json(records);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST api/school/:schoolId/students/:studentId/behavior
+// @desc    Add a behavior record
+// @access  Private (SchoolAdmin, Teacher)
+router.post('/:schoolId/students/:studentId/behavior', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'TEACHER'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const studentId = parseInt(req.params.studentId);
+    const { type, title, description, date, actionTaken, severity } = req.body;
+
+    const record = await BehaviorRecord.create({
+      schoolId,
+      studentId,
+      type,
+      title,
+      description,
+      date: date || new Date(),
+      recordedBy: req.user.name,
+      actionTaken,
+      severity
+    });
+
+    res.status(201).json(record);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   DELETE api/school/:schoolId/behavior/:recordId
+// @desc    Delete a behavior record
+// @access  Private (SchoolAdmin)
+router.delete('/:schoolId/behavior/:recordId', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId);
+    const recordId = parseInt(req.params.recordId);
+
+    const record = await BehaviorRecord.findOne({ where: { id: recordId, schoolId } });
+    if (!record) return res.status(404).json({ msg: 'Record not found' });
+
+    await record.destroy();
+    res.json({ msg: 'Record removed' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
 });
 
 module.exports = router;

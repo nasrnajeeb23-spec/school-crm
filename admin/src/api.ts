@@ -3,7 +3,7 @@
 
 import { 
     User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
-    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup
+    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord
 } from './types';
 
 // 🔗 ضبط عنوان الـ API للإنتاج/التطوير بشكل مرن
@@ -1249,6 +1249,18 @@ export const enqueueStudentsImport = async (schoolId: number, sourceUrl: string)
 
 export const getJobStatus = async (schoolId: number, jobId: string): Promise<{ id: string; name: string; status: string; result?: any; error?: string }> => {
     return await apiCall(`/school/${schoolId}/jobs/${jobId}`, { method: 'GET' });
+};
+
+export const getBehaviorRecords = async (schoolId: number, studentId: number): Promise<BehaviorRecord[]> => {
+    return await apiCall(`/school/${schoolId}/students/${studentId}/behavior`, { method: 'GET' });
+};
+
+export const addBehaviorRecord = async (schoolId: number, studentId: number, data: Partial<BehaviorRecord>): Promise<BehaviorRecord> => {
+    return await apiCall(`/school/${schoolId}/students/${studentId}/behavior`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const deleteBehaviorRecord = async (schoolId: number, recordId: number): Promise<void> => {
+    await apiCall(`/school/${schoolId}/behavior/${recordId}`, { method: 'DELETE' });
 };
 
 // تصدير جميع الدوال

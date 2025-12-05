@@ -2,9 +2,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
-import { Student, StudentStatus, InvoiceStatus, Grade, Invoice, StudentNote, StudentGrades, AttendanceStatus, AttendanceRecord, StudentDocument, UpdatableStudentData, SchoolSettings, Class } from '../types';
+import { Student, StudentStatus, InvoiceStatus, Grade, Invoice, StudentNote, StudentGrades, AttendanceStatus, AttendanceRecord, StudentDocument, UpdatableStudentData, SchoolSettings, Class, BehaviorRecord } from '../types';
 import * as api from '../api';
-import { BackIcon, EditIcon, PrintIcon, NoteIcon, UsersIcon, AttendanceIcon, FinanceIcon, GradesIcon, TrashIcon, PlusIcon, FileIcon, DownloadIcon, UploadIcon, SparklesIcon, CopyIcon, CheckIcon } from '../components/icons';
+import { BackIcon, EditIcon, PrintIcon, NoteIcon, UsersIcon, AttendanceIcon, FinanceIcon, GradesIcon, TrashIcon, PlusIcon, FileIcon, DownloadIcon, UploadIcon, SparklesIcon, CopyIcon, CheckIcon, StarIcon, AlertTriangleIcon } from '../components/icons';
 import { GoogleGenAI } from "@google/genai";
 import EditStudentModal from '../components/EditStudentModal';
 import { useToast } from '../contexts/ToastContext';
@@ -58,8 +58,11 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
   const [student, setStudent] = useState<Student | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [studentData, setStudentData] = useState<{ grades: StudentGrades[], invoices: Invoice[], notes: StudentNote[], attendance: AttendanceRecord[], documents: StudentDocument[] } | null>(null);
+  const [behaviorRecords, setBehaviorRecords] = useState<BehaviorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isBehaviorModalOpen, setIsBehaviorModalOpen] = useState(false);
+  const [newBehavior, setNewBehavior] = useState<Partial<BehaviorRecord>>({ type: 'Negative', severity: 'Low', date: new Date().toISOString().split('T')[0] });
   const { addToast } = useToast();
   const [aiComment, setAiComment] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
@@ -74,10 +77,12 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
         // In a real app, you would fetch the specific student by ID.
         // For this mock, we find them in the full list.
         api.getSchoolStudents(schoolId).then(students => students.find(s => s.id === studentId)),
-        api.getStudentDetails(schoolId, studentId)
-    ]).then(([studentDetails, data]) => {
+        api.getStudentDetails(schoolId, studentId),
+        api.getBehaviorRecords(schoolId, parseInt(studentId))
+    ]).then(([studentDetails, data, behavior]) => {
         if (studentDetails) setStudent(studentDetails);
         setStudentData(data);
+        setBehaviorRecords(behavior);
     }).catch(err => {
         console.error("Failed to fetch student details:", err);
         addToast("فشل تحميل بيانات الطالب.", 'error');
@@ -100,7 +105,32 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
     }
   };
 
-  const handleGenerateComment = async () => {
+  const handleAddBehavior = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student || !newBehavior.title) return;
+    try {
+      const added = await api.addBehaviorRecord(schoolId, parseInt(student.id), newBehavior);
+      setBehaviorRecords(prev => [added, ...prev]);
+      setIsBehaviorModalOpen(false);
+      setNewBehavior({ type: 'Negative', severity: 'Low', date: new Date().toISOString().split('T')[0], title: '', description: '', actionTaken: '' });
+      addToast('تم إضافة السجل السلوكي بنجاح.', 'success');
+    } catch (error) {
+      addToast('فشل إضافة السجل السلوكي.', 'error');
+    }
+  };
+
+  const handleDeleteBehavior = async (recordId: number) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا السجل؟')) return;
+    try {
+      await api.deleteBehaviorRecord(schoolId, recordId);
+      setBehaviorRecords(prev => prev.filter(r => r.id !== recordId));
+      addToast('تم حذف السجل السلوكي.', 'success');
+    } catch (error) {
+      addToast('فشل حذف السجل السلوكي.', 'error');
+    }
+  };
+
+  const generateAiReport = async () => {
     if (!studentData?.grades || studentData.grades.length === 0) {
       setAiError('لا توجد درجات متاحة لإنشاء تعليق.');
       return;
@@ -132,6 +162,7 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
   const tabs = [
     { id: 'overview', label: 'نظرة عامة', icon: UsersIcon }, { id: 'grades', label: 'الدرجات', icon: GradesIcon },
     { id: 'attendance', label: 'الحضور', icon: AttendanceIcon }, { id: 'finance', label: 'المالية', icon: FinanceIcon },
+    { id: 'behavior', label: 'السلوك', icon: StarIcon },
     { id: 'notes', label: 'ملاحظات', icon: NoteIcon }, { id: 'documents', label: 'مستندات', icon: FileIcon }
   ];
   
@@ -206,6 +237,64 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
 
         {activeTab === 'finance' && (<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><ul className="space-y-2">{studentData.invoices.map(inv => <li key={inv.id} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50"><div><p className="font-semibold">فاتورة #{inv.id}</p><p className="text-xs text-gray-500 dark:text-gray-400">تستحق في: {inv.dueDate}</p></div><div className="text-left"><p className="font-bold text-lg">${inv.totalAmount.toFixed(2)}</p><span className={`px-2 py-0.5 text-xs font-medium rounded-full ${invoiceStatusColorMap[inv.status]}`}>{inv.status}</span></div></li>)}</ul></div>)}
 
+        {activeTab === 'behavior' && (
+            <div className="space-y-6">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                    <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-semibold text-lg text-gray-800 dark:text-white">سجل السلوك</h4>
+                        <button 
+                            onClick={() => setIsBehaviorModalOpen(true)}
+                            className="flex items-center px-3 py-1.5 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700"
+                        >
+                            <PlusIcon className="h-4 w-4 ml-1"/>
+                            إضافة سجل
+                        </button>
+                    </div>
+                    
+                    {behaviorRecords.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">لا توجد سجلات سلوكية مسجلة.</div>
+                    ) : (
+                        <ul className="space-y-3">
+                            {behaviorRecords.map(record => (
+                                <li key={record.id} className={`p-4 rounded-lg border-r-4 shadow-sm ${record.type === 'Positive' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h5 className="font-bold text-gray-800 dark:text-gray-200">{record.title}</h5>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full ${record.type === 'Positive' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                                                    {record.type === 'Positive' ? 'إيجابي' : 'سلبي'}
+                                                </span>
+                                                {record.severity !== 'Low' && (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                                                        {record.severity === 'Medium' ? 'متوسط' : record.severity === 'High' ? 'مرتفع' : 'حرج'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{record.description}</p>
+                                            {record.actionTaken && (
+                                                <div className="text-xs text-gray-500 bg-white dark:bg-gray-800 p-2 rounded mt-2">
+                                                    <span className="font-semibold">الإجراء المتخذ:</span> {record.actionTaken}
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-gray-400 mt-2">
+                                                سجل بواسطة {record.recordedBy || 'المعلم'} في {record.date}
+                                            </p>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleDeleteBehavior(record.id)}
+                                            className="p-1.5 text-red-500 hover:bg-red-100 rounded-full transition-colors"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
+        )}
+
         {activeTab === 'notes' && (<div className="space-y-6"><div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><h4 className="font-semibold text-lg text-gray-800 dark:text-white mb-4">كتابة تعليق لبطاقة التقرير (AI)</h4><div><button onClick={handleGenerateComment} disabled={loadingAI} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:bg-teal-400"><SparklesIcon className="h-5 w-5 ml-2"/>{loadingAI ? 'جاري الإنشاء...' : 'إنشاء تعليق تلقائي'}</button>{(aiComment || aiError || loadingAI) && (<div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">{loadingAI && <p>...الذكاء الاصطناعي يكتب الآن</p>}{aiError && <p className="text-red-500">{aiError}</p>}{aiComment && (<div><textarea readOnly value={aiComment} className="w-full h-28 bg-transparent border-none resize-none p-0 focus:ring-0"></textarea><div className="text-left"><button onClick={handleCopy} className="text-sm font-medium text-teal-600 hover:underline flex items-center">{copied ? <CheckIcon className="w-4 h-4 ml-1 text-green-500" /> : <CopyIcon className="w-4 h-4 ml-1" />} {copied ? 'تم النسخ!' : 'نسخ النص'}</button></div></div>)}</div>)}</div></div><div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><div className="flex justify-between items-center mb-4"><h4 className="font-semibold text-lg text-gray-800 dark:text-white">ملاحظات المعلمين</h4><button className="flex items-center px-3 py-1.5 bg-teal-100 text-teal-700 text-sm rounded-lg hover:bg-teal-200 dark:bg-teal-900/50 dark:text-teal-300"><PlusIcon className="h-4 w-4 ml-1"/>إضافة ملاحظة</button></div><ul className="space-y-3">{studentData.notes.map(note => <li key={note.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"><p className="text-sm text-gray-700 dark:text-gray-300">{note.content}</p><p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-left">{note.author} - {note.date}</p></li>)}</ul></div></div>)}
         
         {activeTab === 'documents' && (<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><div className="flex justify-between items-center mb-4"><h4 className="font-semibold text-lg text-gray-800 dark:text-white">مستندات الطالب</h4><button className="flex items-center px-3 py-1.5 bg-teal-100 text-teal-700 text-sm rounded-lg hover:bg-teal-200 dark:bg-teal-900/50 dark:text-teal-300"><UploadIcon className="h-4 w-4 ml-1"/>رفع مستند</button></div><ul className="space-y-2">{studentData.documents.map(doc => <li key={doc.id} className="flex justify-between items-center p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50"><div className="flex items-center"><FileIcon className="w-6 h-6 text-gray-400 ml-3"/><p className="font-medium text-gray-800 dark:text-white">{doc.fileName}</p><p className="text-xs text-gray-500 dark:text-gray-400 mr-3">({doc.fileSize})</p></div><div className="flex items-center gap-3"><button className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"><DownloadIcon className="w-5 h-5 text-gray-500 dark:text-gray-400"/></button><button className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50"><TrashIcon className="w-5 h-5 text-red-500"/></button></div></li>)}</ul></div>)}
@@ -218,6 +307,96 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
             onClose={() => setIsEditModalOpen(false)}
             onSave={handleUpdateStudent}
         />
+      )}
+
+      {isBehaviorModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center modal-fade-in" onClick={() => setIsBehaviorModalOpen(false)}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6 m-4 modal-content-scale-up" onClick={e => e.stopPropagation()}>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">إضافة سجل سلوكي</h2>
+                <form onSubmit={handleAddBehavior} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">عنوان السجل</label>
+                        <input 
+                            type="text" 
+                            required
+                            value={newBehavior.title}
+                            onChange={e => setNewBehavior({...newBehavior, title: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">النوع</label>
+                            <select 
+                                value={newBehavior.type}
+                                onChange={e => setNewBehavior({...newBehavior, type: e.target.value as any})}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                            >
+                                <option value="Negative">سلبي</option>
+                                <option value="Positive">إيجابي</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الشدة</label>
+                            <select 
+                                value={newBehavior.severity}
+                                onChange={e => setNewBehavior({...newBehavior, severity: e.target.value as any})}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                            >
+                                <option value="Low">منخفض</option>
+                                <option value="Medium">متوسط</option>
+                                <option value="High">مرتفع</option>
+                                <option value="Critical">حرج</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">التاريخ</label>
+                        <input 
+                            type="date" 
+                            required
+                            value={newBehavior.date}
+                            onChange={e => setNewBehavior({...newBehavior, date: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الوصف</label>
+                        <textarea 
+                            rows={3}
+                            value={newBehavior.description}
+                            onChange={e => setNewBehavior({...newBehavior, description: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                        ></textarea>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الإجراء المتخذ (اختياري)</label>
+                        <input 
+                            type="text" 
+                            value={newBehavior.actionTaken}
+                            onChange={e => setNewBehavior({...newBehavior, actionTaken: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                            placeholder="مثال: تنبيه شفهي، استدعاء ولي أمر..."
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                        <button 
+                            type="button" 
+                            onClick={() => setIsBehaviorModalOpen(false)}
+                            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        >
+                            إلغاء
+                        </button>
+                        <button 
+                            type="submit" 
+                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                        >
+                            حفظ السجل
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
       )}
     </>
   );

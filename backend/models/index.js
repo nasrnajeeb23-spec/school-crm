@@ -35,6 +35,7 @@ const PricingConfig = require('./PricingConfig');
 const Job = require('./Job');
 const ApiKey = require('./ApiKey');
 const TrialRequest = require('./TrialRequest');
+const BehaviorRecord = require('./BehaviorRecord');
 
 
 // Define associations
@@ -137,6 +138,12 @@ StudentNote.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' })
 Student.hasMany(StudentDocument, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
 StudentDocument.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
 
+// Student <-> BehaviorRecord (One-to-Many)
+Student.hasMany(BehaviorRecord, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+BehaviorRecord.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
+School.hasMany(BehaviorRecord, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+BehaviorRecord.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
 // Class <-> Student (One-to-Many roster membership)
 Class.hasMany(Student, { foreignKey: 'classId', onDelete: 'SET NULL' });
 Student.belongsTo(Class, { foreignKey: 'classId', onDelete: 'SET NULL' });
@@ -210,6 +217,7 @@ const db = {
   SecurityPolicy,
   ModuleCatalog,
   PricingConfig,
+  BehaviorRecord,
 };
 
 module.exports = db;

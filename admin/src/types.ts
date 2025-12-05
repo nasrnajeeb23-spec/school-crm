@@ -294,6 +294,20 @@ export interface SchoolEvent {
     eventType: SchoolEventType;
 }
 
+export interface BehaviorRecord {
+  id: number;
+  schoolId: number;
+  studentId: number;
+  type: 'Positive' | 'Negative';
+  title: string;
+  description?: string;
+  date: string;
+  recordedBy?: string;
+  actionTaken?: string;
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   email: string;
