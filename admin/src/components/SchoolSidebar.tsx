@@ -59,9 +59,14 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
     <aside className="fixed top-0 right-0 h-full w-16 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex flex-col transition-all duration-300 shadow-lg z-30">
       <div className="flex items-center justify-center md:justify-start md:pr-6 h-20 border-b border-gray-200 dark:border-gray-700">
         {schoolLogoUrl ? (
-            <img src={schoolLogoUrl} alt="School Logo" className="w-10 h-10 rounded-full" />
+            <img 
+                src={schoolLogoUrl} 
+                alt="School Logo" 
+                className="w-10 h-10 rounded-full" 
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
         ) : (
-            <span className="text-2xl font-bold text-teal-600 dark:text-teal-400">S</span>
+            <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">S</span>
         )}
         <h1 className="hidden md:block ml-2 text-xl font-bold text-gray-800 dark:text-white truncate">{schoolName || 'لوحة التحكم'}</h1>
       </div>

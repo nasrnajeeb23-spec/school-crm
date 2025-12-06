@@ -67,7 +67,19 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
         </button>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-           {schoolSettings && (<div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 mb-6"><img src={schoolSettings.schoolLogoUrl as string} alt="School Logo" className="w-12 h-12 rounded-lg" /><h2 className="text-xl font-bold text-gray-700 dark:text-gray-200">{schoolSettings.schoolName}</h2></div>)}
+           {schoolSettings && (
+             <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 mb-6">
+               {schoolSettings.schoolLogoUrl && (
+                 <img 
+                   src={schoolSettings.schoolLogoUrl as string} 
+                   alt="School Logo" 
+                   className="w-12 h-12 rounded-lg" 
+                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                 />
+               )}
+               <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200">{schoolSettings.schoolName}</h2>
+             </div>
+           )}
             <div className="flex flex-col md:flex-row items-center gap-6">
                 <img src={`https://picsum.photos/seed/${teacher.id}/100/100`} alt={teacher.name} className="w-24 h-24 rounded-full border-4 border-teal-500" />
                 <div className="flex-grow text-center md:text-right">

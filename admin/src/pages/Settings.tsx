@@ -1113,7 +1113,14 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                 <div>
                     <label htmlFor="schoolLogo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">شعار المدرسة</label>
                     <input type="file" id="schoolLogo" accept="image/*" onChange={handleLogoChange} className="mt-1 block w-full" />
-                    {settings.schoolLogoUrl && <img src={settings.schoolLogoUrl as string} alt="School Logo" className="mt-2 w-16 h-16 rounded" />}
+                    {settings.schoolLogoUrl && (
+                        <img 
+                            src={settings.schoolLogoUrl as string} 
+                            alt="School Logo" 
+                            className="mt-2 w-16 h-16 rounded object-contain" 
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                    )}
                 </div>
                 <div>
                     <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">هاتف التواصل</label>
