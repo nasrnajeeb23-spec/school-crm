@@ -1181,7 +1181,9 @@ export const updatePricingConfig = async (config: PricingConfig): Promise<Pricin
 };
 
 export const updateModule = async (moduleId: string, data: Partial<Module>): Promise<Module> => {
-    return await apiCall(`/modules/${moduleId}`, { method: 'PUT', body: JSON.stringify(data) });
+    // Remove 'id' from data if it exists to avoid [object Object] in URL or body issues if ID is immutable
+    const { id, ...updateData } = data as any;
+    return await apiCall(`/modules/${moduleId}`, { method: 'PUT', body: JSON.stringify(updateData) });
 };
 
 export const createModule = async (data: Module): Promise<Module> => {

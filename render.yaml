@@ -20,3 +20,15 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
+      - key: CORS_ORIGIN
+        value: https://school-crm-admin.onrender.com
+      - key: FRONTEND_URL
+        value: https://school-crm-admin.onrender.com
+      - key: LICENSE_KEY
+        value: eyJtb2R1bGVzIjpbImZpbmFuY2UiLCJ0cmFuc3BvcnRhdGlvbiIsImFkdmFuY2VkX3JlcG9ydHMiXSwiZXhwaXJlc0F0IjoiMjAyNi0wMS0wMVQwMDowMDowMFoifQ.14BRfL9ZLhC2Lp1BV8lWUdplTdgxUsQ4OmfckcsDcNM
+      - key: JWT_SECRET
+        value: f846f66cf2dc8cb5026a70a67ab0e10fc6050d0cd40078f97febadea581c018a
+      - key: SESSION_SECRET
+        value: ea03441c39faeae8277a9ad7aa28bd76
+      - key: NODE_ENV
+        value: production

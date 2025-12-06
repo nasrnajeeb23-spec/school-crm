@@ -230,7 +230,11 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
 
     const handleSaveModule = async (data: any) => {
         try {
+            // Fix NaN warning by ensuring monthlyPrice is a valid number
+            if (data.monthlyPrice) data.monthlyPrice = Number(data.monthlyPrice) || 0;
+            
             if (editingModule) {
+                // Pass ID explicitly as first argument
                 await api.updateModule(editingModule.id, data);
                 addToast('تم تعديل الوحدة بنجاح', 'success');
             } else {
@@ -241,6 +245,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
             setIsCreateModalOpen(false);
             fetchData();
         } catch (e) {
+            console.error(e);
             addToast('فشل حفظ الوحدة', 'error');
         }
     };
