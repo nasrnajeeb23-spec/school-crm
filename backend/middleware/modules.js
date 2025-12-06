@@ -53,8 +53,27 @@ function requireModule(moduleId) {
       const active = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
       
       // Normalize module IDs if needed (e.g. 'transport' vs 'transportation')
-      // For now assume exact match or simple mapping could be added
-      if (!active.includes(moduleId)) {
+      // Define parent-child module relationships
+      const moduleMap = {
+          'finance': ['finance', 'finance_salaries', 'finance_fees', 'finance_expenses', 'finance_reports'],
+          'transportation': ['transportation', 'transport', 'bus_management'],
+          'academic': ['academic', 'academic_management', 'grades', 'attendance'],
+          'student': ['student', 'student_management']
+      };
+
+      // Check if module is directly active or part of an active parent module
+      const isActive = active.some(m => {
+          if (m === moduleId) return true;
+          // Check if 'm' is a parent that includes 'moduleId'
+          return moduleMap[m] && moduleMap[m].includes(moduleId);
+      });
+
+      if (!isActive) {
+        // Fallback: check if we are requesting a parent module but have a child active? 
+        // Usually we want parent implies child.
+        
+        // Special case: if we are in dev mode, allow everything? No, stick to logic.
+        
         return res.status(403).json({ 
             msg: `Module '${moduleId}' is not active for this school.`,
             code: 'MODULE_DISABLED',
@@ -64,7 +83,16 @@ function requireModule(moduleId) {
 
       // 5. Check Global Server License (if applicable)
       const allowedGlobal = req.app?.locals?.allowedModules || [];
-      if (allowedGlobal.length > 0 && !allowedGlobal.includes(moduleId)) {
+      
+      // Expand allowedGlobal using the same map
+      const expandedGlobal = new Set(allowedGlobal);
+      allowedGlobal.forEach(m => {
+          if (moduleMap[m]) {
+              moduleMap[m].forEach(child => expandedGlobal.add(child));
+          }
+      });
+
+      if (expandedGlobal.size > 0 && !expandedGlobal.has(moduleId)) {
         return res.status(403).json({ msg: `Module ${moduleId} not licensed on server.` });
       }
 
