@@ -1523,7 +1523,9 @@ router.get('/:schoolId/jobs/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 
 router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
+    // Import Job model directly from the models file to ensure it is loaded
     const { Job } = require('../models');
+    
     // Ensure schoolId is a number
     const schoolId = parseInt(req.params.schoolId, 10);
     if (isNaN(schoolId)) {
@@ -1538,11 +1540,22 @@ router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
       return res.status(500).send('Server Error: Model not loaded');
     }
 
-    const jobs = await Job.findAll({
-      where: { schoolId: schoolId },
-      order: [['createdAt', 'DESC']],
-      limit
-    });
+    // Use try-catch specifically for the database query
+    let jobs;
+    try {
+      jobs = await Job.findAll({
+        where: { schoolId: schoolId },
+        order: [['createdAt', 'DESC']],
+        limit
+      });
+    } catch (dbError) {
+      console.error('Database error when fetching jobs:', dbError);
+      // Check if the error is due to table missing (migration issue)
+      if (dbError.name === 'SequelizeDatabaseError' && dbError.message.includes('no such table')) {
+         return res.status(500).send('Server Error: Jobs table missing. Please run migrations.');
+      }
+      return res.status(500).send('Server Error: Database query failed');
+    }
     
     res.json(jobs.map(j => {
         const json = j.toJSON();
