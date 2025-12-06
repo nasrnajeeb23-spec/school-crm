@@ -8,6 +8,7 @@ const fse = require('fs-extra');
 const net = require('net');
 const { spawn } = require('child_process');
 const multer = require('multer');
+const { scanFile, verifyFileSignature } = require('../utils/fileSecurity');
 const allowedMimes = new Set(['image/png','image/jpeg','application/pdf']);
 const allowedExts = new Set(['.png','.jpg','.jpeg','.pdf']);
 const tmpDir = path.join(__dirname, '..', 'storage', 'tmp');
@@ -23,55 +24,6 @@ const upload = multer({
     } catch (e) { cb(new Error('Invalid file')); }
   }
 });
-
-async function scanFile(filePath) {
-  const mode = String(process.env.CLAMAV_MODE || '').toLowerCase();
-  const host = process.env.CLAMAV_HOST || '';
-  const port = parseInt(process.env.CLAMAV_PORT || '3310');
-  const timeoutMs = parseInt(process.env.CLAMAV_TIMEOUT_MS || '5000');
-  const clamscanPath = process.env.CLAMAV_CLAMSCAN_PATH || 'clamscan';
-  if (host && !mode) {
-    return new Promise((resolve) => {
-      const socket = new net.Socket();
-      let result = '';
-      let done = false;
-      socket.setTimeout(timeoutMs, () => { if (!done) { done = true; socket.destroy(); resolve({ clean: true, reason: 'timeout' }); } });
-      socket.connect(port, host, () => {
-        socket.write('zINSTREAM\0');
-        const stream = fs.createReadStream(filePath);
-        stream.on('data', (chunk) => {
-          const len = Buffer.alloc(4);
-          len.writeUInt32BE(chunk.length, 0);
-          socket.write(len);
-          socket.write(chunk);
-        });
-        stream.on('end', () => { const end = Buffer.alloc(4); end.writeUInt32BE(0, 0); socket.write(end); });
-      });
-      socket.on('data', (data) => { result += data.toString(); });
-      socket.on('error', () => { if (!done) { done = true; resolve({ clean: true, reason: 'error' }); } });
-      socket.on('close', () => {
-        if (!done) {
-          done = true;
-          const ok = /OK/i.test(result) && !/FOUND/i.test(result);
-          resolve({ clean: !!ok, reason: result.trim() });
-        }
-      });
-    });
-  }
-  if (mode === 'cli') {
-    return new Promise((resolve) => {
-      const p = spawn(clamscanPath, ['--no-summary', filePath], { stdio: ['ignore', 'pipe', 'pipe'] });
-      let out = '';
-      let err = '';
-      p.stdout.on('data', (d) => out += d.toString());
-      p.stderr.on('data', (d) => err += d.toString());
-      const to = setTimeout(() => { try { p.kill(); } catch {} }, timeoutMs);
-      p.on('close', (code) => { clearTimeout(to); resolve({ clean: code === 0, reason: (out || err).trim() }); });
-      p.on('error', () => { clearTimeout(to); resolve({ clean: true, reason: 'error' }); });
-    });
-  }
-  return { clean: true, reason: 'disabled' };
-}
 
 router.get('/', (req, res) => res.json({ ok: true, msg: 'messaging routes alive' }));
 
@@ -137,6 +89,14 @@ router.post('/upload', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', '
     const targetDir = path.join(__dirname, '..', 'storage', 'chat', String(schoolId));
     await fse.ensureDir(targetDir);
     const targetPath = path.join(targetDir, safeName);
+
+    // Verify File Signature (Magic Numbers)
+    const sig = await verifyFileSignature(req.file.path);
+    if (!sig.valid) {
+        try { await fse.remove(req.file.path); } catch {}
+        return res.status(400).json({ msg: 'Invalid file signature: ' + sig.reason });
+    }
+
     const scan = await scanFile(req.file.path);
     if (!scan.clean) { try { await fse.remove(req.file.path); } catch {} return res.status(400).json({ msg: 'Malware detected' }); }
     await fse.move(req.file.path, targetPath, { overwrite: true });

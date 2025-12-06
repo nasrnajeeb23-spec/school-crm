@@ -29,6 +29,12 @@ const Grade = sequelize.define('Grade', {
   },
   // Foreign keys are added via association
   // studentId, teacherId, classId
+}, {
+  indexes: [
+    { fields: ['studentId'] },
+    { fields: ['classId'] },
+    { fields: ['subject'] }
+  ]
 });
 
 module.exports = Grade;
