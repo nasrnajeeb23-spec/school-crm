@@ -697,14 +697,75 @@ router.get('/plans', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) =
     res.json(rows.map(r => ({ id: r.id, name: r.name, price: Number(r.price || 0) })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
-// Public onboarding request
+// Public onboarding request (Self-Service Free Trial)
 router.post('/public/onboard', async (req, res) => {
   try {
     const { schoolName, adminName, adminEmail, phone } = req.body || {};
-    if (!schoolName || !adminName || !adminEmail) return res.status(400).json({ message: 'Invalid payload' });
-    const r = await TrialRequest.create({ schoolName, adminName, adminEmail, phone });
-    res.json({ success: true, id: r.id });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+    
+    // 1. Basic Validation
+    if (!schoolName || !adminName || !adminEmail) {
+        return res.status(400).json({ message: 'الرجاء تعبئة جميع الحقول المطلوبة' });
+    }
+
+    // 2. Check for existing user/school to prevent duplicates
+    const existingUser = await User.findOne({ where: { email: adminEmail } });
+    if (existingUser) {
+        return res.status(400).json({ message: 'البريد الإلكتروني مسجل بالفعل' });
+    }
+
+    // 3. Create Trial Request Record (for audit/analytics)
+    const r = await TrialRequest.create({ schoolName, adminName, adminEmail, phone, status: 'APPROVED' });
+
+    // 4. Auto-Provisioning Logic
+    const { Plan } = require('../models');
+    const plan = await Plan.findOne({ order: [['id','ASC']] }); // Default to first plan (Basic)
+    
+    // Create School
+    const school = await School.create({ name: schoolName, phone });
+    
+    // Create Subscription (30 Days Trial)
+    const start = new Date();
+    const renewal = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+    await Subscription.create({ 
+        schoolId: school.id, 
+        planId: plan ? plan.id : null, 
+        status: 'TRIAL', 
+        startDate: start, 
+        renewalDate: renewal 
+    });
+
+    // Create Admin User
+    const bcrypt = require('bcryptjs');
+    const pass = Math.random().toString(36).slice(2, 10); // Generate random password
+    const hashedPassword = await bcrypt.hash(pass, 10);
+    
+    const admin = await User.create({ 
+        name: adminName, 
+        email: adminEmail, 
+        username: adminEmail, 
+        password: hashedPassword, 
+        role: 'SchoolAdmin', 
+        schoolId: school.id, 
+        isActive: true 
+    });
+
+    // 5. Send Welcome Email
+    const EmailService = require('../services/EmailService');
+    const loginUrl = process.env.FRONTEND_URL || 'https://school-crm-admin.onrender.com';
+    
+    // We don't await this to not block the response, but logging error is good practice
+    EmailService.sendWelcomeEmail(adminEmail, adminName, schoolName, pass, loginUrl).catch(e => console.error('Failed to send welcome email', e));
+
+    res.json({ 
+        success: true, 
+        message: 'تم إنشاء حسابك بنجاح! راجع بريدك الإلكتروني للحصول على كلمة المرور.',
+        id: r.id 
+    });
+
+  } catch (err) { 
+      console.error(err.message); 
+      res.status(500).send('Server Error'); 
+  }
 });
 
 // List onboarding requests

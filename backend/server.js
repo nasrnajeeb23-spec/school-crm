@@ -180,6 +180,24 @@ if (promClient) {
   });
 }
 
+// Subscription Cron Job (Runs daily at 2:00 AM)
+try {
+  const cron = require('node-cron');
+  const SubscriptionManager = require('./services/SubscriptionManager');
+  
+  cron.schedule('0 2 * * *', async () => {
+    console.log('Starting daily subscription check...');
+    try {
+      await SubscriptionManager.checkExpirations();
+      console.log('Daily subscription check completed.');
+    } catch (error) {
+      console.error('Failed to run subscription check:', error);
+    }
+  });
+} catch (err) {
+  console.error('Failed to initialize cron jobs:', err);
+}
+
 // Session middleware for enterprise/SAML features
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret && process.env.NODE_ENV === 'production') { throw new Error('SESSION_SECRET required'); }

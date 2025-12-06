@@ -193,6 +193,7 @@ export interface Module {
 export interface SchoolModuleSubscription {
     schoolId: number;
     moduleId: ModuleId;
+    status?: string;
 }
 
 export interface PricingConfig {

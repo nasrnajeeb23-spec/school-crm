@@ -31,6 +31,7 @@ const StaffAttendance = require('./StaffAttendance');
 const TeacherAttendance = require('./TeacherAttendance');
 const SecurityPolicy = require('./SecurityPolicy');
 const ModuleCatalog = require('./ModuleCatalog');
+const SchoolModule = require('./SchoolModule');
 const PricingConfig = require('./PricingConfig');
 const Job = require('./Job');
 const ApiKey = require('./ApiKey');
@@ -179,6 +180,10 @@ School.hasMany(Conversation, { foreignKey: 'schoolId', onDelete: 'CASCADE', hook
 Conversation.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 
+// School <-> SchoolModule (One-to-Many)
+School.hasMany(SchoolModule, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+SchoolModule.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
 const db = {
   sequelize,
   User,
@@ -216,6 +221,7 @@ const db = {
   TrialRequest,
   SecurityPolicy,
   ModuleCatalog,
+  SchoolModule,
   PricingConfig,
   BehaviorRecord,
 };

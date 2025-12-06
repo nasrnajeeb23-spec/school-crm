@@ -18,6 +18,33 @@ async function verifyToken(req, res, next) {
     req.user = payload;
     const u = await User.findByPk(payload.id);
     if (!u || u.isActive === false) return res.status(401).json({ msg: 'User disabled' });
+    
+    // Check Subscription Status for SchoolAdmins
+    if (u.role === 'SchoolAdmin' && u.schoolId) {
+        const { Subscription } = require('../models');
+        const sub = await Subscription.findOne({ where: { schoolId: u.schoolId, status: 'ACTIVE' } });
+        
+        // If not active, check other valid statuses
+        if (!sub) {
+            const validSub = await Subscription.findOne({ 
+                where: { 
+                    schoolId: u.schoolId, 
+                    status: ['TRIAL', 'GRACE_PERIOD'] 
+                } 
+            });
+            
+            if (!validSub) {
+                // Check if suspended
+                const suspendedSub = await Subscription.findOne({ where: { schoolId: u.schoolId, status: 'SUSPENDED' } });
+                if (suspendedSub) {
+                    return res.status(403).json({ msg: 'Account Suspended. Please contact support to renew your subscription.', code: 'SUBSCRIPTION_SUSPENDED' });
+                }
+                // Default fallback
+                return res.status(403).json({ msg: 'No active subscription found', code: 'NO_SUBSCRIPTION' });
+            }
+        }
+    }
+
     const tv = Number(u.tokenVersion || 0);
     const ptv = Number(payload.tokenVersion || 0);
     if (tv !== ptv) return res.status(401).json({ msg: 'Token revoked' });
