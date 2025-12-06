@@ -147,7 +147,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
         permissions={userRolePermissions} 
         activeModules={activeModules}
         schoolName={settings?.schoolName || school.name}
-        schoolLogoUrl={settings?.schoolLogoUrl as string}
+        schoolLogoUrl={api.getAssetUrl(settings?.schoolLogoUrl as string)}
         isSuperAdminView={isSuperAdminView}
       />
       <main className="pr-16 md:pr-64 transition-all duration-300">

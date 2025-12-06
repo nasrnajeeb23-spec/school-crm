@@ -72,7 +72,9 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       const file = e.target.files?.[0];
       if (!file) return;
       const url = await api.uploadSchoolLogo(schoolId, file);
-      setSettings(prev => prev ? { ...prev, schoolLogoUrl: url } : null);
+      // Add timestamp to prevent caching issues
+      const timestampedUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
+      setSettings(prev => prev ? { ...prev, schoolLogoUrl: timestampedUrl } : null);
       addToast('تم رفع شعار المدرسة بنجاح.', 'success');
     } catch (err) {
       console.error('Failed to upload logo:', err);
@@ -1115,7 +1117,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <input type="file" id="schoolLogo" accept="image/*" onChange={handleLogoChange} className="mt-1 block w-full" />
                     {settings.schoolLogoUrl && (
                         <img 
-                            src={settings.schoolLogoUrl as string} 
+                            src={api.getAssetUrl(settings.schoolLogoUrl as string)} 
                             alt="School Logo" 
                             className="mt-2 w-16 h-16 rounded object-contain" 
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

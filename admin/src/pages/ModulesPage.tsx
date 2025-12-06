@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
 import { School, Module, ModuleId, PaymentProofSubmission, PaymentMethod, PricingConfig } from '../types';
 import { useToast } from '../contexts/ToastContext';
-import { CheckIcon } from '../components/icons';
+import { CheckIcon, EditIcon, PlusIcon, TrashIcon } from '../components/icons';
 import PaymentProofModal from '../components/PaymentProofModal';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -10,12 +10,126 @@ interface ModulesPageProps {
     school: School;
 }
 
+interface EditModuleModalProps {
+    module?: Module;
+    onClose: () => void;
+    onSave: (data: any) => void;
+}
+
+const EditModuleModal: React.FC<EditModuleModalProps> = ({ module, onClose, onSave }) => {
+    const [formData, setFormData] = useState<Partial<Module>>(module || {
+        id: '' as ModuleId,
+        name: '',
+        description: '',
+        monthlyPrice: 0,
+        isCore: false,
+        isEnabled: true
+    });
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
+                     type === 'number' ? Number(value) : value
+        }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(formData);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
+                <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                    {module ? 'تعديل الوحدة' : 'إضافة وحدة جديدة'}
+                </h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {!module && (
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">المعرف (ID)</label>
+                            <input 
+                                type="text" 
+                                name="id" 
+                                value={formData.id} 
+                                onChange={handleChange} 
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                required 
+                            />
+                        </div>
+                    )}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم الوحدة</label>
+                        <input 
+                            type="text" 
+                            name="name" 
+                            value={formData.name} 
+                            onChange={handleChange} 
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            required 
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">الوصف</label>
+                        <textarea 
+                            name="description" 
+                            value={formData.description} 
+                            onChange={handleChange} 
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر الشهري ($)</label>
+                        <input 
+                            type="number" 
+                            name="monthlyPrice" 
+                            value={formData.monthlyPrice} 
+                            onChange={handleChange} 
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        />
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <label className="flex items-center">
+                            <input 
+                                type="checkbox" 
+                                name="isCore" 
+                                checked={formData.isCore} 
+                                onChange={handleChange} 
+                                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                            />
+                            <span className="mr-2 text-gray-700 dark:text-gray-300">وحدة أساسية</span>
+                        </label>
+                        <label className="flex items-center">
+                            <input 
+                                type="checkbox" 
+                                name="isEnabled" 
+                                checked={formData.isEnabled} 
+                                onChange={handleChange} 
+                                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                            />
+                            <span className="mr-2 text-gray-700 dark:text-gray-300">مفعلة للنظام</span>
+                        </label>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-6">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg dark:text-gray-300 dark:hover:bg-gray-700">إلغاء</button>
+                        <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">حفظ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const [availableModules, setAvailableModules] = useState<Module[]>([]);
     const [activeModuleIds, setActiveModuleIds] = useState<Set<ModuleId>>(new Set());
     const [loading, setLoading] = useState(true);
     const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
     const [moduleToActivate, setModuleToActivate] = useState<Module | null>(null);
+    const [editingModule, setEditingModule] = useState<Module | null>(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const { addToast } = useToast();
     const { currentUser } = useAppContext();
     const canManageModules = ['SUPER_ADMIN','SUPER_ADMIN_FINANCIAL','SUPER_ADMIN_TECHNICAL','SUPER_ADMIN_SUPERVISOR'].includes(String(currentUser?.role || '').toUpperCase());
@@ -70,6 +184,34 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         }
     };
 
+    const handleSaveModule = async (data: any) => {
+        try {
+            if (editingModule) {
+                await api.updateModule(editingModule.id, data);
+                addToast('تم تعديل الوحدة بنجاح', 'success');
+            } else {
+                await api.createModule(data);
+                addToast('تم إضافة الوحدة بنجاح', 'success');
+            }
+            setEditingModule(null);
+            setIsCreateModalOpen(false);
+            fetchData();
+        } catch (e) {
+            addToast('فشل حفظ الوحدة', 'error');
+        }
+    };
+
+    const handleDeleteModule = async (id: string) => {
+        if (!confirm('هل أنت متأكد من حذف هذه الوحدة نهائياً من النظام؟')) return;
+        try {
+            await api.deleteModule(id);
+            addToast('تم حذف الوحدة بنجاح', 'success');
+            fetchData();
+        } catch (e) {
+            addToast('فشل حذف الوحدة', 'error');
+        }
+    };
+
     const { baseCost, modulesCost, totalCost } = useMemo(() => {
         const pricePerStudent = pricingConfig?.pricePerStudent ?? 1.5;
         const baseCost = school.students * pricePerStudent;
@@ -84,21 +226,27 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         return <p className="text-center p-8">جاري تحميل الوحدات...</p>;
     }
 
-    const coreFallback: Module[] = [
-        { id: ModuleId.TeacherPortal, name: 'بوابة المعلم', description: 'واجهة ويب للمعلم لإدارة الجدول والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
-        { id: ModuleId.TeacherApp, name: 'تطبيق المعلم', description: 'تطبيق الجوال للمعلم بنفس وظائف البوابة مع إشعارات.', monthlyPrice: 0, isEnabled: true, isCore: true },
-    ];
-    const hasTeacherPortal = availableModules.some(m => m.id === ModuleId.TeacherPortal);
-    const hasTeacherApp = availableModules.some(m => m.id === ModuleId.TeacherApp);
-    const coreModules = [
-        ...availableModules.filter(m => m.isEnabled && m.isCore),
-        ...(!hasTeacherPortal ? [coreFallback[0]] : []),
-        ...(!hasTeacherApp ? [coreFallback[1]] : []),
-    ];
+    // For Super Admin, we show ALL modules fetched from API (which should return everything)
+    // For School Admin, we might still want to categorize them
+    const coreModules = availableModules.filter(m => m.isCore);
+    const addonModules = availableModules.filter(m => !m.isCore);
 
     return (
         <>
             <div className="mt-6 space-y-6">
+                {/* Admin Controls */}
+                {canManageModules && (
+                    <div className="flex justify-end">
+                        <button 
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                        >
+                            <PlusIcon className="w-5 h-5 ml-2" />
+                            إضافة وحدة جديدة للنظام
+                        </button>
+                    </div>
+                )}
+
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white">ملخص الاشتراك الحالي</h3>
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
@@ -117,27 +265,40 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                     </div>
                 </div>
 
+                {/* Core Modules */}
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الوحدات المتاحة</h3>
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الوحدات الأساسية (Core)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {availableModules.filter(m => m.isEnabled && !m.isCore).map(module => (
-                            <div key={module.id} className="border dark:border-gray-700 rounded-lg p-6 flex flex-col justify-between">
+                        {coreModules.map(module => (
+                            <div key={module.id} className="border dark:border-gray-700 rounded-lg p-6 flex flex-col justify-between relative">
+                                {canManageModules && (
+                                    <div className="absolute top-2 left-2 flex gap-2">
+                                        <button onClick={() => setEditingModule(module)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><EditIcon className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDeleteModule(module.id)} className="p-1 text-red-600 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4" /></button>
+                                    </div>
+                                )}
                                 <div>
-                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white">{module.name}</h4>
+                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                                        {module.name}
+                                        {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
+                                    </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
+                                    <p className="text-xs text-gray-400 mt-2">ID: {module.id}</p>
                                 </div>
                                 <div className="mt-4 text-center">
                                     {activeModuleIds.has(module.id) ? (
-                                        <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center justify-center">
-                                            <CheckIcon className="w-5 h-5 ml-2" />
-                                            مفعلة
-                                        </div>
+                                        <button
+                                            onClick={() => handleToggleModule(module, false)}
+                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                        >
+                                            تعطيل للمدرسة
+                                        </button>
                                     ) : (
                                         <button
-                                            onClick={() => handleActivateRequest(module)}
+                                            onClick={() => handleToggleModule(module, true)}
                                             className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
                                         >
-                                            طلب تفعيل (+${module.monthlyPrice}/شهرياً)
+                                            تفعيل للمدرسة
                                         </button>
                                     )}
                                 </div>
@@ -146,29 +307,52 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                     </div>
                 </div>
 
+                {/* Add-on Modules */}
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الوحدات الأساسية</h3>
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الوحدات الإضافية (Add-ons)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {coreModules.map(module => (
-                            <div key={module.id} className="border dark:border-gray-700 rounded-lg p-6 flex flex-col justify-between">
+                        {addonModules.map(module => (
+                            <div key={module.id} className="border dark:border-gray-700 rounded-lg p-6 flex flex-col justify-between relative">
+                                {canManageModules && (
+                                    <div className="absolute top-2 left-2 flex gap-2">
+                                        <button onClick={() => setEditingModule(module)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><EditIcon className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDeleteModule(module.id)} className="p-1 text-red-600 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4" /></button>
+                                    </div>
+                                )}
                                 <div>
-                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white">{module.name}</h4>
+                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                                        {module.name}
+                                        {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
+                                    </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
+                                    <p className="text-xs text-gray-400 mt-2">ID: {module.id}</p>
+                                    <p className="font-semibold text-teal-600 mt-1">${module.monthlyPrice}/شهرياً</p>
                                 </div>
                                 <div className="mt-4 text-center">
                                     {activeModuleIds.has(module.id) ? (
-                                        <button
-                                            onClick={() => handleToggleModule(module, false)}
-                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                        >
-                                            تعطيل
-                                        </button>
+                                        canManageModules ? (
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm('هل أنت متأكد من تعطيل هذه الوحدة؟ سيتم إيقاف الخدمة فوراً.')) {
+                                                        handleToggleModule(module, false);
+                                                    }
+                                                }}
+                                                className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900 transition-colors"
+                                            >
+                                                تعطيل الوحدة للمدرسة
+                                            </button>
+                                        ) : (
+                                            <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center justify-center">
+                                                <CheckIcon className="w-5 h-5 ml-2" />
+                                                مفعلة
+                                            </div>
+                                        )
                                     ) : (
                                         <button
-                                            onClick={() => handleToggleModule(module, true)}
+                                            onClick={() => handleActivateRequest(module)}
                                             className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
                                         >
-                                            تفعيل
+                                            طلب تفعيل
                                         </button>
                                     )}
                                 </div>
@@ -177,6 +361,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                     </div>
                 </div>
             </div>
+
             {moduleToActivate && (
                 <PaymentProofModal
                     onClose={() => setModuleToActivate(null)}
@@ -184,6 +369,14 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                     amount={moduleToActivate.monthlyPrice}
                     serviceName={`تفعيل وحدة: ${moduleToActivate.name}`}
                     schoolName={school.name}
+                />
+            )}
+
+            {(isCreateModalOpen || editingModule) && (
+                <EditModuleModal
+                    module={editingModule || undefined}
+                    onClose={() => { setIsCreateModalOpen(false); setEditingModule(null); }}
+                    onSave={handleSaveModule}
                 />
             )}
         </>

@@ -145,6 +145,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+// Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Standard API response middleware
 try { app.use(require('./middleware/response').responseFormatter); } catch {}
 let promClient;

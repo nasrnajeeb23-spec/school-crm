@@ -26,6 +26,14 @@ const API_ALT_BASE_URL = (() => {
 export const getApiBase = (): string => API_BASE_URL;
 export const getApiAltBase = (): string => API_ALT_BASE_URL;
 
+export const getAssetUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('data:')) return url;
+    // Remove /api suffix from base to get root
+    const root = API_BASE_URL.replace(/\/api\/?$/, '');
+    return `${root}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const schoolId = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
@@ -1021,6 +1029,18 @@ export const deleteUser = async (userId: number | string): Promise<void> => {
 
 export const getAvailableModules = async (): Promise<Module[]> => {
     return await apiCall('/modules', { method: 'GET' });
+};
+
+export const updateModule = async (moduleId: string, data: Partial<Module>): Promise<Module> => {
+    return await apiCall(`/modules/${moduleId}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
+export const createModule = async (data: Module): Promise<Module> => {
+    return await apiCall('/modules', { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const deleteModule = async (moduleId: string): Promise<void> => {
+    await apiCall(`/modules/${moduleId}`, { method: 'DELETE' });
 };
 
 // Removed duplicated functions (getSchoolModules, updateSchoolModules, submitPaymentProof)

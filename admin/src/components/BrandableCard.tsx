@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { SchoolSettings } from '../types';
+import * as api from '../api';
 
 interface BrandableCardProps {
     children: React.ReactNode;
@@ -14,7 +15,7 @@ const BrandableCard: React.FC<BrandableCardProps> = ({ children, className, scho
             <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 mb-6">
                 {schoolSettings.schoolLogoUrl && (
                     <img 
-                        src={schoolSettings.schoolLogoUrl as string} 
+                        src={api.getAssetUrl(schoolSettings.schoolLogoUrl as string)} 
                         alt="School Logo" 
                         className="w-10 h-10 rounded-lg" 
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

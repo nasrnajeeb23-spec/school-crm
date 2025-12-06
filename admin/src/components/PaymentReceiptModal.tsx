@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
+import * as api from '../api';
 
 interface ReceiptProps {
   payment: {
@@ -53,7 +54,7 @@ const PaymentReceiptModal: React.FC<ReceiptProps> = ({ payment, onClose }) => {
             </div>
             {payment.logoUrl && (
               <img 
-                src={payment.logoUrl} 
+                src={api.getAssetUrl(payment.logoUrl)} 
                 alt="Logo" 
                 className="h-20 w-20 object-contain" 
                 onError={(e) => {

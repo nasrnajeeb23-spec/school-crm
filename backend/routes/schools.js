@@ -270,15 +270,35 @@ router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN
     } catch {}
     const role = String(req.user?.role || '').toUpperCase();
     const isSchoolAdmin = role.includes('SCHOOL') && role.includes('ADMIN');
-    const moduleIds = isSchoolAdmin ? requestedIds.filter(id => {
-      const m = byId.get(String(id));
-      return m && m.isCore === true;
-    }) : requestedIds;
+
     const settings = await SchoolSettings.findOrCreate({ where: { schoolId }, defaults: { schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } } });
     const settingsInstance = Array.isArray(settings) ? settings[0] : settings;
-    settingsInstance.activeModules = moduleIds;
+
+    let finalModuleIds = [];
+    if (isSchoolAdmin) {
+        // School Admin can only toggle Core modules.
+        // We must PRESERVE their existing Non-Core modules to prevent accidental deletion of paid features.
+        const currentActive = Array.isArray(settingsInstance.activeModules) ? settingsInstance.activeModules : [];
+        
+        const preservedNonCore = currentActive.filter(id => {
+            const m = byId.get(String(id));
+            // Keep if it's a known non-core module OR if it's unknown (legacy/custom)
+            return !m || m.isCore !== true;
+        });
+
+        const requestedCore = requestedIds.filter(id => {
+             const m = byId.get(String(id));
+             return m && m.isCore === true;
+        });
+
+        finalModuleIds = [...new Set([...preservedNonCore, ...requestedCore])];
+    } else {
+        finalModuleIds = requestedIds;
+    }
+
+    settingsInstance.activeModules = finalModuleIds;
     await settingsInstance.save();
-    const list = moduleIds.map(m => ({ schoolId, moduleId: m }));
+    const list = finalModuleIds.map(m => ({ schoolId, moduleId: m }));
     res.json(list);
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
