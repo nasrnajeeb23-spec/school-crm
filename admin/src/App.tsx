@@ -59,6 +59,7 @@ const Finance = React.lazy(() => import('./pages/Finance'));
 const Reports = React.lazy(() => import('./pages/Reports'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const ModulesPage = React.lazy(() => import('./pages/ModulesPage'));
+const SubscriptionLocked = React.lazy(() => import('./pages/SubscriptionLocked'));
 
 // Teacher Pages
 const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
@@ -199,6 +200,7 @@ const App: React.FC = () => {
 
           {/* School Admin Routes */}
           <Route element={<ProtectedRoute allowedRoles={[UserRole.SchoolAdmin]} />}>
+            <Route path="/school/subscription-locked" element={<SubscriptionLocked />} />
             <Route path="/school/*" element={<SchoolAdminLayout />} />
           </Route>
           

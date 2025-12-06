@@ -112,14 +112,22 @@ async function enforceActiveSubscription(req, res, next) {
   const renewal = sub.renewalDate ? new Date(sub.renewalDate) : null;
   const status = String(sub.status || '').toUpperCase();
   const trialExpired = status === 'TRIAL' && renewal && renewal.getTime() < now.getTime();
-  const blocked = status === 'CANCELED' || status === 'PAST_DUE' || trialExpired;
+    const blocked = status === 'CANCELED' || status === 'PAST_DUE' || trialExpired;
     if (blocked) {
-      // Allow reading settings so المدير يستطيع رؤية وضبط المعلومات حتى في حالة الحظر
+      // Allow access to settings, modules (to select plan), and payments (to pay)
       const pathStr = (req.path || '').toLowerCase();
-      if (req.method === 'GET' && pathStr.includes('/settings')) {
+      const method = req.method;
+      
+      // Whitelist essential endpoints for renewal
+      const isSettings = method === 'GET' && pathStr.includes('/settings');
+      const isModules = pathStr.includes('/modules'); // GET to list, PUT to update selection
+      const isPayments = pathStr.includes('/payment') || pathStr.includes('/subscription'); // POST to pay
+      const isMe = pathStr.includes('/me'); // Auth check
+      
+      if (isSettings || isModules || isPayments || isMe) {
         return next();
       }
-      return res.status(402).json({ msg: 'انتهت النسخة التجريبية أو الاشتراك غير فعال. الرجاء دفع الرسوم لتفعيل المنصة.' });
+      return res.status(402).json({ msg: 'انتهت النسخة التجريبية أو الاشتراك غير فعال. الرجاء دفع الرسوم لتفعيل المنصة.', code: 'SUBSCRIPTION_EXPIRED' });
     }
     next();
   } catch (e) {
@@ -129,6 +137,23 @@ async function enforceActiveSubscription(req, res, next) {
 }
 
 // Note: Do not apply global enforcement to avoid blocking benign GETs.
+
+// @route   GET api/school/:schoolId/stats/counts
+// @desc    Get quick counts for resource usage widget
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/stats/counts', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = req.params.schoolId;
+    const [students, teachers] = await Promise.all([
+      Student.count({ where: { schoolId } }),
+      Teacher.count({ where: { schoolId } })
+    ]);
+    res.json({ students, teachers });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
 
 // @route   GET api/schools/:id
 // @desc    Get school by ID
@@ -172,10 +197,37 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     const { schoolId } = req.params;
     const { name, grade, parentName, dateOfBirth, address, city, homeLocation, lat, lng } = req.body;
 
-  const school = await School.findByPk(schoolId);
-  if (!school) {
-      return res.error(404, 'NOT_FOUND', 'School not found');
-  }
+    const school = await School.findByPk(schoolId);
+    if (!school) {
+        return res.error(404, 'NOT_FOUND', 'School not found');
+    }
+
+    // Check plan limits
+    const { Subscription, Plan } = require('../models');
+    const subscription = await Subscription.findOne({ where: { schoolId }, include: [Plan] });
+    
+    // Default limits if no plan (fallback)
+    let maxStudents = 50; 
+    
+    if (subscription && subscription.Plan && subscription.Plan.limits) {
+        const limits = typeof subscription.Plan.limits === 'string' 
+            ? JSON.parse(subscription.Plan.limits) 
+            : subscription.Plan.limits;
+        
+        if (limits.students && limits.students !== 'unlimited') {
+            maxStudents = Number(limits.students);
+        } else if (limits.students === 'unlimited') {
+            maxStudents = 999999;
+        }
+    }
+
+    const currentCount = await Student.count({ where: { schoolId } });
+    if (currentCount >= maxStudents) {
+        return res.status(403).json({ 
+            msg: 'لقد تجاوزت الحد الأقصى لعدد الطلاب المسموح به في خطتك الحالية. يرجى ترقية الاشتراك لإضافة المزيد.',
+            code: 'LIMIT_EXCEEDED'
+        });
+    }
 
     const newStudent = await Student.create({
       id: `std_${Date.now()}`,
@@ -523,9 +575,34 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     const { schoolId } = req.params;
     const { name, subject, phone, department, bankAccount } = req.body;
 
-    const school = await School.findByPk(schoolId);
-    if (!school) {
-      return res.status(404).json({ msg: 'School not found' });
+    const school = await School.findByPk(req.user.schoolId);
+    if (!school) return res.status(404).json({ msg: 'School not found' });
+
+    // Check plan limits
+    const { Subscription, Plan } = require('../models');
+    const subscription = await Subscription.findOne({ where: { schoolId: req.user.schoolId }, include: [Plan] });
+    
+    // Default limits
+    let maxTeachers = 5; 
+    
+    if (subscription && subscription.Plan && subscription.Plan.limits) {
+        const limits = typeof subscription.Plan.limits === 'string' 
+            ? JSON.parse(subscription.Plan.limits) 
+            : subscription.Plan.limits;
+        
+        if (limits.teachers && limits.teachers !== 'unlimited') {
+            maxTeachers = Number(limits.teachers);
+        } else if (limits.teachers === 'unlimited') {
+            maxTeachers = 999999;
+        }
+    }
+
+    const currentCount = await Teacher.count({ where: { schoolId: req.user.schoolId } });
+    if (currentCount >= maxTeachers) {
+        return res.status(403).json({ 
+            msg: 'لقد تجاوزت الحد الأقصى لعدد المعلمين المسموح به في خطتك الحالية.',
+            code: 'LIMIT_EXCEEDED'
+        });
     }
 
     const newTeacher = await Teacher.create({

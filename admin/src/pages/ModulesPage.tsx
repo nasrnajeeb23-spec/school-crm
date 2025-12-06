@@ -173,6 +173,50 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
             addToast('هذه العملية تتطلب موافقة المدير العام للمنصة.', 'error');
             return;
         }
+
+        // Dependency Logic:
+        // 1. If enabling a dependent module (e.g., teacher_app), ensure parent (teacher_portal) is enabled
+        if (enable) {
+            if (module.id === ModuleId.TeacherApp) {
+                const hasPortal = activeModuleIds.has(ModuleId.TeacherPortal);
+                if (!hasPortal) {
+                    if (confirm('تطبيق المعلم يتطلب تفعيل "بوابة المعلم" أولاً. هل تريد تفعيلها تلقائياً؟')) {
+                        // Activate both
+                        try {
+                            const next = new Set(activeModuleIds);
+                            next.add(ModuleId.TeacherApp);
+                            next.add(ModuleId.TeacherPortal);
+                            const updated = await api.updateSchoolModules(school.id, Array.from(next));
+                            setActiveModuleIds(new Set(updated.map(m => m.moduleId)));
+                            addToast('تم تفعيل تطبيق وبوابة المعلم بنجاح.', 'success');
+                            return;
+                        } catch (e) { addToast('فشل التفعيل.', 'error'); return; }
+                    } else {
+                        return; // Cancelled
+                    }
+                }
+            }
+        }
+        // 2. If disabling a parent module, warn about dependents
+        else {
+            if (module.id === ModuleId.TeacherPortal) {
+                const hasApp = activeModuleIds.has(ModuleId.TeacherApp);
+                if (hasApp) {
+                    if (!confirm('تعطيل "بوابة المعلم" سيؤدي لتعطيل "تطبيق المعلم" أيضاً. هل أنت متأكد؟')) return;
+                    // Disable both
+                     try {
+                        const next = new Set(activeModuleIds);
+                        next.delete(ModuleId.TeacherPortal);
+                        next.delete(ModuleId.TeacherApp);
+                        const updated = await api.updateSchoolModules(school.id, Array.from(next));
+                        setActiveModuleIds(new Set(updated.map(m => m.moduleId)));
+                        addToast('تم تعطيل البوابة والتطبيق.', 'success');
+                        return;
+                    } catch (e) { addToast('فشل التعطيل.', 'error'); return; }
+                }
+            }
+        }
+
         try {
             const next = new Set(activeModuleIds);
             if (enable) next.add(module.id); else next.delete(module.id);

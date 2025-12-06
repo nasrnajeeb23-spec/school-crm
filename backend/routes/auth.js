@@ -139,7 +139,8 @@ router.post('/trial-signup', validate([
 
     let plan = await Plan.findOne({ where: { recommended: true } });
     if (!plan) plan = await Plan.findOne();
-    const renewal = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // 30 Days Trial Period
+    const renewal = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await Subscription.create({ schoolId: school.id, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
 
     const hashed = await bcrypt.hash(adminPassword, 10);

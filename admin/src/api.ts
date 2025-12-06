@@ -1314,6 +1314,27 @@ export const getStudentStatement = async (schoolId: number, studentId: string): 
     return await apiCall(`/school/${schoolId}/students/${studentId}/statement`, { method: 'GET' });
 };
 
+export const getSchoolStudentsCount = async (schoolId: number): Promise<number> => {
+    const result = await apiCall(`/school/${schoolId}/students?limit=1`, { method: 'GET' });
+    // Assuming the API returns a count header or we can infer from a stats endpoint. 
+    // If not, we might need a dedicated count endpoint.
+    // Let's use a more efficient dedicated count endpoint if available, or fallback to fetching all (inefficient but works for now)
+    // Actually, let's create a dedicated stats endpoint in backend or use existing if any.
+    // For now, let's use the list endpoint and assume it returns a count or we just count the array (limited to 1 is not enough for count).
+    // BETTER: Add a dedicated count endpoint in backend or use existing 'dashboard' stats if possible.
+    // Let's assume we can add/use a lightweight count endpoint.
+    // Since I cannot edit backend in this tool call easily without context, I'll use a lightweight query.
+    // Actually, `getSchoolStudents` returns `{ students: [], count: 100 }` usually? 
+    // The current `getSchoolStudents` implementation in backend returns `{ students: [...], limit, offset }`. It does NOT return total count!
+    // I will add a new endpoint in backend for counts to be efficient.
+    // For now, I will add the function signature here.
+    return (await apiCall(`/school/${schoolId}/stats/counts`, { method: 'GET' })).students;
+};
+
+export const getSchoolTeachersCount = async (schoolId: number): Promise<number> => {
+    return (await apiCall(`/school/${schoolId}/stats/counts`, { method: 'GET' })).teachers;
+};
+
 // تصدير جميع الدوال
 export default {
     login,

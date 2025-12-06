@@ -12,14 +12,16 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import StudentDistributionChart from '../components/StudentDistributionChart';
 import { useToast } from '../contexts/ToastContext';
 
+import ResourceUsageWidget from '../components/ResourceUsageWidget';
+
 interface SchoolDashboardProps {
     school: School;
     activeModules?: ModuleId[];
 }
 
 interface DistributionData {
-  name: string;
-  value: number;
+    name: string;
+    value: number;
 }
 
 const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school, activeModules }) => {
@@ -98,6 +100,7 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school, activeModules
 
     return (
         <div className="space-y-8 mt-6">
+            <ResourceUsageWidget schoolId={school.id} />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatsCard 
                     icon={StudentsIcon} 

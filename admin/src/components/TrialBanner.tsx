@@ -28,23 +28,49 @@ export default function TrialBanner() {
   const path = location?.pathname || ''
   const onSchoolPages = path.startsWith('/school')
   const isSchoolAdmin = !!currentUser && String(currentUser.role).toUpperCase() === 'SCHOOL_ADMIN'
-  const trialExpired = !!state?.subscription?.trialExpired
-  if (!onSchoolPages || !isSchoolAdmin || !trialExpired) return null
+  if (!onSchoolPages || !isSchoolAdmin) return null
 
-  return (
-    <div className="mb-4">
-      <div className="rounded-lg border border-amber-300 bg-amber-100 text-amber-900 shadow">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div>
-            <div className="font-bold">انتهت فترة التجربة لهذه المدرسة</div>
-            <div className="text-sm">فعّل اشتراكك واختر الوحدات التي تحتاجها للاستمرار. الوحدات غير المفعّلة ستبقى مقيدة.</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <a href="/school/modules" className="px-3 py-2 rounded bg-amber-600 text-white">إدارة الوحدات</a>
-            <button onClick={() => setVisible(false)} className="px-3 py-2 rounded border border-amber-400 bg-white text-amber-800">إخفاء</button>
+  // 1. Expired State
+  if (state?.subscription?.trialExpired) {
+    return (
+      <div className="mb-4">
+        <div className="rounded-lg border border-red-300 bg-red-100 text-red-900 shadow">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div>
+              <div className="font-bold">انتهت فترة التجربة لهذه المدرسة</div>
+              <div className="text-sm">فعّل اشتراكك الآن لتجنب انقطاع الخدمة.</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <a href="/school/subscription-locked" className="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors">تجديد الاشتراك</a>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  // 2. Countdown State (Less than 5 days remaining)
+  if (state?.subscription?.daysRemaining !== undefined && state.subscription.daysRemaining <= 5 && state.subscription.daysRemaining >= 0) {
+    return (
+      <div className="mb-4">
+        <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 shadow">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div>
+              <div className="font-bold flex items-center gap-2">
+                <span>⚠️</span>
+                <span>تنبيه: متبقي {state.subscription.daysRemaining} أيام على انتهاء الفترة التجريبية</span>
+              </div>
+              <div className="text-sm mt-1">يرجى تجديد الاشتراك واختيار الخطة المناسبة لضمان استمرار عمل النظام دون توقف.</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <a href="/school/subscription-locked" className="px-3 py-2 rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors">تجديد الآن</a>
+              <button onClick={() => setVisible(false)} className="px-3 py-2 rounded border border-amber-300 hover:bg-amber-100 text-amber-800 transition-colors">تذكير لاحقاً</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }

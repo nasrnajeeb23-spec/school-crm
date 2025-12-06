@@ -91,6 +91,12 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
             const [schoolRes, actionsRes, modulesRes, settingsRes] = results;
             if (schoolRes.status === 'fulfilled') {
               setSchool(schoolRes.value);
+            } else if (schoolRes.status === 'rejected') {
+                // Check if rejected due to subscription expired
+                if (schoolRes.reason?.code === 'SUBSCRIPTION_EXPIRED' || schoolRes.reason?.response?.status === 402) {
+                    navigate('/school/subscription-locked');
+                    return;
+                }
             }
             if (actionsRes.status === 'fulfilled') {
               setActionItems(actionsRes.value);
