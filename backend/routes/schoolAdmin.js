@@ -1442,8 +1442,57 @@ router.post('/:schoolId/import/students', verifyToken, requireRole('SCHOOL_ADMIN
     const schoolId = Number(req.params.schoolId);
     const { sourceUrl } = req.body || {};
     const id = req.app.locals.enqueueJob('import_students', { schoolId, sourceUrl }, async ({ schoolId, sourceUrl }) => {
-      try { await AuditLog.create({ userId: req.user.id, schoolId, action: 'import_students_schedule', description: String(sourceUrl || '') }); } catch {}
-      return true;
+      const axios = require('axios');
+      const csv = require('csv-parse/sync');
+      try {
+        // Fetch the CSV file
+        const response = await axios.get(sourceUrl);
+        const records = csv.parse(response.data, {
+          columns: true,
+          skip_empty_lines: true
+        });
+
+        const studentsToCreate = [];
+        for (const record of records) {
+          // Basic validation
+          if (!record.name || !record.grade) continue;
+
+          studentsToCreate.push({
+            id: `std_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            name: record.name,
+            grade: record.grade,
+            parentName: record.parentName || 'N/A',
+            dateOfBirth: record.dateOfBirth || null,
+            schoolId: schoolId,
+            status: 'Active',
+            registrationDate: new Date(),
+            profileImageUrl: `https://picsum.photos/seed/std_${Date.now()}/100/100`
+          });
+        }
+
+        // Bulk create students
+        if (studentsToCreate.length > 0) {
+          await Student.bulkCreate(studentsToCreate);
+          
+          // Update school student count
+          const school = await School.findByPk(schoolId);
+          if (school) {
+            await school.increment('studentCount', { by: studentsToCreate.length });
+          }
+        }
+
+        await AuditLog.create({ 
+          userId: req.user.id, 
+          schoolId, 
+          action: 'import_students_schedule', 
+          description: `Imported ${studentsToCreate.length} students from ${sourceUrl}` 
+        });
+
+        return { importedCount: studentsToCreate.length };
+      } catch (error) {
+        console.error('Import failed:', error);
+        throw new Error(`Import failed: ${error.message}`);
+      }
     });
     res.status(202).json({ jobId: id });
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
@@ -1451,9 +1500,44 @@ router.post('/:schoolId/import/students', verifyToken, requireRole('SCHOOL_ADMIN
 
 router.get('/:schoolId/jobs/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const j = req.app.locals.jobs[req.params.id];
+    // First check in-memory active jobs
+    let j = req.app.locals.jobs ? req.app.locals.jobs[req.params.id] : null;
+    
+    // If not found in memory, check database
+    if (!j) {
+      const { Job } = require('../models');
+      const dbJob = await Job.findByPk(req.params.id);
+      if (dbJob) {
+        j = dbJob.toJSON();
+        // Parse result if it's a string
+        try {
+            if (typeof j.result === 'string') j.result = JSON.parse(j.result);
+        } catch {}
+      }
+    }
+
     if (!j) return res.status(404).json({ msg: 'Not found' });
     res.json(j);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { Job } = require('../models');
+    const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
+    const jobs = await Job.findAll({
+      where: { schoolId: Number(req.params.schoolId) },
+      order: [['createdAt', 'DESC']],
+      limit
+    });
+    
+    res.json(jobs.map(j => {
+        const json = j.toJSON();
+        try {
+            if (typeof json.result === 'string') json.result = JSON.parse(json.result);
+        } catch {}
+        return json;
+    }));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 

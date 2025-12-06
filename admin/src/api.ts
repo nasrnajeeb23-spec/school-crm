@@ -1252,6 +1252,10 @@ export const getJobStatus = async (schoolId: number, jobId: string): Promise<{ i
     return await apiCall(`/school/${schoolId}/jobs/${jobId}`, { method: 'GET' });
 };
 
+export const getJobs = async (schoolId: number): Promise<any[]> => {
+    return await apiCall(`/school/${schoolId}/jobs`, { method: 'GET' });
+};
+
 export const getBehaviorRecords = async (schoolId: number, studentId: string | number): Promise<BehaviorRecord[]> => {
     return await apiCall(`/school/${schoolId}/students/${studentId}/behavior`, { method: 'GET' });
 };
