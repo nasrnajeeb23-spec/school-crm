@@ -94,45 +94,6 @@ class EmailService {
       return false;
     }
   }
-
-  async sendWelcomeEmail(toEmail, adminName, schoolName, password, loginUrl) {
-    if (!toEmail) return false;
-
-    const mailOptions = {
-      from: `"SchoolSaaS Team" <${process.env.SMTP_USER}>`,
-      to: toEmail,
-      subject: `مرحباً بك في SchoolSaaS - بيانات الدخول الخاصة بك`,
-      html: `
-        <div style="font-family: Arial, sans-serif; direction: rtl; text-align: right;">
-          <h2 style="color: #0d9488;">مرحباً بك في عائلة SchoolSaaS! 🚀</h2>
-          <p>عزيزي/تي <strong>${adminName}</strong>،</p>
-          <p>يسعدنا انضمام مدرسة <strong>${schoolName}</strong> إلينا.</p>
-          <p>لقد تم إنشاء حسابك بنجاح، وبدأت فترتك التجريبية المجانية لمدة 30 يوماً.</p>
-          
-          <div style="background-color: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #ccfbf1;">
-            <h3 style="margin-top: 0; color: #115e59;">بيانات الدخول:</h3>
-            <p style="margin: 5px 0;"><strong>رابط المنصة:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
-            <p style="margin: 5px 0;"><strong>اسم المستخدم:</strong> ${toEmail}</p>
-            <p style="margin: 5px 0;"><strong>كلمة المرور:</strong> <span style="background: #fff; padding: 2px 8px; border-radius: 4px; font-family: monospace; border: 1px solid #ddd;">${password}</span></p>
-          </div>
-
-          <p>نصيحة: يرجى تغيير كلمة المرور بعد تسجيل الدخول لأول مرة.</p>
-          
-          <p>إذا احتجت لأي مساعدة، نحن هنا لخدمتك.</p>
-          <p>مع تحيات فريق SchoolSaaS</p>
-        </div>
-      `,
-    };
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-      console.log(`Welcome email sent to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error('Error sending welcome email:', error);
-      return false;
-    }
-  }
 }
 
 module.exports = new EmailService();

@@ -5,7 +5,7 @@ import { UploadIcon } from './icons';
 
 interface PaymentProofModalProps {
   onClose: () => void;
-  onSubmit: (submission: PaymentProofSubmission) => Promise<void>;
+  onSubmit: (submission: Omit<PaymentProofSubmission, 'proofImage'>) => Promise<void>;
   amount: number;
   serviceName: string;
   schoolName: string;
@@ -35,7 +35,6 @@ const PaymentProofModal: React.FC<PaymentProofModalProps> = ({ onClose, onSubmit
             reference,
             relatedService: serviceName,
             schoolName,
-            proofImage: proofImage || undefined,
         });
         setIsSubmitting(false);
     };

@@ -9,8 +9,6 @@ import { EditIcon } from '../components/icons';
 const FeatureManagement: React.FC = () => {
     const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
     const [modules, setModules] = useState<Module[]>([]);
-    const [requests, setRequests] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'pricing' | 'modules' | 'requests'>('modules');
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [editingModule, setEditingModule] = useState<Module | null>(null);
@@ -27,11 +25,9 @@ const FeatureManagement: React.FC = () => {
         Promise.all([
             api.getPricingConfig(),
             api.getAvailableModules(),
-            api.getPendingRequests(),
-        ]).then(([configData, modulesData, requestsData]) => {
+        ]).then(([configData, modulesData]) => {
             setPricingConfig(configData);
             setModules(modulesData);
-            setRequests(requestsData);
         }).catch(err => {
             console.error("Failed to fetch feature management data:", err);
             addToast("فشل تحميل بيانات الوحدات والأسعار.", 'error');
@@ -55,28 +51,6 @@ const FeatureManagement: React.FC = () => {
             addToast('فشل حفظ إعدادات التسعير.', 'error');
         } finally {
             setIsSaving(false);
-        }
-    };
-
-    const handleApproveRequest = async (id: number) => {
-        if (!window.confirm('هل أنت متأكد من الموافقة على هذا الطلب؟')) return;
-        try {
-            await api.approveRequest(id);
-            setRequests(prev => prev.filter(r => r.id !== id));
-            addToast('تمت الموافقة على الطلب.', 'success');
-        } catch {
-            addToast('فشل الموافقة على الطلب.', 'error');
-        }
-    };
-    
-    const handleRejectRequest = async (id: number) => {
-        if (!window.confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
-        try {
-            await api.rejectRequest(id);
-            setRequests(prev => prev.filter(r => r.id !== id));
-            addToast('تم رفض الطلب.', 'success');
-        } catch {
-            addToast('فشل رفض الطلب.', 'error');
         }
     };
 
@@ -121,29 +95,8 @@ const FeatureManagement: React.FC = () => {
 
     return (
         <>
-            <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-                <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
-                    <li className="mr-2">
-                        <button onClick={() => setActiveTab('modules')} className={`inline-block p-4 rounded-t-lg border-b-2 ${activeTab === 'modules' ? 'text-indigo-600 border-indigo-600 dark:text-indigo-500 dark:border-indigo-500' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}>
-                            إدارة الوحدات
-                        </button>
-                    </li>
-                    <li className="mr-2">
-                        <button onClick={() => setActiveTab('pricing')} className={`inline-block p-4 rounded-t-lg border-b-2 ${activeTab === 'pricing' ? 'text-indigo-600 border-indigo-600 dark:text-indigo-500 dark:border-indigo-500' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}>
-                            إعدادات التسعير
-                        </button>
-                    </li>
-                    <li className="mr-2">
-                        <button onClick={() => setActiveTab('requests')} className={`inline-block p-4 rounded-t-lg border-b-2 ${activeTab === 'requests' ? 'text-indigo-600 border-indigo-600 dark:text-indigo-500 dark:border-indigo-500' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}>
-                            طلبات التفعيل ({requests.length})
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
             <div className="space-y-8">
-                {activeTab === 'pricing' && (
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">إعدادات التسعير الأساسية</h3>
                     <div className="flex items-end gap-4">
                         <div className="flex-grow">
@@ -161,10 +114,8 @@ const FeatureManagement: React.FC = () => {
                             {isSaving ? 'جاري الحفظ...' : 'حفظ'}
                         </button>
                     </div>
-                    </div>
-                )}
+                </div>
 
-                {activeTab === 'modules' && (
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-xl font-semibold text-gray-800 dark:text-white">إدارة الوحدات الإضافية</h3>
@@ -266,52 +217,6 @@ const FeatureManagement: React.FC = () => {
                         </table>
                     </div>
                 </div>
-                )}
-
-                {activeTab === 'requests' && (
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">طلبات التفعيل المعلقة</h3>
-                        {requests.length === 0 ? (
-                            <p className="text-gray-500 text-center py-8">لا توجد طلبات معلقة.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
-                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                        <tr>
-                                            <th scope="col" className="px-6 py-3">المدرسة</th>
-                                            <th scope="col" className="px-6 py-3">الوحدة</th>
-                                            <th scope="col" className="px-6 py-3">السعر</th>
-                                            <th scope="col" className="px-6 py-3">طريقة الدفع</th>
-                                            <th scope="col" className="px-6 py-3">المرجع</th>
-                                            <th scope="col" className="px-6 py-3">الإثبات</th>
-                                            <th scope="col" className="px-6 py-3">إجراء</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {requests.map(req => (
-                                            <tr key={req.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                                <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{req.School?.name}</td>
-                                                <td className="px-6 py-4">{req.ModuleCatalog?.name}</td>
-                                                <td className="px-6 py-4 font-semibold">${req.ModuleCatalog?.monthlyPrice}</td>
-                                                <td className="px-6 py-4">{req.paymentMethod || '-'}</td>
-                                                <td className="px-6 py-4">{req.transactionReference || '-'}</td>
-                                                <td className="px-6 py-4">
-                                                    {req.paymentProofUrl ? (
-                                                        <a href={`${api.getApiBase().replace('/api', '')}${req.paymentProofUrl}`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">عرض الصورة</a>
-                                                    ) : '-'}
-                                                </td>
-                                                <td className="px-6 py-4 flex items-center gap-2">
-                                                    <button onClick={() => handleApproveRequest(req.id)} className="px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">قبول</button>
-                                                    <button onClick={() => handleRejectRequest(req.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200">رفض</button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
             </div>
             {editingModule && (
                 <EditModuleModal

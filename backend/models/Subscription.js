@@ -8,7 +8,7 @@ const Subscription = sequelize.define('Subscription', {
     primaryKey: true,
   },
   status: {
-    type: DataTypes.ENUM('ACTIVE', 'TRIAL', 'CANCELED', 'PAST_DUE', 'GRACE_PERIOD', 'SUSPENDED'),
+    type: DataTypes.ENUM('ACTIVE', 'TRIAL', 'CANCELED', 'PAST_DUE'),
     allowNull: false,
     defaultValue: 'TRIAL',
   },

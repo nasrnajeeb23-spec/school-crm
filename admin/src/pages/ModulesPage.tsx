@@ -13,7 +13,6 @@ interface ModulesPageProps {
 const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const [availableModules, setAvailableModules] = useState<Module[]>([]);
     const [activeModuleIds, setActiveModuleIds] = useState<Set<ModuleId>>(new Set());
-    const [moduleStatuses, setModuleStatuses] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
     const [moduleToActivate, setModuleToActivate] = useState<Module | null>(null);
@@ -29,17 +28,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
             api.getPricingConfig()
         ]).then(([available, active, pricing]) => {
             setAvailableModules(available);
-            // active is SchoolModuleSubscription[]
-            const statuses: Record<string, string> = {};
-            const activeIds = new Set<ModuleId>();
-            active.forEach((m: any) => {
-                statuses[m.moduleId] = m.status || 'ACTIVE';
-                if (m.status === 'ACTIVE' || m.status === 'TRIAL') {
-                    activeIds.add(m.moduleId as ModuleId);
-                }
-            });
-            setModuleStatuses(statuses);
-            setActiveModuleIds(activeIds);
+            setActiveModuleIds(new Set(active.map(m => m.moduleId)));
             setPricingConfig(pricing);
         }).catch(err => {
             console.error("Failed to fetch modules data:", err);
@@ -55,21 +44,12 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         setModuleToActivate(module);
     };
 
-    const handlePaymentSubmit = async (submission: PaymentProofSubmission) => {
-        if (!moduleToActivate) return;
+    const handlePaymentSubmit = async (submission: Omit<PaymentProofSubmission, 'proofImage'>) => {
         try {
-            await api.requestModuleActivation(
-                school.id,
-                moduleToActivate.id,
-                submission.method,
-                submission.reference,
-                submission.proofImage
-            );
+            await api.submitPaymentProof(submission);
             addToast('تم إرسال إثبات الدفع بنجاح! سيتم تفعيل الوحدة بعد المراجعة.', 'success');
             setModuleToActivate(null);
-            fetchData();
         } catch (error) {
-            console.error(error);
             addToast('فشل إرسال إثبات الدفع.', 'error');
         }
     };
@@ -151,10 +131,6 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                         <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center justify-center">
                                             <CheckIcon className="w-5 h-5 ml-2" />
                                             مفعلة
-                                        </div>
-                                    ) : moduleStatuses[module.id] === 'PENDING_PAYMENT' ? (
-                                        <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 flex items-center justify-center">
-                                            بانتظار الموافقة
                                         </div>
                                     ) : (
                                         <button
