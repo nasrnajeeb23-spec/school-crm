@@ -498,72 +498,7 @@ app.get('/', (req, res) => {
   });
 });
 
-const uploadLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 100 });
-app.post('/api/messaging/upload', uploadLimiter, verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), async (req, res) => {
-  try {
-    const path = require('path');
-    const fse = require('fs-extra');
-    const multer = require('multer');
-    
-    // File upload configuration with security measures
-    const maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || 10485760; // 10MB default
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.txt', '.mp4', '.mp3'];
-    
-    const storage = multer.diskStorage({
-      destination: function (req, file, cb) {
-        const targetDir = path.join(__dirname, '..', 'uploads', 'chat');
-        fse.ensureDirSync(targetDir);
-        cb(null, targetDir);
-      },
-      filename: function (req, file, cb) {
-        const ext = path.extname(file.originalname).toLowerCase();
-        const safeName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
-        cb(null, safeName);
-      }
-    });
-    
-    const upload = multer({ 
-      storage: storage,
-      limits: { 
-        fileSize: maxFileSize,
-        files: parseInt(process.env.MAX_FILES) || 5
-      },
-      fileFilter: function (req, file, cb) {
-        const ext = path.extname(file.originalname).toLowerCase();
-        if (!allowedExtensions.includes(ext)) {
-          return cb(new Error('File type not allowed'), false);
-        }
-        cb(null, true);
-      }
-    }).single('file');
-    
-    upload(req, res, async function(err){
-      if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ msg: 'File too large' });
-        }
-        return res.status(400).json({ msg: 'Upload error' });
-      } else if (err) {
-        console.error('Upload error:', err);
-        return res.status(400).json({ msg: err.message });
-      }
-      
-      if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
-      
-      const ext = path.extname(req.file.originalname).toLowerCase();
-      const url = `/uploads/chat/${req.file.filename}`;
-      return res.json({ 
-        url, 
-        name: req.file.originalname, 
-        type: ext,
-        size: req.file.size
-      });
-    });
-  } catch (e) { 
-    console.error('Upload exception:', e);
-    res.status(500).json({ msg: 'Server error during upload' }); 
-  }
-});
+
 
 // Global error handler
 app.use((err, req, res, next) => {
