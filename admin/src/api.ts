@@ -1027,6 +1027,14 @@ export const deleteUser = async (userId: number | string): Promise<void> => {
 
 // ==================== Missing API Functions ====================
 
+export const getPlans = async (): Promise<Plan[]> => {
+    return await apiCall('/plans', { method: 'GET' });
+};
+
+export const updatePlan = async (id: string, data: Partial<Plan>): Promise<Plan> => {
+    return await apiCall(`/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
 export const getAvailableModules = async (): Promise<Module[]> => {
     return await apiCall('/modules', { method: 'GET' });
 };
@@ -1374,6 +1382,7 @@ export default {
     getRevenueData,
     getSubscriptions,
     getPlans,
+    updatePlan,
     getAvailableModules,
     generateSelfHostedPackage,
     submitAdRequest,
