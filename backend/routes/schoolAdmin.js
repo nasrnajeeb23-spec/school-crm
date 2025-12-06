@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord } = require('../models');
+const { School, Student, Teacher, Class, Parent, Invoice, Expense, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
@@ -540,9 +540,38 @@ router.put('/:schoolId/payroll/salary-slips/:id/approve', verifyToken, requireRo
   try {
     const row = await SalarySlip.findOne({ where: { id: req.params.id, schoolId: req.params.schoolId } });
     if (!row) return res.status(404).json({ msg: 'Not Found' });
+
+    if (row.status === 'Approved' || row.status === 'Paid') {
+        return res.status(400).json({ msg: 'Salary slip already approved' });
+    }
+
     row.status = 'Approved';
     row.approvedBy = req.user?.id || null;
     await row.save();
+
+    // Auto-create Expense Record
+    try {
+        let personName = row.personId;
+        if (row.personType === 'teacher') {
+            const t = await Teacher.findByPk(row.personId);
+            if (t) personName = t.name;
+        } else if (row.personType === 'staff') {
+            const s = await User.findByPk(row.personId);
+            if (s) personName = s.name;
+        }
+
+        await Expense.create({
+            schoolId: row.schoolId,
+            date: new Date(),
+            description: `Salary Payment - ${row.month} - ${personName}`,
+            category: 'Salaries',
+            amount: row.netAmount
+        });
+    } catch (expErr) {
+        console.error('Failed to create expense for salary slip:', expErr);
+        // Don't fail the approval if expense creation fails, but log it
+    }
+
     res.json(row.toJSON());
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
@@ -1333,6 +1362,7 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         dueDate: inv.dueDate.toISOString().split('T')[0],
         items: [{ description: `رسوم دراسية`, amount: parseFloat(inv.amount) }],
         totalAmount: parseFloat(inv.amount),
+        taxAmount: parseFloat(inv.taxAmount || 0),
         paidAmount: parseFloat(inv.paidAmount || 0),
         remainingAmount: parseFloat(inv.amount) - parseFloat(inv.paidAmount || 0)
     })));
@@ -1352,9 +1382,40 @@ router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     if (!studentId || !dueDate || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ msg: 'Invalid invoice data' });
     }
-    const totalAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const inv = await Invoice.create({ studentId, amount: totalAmount, dueDate: new Date(dueDate), status: 'UNPAID' });
-    res.status(201).json({ id: inv.id.toString(), studentId, studentName: '', status: 'غير مدفوعة', issueDate: inv.createdAt.toISOString().split('T')[0], dueDate, items, totalAmount });
+    const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
+    const taxRate = Number(settings?.taxRate || 0);
+    const discount = Number(req.body.discount || 0);
+    
+    const subTotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    // Calculate taxable amount after discount (if discount is applied before tax)
+    // Assuming discount is a fixed amount for now based on simple invoice structure
+    const taxableAmount = Math.max(0, subTotal - discount);
+    const taxAmount = taxableAmount * (taxRate / 100);
+    const totalAmount = taxableAmount + taxAmount;
+    
+    const inv = await Invoice.create({ 
+        studentId, 
+        amount: totalAmount, 
+        discount: discount,
+        taxAmount: taxAmount,
+        dueDate: new Date(dueDate), 
+        status: 'UNPAID',
+        items: items 
+    });
+    
+    res.status(201).json({ 
+        id: inv.id.toString(), 
+        studentId, 
+        studentName: '', 
+        status: 'غير مدفوعة', 
+        issueDate: inv.createdAt.toISOString().split('T')[0], 
+        dueDate, 
+        items, 
+        subTotal,
+        discount,
+        taxAmount,
+        totalAmount 
+    });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -1497,6 +1558,67 @@ router.post('/:schoolId/invoices/:invoiceId/remind', verifyToken, requireRole('S
     } else {
         res.status(200).json({ msg: 'Internal notification sent (Email failed or not provided)' });
     }
+
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// @route   GET api/school/:schoolId/finance/reports/pnl
+// @desc    Get Profit & Loss Report
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/finance/reports/pnl', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
+  try {
+    const { Expense, Payment, Invoice, Student } = require('../models');
+    const { Op } = require('sequelize');
+    const schoolId = Number(req.params.schoolId);
+    
+    // Date Range (Expect YYYY-MM-DD)
+    const startStr = req.query.startDate || `${new Date().getFullYear()}-01-01`;
+    const endStr = req.query.endDate || new Date().toISOString().split('T')[0];
+
+    // 1. Calculate Revenue (Payments)
+    // We need payments for invoices belonging to students of this school
+    const payments = await Payment.findAll({
+                where: {
+                    date: { [Op.between]: [startStr, endStr] }
+                },
+                include: [{
+            model: Invoice,
+            required: true,
+            include: [{
+                model: Student,
+                required: true,
+                where: { schoolId }
+            }]
+        }]
+    });
+    
+    const revenue = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    // 2. Calculate Expenses
+    const expenses = await Expense.findAll({
+        where: {
+            schoolId,
+            date: { [Op.between]: [startStr, endStr] }
+        }
+    });
+    
+    const expenseTotal = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    
+    // Group expenses by category
+    const expenseByCategory = {};
+    expenses.forEach(e => {
+        const cat = e.category || 'Uncategorized';
+        expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Number(e.amount || 0);
+    });
+
+    res.json({
+        startDate: startStr,
+        endDate: endStr,
+        revenue,
+        expenses: expenseTotal,
+        netProfit: revenue - expenseTotal,
+        expenseBreakdown: expenseByCategory
+    });
 
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
@@ -2409,6 +2531,8 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
     }
     const feeRows = await FeeSetup.findAll({ where: { schoolId } });
     const feeByStage = new Map(feeRows.map(f => [f.stage, f]));
+    const taxRate = Number(settings?.taxRate || 0);
+
     const created = [];
     for (const s of targetStudents) {
       let g = s.grade;
@@ -2430,10 +2554,41 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
       if (include.books !== false && Number(fee.bookFees || 0) > 0) items.push({ description: 'رسوم الكتب', amount: Number(fee.bookFees || 0) });
       if (include.uniform !== false && Number(fee.uniformFees || 0) > 0) items.push({ description: 'رسوم الزي', amount: Number(fee.uniformFees || 0) });
       if (include.activities !== false && Number(fee.activityFees || 0) > 0) items.push({ description: 'رسوم الأنشطة', amount: Number(fee.activityFees || 0) });
-      const totalAmount = items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
-      if (totalAmount <= 0) continue;
-      const inv = await Invoice.create({ studentId: s.id, amount: totalAmount, dueDate: new Date(dueDate), status: 'UNPAID' });
-      created.push({ id: inv.id.toString(), studentId: s.id, studentName: s.name || '', status: 'غير مدفوعة', issueDate: inv.createdAt.toISOString().split('T')[0], dueDate, items, totalAmount });
+      
+      const subTotal = items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
+      if (subTotal <= 0) continue;
+
+      // Logic for bulk invoice discount is already handled via 'percent' reduction on tuition fee
+      // But we should store the 'discount amount' explicitly if we want to track it.
+      // Current logic: tuitionAfter = tuitionBase * (1 - maxPct/100).
+      // Discount Amount = tuitionBase * (maxPct/100).
+      const discountAmount = (tuitionBase * (maxPct / 100)) || 0;
+
+      const taxAmount = subTotal * (taxRate / 100);
+      const totalAmount = subTotal + taxAmount;
+
+      const inv = await Invoice.create({ 
+          studentId: s.id, 
+          amount: totalAmount,
+          discount: discountAmount,
+          taxAmount: taxAmount,
+          dueDate: new Date(dueDate), 
+          status: 'UNPAID',
+          items: items 
+      });
+
+      created.push({ 
+          id: inv.id.toString(), 
+          studentId: s.id, 
+          studentName: s.name || '', 
+          status: 'غير مدفوعة', 
+          issueDate: inv.createdAt.toISOString().split('T')[0], 
+          dueDate, 
+          items, 
+          subTotal,
+          taxAmount,
+          totalAmount 
+      });
     }
     res.status(201).json({ createdCount: created.length, invoices: created });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }

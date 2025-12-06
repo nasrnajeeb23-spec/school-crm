@@ -63,6 +63,15 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.DATEONLY,
     allowNull: false,
   },
+  taxRate: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: false,
+    defaultValue: 0.00
+  },
+  taxNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   notifications: {
     type: DataTypes.JSON, // { email: bool, sms: bool, push: bool }
     allowNull: false,

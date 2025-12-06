@@ -11,6 +11,11 @@ const Invoice = sequelize.define('Invoice', {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
+  discount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0.00,
+  },
   paidAmount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
@@ -24,6 +29,17 @@ const Invoice = sequelize.define('Invoice', {
     type: DataTypes.ENUM('PAID', 'UNPAID', 'PARTIALLY_PAID', 'OVERDUE'),
     allowNull: false,
     defaultValue: 'UNPAID',
+  },
+  items: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+    comment: 'Details of invoice items (tuition, books, etc.)'
+  },
+  taxAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0.00,
   },
   // Foreign keys are added via associations
   // studentId

@@ -20,6 +20,11 @@ const Payment = sequelize.define('Payment', {
     allowNull: false,
     defaultValue: DataTypes.NOW,
   },
+  // Mapped to handle legacy schema requirement
+  paymentDate: {
+    type: DataTypes.DATE,
+    allowNull: true, // We handle this in hook, but DB has NOT NULL
+  },
   method: {
     type: DataTypes.STRING, // Cash, Bank Transfer, Credit Card, etc.
     allowNull: false,
@@ -43,7 +48,23 @@ const Payment = sequelize.define('Payment', {
     { fields: ['invoiceId'] },
     { fields: ['date'] },
     { fields: ['method'] }
-  ]
+  ],
+  hooks: {
+    beforeValidate: (payment) => {
+      // Ensure both date columns are populated to satisfy DB constraints
+      if (payment.date && !payment.paymentDate) {
+        payment.paymentDate = payment.date;
+      }
+      if (!payment.date && payment.paymentDate) {
+        payment.date = payment.paymentDate;
+      }
+      // Fallback if neither is set (though defaultValue covers date)
+      if (!payment.date && !payment.paymentDate) {
+        payment.date = new Date();
+        payment.paymentDate = new Date();
+      }
+    }
+  }
 });
 
 module.exports = Payment;
