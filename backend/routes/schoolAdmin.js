@@ -1500,12 +1500,19 @@ router.post('/:schoolId/import/students', verifyToken, requireRole('SCHOOL_ADMIN
 
 router.get('/:schoolId/jobs/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
+    // Import Job model explicitly
+    const { Job } = require('../models');
+
     // First check in-memory active jobs
     let j = req.app.locals.jobs ? req.app.locals.jobs[req.params.id] : null;
     
     // If not found in memory, check database
     if (!j) {
-      const { Job } = require('../models');
+      if (!Job) {
+        console.error('Job model is missing!');
+        return res.status(500).json({ msg: 'Internal Server Error: Job model not loaded' });
+      }
+      
       const dbJob = await Job.findByPk(req.params.id);
       if (dbJob) {
         j = dbJob.toJSON();
@@ -1518,12 +1525,12 @@ router.get('/:schoolId/jobs/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 
     if (!j) return res.status(404).json({ msg: 'Not found' });
     res.json(j);
-  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+  } catch (e) { console.error('Error in getJobById:', e); res.status(500).send('Server Error'); }
 });
 
 router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    // Import Job model directly from the models file to ensure it is loaded
+    // Import Job model explicitly
     const { Job } = require('../models');
     
     // Ensure schoolId is a number
@@ -1552,7 +1559,10 @@ router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
       console.error('Database error when fetching jobs:', dbError);
       // Check if the error is due to table missing (migration issue)
       if (dbError.name === 'SequelizeDatabaseError' && dbError.message.includes('no such table')) {
-         return res.status(500).send('Server Error: Jobs table missing. Please run migrations.');
+         // If table is missing, return empty list instead of error to prevent UI crash
+         // This is a temporary fix until migration is run
+         console.warn('Jobs table missing, returning empty list');
+         return res.json([]);
       }
       return res.status(500).send('Server Error: Database query failed');
     }
