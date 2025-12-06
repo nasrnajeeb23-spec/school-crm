@@ -161,6 +161,7 @@ const FeatureManagement: React.FC = () => {
                             {isSaving ? 'جاري الحفظ...' : 'حفظ'}
                         </button>
                     </div>
+                    </div>
                 )}
 
                 {activeTab === 'modules' && (
