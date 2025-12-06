@@ -1524,9 +1524,22 @@ router.get('/:schoolId/jobs/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const { Job } = require('../models');
+    // Ensure schoolId is a number
+    const schoolId = parseInt(req.params.schoolId, 10);
+    if (isNaN(schoolId)) {
+      return res.status(400).json({ msg: 'Invalid school ID' });
+    }
+
     const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
+    
+    // Check if Job model is properly loaded
+    if (!Job) {
+      console.error('Job model not loaded');
+      return res.status(500).send('Server Error: Model not loaded');
+    }
+
     const jobs = await Job.findAll({
-      where: { schoolId: Number(req.params.schoolId) },
+      where: { schoolId: schoolId },
       order: [['createdAt', 'DESC']],
       limit
     });
@@ -1538,7 +1551,10 @@ router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
         } catch {}
         return json;
     }));
-  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+  } catch (e) { 
+    console.error('Error in getJobs:', e); 
+    res.status(500).send('Server Error'); 
+  }
 });
 
 router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
