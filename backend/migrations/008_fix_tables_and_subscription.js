@@ -1,8 +1,8 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = {
-  up: async ({ context: queryInterface }) => {
-    const transaction = await queryInterface.sequelize.transaction();
+  up: async ({ queryInterface, sequelize }) => {
+    const transaction = await sequelize.transaction();
     try {
       // 1. Create SchoolStats table if not exists
       const tables = await queryInterface.showAllTables();
@@ -89,7 +89,7 @@ module.exports = {
 
       // 3. Fix Subscription Expiry (Extend by 1 year)
       // We execute raw SQL to be safe across environments
-      await queryInterface.sequelize.query(
+      await sequelize.query(
         `UPDATE "Subscriptions" SET "endDate" = :futureDate, "status" = 'ACTIVE' WHERE "endDate" < :now OR "status" != 'ACTIVE'`,
         {
           replacements: { 
@@ -105,14 +105,14 @@ module.exports = {
       const modulesTable = tables.find(t => t.toLowerCase() === 'modulecatalog' || t.toLowerCase() === 'module_catalog');
       if (modulesTable) {
          // Check if finance exists
-         const [results] = await queryInterface.sequelize.query(`SELECT * FROM "${modulesTable}" WHERE id = 'finance'`, { transaction });
+         const [results] = await sequelize.query(`SELECT * FROM "${modulesTable}" WHERE id = 'finance'`, { transaction });
          if (results.length > 0) {
-             await queryInterface.sequelize.query(
+             await sequelize.query(
                  `UPDATE "${modulesTable}" SET "isCore" = true, "monthlyPrice" = 0, "oneTimePrice" = 0 WHERE id = 'finance'`,
                  { transaction }
              );
          } else {
-             await queryInterface.sequelize.query(
+             await sequelize.query(
                  `INSERT INTO "${modulesTable}" (id, name, description, "monthlyPrice", "oneTimePrice", currency, "isEnabled", "isCore", "createdAt", "updatedAt") VALUES ('finance', 'المالية', 'فواتير، مدفوعات، تقارير مالية.', 0, 0, 'SAR', true, true, NOW(), NOW())`,
                  { transaction }
              );
@@ -127,7 +127,7 @@ module.exports = {
     }
   },
 
-  down: async ({ context: queryInterface }) => {
+  down: async ({ queryInterface, sequelize }) => {
     // We generally don't want to revert these fixes automatically as they preserve data integrity
   }
 };

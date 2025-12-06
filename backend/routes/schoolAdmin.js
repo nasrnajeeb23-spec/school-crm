@@ -122,14 +122,61 @@ router.get('/:schoolId/stats/counts', verifyToken, requireRole('SCHOOL_ADMIN', '
   }
 });
 
+// @route   GET api/school/:schoolId/subscription
+// @desc    Get school subscription plan details
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/subscription', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+    try {
+      const schoolId = Number(req.params.schoolId);
+      const { Subscription, Plan } = require('../models');
+      const subscription = await Subscription.findOne({ 
+        where: { schoolId }, 
+        include: [Plan] 
+      });
+      
+      if (!subscription) {
+          return res.status(404).json({ msg: 'No subscription found' });
+      }
+
+      // Calculate days remaining
+      const now = new Date();
+      const end = new Date(subscription.endDate);
+      const diffTime = Math.abs(end - now);
+      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      const isExpired = end < now;
+
+      res.json({
+        planName: subscription.Plan?.name || 'Unknown',
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        status: isExpired ? 'EXPIRED' : subscription.status,
+        daysRemaining: isExpired ? 0 : daysRemaining,
+        limits: subscription.Plan?.limits || {},
+        price: subscription.Plan?.price || 0,
+        interval: subscription.Plan?.interval || 'monthly'
+      });
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
+});
+
 // @route   GET api/school/:schoolId/stats/dashboard
 // @desc    Get comprehensive dashboard stats (uses aggregation if available)
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
     try {
         const schoolId = Number(req.params.schoolId);
-        const { SchoolStats } = require('../models');
+        const { SchoolStats, Subscription, Plan } = require('../models');
         
+        // Fetch Subscription info
+        const subscription = await Subscription.findOne({ 
+            where: { schoolId },
+            include: [Plan]
+        });
+        const planName = subscription?.Plan?.name || 'Basic';
+        const subscriptionStatus = subscription?.status || 'Inactive';
+
         // Check for cached/aggregated stats for today
         const today = new Date().toISOString().split('T')[0];
         let stats = null;
@@ -144,7 +191,9 @@ router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN'
                 attendanceRate: stats.attendanceRate,
                 revenue: stats.totalRevenue,
                 expenses: stats.totalExpenses,
-                source: 'aggregated'
+                source: 'aggregated',
+                planName,
+                subscriptionStatus
             });
         }
 
@@ -152,7 +201,7 @@ router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN'
         const [students, attendanceCount, revenue, expenses] = await Promise.all([
             Student.count({ where: { schoolId } }),
             Attendance.count({ where: { schoolId, date: today, status: 'Present' } }),
-            Invoice.sum('amount', { where: { schoolId, status: 'PAID' } }), // Simplified: total paid revenue all time? Or today? usually dashboard shows total or monthly. Let's assume total for now to match typical "Revenue" widget
+            Invoice.sum('amount', { where: { schoolId, status: 'PAID' } }), 
             Expense.sum('amount', { where: { schoolId } })
         ]);
 
@@ -163,7 +212,9 @@ router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN'
             attendanceRate,
             revenue: revenue || 0,
             expenses: expenses || 0,
-            source: 'realtime'
+            source: 'realtime',
+            planName,
+            subscriptionStatus
         });
 
     } catch (err) {
@@ -178,7 +229,13 @@ router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN'
 // @access  Private (SchoolAdmin, SuperAdmin)
 router.get('/schools/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
-    const school = await School.findByPk(req.params.id);
+    const { Subscription, Plan } = require('../models');
+    const school = await School.findByPk(req.params.id, {
+        include: [{
+            model: Subscription,
+            include: [Plan]
+        }]
+    });
     if (!school) return res.status(404).json({ msg: 'School not found' });
     res.json(school);
   } catch (err) {
