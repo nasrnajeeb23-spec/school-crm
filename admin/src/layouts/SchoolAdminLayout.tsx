@@ -23,7 +23,9 @@ const Attendance = React.lazy(() => import('../pages/Attendance'));
 const Grades = React.lazy(() => import('../pages/Grades'));
 const Schedule = React.lazy(() => import('../pages/Schedule'));
 const Messaging = React.lazy(() => import('../pages/Messaging'));
-const Finance = React.lazy(() => import('../pages/Finance'));
+const FinanceFees = React.lazy(() => import('../pages/finance/FinanceFees'));
+const FinancePayroll = React.lazy(() => import('../pages/finance/FinancePayroll'));
+const FinanceExpenses = React.lazy(() => import('../pages/finance/FinanceExpenses'));
 const Reports = React.lazy(() => import('../pages/Reports'));
 const ParentsList = React.lazy(() => import('../pages/ParentsList'));
 const Settings = React.lazy(() => import('../pages/Settings'));
@@ -196,7 +198,10 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="calendar" element={<ProtectedPage permission={Permission.MANAGE_CALENDAR}><Calendar schoolId={school.id} /></ProtectedPage>} />
                     <Route path="grades" element={<ProtectedPage permission={Permission.MANAGE_GRADES}><Grades schoolId={school.id} /></ProtectedPage>} />
                     <Route path="messaging" element={<ProtectedPage permission={Permission.MANAGE_MESSAGING}><Messaging /></ProtectedPage>} />
-                    <Route path="finance" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><Finance schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
+                    <Route path="finance/invoices" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><FinanceFees schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
+                    <Route path="finance/payroll" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><FinancePayroll schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
+                    <Route path="finance/expenses" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><FinanceExpenses schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
+                    <Route path="finance" element={<Navigate to="finance/invoices" replace />} />
                     <Route path="reports" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><Reports schoolSettings={settings} /></ProtectedPage>} />
                     <Route path="parent_requests" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><SchoolParentRequests schoolId={school.id} /></ProtectedPage>} />
                     <Route path="jobs" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><BackgroundJobs schoolId={school.id} /></ProtectedPage>} />

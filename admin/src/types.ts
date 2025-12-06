@@ -81,7 +81,9 @@ export enum Permission {
 export enum ModuleId {
     StudentManagement = 'student_management',
     AcademicManagement = 'academic_management',
-    Finance = 'finance',
+    FinanceFees = 'finance_fees',
+    FinanceSalaries = 'finance_salaries',
+    FinanceExpenses = 'finance_expenses',
     Transportation = 'transportation',
     AdvancedReports = 'advanced_reports',
     ParentPortal = 'parent_portal',

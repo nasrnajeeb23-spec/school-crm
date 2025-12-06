@@ -453,7 +453,9 @@ const modulesCatalog = [
   { id: 'parent_portal', name: 'بوابة ولي الأمر', description: 'وصول أولياء الأمور لمتابعة الحضور والدرجات والرسائل.', monthlyPrice: 0, isEnabled: true, isCore: true },
   { id: 'teacher_portal', name: 'بوابة المعلم', description: 'واجهة ويب للمعلم لإدارة الجدول والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
   { id: 'teacher_app', name: 'تطبيق المعلم', description: 'تطبيق الجوال للمعلم مع إشعارات فورية.', monthlyPrice: 0, isEnabled: true, isCore: true },
-  { id: 'finance', name: 'المالية', description: 'فواتير ورسوم وتقارير مالية متقدمة.', monthlyPrice: 49, oneTimePrice: 0, isEnabled: true, isCore: false },
+  { id: 'finance_fees', name: 'الرسوم الدراسية', description: 'إدارة الفواتير والرسوم الدراسية والمدفوعات.', monthlyPrice: 29, oneTimePrice: 0, isEnabled: true, isCore: false },
+  { id: 'finance_salaries', name: 'الرواتب وشؤون الموظفين', description: 'إدارة مسيرات الرواتب وهياكل الأجور والحضور.', monthlyPrice: 29, oneTimePrice: 0, isEnabled: true, isCore: false },
+  { id: 'finance_expenses', name: 'المصروفات', description: 'تتبع المصروفات والمشتريات.', monthlyPrice: 19, oneTimePrice: 0, isEnabled: true, isCore: false },
   { id: 'transportation', name: 'النقل المدرسي', description: 'إدارة الحافلات والمسارات والطلاب المنقولين.', monthlyPrice: 29, oneTimePrice: 0, isEnabled: true, isCore: false },
   { id: 'advanced_reports', name: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات مخصصة.', monthlyPrice: 39, oneTimePrice: 0, isEnabled: true, isCore: false },
 ];
@@ -755,6 +757,19 @@ syncDatabase()
       const catalog = Array.isArray(app.locals.modulesCatalog) ? app.locals.modulesCatalog : [];
       const allIds = catalog.map(m => m.id);
       for (const s of settingsRows) {
+        // Migration: Replace legacy 'finance' with new granular modules
+        let modules = Array.isArray(s.activeModules) ? [...s.activeModules] : [];
+        if (modules.includes('finance')) {
+           modules = modules.filter(m => m !== 'finance');
+           if (!modules.includes('finance_fees')) modules.push('finance_fees');
+           if (!modules.includes('finance_salaries')) modules.push('finance_salaries');
+           if (!modules.includes('finance_expenses')) modules.push('finance_expenses');
+           s.activeModules = modules;
+           await s.save();
+           updatedCount++;
+           continue; // Skip trial check if we just migrated
+        }
+
         const sub = await Subscription.findOne({ where: { schoolId: s.schoolId } });
         if (!sub || String(sub.status).toUpperCase() !== 'TRIAL') continue;
         const now = new Date();
@@ -766,9 +781,9 @@ syncDatabase()
         const changed = JSON.stringify(active) !== JSON.stringify(next);
         if (changed) { s.activeModules = next; await s.save(); updatedCount++; }
       }
-      console.log('Trial module sync complete. Updated schools:', updatedCount);
+      console.log('Module sync/migration complete. Updated schools:', updatedCount);
     } catch (e) {
-      console.warn('Trial module sync failed:', e?.message || e);
+      console.warn('Module sync failed:', e?.message || e);
     }
     io.on('connection', (socket) => {
       try {

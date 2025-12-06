@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { DashboardIcon, StudentsIcon, UsersIcon, ClassesIcon, FinanceIcon, ReportsIcon, AttendanceIcon, GradesIcon, ScheduleIcon, MessagingIcon, ParentsIcon, SettingsIcon, EventIcon, LogoutIcon, ProfileIcon, BusIcon, ModuleIcon } from './icons';
+import { DashboardIcon, StudentsIcon, UsersIcon, ClassesIcon, FinanceIcon, ReportsIcon, AttendanceIcon, GradesIcon, ScheduleIcon, MessagingIcon, ParentsIcon, SettingsIcon, EventIcon, LogoutIcon, ProfileIcon, BusIcon, ModuleIcon, NetProfitIcon } from './icons';
 import { Permission, ModuleId } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -33,7 +33,9 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
     { id: 'calendar', label: 'التقويم والأحداث', icon: EventIcon, requiredPermission: Permission.MANAGE_CALENDAR, path: `${basePath}/calendar` },
     { id: 'grades', label: 'الدرجات', icon: GradesIcon, requiredPermission: Permission.MANAGE_GRADES, path: `${basePath}/grades` },
     { id: 'messaging', label: 'الرسائل', icon: MessagingIcon, requiredPermission: Permission.MANAGE_MESSAGING, path: `${basePath}/messaging` },
-    { id: 'finance', label: 'المالية', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, path: `${basePath}/finance` },
+    { id: 'finance_fees', label: 'الرسوم الدراسية', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, requiredModule: ModuleId.FinanceFees, path: `${basePath}/finance/invoices` },
+    { id: 'finance_payroll', label: 'الرواتب', icon: NetProfitIcon, requiredPermission: Permission.MANAGE_FINANCE, requiredModule: ModuleId.FinanceSalaries, path: `${basePath}/finance/payroll` },
+    { id: 'finance_expenses', label: 'المصروفات', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, requiredModule: ModuleId.FinanceExpenses, path: `${basePath}/finance/expenses` },
     { id: 'reports', label: 'التقارير', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/reports` },
     { id: 'parent_requests', label: 'طلبات أولياء الأمور', icon: ParentsIcon, requiredPermission: Permission.MANAGE_PARENTS, path: `${basePath}/parent_requests` },
     { id: 'jobs', label: 'مهام الخلفية', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/jobs` },

@@ -304,13 +304,13 @@ router.get('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 });
 
 // Salary Structures CRUD
-router.get('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const rows = await SalaryStructure.findAll({ where: { schoolId: req.params.schoolId }, order: [['createdAt','DESC']] });
     res.json(rows.map(r => r.toJSON()));
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
-router.post('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), validate([
+router.post('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), validate([
   { name: 'name', required: true, type: 'string', minLength: 2 },
   { name: 'type', required: true, type: 'string' },
   { name: 'baseAmount', required: false, type: 'string' },
@@ -322,7 +322,7 @@ router.post('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADM
     res.status(201).json(row.toJSON());
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
-router.put('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.put('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const row = await SalaryStructure.findOne({ where: { id: req.params.id, schoolId: req.params.schoolId } });
     if (!row) return res.status(404).json({ msg: 'Not Found' });
@@ -343,7 +343,7 @@ router.put('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHOOL_
     res.json(row.toJSON());
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
-router.delete('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.delete('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const count = await SalaryStructure.destroy({ where: { id: req.params.id, schoolId: req.params.schoolId } });
     res.json({ deleted: count > 0 });
@@ -351,7 +351,7 @@ router.delete('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHO
 });
 
 // Assign salary structure to staff
-router.put('/:schoolId/staff/:userId/salary-structure', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.put('/:schoolId/staff/:userId/salary-structure', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const staff = await User.findOne({ where: { id: req.params.userId, schoolId: req.params.schoolId, role: 'SchoolAdmin' } });
     if (!staff) return res.status(404).json({ msg: 'Staff not found' });
@@ -366,7 +366,7 @@ router.put('/:schoolId/staff/:userId/salary-structure', verifyToken, requireRole
 });
 
 // Assign salary structure to teacher
-router.put('/:schoolId/teachers/:teacherId/salary-structure', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.put('/:schoolId/teachers/:teacherId/salary-structure', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ where: { id: Number(req.params.teacherId), schoolId: Number(req.params.schoolId) } });
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
@@ -508,7 +508,7 @@ router.post('/:schoolId/teacher-attendance', verifyToken, requireRole('SCHOOL_AD
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
-router.get('/:schoolId/payroll/salary-slips', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/payroll/salary-slips', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const month = String(req.query.month || '').trim();
     const where = { schoolId: req.params.schoolId };
@@ -518,7 +518,7 @@ router.get('/:schoolId/payroll/salary-slips', verifyToken, requireRole('SCHOOL_A
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
-router.put('/:schoolId/payroll/salary-slips/:id/approve', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.put('/:schoolId/payroll/salary-slips/:id/approve', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const row = await SalarySlip.findOne({ where: { id: req.params.id, schoolId: req.params.schoolId } });
     if (!row) return res.status(404).json({ msg: 'Not Found' });
@@ -530,7 +530,7 @@ router.put('/:schoolId/payroll/salary-slips/:id/approve', verifyToken, requireRo
 });
 
 // Manual receipt (سند استلام)
-router.post('/:schoolId/payroll/salary-slips/:id/receipt', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), upload.single('attachment'), async (req, res) => {
+router.post('/:schoolId/payroll/salary-slips/:id/receipt', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), upload.single('attachment'), async (req, res) => {
   try {
     const row = await SalarySlip.findOne({ where: { id: req.params.id, schoolId: req.params.schoolId } });
     if (!row) return res.status(404).json({ msg: 'Not Found' });
@@ -550,7 +550,7 @@ router.post('/:schoolId/payroll/salary-slips/:id/receipt', verifyToken, requireR
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
-router.get('/:schoolId/payroll/receipts/:filename', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/payroll/receipts/:filename', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const filename = path.basename(req.params.filename);
     const filePath = path.join(__dirname, '..', 'storage', 'payroll-receipts', String(req.params.schoolId), filename);
@@ -1226,7 +1226,7 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 // @route   GET api/school/:schoolId/invoices
 // @desc    Get all invoices for a specific school
 // @access  Private (SchoolAdmin)
-router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
+router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance_fees'), async (req, res) => {
   try {
     const invoices = await Invoice.findAll({
         include: {
@@ -1847,7 +1847,7 @@ router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
   }
 });
 
-router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_expenses'), async (req, res) => {
   try {
     const { Expense } = require('../models');
     const rows = await Expense.findAll({ where: { schoolId: Number(req.params.schoolId) }, order: [['date','DESC']] });
@@ -1855,7 +1855,7 @@ router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_expenses'), async (req, res) => {
   try {
     const { Expense } = require('../models');
     const { date, description, category, amount } = req.body || {};
