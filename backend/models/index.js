@@ -36,6 +36,7 @@ const Job = require('./Job');
 const ApiKey = require('./ApiKey');
 const TrialRequest = require('./TrialRequest');
 const BehaviorRecord = require('./BehaviorRecord');
+const SchoolStats = require('./SchoolStats');
 
 
 // Define associations
@@ -218,9 +219,15 @@ const db = {
   ModuleCatalog,
   PricingConfig,
   BehaviorRecord,
+  SchoolStats,
 };
 
 module.exports = db;
+
+// School <-> SchoolStats (One-to-Many)
+School.hasMany(SchoolStats, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+SchoolStats.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
 // School <-> SalaryStructure (One-to-Many)
 School.hasMany(SalaryStructure, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 SalaryStructure.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });

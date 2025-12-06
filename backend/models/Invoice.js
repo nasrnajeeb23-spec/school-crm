@@ -32,7 +32,9 @@ const Invoice = sequelize.define('Invoice', {
     { fields: ['studentId'] },
     { fields: ['status'] },
     { fields: ['dueDate'] },
-    { fields: ['studentId','dueDate'] }
+    { fields: ['studentId','dueDate'] },
+    { fields: ['schoolId'] },
+    { fields: ['schoolId', 'status'] }
   ]
 });
 

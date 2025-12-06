@@ -139,7 +139,14 @@ function requirePermission(...requiredPerms) {
 
     const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
     const ok = requiredPerms.some(p => perms.includes(p));
-    if (!ok) { try { const logger = req.app && req.app.locals && req.app.locals.logger; if (logger) logger.warn('access_denied_permission', { userId: req.user.id, role: req.user.role, requiredPerms, path: req.originalUrl || req.url }); } catch {} return res.status(403).json({ msg: 'Insufficient permissions' }); }
+    if (!ok) { 
+      try { 
+        const logger = req.app && req.app.locals && req.app.locals.logger; 
+        if (logger) logger.warn('access_denied_permission', { userId: req.user.id, role: req.user.role, requiredPerms, path: req.originalUrl || req.url }); 
+      } catch {} 
+      // Return clear error message about missing permissions
+      return res.status(403).json({ msg: 'Insufficient permissions', requiredPermissions: requiredPerms, userPermissions: perms }); 
+    }
     next();
   };
 }

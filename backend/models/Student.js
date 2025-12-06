@@ -49,6 +49,7 @@ const Student = sequelize.define('Student', {
     { fields: ['parentId'] },
     { fields: ['grade'] },
     { fields: ['status'] },
+    { fields: ['schoolId', 'status'] },
     { fields: ['classId'] }
   ]
 });

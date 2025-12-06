@@ -27,6 +27,10 @@ const Grade = sequelize.define('Grade', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  total: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   // Foreign keys are added via association
   // studentId, teacherId, classId
 }, {
@@ -34,7 +38,12 @@ const Grade = sequelize.define('Grade', {
     { fields: ['studentId'] },
     { fields: ['classId'] },
     { fields: ['subject'] }
-  ]
+  ],
+  hooks: {
+    beforeSave: (grade) => {
+      grade.total = (grade.homework || 0) + (grade.quiz || 0) + (grade.midterm || 0) + (grade.final || 0);
+    }
+  }
 });
 
 module.exports = Grade;

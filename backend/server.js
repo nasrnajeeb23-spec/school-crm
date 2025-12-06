@@ -39,6 +39,7 @@ const helpRoutes = require('./routes/help');
 const modulesRoutes = require('./routes/modules');
 const pricingRoutes = require('./routes/pricing');
 const billingRoutes = require('./routes/billing');
+const reportsRoutes = require('./routes/reports');
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
 const fse = require('fs-extra');
@@ -356,6 +357,7 @@ app.use('/api/help', helpRoutes);
 app.use('/api/modules', modulesRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/reports', reportsRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);

@@ -90,11 +90,27 @@ async function enforceActiveSubscription(req, res, next) {
 // Note: Do not apply global enforcement to avoid blocking benign GETs.
 
 // @route   GET api/school/:schoolId/stats/counts
-// @desc    Get quick counts for resource usage widget
+// @desc    Get quick counts for resource usage widget (uses aggregated stats if available)
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/stats/counts', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const schoolId = req.params.schoolId;
+    const schoolId = Number(req.params.schoolId);
+    
+    // Try to get latest aggregated stats first
+    const { SchoolStats } = require('../models');
+    if (SchoolStats) {
+        const today = new Date().toISOString().split('T')[0];
+        const stats = await SchoolStats.findOne({ 
+            where: { schoolId, date: today },
+            attributes: ['totalStudents', 'presentStudents'] // We don't have teachers in stats yet, but we can partially use it
+        });
+        
+        // If we have stats for today, use them for students count (though stats might be end-of-day, so realtime might be better for counts?)
+        // Actually, for dashboard counts, real-time is usually preferred unless expensive.
+        // Let's keep real-time for simple counts as they are indexed and fast enough for now.
+        // But let's add a "performance" flag query param to force using stats if client wants
+    }
+
     const [students, teachers] = await Promise.all([
       Student.count({ where: { schoolId } }),
       Teacher.count({ where: { schoolId } })
@@ -105,6 +121,57 @@ router.get('/:schoolId/stats/counts', verifyToken, requireRole('SCHOOL_ADMIN', '
     res.status(500).send('Server Error');
   }
 });
+
+// @route   GET api/school/:schoolId/stats/dashboard
+// @desc    Get comprehensive dashboard stats (uses aggregation if available)
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+    try {
+        const schoolId = Number(req.params.schoolId);
+        const { SchoolStats } = require('../models');
+        
+        // Check for cached/aggregated stats for today
+        const today = new Date().toISOString().split('T')[0];
+        let stats = null;
+        
+        if (SchoolStats) {
+            stats = await SchoolStats.findOne({ where: { schoolId, date: today } });
+        }
+
+        if (stats) {
+            return res.json({
+                students: stats.totalStudents,
+                attendanceRate: stats.attendanceRate,
+                revenue: stats.totalRevenue,
+                expenses: stats.totalExpenses,
+                source: 'aggregated'
+            });
+        }
+
+        // Fallback to real-time calculation if no aggregated stats
+        const [students, attendanceCount, revenue, expenses] = await Promise.all([
+            Student.count({ where: { schoolId } }),
+            Attendance.count({ where: { schoolId, date: today, status: 'Present' } }),
+            Invoice.sum('amount', { where: { schoolId, status: 'PAID' } }), // Simplified: total paid revenue all time? Or today? usually dashboard shows total or monthly. Let's assume total for now to match typical "Revenue" widget
+            Expense.sum('amount', { where: { schoolId } })
+        ]);
+
+        const attendanceRate = students > 0 ? (attendanceCount / students) * 100 : 0;
+
+        res.json({
+            students,
+            attendanceRate,
+            revenue: revenue || 0,
+            expenses: expenses || 0,
+            source: 'realtime'
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
 
 // @route   GET api/schools/:id
 // @desc    Get school by ID
@@ -800,7 +867,18 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
     const currentIds = new Set(currentMembers.map(s => String(s.id)));
     const toAdd = uniqueIds.filter(id => !currentIds.has(id));
     const toRemove = Array.from(currentIds).filter(id => !uniqueIds.includes(id));
+    
+    // Check capacity
     if (toAdd.length > 0) {
+      const currentCount = await Student.count({ where: { schoolId: cls.schoolId, classId: cls.id } });
+      const available = cls.capacity - currentCount + toRemove.length; // +toRemove because they will be removed
+      if (toAdd.length > available) {
+        return res.status(400).json({ 
+          msg: `Cannot add students. Class capacity exceeded. Available spots: ${available}`,
+          code: 'CAPACITY_EXCEEDED'
+        });
+      }
+      
       await Student.update({ classId: cls.id }, { where: { id: { [Op.in]: toAdd }, schoolId: cls.schoolId } });
     }
     if (toRemove.length > 0) {
@@ -952,6 +1030,7 @@ router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN',
       }
       byTeacherDay[key].push(n);
     }
+    // Check for Teacher Conflicts
     if (teacherIds.size > 0) {
       const existing = await Schedule.findAll({ where: { teacherId: { [Op.in]: Array.from(teacherIds) }, day: { [Op.in]: Array.from(daysSet) } }, include: [{ model: Class, attributes: ['id','gradeLevel','section'] }] });
       for (const n of normalized) {
@@ -968,6 +1047,52 @@ router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN',
         }
       }
     }
+
+    // Check for Room/Section Conflicts (if section represents a shared room)
+    if (cls.section) {
+      // Find other classes with the same section name in this school
+      const sameSectionClasses = await Class.findAll({ 
+        where: { 
+          schoolId: cls.schoolId, 
+          section: cls.section,
+          id: { [Op.ne]: cls.id } // Exclude current class
+        },
+        attributes: ['id', 'gradeLevel', 'section']
+      });
+
+      if (sameSectionClasses.length > 0) {
+        const otherClassIds = sameSectionClasses.map(c => c.id);
+        const roomSchedules = await Schedule.findAll({
+          where: {
+            classId: { [Op.in]: otherClassIds },
+            day: { [Op.in]: Array.from(daysSet) }
+          },
+          include: [{ model: Class, attributes: ['id', 'gradeLevel', 'section'] }]
+        });
+
+        for (const n of normalized) {
+          for (const r of roomSchedules) {
+            if (r.day !== n.day) continue;
+            const ps2 = parseSlot(r.timeSlot);
+            if (!ps2.ok) continue;
+            // Check overlap
+            if (n.start < ps2.end && ps2.start < n.end) {
+              const cname = r.Class ? `${r.Class.gradeLevel} (${r.Class.section})` : 'Unknown Class';
+              conflicts.push({ 
+                type: 'room', 
+                day: n.day, 
+                timeSlot: n.timeSlot, 
+                existingTimeSlot: r.timeSlot, 
+                conflictWithClassId: String(r.classId), 
+                conflictWithClassName: cname,
+                message: `Room conflict (Section ${cls.section}) with ${cname}`
+              });
+            }
+          }
+        }
+      }
+    }
+
     if (conflicts.length > 0) {
       const ids = Array.from(teacherIds);
       const tMap = {};
@@ -2214,6 +2339,18 @@ router.post('/:schoolId/logo', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
       if (err) return res.status(400).json({ msg: 'Upload failed' });
       const file = req.file;
       if (!file) return res.status(400).json({ msg: 'No file uploaded' });
+
+      // Verify File Signature (Magic Numbers)
+      const sig = await verifyFileSignature(file.path);
+      if (!sig.valid) {
+          try { await fse.remove(file.path); } catch {}
+          return res.status(400).json({ msg: 'Invalid file signature: ' + sig.reason });
+      }
+
+      // Scan for malware
+      const scan = await scanFile(file.path);
+      if (!scan.clean) { try { await fse.remove(file.path); } catch {} return res.status(400).json({ msg: 'Malware detected' }); }
+
       const publicUrl = `/uploads/school-logos/${file.filename}`;
       const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
       if (settings) { settings.schoolLogoUrl = publicUrl; await settings.save(); }

@@ -21,7 +21,9 @@ const Attendance = sequelize.define('Attendance', {
   indexes: [
     { fields: ['date'] },
     { fields: ['studentId','date'] },
-    { fields: ['classId','date'] }
+    { fields: ['classId','date'] },
+    { fields: ['schoolId'] },
+    { fields: ['schoolId', 'date'] }
   ]
 });
 
