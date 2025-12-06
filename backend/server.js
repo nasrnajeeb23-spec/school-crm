@@ -222,7 +222,7 @@ app.use(languageMiddleware);
 
 // License enforcement setup
 const { verifyLicenseKey } = require('./utils/license');
-const coreModules = ['student_management', 'academic_management', 'parent_portal', 'teacher_portal', 'teacher_app'];
+const coreModules = ['student_management', 'academic_management', 'parent_portal', 'teacher_portal', 'teacher_app', 'finance'];
 const licenseKey = process.env.LICENSE_KEY || null;
 let allowedModules = [...coreModules];
 if (licenseKey) {
