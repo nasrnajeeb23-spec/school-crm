@@ -52,7 +52,14 @@ const PaymentReceiptModal: React.FC<ReceiptProps> = ({ payment, onClose }) => {
               <p className="text-sm text-gray-600">Financial Receipt</p>
             </div>
             {payment.logoUrl && (
-              <img src={payment.logoUrl} alt="Logo" className="h-20 w-20 object-contain" />
+              <img 
+                src={payment.logoUrl} 
+                alt="Logo" 
+                className="h-20 w-20 object-contain" 
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
             )}
             <div className="text-left">
               <div className="mb-1">
