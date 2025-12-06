@@ -7,28 +7,41 @@ const Payment = sequelize.define('Payment', {
     autoIncrement: true,
     primaryKey: true,
   },
+  invoiceId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
-  paymentDate: {
-    type: DataTypes.DATE,
+  date: {
+    type: DataTypes.DATEONLY,
     allowNull: false,
     defaultValue: DataTypes.NOW,
   },
-  paymentMethod: {
-    type: DataTypes.STRING,
-    allowNull: true, // e.g., 'Credit Card', 'PayPal'
+  method: {
+    type: DataTypes.STRING, // Cash, Bank Transfer, Credit Card, etc.
+    allowNull: false,
+    defaultValue: 'Cash',
   },
-  transactionId: {
+  reference: {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  // Foreign key for Invoice
+  notes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  recordedBy: {
+    type: DataTypes.INTEGER, // User ID of the admin/staff who recorded it
+    allowNull: true,
+  }
 }, {
+  tableName: 'payments',
   indexes: [
-    { name: 'idx_payment_date', fields: ['paymentDate'] },
-    { name: 'idx_invoice_id', fields: ['invoiceId'] }
+    { fields: ['invoiceId'] },
+    { fields: ['date'] }
   ]
 });
 

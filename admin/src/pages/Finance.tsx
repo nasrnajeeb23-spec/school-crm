@@ -8,6 +8,8 @@ import StatsCard from '../components/StatsCard';
 import { RevenueIcon, TotalDebtIcon, PastDueIcon, FileIcon, PlusIcon, ExpenseIcon, NetProfitIcon } from '../components/icons';
 import type { SalaryStructurePayload } from '../api';
 import RecordPaymentModal from '../components/RecordPaymentModal';
+import StudentStatementModal from '../components/StudentStatementModal';
+import FinancialReports from '../components/FinancialReports';
 import AddInvoiceModal from '../components/AddInvoiceModal';
 import AddExpenseModal from '../components/AddExpenseModal';
 import { useToast } from '../contexts/ToastContext';
@@ -33,6 +35,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
     const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
+    const [statementStudent, setStatementStudent] = useState<{id: string, name: string} | null>(null);
     const [isAddInvoiceModalOpen, setIsAddInvoiceModalOpen] = useState(false);
     const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
     const [salaryStructures, setSalaryStructures] = useState<SalaryStructurePayload[]>([]);
@@ -104,8 +107,15 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
             const updatedInvoice = await api.recordPayment(invoiceId, paymentData);
             setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
             setInvoiceToPay(null);
-            addToast('تم تسجيل الدفعة بنجاح.', 'success');
+            addToast('تم تسجيل الدفعة بنجاح وإرسال إشعار لولي الأمر.', 'success');
         } catch (error) { addToast("فشل تسجيل الدفعة.", 'error'); }
+    };
+
+    const handleSendReminder = async (invoiceId: string) => {
+        try {
+            await api.sendInvoiceReminder(schoolId, invoiceId);
+            addToast('تم إرسال تذكير لولي الأمر بنجاح.', 'success');
+        } catch (error) { addToast("فشل إرسال التذكير.", 'error'); }
     };
 
     const handleAddInvoice = async (invoiceData: NewInvoiceData) => {
@@ -156,9 +166,9 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
              <div className="overflow-x-auto">
                 {filteredInvoices.length > 0 ? (
                     <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">اسم الطالب</th><th scope="col" className="px-6 py-3">تاريخ الاستحقاق</th><th scope="col" className="px-6 py-3">المبلغ</th><th scope="col" className="px-6 py-3">الحالة</th><th scope="col" className="px-6 py-3">إجراءات</th></tr></thead>
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">اسم الطالب</th><th scope="col" className="px-6 py-3">تاريخ الاستحقاق</th><th scope="col" className="px-6 py-3">المبلغ</th><th scope="col" className="px-6 py-3">المدفوع</th><th scope="col" className="px-6 py-3">المتبقي</th><th scope="col" className="px-6 py-3">الحالة</th><th scope="col" className="px-6 py-3">إجراءات</th></tr></thead>
                         <tbody>
-                            {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button className="font-medium text-teal-600 dark:text-teal-500 hover:underline">عرض</button></div></td></tr>))}
+                            {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4 text-green-600">${(invoice.paidAmount || 0).toFixed(2)}</td><td className="px-6 py-4 text-red-600">${(invoice.remainingAmount ?? invoice.totalAmount).toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>{invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}<button className="font-medium text-teal-600 dark:text-teal-500 hover:underline">عرض</button></div></td></tr>))}
                         </tbody>
                     </table>
                 ) : (
@@ -184,6 +194,10 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                 )}
             </div>
         </BrandableCard>
+    );
+
+    const renderReportsTab = () => (
+        <FinancialReports invoices={invoices} expenses={expenses} />
     );
 
     const renderPayrollTab = () => {
@@ -506,7 +520,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
         );
     };
 
-    const tabs = [ { id: 'overview', label: 'نظرة عامة', icon: RevenueIcon }, { id: 'invoices', label: 'الفواتير (الإيرادات)', icon: FileIcon }, { id: 'expenses', label: 'المصروفات', icon: ExpenseIcon }, { id: 'fees', label: 'إعداد الرسوم', icon: FileIcon }, { id: 'payroll', label: 'الرواتب', icon: NetProfitIcon } ];
+    const tabs = [ { id: 'overview', label: 'نظرة عامة', icon: RevenueIcon }, { id: 'invoices', label: 'الفواتير (الإيرادات)', icon: FileIcon }, { id: 'expenses', label: 'المصروفات', icon: ExpenseIcon }, { id: 'reports', label: 'التقارير', icon: FileIcon }, { id: 'fees', label: 'إعداد الرسوم', icon: FileIcon }, { id: 'payroll', label: 'الرواتب', icon: NetProfitIcon } ];
 
     return (
         <>
@@ -516,11 +530,13 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                         {activeTab === 'overview' && (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><StatsCard icon={RevenueIcon} title="إجمالي الإيرادات" value={`$${summary.totalRevenue.toLocaleString()}`} description="مجموع الفواتير المدفوعة" /><StatsCard icon={ExpenseIcon} title="إجمالي المصروفات" value={`$${summary.totalExpenses.toLocaleString()}`} description="مجموع النفقات المسجلة" /><StatsCard icon={NetProfitIcon} title="صافي الربح" value={`$${summary.netProfit.toLocaleString()}`} description="الإيرادات - المصروفات" /></div>)}
                         {activeTab === 'invoices' && renderInvoicesTab()}
                         {activeTab === 'expenses' && renderExpensesTab()}
+                        {activeTab === 'reports' && renderReportsTab()}
                         {activeTab === 'fees' && renderFeesTab()}
                         {activeTab === 'payroll' && renderPayrollTab()}
                 </>)}
             </div>
             {invoiceToPay && <RecordPaymentModal invoice={invoiceToPay} onClose={() => setInvoiceToPay(null)} onSave={handleRecordPayment} />}
+            {statementStudent && <StudentStatementModal schoolId={schoolId} studentId={statementStudent.id} studentName={statementStudent.name} onClose={() => setStatementStudent(null)} />}
             {isAddInvoiceModalOpen && <AddInvoiceModal schoolId={schoolId} onClose={() => setIsAddInvoiceModalOpen(false)} onSave={handleAddInvoice} />}
             {isAddExpenseModalOpen && <AddExpenseModal onClose={() => setIsAddExpenseModalOpen(false)} onSave={handleAddExpense} />}
         </>

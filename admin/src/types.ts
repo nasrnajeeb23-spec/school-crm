@@ -562,6 +562,8 @@ export interface Invoice {
     dueDate: string;
     items: InvoiceItem[];
     totalAmount: number;
+    paidAmount?: number;
+    remainingAmount?: number;
 }
 
 export interface NewInvoiceData {

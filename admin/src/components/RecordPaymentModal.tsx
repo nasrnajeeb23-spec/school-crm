@@ -9,7 +9,7 @@ interface RecordPaymentModalProps {
 
 const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ invoice, onClose, onSave }) => {
   const [paymentData, setPaymentData] = useState<PaymentData>({
-    amount: invoice.totalAmount,
+    amount: invoice.remainingAmount ?? invoice.totalAmount,
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'تحويل بنكي',
     notes: '',
@@ -42,6 +42,8 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ invoice, onClos
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">تسجيل دفعة جديدة</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
             فاتورة الطالب: <span className="font-semibold">{invoice.studentName}</span>
+            {' | '}
+            المبلغ المتبقي: <span className="font-bold text-red-600">${(invoice.remainingAmount ?? invoice.totalAmount).toFixed(2)}</span>
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

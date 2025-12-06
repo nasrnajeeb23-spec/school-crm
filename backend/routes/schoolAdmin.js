@@ -1160,7 +1160,7 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         order: [['dueDate', 'DESC']]
     });
 
-    const statusMap = { 'PAID': 'مدفوعة', 'UNPAID': 'غير مدفوعة', 'OVERDUE': 'متأخرة' };
+    const statusMap = { 'PAID': 'مدفوعة', 'UNPAID': 'غير مدفوعة', 'OVERDUE': 'متأخرة', 'PARTIALLY_PAID': 'مدفوعة جزئياً' };
     res.json(invoices.map(inv => ({
         id: inv.id.toString(),
         studentId: inv.studentId,
@@ -1170,6 +1170,8 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         dueDate: inv.dueDate.toISOString().split('T')[0],
         items: [{ description: `رسوم دراسية`, amount: parseFloat(inv.amount) }],
         totalAmount: parseFloat(inv.amount),
+        paidAmount: parseFloat(inv.paidAmount || 0),
+        remainingAmount: parseFloat(inv.amount) - parseFloat(inv.paidAmount || 0)
     })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
@@ -1194,20 +1196,210 @@ router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
 });
 
 // @route   POST api/school/:schoolId/invoices/:invoiceId/payments
-// @desc    Record a payment for an invoice
+// @desc    Record a payment for an invoice (Supports partial payments)
 // @access  Private (SchoolAdmin)
 router.post('/:schoolId/invoices/:invoiceId/payments', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), validate([
   { name: 'amount', required: true },
   { name: 'paymentDate', required: true, type: 'string' },
 ]), async (req, res) => {
   try {
+    const { Payment } = require('../models');
     const { amount, paymentDate, paymentMethod, notes } = req.body;
+    
     if (!amount || !paymentDate) return res.status(400).json({ msg: 'Missing payment data' });
+    
     const inv = await Invoice.findByPk(req.params.invoiceId);
     if (!inv) return res.status(404).json({ msg: 'Invoice not found' });
-    inv.status = 'PAID';
+
+    // Create payment record
+    const payment = await Payment.create({
+      invoiceId: inv.id,
+      amount: Number(amount),
+      date: paymentDate,
+      method: paymentMethod || 'Cash',
+      notes: notes || '',
+      recordedBy: req.user.id
+    });
+
+    // Update invoice paid amount
+    const currentPaid = Number(inv.paidAmount || 0);
+    const newPaid = currentPaid + Number(amount);
+    inv.paidAmount = newPaid;
+
+    // Update status
+    const total = Number(inv.amount);
+    if (newPaid >= total - 0.01) { // Tolerance for floating point
+        inv.status = 'PAID';
+    } else if (newPaid > 0) {
+        inv.status = 'PARTIALLY_PAID';
+    } else {
+        inv.status = 'UNPAID';
+    }
+
     await inv.save();
-    res.json({ id: inv.id.toString(), studentId: inv.studentId, studentName: '', status: 'مدفوعة', issueDate: inv.createdAt.toISOString().split('T')[0], dueDate: inv.dueDate.toISOString().split('T')[0], items: [{ description: 'القسط الدراسي', amount: parseFloat(inv.amount) }], totalAmount: parseFloat(inv.amount) });
+
+    // Send email notification if Student has parent email
+    try {
+        const { Student, Parent } = require('../models');
+        const student = await Student.findByPk(inv.studentId, { include: Parent });
+        if (student && student.Parent) {
+            // Send internal notification
+            const NotificationService = require('../services/NotificationService');
+            await NotificationService.sendFinancialAlert(
+                student.Parent.id,
+                'تم استلام دفعة مالية',
+                `تم استلام مبلغ ${amount} $ للطالب ${student.name}. رقم السند: PAY-${payment.id}`,
+                req.params.schoolId
+            );
+
+            // Send email if available
+            if (student.Parent.email) {
+                const EmailService = require('../services/EmailService');
+                await EmailService.sendPaymentReceipt(
+                    student.Parent.email,
+                    student.name,
+                    amount,
+                    '$', 
+                    `PAY-${payment.id}`,
+                    paymentDate
+                );
+            }
+        }
+    } catch (emailErr) {
+        console.error('Failed to send payment receipt notification:', emailErr);
+        // Don't fail the request just because notification failed
+    }
+
+    // Return updated invoice structure
+    const statusMap = { 'PAID': 'مدفوعة', 'UNPAID': 'غير مدفوعة', 'OVERDUE': 'متأخرة', 'PARTIALLY_PAID': 'مدفوعة جزئياً' };
+    
+    res.json({ 
+        id: inv.id.toString(), 
+        studentId: inv.studentId, 
+        studentName: '', // Frontend handles this or we fetch it if needed
+        status: statusMap[inv.status] || inv.status, 
+        issueDate: inv.createdAt.toISOString().split('T')[0], 
+        dueDate: inv.dueDate.toISOString().split('T')[0], 
+        items: [{ description: 'القسط الدراسي', amount: parseFloat(inv.amount) }], 
+        totalAmount: parseFloat(inv.amount),
+        paidAmount: parseFloat(inv.paidAmount),
+        remainingAmount: parseFloat(inv.amount) - parseFloat(inv.paidAmount)
+    });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// @route   POST api/school/:schoolId/invoices/:invoiceId/remind
+// @desc    Send payment reminder email
+// @access  Private (SchoolAdmin)
+router.post('/:schoolId/invoices/:invoiceId/remind', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { Invoice, Student, Parent } = require('../models');
+    const inv = await Invoice.findByPk(req.params.invoiceId, {
+        include: [{ model: Student, include: [Parent] }]
+    });
+
+    if (!inv) return res.status(404).json({ msg: 'Invoice not found' });
+    
+    if (inv.status === 'PAID') return res.status(400).json({ msg: 'Invoice is already paid' });
+
+    const student = inv.Student;
+    if (!student || !student.Parent) {
+        return res.status(400).json({ msg: 'Parent not found' });
+    }
+
+    const NotificationService = require('../services/NotificationService');
+    await NotificationService.sendFinancialAlert(
+        student.Parent.id,
+        'تذكير بفاتورة مستحقة',
+        `نود تذكيركم بوجود فاتورة مستحقة للطالب ${student.name} بقيمة ${inv.remainingAmount || inv.amount} $. تاريخ الاستحقاق: ${inv.dueDate.toISOString().split('T')[0]}`,
+        req.params.schoolId
+    );
+
+    let sent = false;
+    if (student.Parent.email) {
+        const EmailService = require('../services/EmailService');
+        sent = await EmailService.sendInvoiceReminder(
+            student.Parent.email,
+            student.name,
+            `${inv.remainingAmount || inv.amount} $`,
+            inv.dueDate.toISOString().split('T')[0]
+        );
+    } else {
+        // If no email, at least we sent the internal notification
+        sent = true; 
+    }
+
+    if (sent) {
+        res.json({ msg: 'Reminder sent successfully' });
+    } else {
+        res.status(200).json({ msg: 'Internal notification sent (Email failed or not provided)' });
+    }
+
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// @route   GET api/school/:schoolId/students/:studentId/statement
+// @desc    Get financial statement for a student
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/students/:studentId/statement', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { Invoice, Payment } = require('../models');
+    const studentId = req.params.studentId;
+    
+    // Fetch Invoices
+    const invoices = await Invoice.findAll({ 
+        where: { studentId },
+        order: [['createdAt', 'ASC']] 
+    });
+
+    // Fetch Payments
+    const invoiceIds = invoices.map(i => i.id);
+    const payments = await Payment.findAll({
+        where: { invoiceId: invoiceIds },
+        order: [['date', 'ASC']]
+    });
+
+    // Combine and sort
+    let transactions = [];
+    
+    invoices.forEach(inv => {
+        transactions.push({
+            id: `inv_${inv.id}`,
+            date: inv.createdAt,
+            type: 'INVOICE',
+            description: `فاتورة #${inv.id}`,
+            debit: parseFloat(inv.amount),
+            credit: 0,
+            reference: String(inv.id)
+        });
+    });
+
+    payments.forEach(pay => {
+        transactions.push({
+            id: `pay_${pay.id}`,
+            date: new Date(pay.date),
+            type: 'PAYMENT',
+            description: `دفعة (${pay.method})`,
+            debit: 0,
+            credit: parseFloat(pay.amount),
+            reference: pay.reference,
+            notes: pay.notes,
+            recordedBy: pay.recordedBy,
+            method: pay.method
+        });
+    });
+
+    // Sort by date
+    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate running balance (Debit increases balance [Amount Owed], Credit decreases it)
+    let balance = 0;
+    const statement = transactions.map(t => {
+        balance += (t.debit - t.credit);
+        return { ...t, balance, date: new Date(t.date).toISOString().split('T')[0] };
+    });
+
+    res.json(statement);
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -1558,13 +1750,11 @@ router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     } catch (dbError) {
       console.error('Database error when fetching jobs:', dbError);
       // Check if the error is due to table missing (migration issue)
-      if (dbError.name === 'SequelizeDatabaseError' && dbError.message.includes('no such table')) {
-         // If table is missing, return empty list instead of error to prevent UI crash
-         // This is a temporary fix until migration is run
+      if (dbError.name === 'SequelizeDatabaseError' && (dbError.message.includes('no such table') || dbError.message.includes('does not exist'))) {
          console.warn('Jobs table missing, returning empty list');
          return res.json([]);
       }
-      return res.status(500).send('Server Error: Database query failed');
+      return res.status(500).json({ msg: 'Database query failed', error: dbError.message, details: dbError.toString() });
     }
     
     res.json(jobs.map(j => {
@@ -1576,7 +1766,7 @@ router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     }));
   } catch (e) { 
     console.error('Error in getJobs:', e); 
-    res.status(500).send('Server Error'); 
+    res.status(500).json({ msg: 'Server Error', error: e.message, stack: process.env.NODE_ENV === 'development' ? e.stack : undefined }); 
   }
 });
 

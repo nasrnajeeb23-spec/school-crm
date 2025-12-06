@@ -1286,6 +1286,14 @@ export const saveStaffAttendance = async (schoolId: number, date: string, record
     await apiCall(`/school/${schoolId}/staff-attendance`, { method: 'POST', body: JSON.stringify({ date, records }) });
 };
 
+export const sendInvoiceReminder = async (schoolId: number, invoiceId: string): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/invoices/${invoiceId}/remind`, { method: 'POST' });
+};
+
+export const getStudentStatement = async (schoolId: number, studentId: string): Promise<any[]> => {
+    return await apiCall(`/school/${schoolId}/students/${studentId}/statement`, { method: 'GET' });
+};
+
 // تصدير جميع الدوال
 export default {
     login,
@@ -1320,6 +1328,8 @@ export default {
     deleteSchoolStaff,
     getInvoices,
     getSchoolInvoices,
+    getStudentStatement,
+    sendInvoiceReminder,
     addInvoice,
     recordPayment,
     getSchoolExpenses,

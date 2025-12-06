@@ -11,12 +11,17 @@ const Invoice = sequelize.define('Invoice', {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
+  paidAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0.00,
+  },
   dueDate: {
     type: DataTypes.DATE,
     allowNull: false,
   },
   status: {
-    type: DataTypes.ENUM('PAID', 'UNPAID', 'OVERDUE'),
+    type: DataTypes.ENUM('PAID', 'UNPAID', 'PARTIALLY_PAID', 'OVERDUE'),
     allowNull: false,
     defaultValue: 'UNPAID',
   },

@@ -8,7 +8,7 @@ const Notification = sequelize.define('Notification', {
     primaryKey: true,
   },
   type: {
-    type: DataTypes.ENUM('Warning', 'Info', 'Approval'),
+    type: DataTypes.ENUM('Warning', 'Info', 'Approval', 'Financial', 'Academic', 'General'),
     allowNull: false,
   },
   title: {
@@ -20,9 +20,9 @@ const Notification = sequelize.define('Notification', {
     allowNull: false,
   },
   status: {
-    type: DataTypes.ENUM('Pending', 'Approved', 'Rejected'),
+    type: DataTypes.ENUM('Pending', 'Approved', 'Rejected', 'Sent'), // Sent for info notifications
     allowNull: false,
-    defaultValue: 'Pending',
+    defaultValue: 'Sent',
   },
   date: {
     type: DataTypes.DATE,
