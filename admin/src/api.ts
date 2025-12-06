@@ -1031,17 +1031,8 @@ export const getAvailableModules = async (): Promise<Module[]> => {
     return await apiCall('/modules', { method: 'GET' });
 };
 
-export const updateModule = async (moduleId: string, data: Partial<Module>): Promise<Module> => {
-    return await apiCall(`/modules/${moduleId}`, { method: 'PUT', body: JSON.stringify(data) });
-};
+// Duplicate exports removed
 
-export const createModule = async (data: Module): Promise<Module> => {
-    return await apiCall('/modules', { method: 'POST', body: JSON.stringify(data) });
-};
-
-export const deleteModule = async (moduleId: string): Promise<void> => {
-    await apiCall(`/modules/${moduleId}`, { method: 'DELETE' });
-};
 
 // Removed duplicated functions (getSchoolModules, updateSchoolModules, submitPaymentProof)
 
@@ -1189,15 +1180,15 @@ export const updatePricingConfig = async (config: PricingConfig): Promise<Pricin
     return await apiCall('/pricing/config', { method: 'PUT', body: JSON.stringify(config) });
 };
 
-export const updateModule = async (moduleData: Module): Promise<Module> => {
-    return await apiCall(`/modules/${moduleData.id}`, { method: 'PUT', body: JSON.stringify(moduleData) });
+export const updateModule = async (moduleId: string, data: Partial<Module>): Promise<Module> => {
+    return await apiCall(`/modules/${moduleId}`, { method: 'PUT', body: JSON.stringify(data) });
 };
 
-export const createModule = async (moduleData: Module): Promise<Module> => {
-    return await apiCall('/modules', { method: 'POST', body: JSON.stringify(moduleData) });
+export const createModule = async (data: Module): Promise<Module> => {
+    return await apiCall('/modules', { method: 'POST', body: JSON.stringify(data) });
 };
 
-export const deleteModule = async (moduleId: ModuleId): Promise<void> => {
+export const deleteModule = async (moduleId: string): Promise<void> => {
     await apiCall(`/modules/${moduleId}`, { method: 'DELETE' });
 };
 
