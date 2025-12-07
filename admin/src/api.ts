@@ -477,6 +477,9 @@ export const getFeeSetups = async (schoolId: number): Promise<FeeSetup[]> => {
 export type SubscriptionState = {
   subscription: { status: string; startDate: string | null; endDate: string | null; renewalDate: string | null; trialExpired: boolean };
   modules: { allowed: string[]; active: string[] };
+  plan?: any;
+  limits?: { students: number; teachers: number; source: string };
+  usage?: { students: number; teachers: number };
 };
 
 export const getSubscriptionState = async (schoolId: number): Promise<SubscriptionState> => {

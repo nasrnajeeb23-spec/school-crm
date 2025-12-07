@@ -17,28 +17,35 @@ const ResourceUsageWidget: React.FC<ResourceUsageWidgetProps> = ({ schoolId }) =
     useEffect(() => {
         const fetchUsage = async () => {
             try {
-                // Fetch subscription details and current counts
-                const [state, studentsCount, teachersCount] = await Promise.all([
-                    api.getSubscriptionState(schoolId),
-                    api.getSchoolStudentsCount(schoolId),
-                    api.getSchoolTeachersCount(schoolId)
-                ]);
+                // Fetch subscription details (now includes usage and limits)
+                const state = await api.getSubscriptionState(schoolId);
 
                 const limits = state.limits || state.plan?.limits || { students: 50, teachers: 5 };
+                const usageData = state.usage || { students: 0, teachers: 0 };
+
+                // If usage data is missing in state (legacy), fetch it manually
+                if (!state.usage) {
+                     const [s, t] = await Promise.all([
+                        api.getSchoolStudentsCount(schoolId),
+                        api.getSchoolTeachersCount(schoolId)
+                     ]);
+                     usageData.students = s;
+                     usageData.teachers = t;
+                }
                 
                 const maxStudents = limits.students === 'unlimited' ? 999999 : Number(limits.students);
                 const maxTeachers = limits.teachers === 'unlimited' ? 999999 : Number(limits.teachers);
 
                 setUsage({
                     students: {
-                        current: studentsCount,
+                        current: usageData.students,
                         max: maxStudents,
-                        percent: Math.min(100, Math.round((studentsCount / maxStudents) * 100))
+                        percent: Math.min(100, Math.round((usageData.students / maxStudents) * 100))
                     },
                     teachers: {
-                        current: teachersCount,
+                        current: usageData.teachers,
                         max: maxTeachers,
-                        percent: Math.min(100, Math.round((teachersCount / maxTeachers) * 100))
+                        percent: Math.min(100, Math.round((usageData.teachers / maxTeachers) * 100))
                     }
                 });
             } catch (e) {

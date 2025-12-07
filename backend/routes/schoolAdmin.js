@@ -370,13 +370,23 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     }
 
     // Check plan limits
-    const { Subscription, Plan } = require('../models');
+    const { Subscription, Plan, SchoolSettings } = require('../models');
     const subscription = await Subscription.findOne({ where: { schoolId }, include: [Plan] });
+    const settings = await SchoolSettings.findOne({ where: { schoolId } });
     
     // Default limits if no plan (fallback)
     let maxStudents = 50; 
-    
-    if (subscription && subscription.Plan && subscription.Plan.limits) {
+    let limitSource = 'default';
+
+    // 1. Check Custom Limits (Highest Priority)
+    if (settings && settings.customLimits && settings.customLimits.students !== undefined) {
+        const val = settings.customLimits.students;
+        if (val === 'unlimited') maxStudents = 999999;
+        else maxStudents = Number(val);
+        limitSource = 'custom';
+    } 
+    // 2. Check Plan Limits
+    else if (subscription && subscription.Plan && subscription.Plan.limits) {
         const limits = typeof subscription.Plan.limits === 'string' 
             ? JSON.parse(subscription.Plan.limits) 
             : subscription.Plan.limits;
@@ -386,13 +396,20 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         } else if (limits.students === 'unlimited') {
             maxStudents = 999999;
         }
+        limitSource = 'plan';
+    }
+    // 3. Check Subscription customLimits (Legacy/Fallback)
+    else if (subscription && subscription.customLimits) {
+         const limits = typeof subscription.customLimits === 'string' ? JSON.parse(subscription.customLimits) : subscription.customLimits;
+         if (limits.students) maxStudents = limits.students === 'unlimited' ? 999999 : Number(limits.students);
     }
 
     const currentCount = await Student.count({ where: { schoolId } });
     if (currentCount >= maxStudents) {
         return res.status(403).json({ 
-            msg: 'لقد تجاوزت الحد الأقصى لعدد الطلاب المسموح به في خطتك الحالية. يرجى ترقية الاشتراك لإضافة المزيد.',
-            code: 'LIMIT_EXCEEDED'
+            msg: `لقد تجاوزت الحد الأقصى لعدد الطلاب (${maxStudents}). يرجى ترقية الاشتراك.`,
+            code: 'LIMIT_EXCEEDED',
+            details: { current: currentCount, max: maxStudents, source: limitSource }
         });
     }
 
@@ -785,13 +802,22 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     if (!school) return res.status(404).json({ msg: 'School not found' });
 
     // Check plan limits
-    const { Subscription, Plan } = require('../models');
+    const { Subscription, Plan, SchoolSettings } = require('../models');
     const subscription = await Subscription.findOne({ where: { schoolId: req.user.schoolId }, include: [Plan] });
+    const settings = await SchoolSettings.findOne({ where: { schoolId: req.user.schoolId } });
     
     // Default limits
     let maxTeachers = 5; 
+    let limitSource = 'default';
     
-    if (subscription && subscription.Plan && subscription.Plan.limits) {
+    // 1. Check Custom Limits
+    if (settings && settings.customLimits && settings.customLimits.teachers !== undefined) {
+        const val = settings.customLimits.teachers;
+        maxTeachers = val === 'unlimited' ? 999999 : Number(val);
+        limitSource = 'custom';
+    }
+    // 2. Check Plan Limits
+    else if (subscription && subscription.Plan && subscription.Plan.limits) {
         const limits = typeof subscription.Plan.limits === 'string' 
             ? JSON.parse(subscription.Plan.limits) 
             : subscription.Plan.limits;
@@ -801,13 +827,15 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         } else if (limits.teachers === 'unlimited') {
             maxTeachers = 999999;
         }
+        limitSource = 'plan';
     }
 
     const currentCount = await Teacher.count({ where: { schoolId: req.user.schoolId } });
     if (currentCount >= maxTeachers) {
         return res.status(403).json({ 
-            msg: 'لقد تجاوزت الحد الأقصى لعدد المعلمين المسموح به في خطتك الحالية.',
-            code: 'LIMIT_EXCEEDED'
+            msg: `لقد تجاوزت الحد الأقصى لعدد المعلمين (${maxTeachers}). يرجى ترقية الاشتراك.`,
+            code: 'LIMIT_EXCEEDED',
+            details: { current: currentCount, max: maxTeachers, source: limitSource }
         });
     }
 
@@ -2102,15 +2130,41 @@ router.post('/:schoolId/import/students', verifyToken, requireRole('SCHOOL_ADMIN
           });
         }
 
-        // Bulk create students
+        // Check Limits BEFORE Bulk Create
         if (studentsToCreate.length > 0) {
-          await Student.bulkCreate(studentsToCreate);
+            const { Subscription, Plan, SchoolSettings, Student } = require('../models');
+            const sub = await Subscription.findOne({ where: { schoolId }, include: [Plan] });
+            const settings = await SchoolSettings.findOne({ where: { schoolId } });
+            
+            let maxStudents = 50;
+            // 1. Custom Limits
+            if (settings && settings.customLimits && settings.customLimits.students !== undefined) {
+                 const val = settings.customLimits.students;
+                 maxStudents = val === 'unlimited' ? 999999 : Number(val);
+            } 
+            // 2. Plan Limits
+            else if (sub && sub.Plan && sub.Plan.limits) {
+                 const l = typeof sub.Plan.limits === 'string' ? JSON.parse(sub.Plan.limits) : sub.Plan.limits;
+                 if (l.students) maxStudents = l.students === 'unlimited' ? 999999 : Number(l.students);
+            }
+            // 3. Subscription Legacy
+            else if (sub && sub.customLimits) {
+                 const l = typeof sub.customLimits === 'string' ? JSON.parse(sub.customLimits) : sub.customLimits;
+                 if (l.students) maxStudents = l.students === 'unlimited' ? 999999 : Number(l.students);
+            }
+
+            const currentCount = await Student.count({ where: { schoolId } });
+            if (currentCount + studentsToCreate.length > maxStudents) {
+                throw new Error(`Import failed: Limit exceeded. You can only add ${Math.max(0, maxStudents - currentCount)} more students.`);
+            }
+
+            await Student.bulkCreate(studentsToCreate);
           
-          // Update school student count
-          const school = await School.findByPk(schoolId);
-          if (school) {
-            await school.increment('studentCount', { by: studentsToCreate.length });
-          }
+            // Update school student count
+            const school = await School.findByPk(schoolId);
+            if (school) {
+              await school.increment('studentCount', { by: studentsToCreate.length });
+            }
         }
 
         await AuditLog.create({ 
@@ -2257,15 +2311,46 @@ router.get('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
 router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
-    const { Subscription, SchoolSettings } = require('../models');
+    const { Subscription, SchoolSettings, Plan, Student, Teacher } = require('../models');
     const sub = await Subscription.findOne({ where: { schoolId } });
     const settings = await SchoolSettings.findOne({ where: { schoolId } });
+    const plan = sub ? await Plan.findByPk(sub.planId) : null;
+
+    // Calculate Limits
+    let limits = { students: 50, teachers: 5 }; // Default
+    let limitSource = 'default';
+
+    // 1. Custom Limits
+    if (settings && settings.customLimits) {
+         if (settings.customLimits.students) limits.students = settings.customLimits.students === 'unlimited' ? 999999 : Number(settings.customLimits.students);
+         if (settings.customLimits.teachers) limits.teachers = settings.customLimits.teachers === 'unlimited' ? 999999 : Number(settings.customLimits.teachers);
+         limitSource = 'custom';
+    } 
+    // 2. Plan Limits
+    else if (plan && plan.limits) {
+         const l = typeof plan.limits === 'string' ? JSON.parse(plan.limits) : plan.limits;
+         if (l.students) limits.students = l.students === 'unlimited' ? 999999 : Number(l.students);
+         if (l.teachers) limits.teachers = l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
+         limitSource = 'plan';
+    }
+    // 3. Subscription Legacy Limits
+    else if (sub && sub.customLimits) {
+         const l = typeof sub.customLimits === 'string' ? JSON.parse(sub.customLimits) : sub.customLimits;
+         if (l.students) limits.students = l.students === 'unlimited' ? 999999 : Number(l.students);
+         if (l.teachers) limits.teachers = l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
+    }
+
+    // Counts
+    const studentsCount = await Student.count({ where: { schoolId } });
+    const teachersCount = await Teacher.count({ where: { schoolId } });
+
     const allowedModules = Array.isArray(req.app?.locals?.allowedModules) ? req.app.locals.allowedModules : [];
     const activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
     const now = Date.now();
     const endMs = sub?.renewalDate ? new Date(sub.renewalDate).getTime() : (sub?.endDate ? new Date(sub.endDate).getTime() : 0);
     const isTrial = String(sub?.status || '').toUpperCase() === 'TRIAL';
     const trialExpired = isTrial && endMs > 0 && now > endMs;
+
     return res.success({
       subscription: {
         status: sub?.status || 'UNKNOWN',
@@ -2274,6 +2359,9 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
         renewalDate: sub?.renewalDate || null,
         trialExpired,
       },
+      plan: plan ? plan.toJSON() : null,
+      limits: { ...limits, source: limitSource },
+      usage: { students: studentsCount, teachers: teachersCount },
       modules: {
         allowed: allowedModules,
         active: activeModules,

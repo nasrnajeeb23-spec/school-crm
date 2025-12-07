@@ -40,6 +40,7 @@ const modulesRoutes = require('./routes/modules');
 const pricingRoutes = require('./routes/pricing');
 const billingRoutes = require('./routes/billing');
 const reportsRoutes = require('./routes/reports');
+const CronService = require('./services/CronService');
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
 const fse = require('fs-extra');
@@ -629,6 +630,14 @@ async function syncDatabase(){
 syncDatabase()
   .then(async () => {
     console.log('Database connected successfully.');
+    
+    // Initialize Cron Service
+    try {
+      CronService.init();
+    } catch (e) {
+      console.error('Failed to init CronService:', e);
+    }
+
     try {
       const { User, Plan, School, Subscription, BusOperator, Route, RouteStudent, Student, Parent } = require('./models');
       const userCount = await User.count();
