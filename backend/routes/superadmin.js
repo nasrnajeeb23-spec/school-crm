@@ -8,6 +8,22 @@ const { sequelize } = require('../models');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
+// Helper functions for Redis/JSON
+const getJSON = async (redis, key, defaultValue) => {
+  if (!redis) return defaultValue;
+  try {
+    const data = await redis.get(key);
+    return data ? JSON.parse(data) : defaultValue;
+  } catch { return defaultValue; }
+};
+
+const setJSON = async (redis, key, value) => {
+  if (!redis) return;
+  try {
+    await redis.set(key, JSON.stringify(value));
+  } catch {}
+};
+
 // @route   GET api/superadmin/stats
 // @desc    Get dashboard stats for SuperAdmin
 // @access  Private (SuperAdmin)
@@ -272,6 +288,9 @@ router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_
     try {
         const { SecurityPolicy } = require('../models');
         if (SecurityPolicy) {
+            // Auto-heal: Ensure table exists
+            try { await SecurityPolicy.sync(); } catch(e) { console.warn('SecurityPolicy sync failed:', e.message); }
+
             dbPolicy = await SecurityPolicy.findOne();
             if (!dbPolicy) {
                 try {
@@ -583,16 +602,36 @@ router.put('/bulk/backup-schedule', verifyToken, requireRole('SUPER_ADMIN'), asy
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// @route   GET api/superadmin/onboarding/requests
+// @desc    Get list of onboarding/trial requests
+// @access  Private (SuperAdmin)
+router.get('/onboarding/requests', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+  try {
+    const { TrialRequest } = require('../models');
+    if (!TrialRequest) return res.json([]);
+    
+    // Auto-create table if it doesn't exist (simple self-healing)
+    try { await TrialRequest.sync(); } catch {}
+
+    const requests = await TrialRequest.findAll({ order: [['createdAt', 'DESC']] });
+    res.json(requests);
+  } catch (err) {
+    console.error('Onboarding Requests Error:', err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/superadmin/team
 // @desc    Get list of super admin team members
 // @access  Private (SuperAdmin)
 router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
         const { User } = require('../models');
+        // Fix: Use correct Enum values matching User model (PascalCase)
         const team = await User.findAll({
             where: {
                 role: {
-                    [require('sequelize').Op.in]: ['SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR']
+                    [require('sequelize').Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
                 }
             },
             attributes: ['id', 'name', 'email', 'role', 'lastLogin', 'isActive']
