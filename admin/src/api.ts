@@ -1199,10 +1199,10 @@ export const updatePricingConfig = async (config: PricingConfig): Promise<Pricin
 };
 
 export const updateModule = async (moduleId: ModuleId | string, data: Partial<Module>): Promise<Module> => {
-    // Remove 'id' from data if it exists to avoid [object Object] in URL or body issues if ID is immutable
-    const updateData = { ...data } as any;
-    delete updateData.id; // Remove id field safely
-    return await apiCall(`/modules/${moduleId}`, { method: 'PUT', body: JSON.stringify(updateData) });
+    const idStr = typeof moduleId === 'string' ? moduleId : String(moduleId);
+    const updateData = data ? { ...(data as any) } : {};
+    if (updateData && typeof updateData === 'object') delete (updateData as any).id;
+    return await apiCall(`/modules/${encodeURIComponent(idStr)}`, { method: 'PUT', body: JSON.stringify(updateData) });
 };
 
 export const createModule = async (data: Module): Promise<Module> => {
@@ -1210,7 +1210,8 @@ export const createModule = async (data: Module): Promise<Module> => {
 };
 
 export const deleteModule = async (moduleId: string): Promise<void> => {
-    await apiCall(`/modules/${moduleId}`, { method: 'DELETE' });
+    const idStr = typeof moduleId === 'string' ? moduleId : String(moduleId as any);
+    await apiCall(`/modules/${encodeURIComponent(idStr)}`, { method: 'DELETE' });
 };
 
 export const getRoles = async (): Promise<Role[]> => {
