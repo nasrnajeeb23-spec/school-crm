@@ -567,6 +567,9 @@ router.put('/:schoolId/teachers/:teacherId/salary-structure', verifyToken, requi
 // Payroll processing
 router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
+    const { SalarySlip } = require('../models');
+    try { await SalarySlip.sync({ alter: true }); } catch (e) { console.error('Sync SalarySlip Error:', e); } // Auto-heal
+
     const month = String(req.query.month || '').trim();
     if (!month || !/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ msg: 'Invalid month format' });
     const schoolId = parseInt(req.params.schoolId, 10);

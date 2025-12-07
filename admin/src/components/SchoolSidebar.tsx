@@ -52,6 +52,31 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
 
   const navItems = allNavItems.filter(hasPermission);
   
+  // Helper to expand parent modules (matching backend logic)
+   const getExpandedModules = (modules: ModuleId[]): string[] => {
+       if (!Array.isArray(modules)) return [];
+       const expanded = new Set<string>(modules as unknown as string[]);
+       
+       // Map of parent modules to their children
+      const moduleMap: Record<string, string[]> = {
+          'finance': ['finance_fees', 'finance_salaries', 'finance_expenses'],
+          'transportation': ['transportation', 'transport', 'bus_management'],
+          'academic': ['academic_management', 'grades', 'attendance'],
+          'student': ['student_management']
+      };
+
+      modules.forEach(m => {
+          const key = m as unknown as string;
+          if (moduleMap[key]) {
+              moduleMap[key].forEach(child => expanded.add(child));
+          }
+      });
+      
+      return Array.from(expanded);
+  };
+
+  const expandedActiveModules = getExpandedModules(activeModules);
+
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-1 rounded-lg transition-colors duration-200";
   const activeLinkClasses = "bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300";
   const inactiveLinkClasses = "hover:bg-gray-100 dark:hover:bg-gray-700";
@@ -76,7 +101,12 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
       <nav className="flex-grow pt-4 overflow-y-auto">
         <ul>
           {navItems.map(item => {
-             const isLocked = item.requiredModule && !activeModules.includes(item.requiredModule);
+             const isLocked = item.requiredModule && !expandedActiveModules.includes(item.requiredModule);
+             
+             // Hide finance sub-modules (fees, payroll, expenses) if 'finance' parent is active to avoid clutter?
+             // No, we want to show them, but they should be UNLOCKED if finance is active.
+             // The backend API now returns expanded modules, so 'finance' -> 'finance_fees' etc.
+             // So if 'finance' is active, 'finance_fees' will be in activeModules list.
              
              if (isLocked) {
                  return (
