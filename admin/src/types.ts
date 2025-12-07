@@ -189,6 +189,7 @@ export interface Module {
     oneTimePrice?: number;
     isEnabled: boolean;
     isCore?: boolean;
+    isSystem?: boolean;
     currency?: string;
 }
 

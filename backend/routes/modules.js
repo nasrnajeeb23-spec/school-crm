@@ -27,7 +27,8 @@ const getEffectiveCatalog = async (req) => {
                 annualPrice: Number(db.annualPrice || 0),
                 currency: db.currency || 'USD',
                 isEnabled: db.isEnabled,
-                isCore: db.isCore
+                isCore: db.isCore,
+                isSystem: true
             });
         } else {
             // Use memory version
@@ -40,7 +41,8 @@ const getEffectiveCatalog = async (req) => {
                 annualPrice: 0,
                 currency: 'USD',
                 isEnabled: mem.isEnabled !== false,
-                isCore: !!mem.isCore
+                isCore: !!mem.isCore,
+                isSystem: true
             });
         }
     }
@@ -57,7 +59,8 @@ const getEffectiveCatalog = async (req) => {
                 annualPrice: Number(db.annualPrice || 0),
                 currency: db.currency || 'USD',
                 isEnabled: db.isEnabled,
-                isCore: db.isCore
+                isCore: db.isCore,
+                isSystem: false
             });
         }
     }
@@ -177,7 +180,19 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
     try {
         const id = String(req.params.id || '');
         const row = await ModuleCatalog.findByPk(id);
-        if (!row) return res.status(404).json({ message: 'Module not found' });
+        
+        if (!row) {
+            // Check if it's a built-in module
+            const memoryCatalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
+            const isBuiltIn = memoryCatalog.some(m => m.id === id);
+            
+            if (isBuiltIn) {
+                return res.status(400).json({ message: 'Cannot delete built-in module. You can disable it by editing.' });
+            }
+            
+            return res.status(404).json({ message: 'Module not found' });
+        }
+        
         await row.destroy();
         res.json({ deleted: true });
     } catch (e) {

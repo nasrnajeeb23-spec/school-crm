@@ -201,17 +201,21 @@ const FeatureManagement: React.FC = () => {
                                                 <EditIcon className="w-4 h-4 ml-1" />
                                                 تعديل
                                             </button>
-                                            <button onClick={async () => {
+                                            <button 
+                                                disabled={module.isSystem}
+                                                title={module.isSystem ? 'لا يمكن حذف وحدة النظام' : 'حذف'}
+                                                onClick={async () => {
                                                 if (!window.confirm('هل أنت متأكد من حذف هذه الوحدة؟')) return;
                                                 try {
                                                     await api.deleteModule(module.id as ModuleId);
                                                     await logSuperAdminAction('platform.module.delete', { moduleId: module.id });
                                                     addToast('تم حذف الوحدة.', 'success');
                                                     fetchData();
-                                                } catch {
-                                                    addToast('فشل حذف الوحدة.', 'error');
+                                                } catch (e: any) {
+                                                    const msg = e.message && e.message.includes(':') ? e.message.split(':').pop().trim() : 'فشل حذف الوحدة.';
+                                                    addToast(msg, 'error');
                                                 }
-                                            }} className="font-medium text-red-600 dark:text-red-500 hover:underline">
+                                            }} className={`font-medium ${module.isSystem ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 dark:text-red-500 hover:underline'}`}>
                                                 حذف
                                             </button>
                                         </td>
