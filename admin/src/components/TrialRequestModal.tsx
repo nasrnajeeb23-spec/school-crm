@@ -29,9 +29,14 @@ const TrialRequestModal: React.FC<TrialRequestModalProps> = ({ onClose, onSave }
     if (!formData.adminEmail || !/\S+@\S+\.\S+/.test(formData.adminEmail)) {
       newErrors.adminEmail = "الرجاء إدخال بريد إلكتروني صحيح.";
     }
-    if (formData.adminPassword.length < 6) {
-      newErrors.adminPassword = "يجب أن تكون كلمة المرور 6 أحرف على الأقل.";
+    
+    // Strong password validation regex
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
+    
+    if (!strongPasswordRegex.test(formData.adminPassword)) {
+      newErrors.adminPassword = "كلمة المرور يجب أن تكون 10 خانات على الأقل وتحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص.";
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

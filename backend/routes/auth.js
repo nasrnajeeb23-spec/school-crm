@@ -121,7 +121,12 @@ router.post('/trial-signup', validate([
 ]), async (req, res) => {
   try {
     const { schoolName, adminName, adminEmail, adminPassword } = req.body;
-    if (!isStrongPassword(adminPassword)) return res.status(400).json({ msg: 'Weak password' });
+    if (!isStrongPassword(adminPassword)) {
+        return res.status(400).json({ 
+            msg: 'كلمة المرور ضعيفة. يجب أن تكون 10 خانات على الأقل وتحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص.',
+            code: 'WEAK_PASSWORD' 
+        });
+    }
 
     const exists = await User.findOne({ where: { email: adminEmail } });
     if (exists) return res.status(400).json({ msg: 'Email already in use' });
