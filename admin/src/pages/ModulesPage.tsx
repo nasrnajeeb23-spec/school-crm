@@ -277,8 +277,17 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
 
     // For Super Admin, we show ALL modules fetched from API (which should return everything)
     // For School Admin, we might still want to categorize them
-    const coreModules = availableModules.filter(m => m.isCore);
-    const addonModules = availableModules.filter(m => !m.isCore);
+    // Filter out finance_fees/salaries/expenses etc. from UI if parent 'finance' exists to avoid duplicates
+    const uniqueModules = availableModules.filter(m => {
+        if (m.id === 'finance_fees' || m.id === 'finance_salaries' || m.id === 'finance_expenses') {
+             // If parent finance exists, hide these children
+             return !availableModules.some(p => p.id === 'finance');
+        }
+        return true;
+    });
+
+    const coreModules = uniqueModules.filter(m => m.isCore);
+    const addonModules = uniqueModules.filter(m => !m.isCore);
 
     return (
         <>

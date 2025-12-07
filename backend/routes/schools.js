@@ -284,7 +284,26 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
         }
     }
     
-    res.json(activeModules);
+    // Expand parent modules to children
+    const moduleMap = {
+      'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
+      'transportation': ['transportation', 'transport', 'bus_management'],
+      'academic': ['academic', 'academic_management', 'grades', 'attendance'],
+      'student': ['student', 'student_management']
+    };
+
+    const expandedSet = new Set();
+    activeModules.forEach(am => {
+        expandedSet.add(am.moduleId);
+        if (moduleMap[am.moduleId]) {
+            moduleMap[am.moduleId].forEach(child => expandedSet.add(child));
+        }
+    });
+    
+    // Re-format to expected output
+    const finalModules = Array.from(expandedSet).map(mid => ({ schoolId, moduleId: mid }));
+
+    res.json(finalModules);
   } catch (err) { console.error('Get Modules Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 

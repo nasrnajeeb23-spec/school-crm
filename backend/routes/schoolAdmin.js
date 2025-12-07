@@ -565,7 +565,7 @@ router.put('/:schoolId/teachers/:teacherId/salary-structure', verifyToken, requi
 });
 
 // Payroll processing
-router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
     const month = String(req.query.month || '').trim();
     if (!month || !/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ msg: 'Invalid month format' });
@@ -2267,19 +2267,21 @@ router.get('/:schoolId/jobs', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
 router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_expenses'), async (req, res) => {
   try {
     const { Expense } = require('../models');
+    try { await Expense.sync({ alter: true }); } catch (e) { console.error('Sync Expense Error:', e); } // Auto-heal
     const rows = await Expense.findAll({ where: { schoolId: Number(req.params.schoolId) }, order: [['date','DESC']] });
     res.json(rows.map(e => ({ id: String(e.id), date: e.date, description: e.description, category: e.category, amount: parseFloat(e.amount) })));
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  } catch (err) { console.error('Get Expenses Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 
 router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_expenses'), async (req, res) => {
   try {
     const { Expense } = require('../models');
+    try { await Expense.sync({ alter: true }); } catch (e) { console.error('Sync Expense Error:', e); } // Auto-heal
     const { date, description, category, amount } = req.body || {};
     if (!date || !description || !category || amount === undefined) return res.status(400).json({ msg: 'Invalid payload' });
     const exp = await Expense.create({ schoolId: Number(req.params.schoolId), date, description, category, amount });
     res.status(201).json({ id: String(exp.id), date: exp.date, description: exp.description, category: exp.category, amount: parseFloat(exp.amount) });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  } catch (err) { console.error('Create Expense Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 
 // Fees Setup CRUD
@@ -2345,7 +2347,24 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
     const teachersCount = await Teacher.count({ where: { schoolId } });
 
     const allowedModules = Array.isArray(req.app?.locals?.allowedModules) ? req.app.locals.allowedModules : [];
-    const activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
+    let activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
+    
+    // Expand parent modules to children for frontend compatibility
+    const moduleMap = {
+      'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
+      'transportation': ['transportation', 'transport', 'bus_management'],
+      'academic': ['academic', 'academic_management', 'grades', 'attendance'],
+      'student': ['student', 'student_management']
+    };
+    
+    const expandedActive = new Set(activeModules);
+    activeModules.forEach(m => {
+      if (moduleMap[m]) {
+        moduleMap[m].forEach(child => expandedActive.add(child));
+      }
+    });
+    activeModules = Array.from(expandedActive);
+
     const now = Date.now();
     const endMs = sub?.renewalDate ? new Date(sub.renewalDate).getTime() : (sub?.endDate ? new Date(sub.endDate).getTime() : 0);
     const isTrial = String(sub?.status || '').toUpperCase() === 'TRIAL';

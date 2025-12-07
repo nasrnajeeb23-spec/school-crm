@@ -55,6 +55,7 @@ const FeatureManagement: React.FC = () => {
     };
 
     const handleUpdateModule = async (moduleData: Module) => {
+        // Do not set isSaving here, EditModuleModal handles its own loading state
         try {
             const updatedModule = await api.updateModule(moduleData);
             setModules(prev => prev.map(m => m.id === updatedModule.id ? updatedModule : m));
@@ -62,7 +63,10 @@ const FeatureManagement: React.FC = () => {
             await logSuperAdminAction('platform.module.update', { moduleId: updatedModule.id, enabled: updatedModule.isEnabled, monthlyPrice: updatedModule.monthlyPrice });
             addToast('تم تحديث الوحدة بنجاح.', 'success');
         } catch (error) {
+            console.error(error);
             addToast('فشل تحديث الوحدة.', 'error');
+            // Re-throw so modal knows it failed
+            throw error; 
         }
     };
 

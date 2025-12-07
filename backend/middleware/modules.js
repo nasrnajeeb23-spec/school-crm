@@ -55,7 +55,7 @@ function requireModule(moduleId) {
       // Normalize module IDs if needed (e.g. 'transport' vs 'transportation')
       // Define parent-child module relationships
       const moduleMap = {
-          'finance': ['finance', 'finance_fees', 'finance_salaries'], // Added finance_salaries to allow access if finance is active
+          'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'], // Added finance_expenses
           'transportation': ['transportation', 'transport', 'bus_management'],
           'academic': ['academic', 'academic_management', 'grades', 'attendance'],
           'student': ['student', 'student_management']
