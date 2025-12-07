@@ -166,7 +166,6 @@ router.get('/:id/subscription', verifyToken, requireRole('SUPER_ADMIN'), async (
 router.get('/:id/billing/summary', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const sid = Number(req.params.id);
-    const { Invoice, Student } = require('../models');
     const rows = await Invoice.findAll({ include: [{ model: Student, where: { schoolId: sid }, attributes: [] }] });
     let paid = 0, unpaid = 0, overdue = 0, total = 0, outstanding = 0;
     rows.forEach(r => {

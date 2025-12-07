@@ -177,6 +177,17 @@ router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN'
         const planName = subscription?.Plan?.name || 'Basic';
         const subscriptionStatus = subscription?.status || 'Inactive';
 
+        // Prepare full subscription details for display
+        const subscriptionDetails = subscription ? {
+            planName: subscription.Plan?.name || 'Unknown',
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            status: subscription.status,
+            limits: subscription.Plan?.limits || {},
+            price: subscription.Plan?.price || 0,
+            interval: subscription.Plan?.interval || 'monthly'
+        } : null;
+
         // Check for cached/aggregated stats for today
         const today = new Date().toISOString().split('T')[0];
         let stats = null;
@@ -193,7 +204,8 @@ router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN'
                 expenses: stats.totalExpenses,
                 source: 'aggregated',
                 planName,
-                subscriptionStatus
+                subscriptionStatus,
+                subscription: subscriptionDetails
             });
         }
 
@@ -214,7 +226,8 @@ router.get('/:schoolId/stats/dashboard', verifyToken, requireRole('SCHOOL_ADMIN'
             expenses: expenses || 0,
             source: 'realtime',
             planName,
-            subscriptionStatus
+            subscriptionStatus,
+            subscription: subscriptionDetails
         });
 
     } catch (err) {
@@ -1404,7 +1417,7 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         include: {
             model: Student,
             attributes: ['name'],
-            where: { schoolId: req.user.schoolId },
+            where: { schoolId: Number(req.params.schoolId) },
         },
         order: [['dueDate', 'DESC']]
     });

@@ -1,10 +1,10 @@
-const { sequelize, SchoolSettings } = require('../models');
-
-async function up({ sequelize }) {
-  const transaction = await sequelize.transaction();
-  try {
-    // 1. Fetch all school settings
-    const allSettings = await SchoolSettings.findAll({ transaction });
+module.exports = {
+  up: async ({ sequelize, models }) => {
+    const { SchoolSettings } = models;
+    const transaction = await sequelize.transaction();
+    try {
+      // 1. Fetch all school settings
+      const allSettings = await SchoolSettings.findAll({ transaction });
     
     for (const settings of allSettings) {
       let active = settings.activeModules || [];
@@ -40,6 +40,5 @@ async function up({ sequelize }) {
     await transaction.rollback();
     throw error;
   }
-}
-
-module.exports = { up };
+  }
+};

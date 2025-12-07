@@ -29,4 +29,38 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   PUT api/plans/:id
+// @desc    Update a plan
+// @access  Private (SuperAdmin)
+router.put('/:id', async (req, res) => {
+  try {
+    const plan = await Plan.findByPk(req.params.id);
+    if (!plan) return res.status(404).json({ msg: 'Plan not found' });
+
+    const { name, price, pricePeriod, features, limits, recommended } = req.body;
+
+    if (name) plan.name = name;
+    if (price !== undefined) plan.price = price;
+    if (pricePeriod) plan.pricePeriod = pricePeriod;
+    if (features) plan.features = typeof features === 'object' ? JSON.stringify(features) : features;
+    if (limits) plan.limits = typeof limits === 'object' ? JSON.stringify(limits) : limits;
+    if (recommended !== undefined) plan.recommended = recommended;
+
+    await plan.save();
+
+    res.json({
+      id: plan.id.toString(),
+      name: plan.name,
+      price: parseFloat(plan.price),
+      pricePeriod: plan.pricePeriod,
+      features: typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features,
+      limits: typeof plan.limits === 'string' ? JSON.parse(plan.limits) : plan.limits,
+      recommended: plan.recommended
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;
