@@ -7,6 +7,7 @@ const { ModuleCatalog } = require('../models');
 const getEffectiveCatalog = async (req) => {
     const dbModules = await ModuleCatalog.findAll();
     const memoryCatalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
+    const disabledSet = req.app?.locals?.disabledModules instanceof Set ? req.app.locals.disabledModules : new Set();
     
     const dbMap = new Map(dbModules.map(m => [m.id, m]));
     const combined = [];
@@ -14,10 +15,12 @@ const getEffectiveCatalog = async (req) => {
 
     // 1. Add/Merge memory modules
     for (const mem of memoryCatalog) {
+        if (disabledSet.has(mem.id)) continue;
         seenIds.add(mem.id);
         if (dbMap.has(mem.id)) {
             // DB overrides memory
             const db = dbMap.get(mem.id);
+            if (db.isEnabled === false) { continue; }
             combined.push({
                 id: db.id,
                 name: db.name,
@@ -50,6 +53,7 @@ const getEffectiveCatalog = async (req) => {
     // 2. Add DB-only modules (custom ones created by superadmin)
     for (const db of dbModules) {
         if (!seenIds.has(db.id)) {
+            if (db.isEnabled === false) { continue; }
             combined.push({
                 id: db.id,
                 name: db.name,
@@ -182,22 +186,22 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
         const row = await ModuleCatalog.findByPk(id);
         
         if (!row) {
-            // Check if it's a built-in module
             const memoryCatalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
             const isBuiltIn = memoryCatalog.some(m => m.id === id);
-            
             if (isBuiltIn) {
-                return res.status(400).json({ message: 'Cannot delete built-in module. You can disable it by editing.' });
+                if (!(req.app.locals.disabledModules instanceof Set)) req.app.locals.disabledModules = new Set();
+                req.app.locals.disabledModules.add(id);
+                return res.json({ deleted: true, disabled: true });
             }
-            
             return res.status(404).json({ message: 'Module not found' });
         }
 
-        // Prevent deleting core modules even if in DB
-        if (row.isCore || (id === 'finance' && row.isCore)) {
-             return res.status(400).json({ message: 'Cannot delete a Core module. You can disable it instead.' });
+        if (row.isCore) {
+            row.isEnabled = false;
+            await row.save();
+            return res.json({ deleted: true, disabled: true });
         }
-        
+
         await row.destroy();
         res.json({ deleted: true });
     } catch (e) {

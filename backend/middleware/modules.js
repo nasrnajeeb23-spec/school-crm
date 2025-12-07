@@ -26,7 +26,7 @@ function requireModule(moduleId) {
       const schoolId = Number(schoolIdParam);
 
       // 3. Check Subscription Status (Expiry)
-      const { Subscription, SchoolSettings } = require('../models');
+      const { Subscription, SchoolSettings, School } = require('../models');
       const sub = await Subscription.findOne({ where: { schoolId } });
       const now = new Date();
       
@@ -42,10 +42,18 @@ function requireModule(moduleId) {
         if (expiry && now > new Date(expiry)) {
              return res.status(403).json({ msg: 'School subscription has expired.' });
         }
+        if (status === 'TRIAL') return next();
       } else {
-          // No subscription found? strictly should deny, but maybe allow for initial setup?
-          // For security, deny if not superadmin.
-          // return res.status(403).json({ msg: 'No valid subscription found.' });
+        // No subscription found? strictly should deny, but maybe allow for initial setup?
+        // For security, deny if not superadmin.
+        // return res.status(403).json({ msg: 'No valid subscription found.' });
+        const school = await School.findByPk(schoolId);
+        if (school) {
+          const createdAt = new Date(school.createdAt || Date.now());
+          const diffMs = now.getTime() - createdAt.getTime();
+          const sevenDays = 7 * 24 * 60 * 60 * 1000;
+          if (diffMs <= sevenDays) return next();
+        }
       }
 
       // 4. Check Active Modules for School

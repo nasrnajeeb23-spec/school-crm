@@ -51,6 +51,7 @@ const fs = require('fs');
 const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
+app.locals.disabledModules = new Set();
 let Sentry;
 try { Sentry = require('@sentry/node'); } catch {}
 if (Sentry && process.env.SENTRY_DSN) {

@@ -1198,8 +1198,19 @@ export const updatePricingConfig = async (config: PricingConfig): Promise<Pricin
     return await apiCall('/pricing/config', { method: 'PUT', body: JSON.stringify(config) });
 };
 
-export const updateModule = async (moduleId: ModuleId | string, data: Partial<Module>): Promise<Module> => {
-    const idStr = typeof moduleId === 'string' ? moduleId : String(moduleId);
+export const updateModule = async (moduleId: ModuleId | string | any, data: Partial<Module>): Promise<Module> => {
+    const normalizeId = (input: any): string => {
+        if (input === null || input === undefined) return '';
+        if (typeof input === 'string' || typeof input === 'number' || typeof input === 'boolean') return String(input);
+        if (typeof input === 'object') {
+            if ('id' in input) return normalizeId((input as any).id);
+            if ('moduleId' in input) return normalizeId((input as any).moduleId);
+            const s = input.toString && input.toString !== Object.prototype.toString ? input.toString() : '';
+            return String(s || '');
+        }
+        return String(input);
+    };
+    const idStr = normalizeId(moduleId);
     const updateData = data ? { ...(data as any) } : {};
     if (updateData && typeof updateData === 'object') delete (updateData as any).id;
     return await apiCall(`/modules/${encodeURIComponent(idStr)}`, { method: 'PUT', body: JSON.stringify(updateData) });
@@ -1209,8 +1220,19 @@ export const createModule = async (data: Module): Promise<Module> => {
     return await apiCall('/modules', { method: 'POST', body: JSON.stringify(data) });
 };
 
-export const deleteModule = async (moduleId: string): Promise<void> => {
-    const idStr = typeof moduleId === 'string' ? moduleId : String(moduleId as any);
+export const deleteModule = async (moduleId: string | any): Promise<void> => {
+    const normalizeId = (input: any): string => {
+        if (input === null || input === undefined) return '';
+        if (typeof input === 'string' || typeof input === 'number' || typeof input === 'boolean') return String(input);
+        if (typeof input === 'object') {
+            if ('id' in input) return normalizeId((input as any).id);
+            if ('moduleId' in input) return normalizeId((input as any).moduleId);
+            const s = input.toString && input.toString !== Object.prototype.toString ? input.toString() : '';
+            return String(s || '');
+        }
+        return String(input);
+    };
+    const idStr = normalizeId(moduleId);
     await apiCall(`/modules/${encodeURIComponent(idStr)}`, { method: 'DELETE' });
 };
 
