@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { User, StudentGrades, Grade } from '../types';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { User, StudentGrades, Grade, Student } from '../types';
 import * as api from '../api';
 
 interface GradesScreenProps {
@@ -18,53 +18,85 @@ const getFinalGrade = (total: number) => {
 
 const GradesScreen: React.FC<GradesScreenProps> = ({ user }) => {
     const [grades, setGrades] = useState<StudentGrades[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!user.parentId) { setLoading(false); return; }
-        api.getParentDashboardData(user.parentId)
-            .then(data => setGrades(data.grades))
-            .finally(() => setLoading(false));
+        api.getParentStudents(user.parentId).then(data => {
+            setStudents(data);
+            if (data.length > 0) setSelectedStudentId(data[0].id);
+            else setLoading(false);
+        }).catch(err => {
+            console.error(err);
+            setLoading(false);
+        });
     }, [user.parentId]);
 
-    if (loading) {
+    useEffect(() => {
+        if (!user.parentId || !selectedStudentId) return;
+        setLoading(true);
+        api.getStudentGrades(user.parentId, selectedStudentId)
+            .then(setGrades)
+            .finally(() => setLoading(false));
+    }, [user.parentId, selectedStudentId]);
+
+    if (loading && grades.length === 0) {
         return <View style={styles.center}><ActivityIndicator size="large" color="#dc2626" /></View>;
     }
 
-    if (grades.length === 0) {
-        return <View style={styles.center}><Text>لا توجد درجات لعرضها.</Text></View>;
-    }
-
     return (
-        <ScrollView style={styles.container}>
-            {grades.map(grade => {
-                const total = calculateTotal(grade.grades);
-                const finalGrade = getFinalGrade(total);
-                return (
-                    <View key={grade.subject} style={styles.card}>
-                        <View style={styles.cardHeader}>
-                            <Text style={styles.subjectTitle}>{grade.subject}</Text>
-                            <View style={styles.finalGrade}>
-                                <Text style={styles.finalGradeText}>{finalGrade}</Text>
-                                <Text style={styles.totalScoreText}>{total}%</Text>
+        <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+            {students.length > 1 && (
+                <View style={styles.studentSelector}>
+                    {students.map(student => (
+                        <TouchableOpacity 
+                            key={student.id} 
+                            onPress={() => setSelectedStudentId(student.id)}
+                            style={[styles.studentTab, selectedStudentId === student.id && styles.activeStudentTab]}
+                        >
+                            <Text style={[styles.studentTabText, selectedStudentId === student.id && styles.activeStudentTabText]}>
+                                {student.name}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )}
+            <ScrollView style={styles.container}>
+                {grades.length === 0 ? (
+                     <View style={styles.center}><Text>لا توجد درجات لعرضها.</Text></View>
+                ) : (
+                    grades.map((grade, index) => {
+                        const total = calculateTotal(grade.grades);
+                        const finalGrade = getFinalGrade(total);
+                        return (
+                            <View key={index} style={styles.card}>
+                                <View style={styles.cardHeader}>
+                                    <Text style={styles.subjectTitle}>{grade.subject}</Text>
+                                    <View style={styles.finalGrade}>
+                                        <Text style={styles.finalGradeText}>{finalGrade}</Text>
+                                        <Text style={styles.totalScoreText}>{total}%</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.gradesContainer}>
+                                    <View style={styles.gradeItem}><Text>الواجبات: {grade.grades.homework}/10</Text></View>
+                                    <View style={styles.gradeItem}><Text>اختبار: {grade.grades.quiz}/15</Text></View>
+                                    <View style={styles.gradeItem}><Text>منتصف: {grade.grades.midterm}/25</Text></View>
+                                    <View style={styles.gradeItem}><Text>نهائي: {grade.grades.final}/50</Text></View>
+                                </View>
                             </View>
-                        </View>
-                        <View style={styles.gradesContainer}>
-                            <View style={styles.gradeItem}><Text>الواجبات: {grade.grades.homework}/10</Text></View>
-                            <View style={styles.gradeItem}><Text>اختبار: {grade.grades.quiz}/15</Text></View>
-                            <View style={styles.gradeItem}><Text>منتصف: {grade.grades.midterm}/25</Text></View>
-                            <View style={styles.gradeItem}><Text>نهائي: {grade.grades.final}/50</Text></View>
-                        </View>
-                    </View>
-                );
-            })}
-        </ScrollView>
+                        );
+                    })
+                )}
+            </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f9fafb', padding: 16 },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
     card: {
         backgroundColor: '#fff',
         borderRadius: 12,
@@ -80,6 +112,30 @@ const styles = StyleSheet.create({
     totalScoreText: { fontSize: 14, color: '#6b7280' },
     gradesContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-around' },
     gradeItem: { backgroundColor: '#f3f4f6', padding: 8, borderRadius: 6, margin: 4, minWidth: '45%', alignItems: 'center' },
+    studentSelector: {
+        flexDirection: 'row-reverse',
+        backgroundColor: '#fff',
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb'
+    },
+    studentTab: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        marginHorizontal: 4,
+        backgroundColor: '#f3f4f6'
+    },
+    activeStudentTab: {
+        backgroundColor: '#dc2626'
+    },
+    studentTabText: {
+        color: '#374151',
+        fontWeight: '600'
+    },
+    activeStudentTabText: {
+        color: '#fff'
+    }
 });
 
 export default GradesScreen;

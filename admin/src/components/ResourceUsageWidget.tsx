@@ -24,7 +24,7 @@ const ResourceUsageWidget: React.FC<ResourceUsageWidgetProps> = ({ schoolId }) =
                     api.getSchoolTeachersCount(schoolId)
                 ]);
 
-                const limits = state.plan?.limits || { students: 50, teachers: 5 };
+                const limits = state.limits || state.plan?.limits || { students: 50, teachers: 5 };
                 
                 const maxStudents = limits.students === 'unlimited' ? 999999 : Number(limits.students);
                 const maxTeachers = limits.teachers === 'unlimited' ? 999999 : Number(limits.teachers);

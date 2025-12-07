@@ -62,6 +62,11 @@ export const logout = () => {
 
 // ==================== Parent Dashboard APIs ====================
 
+export const getParentDashboardData = async (parentId: string, studentId?: string): Promise<any> => {
+    const query = studentId ? `?studentId=${studentId}` : '';
+    return await apiCall(`/parents/${parentId}/dashboard${query}`);
+};
+
 export const getCurrentUser = async (): Promise<User> => {
     return await apiCall('/users/me');
 };
@@ -81,6 +86,22 @@ export const getStudentDetails = async (studentId: string): Promise<{
     invoices: Invoice[];
 }> => {
     return await apiCall(`/students/${studentId}/details`);
+};
+
+export const getStudentGrades = async (parentId: string, studentId: string): Promise<StudentGrades[]> => {
+    const response = await apiCall(`/parents/${parentId}/grades?studentId=${studentId}`);
+    if (response.children && response.children.length > 0) {
+        return response.children[0].grades;
+    }
+    return response.grades || [];
+};
+
+export const getStudentAttendance = async (parentId: string, studentId: string): Promise<any[]> => {
+    const response = await apiCall(`/parents/${parentId}/attendance?studentId=${studentId}`);
+    if (response.children && response.children.length > 0) {
+        return response.children[0].attendance;
+    }
+    return response.attendance || [];
 };
 
 export const getStudentSchedule = async (studentId: string): Promise<ScheduleEntry[]> => {
@@ -131,23 +152,27 @@ export const submitParentRequest = async (parentId: string, data: { type: Reques
 
 // ==================== Assignments & Submissions ====================
 
-export const getStudentAssignments = async (studentId: string): Promise<Assignment[]> => {
-    return await apiCall(`/students/${studentId}/assignments`);
+export const getStudentAssignments = async (parentId: string, studentId: string): Promise<Assignment[]> => {
+    const response = await apiCall(`/parents/${parentId}/assignments?studentId=${studentId}`);
+    // Response structure is { children: [{ student: {}, assignments: [] }] } or { student: {}, assignments: [] }
+    if (response.children && response.children.length > 0) {
+        return response.children[0].assignments;
+    }
+    return response.assignments || [];
 };
 
 export const getStudentSubmissions = async (studentId: string): Promise<Submission[]> => {
     return await apiCall(`/students/${studentId}/submissions`);
 };
 
-export const submitAssignment = async (submission: {
-    assignmentId: string;
-    studentId: string;
-    content: string;
-    attachments?: string[];
-}): Promise<Submission> => {
-    return await apiCall('/submissions', {
+export const getSubmissionForAssignment = async (parentId: string, assignmentId: string, studentId: string): Promise<Submission | null> => {
+    return await apiCall(`/parents/${parentId}/assignments/${assignmentId}/submission?studentId=${studentId}`);
+};
+
+export const submitAssignment = async (parentId: string, assignmentId: string, studentId: string, content: string): Promise<Submission> => {
+    return await apiCall(`/parents/${parentId}/assignments/${assignmentId}/submit`, {
         method: 'POST',
-        body: JSON.stringify(submission),
+        body: JSON.stringify({ studentId, content }),
     });
 };
 

@@ -3,7 +3,7 @@
 
 import { User, School, Student, Class, Assignment, Submission, AttendanceRecord, Conversation, Message } from './types';
 
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crm-backend.onrender.com/api';
+export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crm-backend.onrender.com/api';
 
 let memoryToken: string | null = null;
 

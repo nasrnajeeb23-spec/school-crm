@@ -12,26 +12,56 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
     const [loading, setLoading] = useState(true);
     const [quickDetails, setQuickDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Student Selector State
+    const [students, setStudents] = useState<Student[]>([]);
+    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!user.parentId) { setLoading(false); return; }
-        api.getParentDashboardData(user.parentId).then(setData).finally(() => setLoading(false));
+        
+        // Fetch students first
+        api.getParentStudents(user.parentId).then(studentList => {
+            setStudents(studentList);
+            if (studentList.length > 0) {
+                setSelectedStudentId(String(studentList[0].id));
+            } else {
+                setLoading(false);
+            }
+        }).catch(err => {
+            console.error("Failed to fetch students", err);
+            setLoading(false);
+        });
     }, [user.parentId]);
+
+    useEffect(() => {
+        if (!user.parentId || !selectedStudentId) return;
+        
+        setLoading(true);
+        api.getParentDashboardData(user.parentId, selectedStudentId)
+            .then(setData)
+            .catch(err => console.error("Failed to fetch dashboard data", err))
+            .finally(() => setLoading(false));
+    }, [user.parentId, selectedStudentId]);
 
     if (loading) {
         return <View style={styles.center}><ActivityIndicator size="large" color="#dc2626" /></View>;
+    }
+
+    if (!students.length) {
+         return <View style={styles.center}><Text>لا يوجد طلاب مرتبطين بهذا الحساب.</Text></View>;
     }
 
     if (!data) {
         return <View style={styles.center}><Text>لا توجد بيانات لعرضها.</Text></View>;
     }
 
-    const latestGrade = data.grades.length > 0 ? data.grades[0] : null;
-    const unpaidInvoices = data.invoices.filter((inv: Invoice) => inv.status !== InvoiceStatus.Paid);
-    const attendanceSummary = data.attendance.reduce((acc: any, record: any) => {
+    const latestGrade = data.grades && data.grades.length > 0 ? data.grades[0] : null;
+    const unpaidInvoices = data.invoices ? data.invoices.filter((inv: Invoice) => inv.status !== InvoiceStatus.Paid) : [];
+    const attendanceSummary = data.attendance ? data.attendance.reduce((acc: any, record: any) => {
         acc[record.status] = (acc[record.status] || 0) + 1;
         return acc;
-    }, {});
+    }, {}) : {};
     
     const getGradeInfo = (grade: StudentGrades | null) => {
         if (!grade) return { total: 0, finalGrade: 'N/A' };
@@ -45,10 +75,29 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
 
     return (
         <ScrollView style={styles.container}>
+            {/* Student Selector */}
+            {students.length > 1 && (
+                <View style={styles.studentSelector}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                        {students.map(student => (
+                            <TouchableOpacity 
+                                key={student.id} 
+                                style={[styles.studentChip, String(student.id) === String(selectedStudentId) && styles.selectedStudentChip]}
+                                onPress={() => setSelectedStudentId(String(student.id))}
+                            >
+                                <Text style={[styles.studentChipText, String(student.id) === String(selectedStudentId) && styles.selectedStudentChipText]}>
+                                    {student.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
             <View style={styles.profileHeader}>
-                <Image source={{ uri: data.student.profileImageUrl }} style={styles.avatar} />
-                <Text style={styles.studentName}>{data.student.name}</Text>
-                <Text style={styles.studentGrade}>{data.student.grade}</Text>
+                <Image source={{ uri: data.student?.profileImageUrl || 'https://via.placeholder.com/150' }} style={styles.avatar} />
+                <Text style={styles.studentName}>{data.student?.name}</Text>
+                <Text style={styles.studentGrade}>{data.student?.gradeLevel || 'الصف غير محدد'}</Text>
             </View>
 
             <View style={styles.card}>
@@ -59,7 +108,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
                         <Text style={styles.statLabel}>آخر درجة ({latestGrade?.subject || 'N/A'})</Text>
                     </View>
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{(attendanceSummary[AttendanceStatus.Present] || 0)} <Text style={styles.statUnit}>/ {data.attendance.length} يوم</Text></Text>
+                        <Text style={styles.statValue}>{(attendanceSummary[AttendanceStatus.Present] || 0)} <Text style={styles.statUnit}>/ {data.attendance?.length || 0} يوم</Text></Text>
                         <Text style={styles.statLabel}>الحضور</Text>
                     </View>
                     <View style={styles.statItem}>
@@ -71,12 +120,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
             
             <View style={styles.card}>
                 <Text style={styles.cardTitle}>إعلانات المدرسة</Text>
-                {data.announcements.map((ann: any) => (
-                    <View key={ann.id} style={styles.announcementItem}>
-                        <Text style={styles.announcementText}>{ann.lastMessage}</Text>
-                        <Text style={styles.announcementTime}>{ann.timestamp}</Text>
-                    </View>
-                ))}
+                {data.announcements && data.announcements.length > 0 ? (
+                    data.announcements.map((ann: any) => (
+                        <View key={ann.id} style={styles.announcementItem}>
+                            <Text style={styles.announcementText}>{ann.lastMessage || ann.description || ann.title}</Text>
+                            <Text style={styles.announcementTime}>{ann.timestamp || ann.date}</Text>
+                        </View>
+                    ))
+                ) : (
+                    <Text style={{ textAlign: 'center', color: '#6b7280', padding: 10 }}>لا توجد إعلانات جديدة</Text>
+                )}
             </View>
 
             <View style={styles.card}>
@@ -100,8 +153,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
                             try {
                                 await api.submitParentRequest(user.parentId, { type: RequestType.Leave, details: quickDetails.trim() });
                                 setQuickDetails('');
+                                alert('تم إرسال الطلب بنجاح');
                             } catch (e) {
-                                // يمكن لاحقًا إضافة تنبيه
+                                alert('حدث خطأ أثناء إرسال الطلب');
                             } finally { setIsSubmitting(false); }
                         }}
                         style={{ backgroundColor: isSubmitting || !quickDetails.trim() ? '#9ca3af' : '#dc2626', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}
@@ -117,6 +171,33 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ user }) => {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f9fafb' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    studentSelector: {
+        backgroundColor: '#fff',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    studentChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#f3f4f6',
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    selectedStudentChip: {
+        backgroundColor: '#dc2626',
+        borderColor: '#dc2626',
+    },
+    studentChipText: {
+        fontSize: 14,
+        color: '#374151',
+        fontWeight: '500',
+    },
+    selectedStudentChipText: {
+        color: '#fff',
+    },
     profileHeader: {
         backgroundColor: '#fff',
         alignItems: 'center',

@@ -24,6 +24,7 @@ const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.itemContainer}
             onPress={() => navigation.navigate('Chat', { 
                 conversationId: item.id, 
+                roomId: item.roomId,
                 participantName: item.participantName,
                 participantAvatar: item.participantAvatar,
             })}

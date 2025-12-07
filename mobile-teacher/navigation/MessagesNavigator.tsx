@@ -5,7 +5,7 @@ import ChatScreen from '../screens/ChatScreen';
 
 export type MessagesStackParamList = {
   Conversations: undefined;
-  Chat: { conversationId: string; participantName: string, participantAvatar: string };
+  Chat: { conversationId: string; roomId: string; participantName: string, participantAvatar: string };
 };
 
 const Stack = createStackNavigator<MessagesStackParamList>();

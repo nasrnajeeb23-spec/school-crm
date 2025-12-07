@@ -138,8 +138,9 @@ router.post('/send', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TE
 
     try { await conv.update({ updatedAt: new Date() }); } catch {}
 
-    return res.success({
+    const responseData = {
       id: msg.id,
+      conversationId,
       text: msg.text,
       senderId: msg.senderId,
       senderRole: msg.senderRole,
@@ -147,7 +148,14 @@ router.post('/send', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TE
       attachmentUrl: msg.attachmentUrl,
       attachmentType: msg.attachmentType,
       attachmentName: msg.attachmentName,
-    }, 'Message sent', 'CREATED');
+    };
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(conv.roomId).emit('receive_message', responseData);
+    }
+
+    return res.success(responseData, 'Message sent', 'CREATED');
   } catch (e) {
     console.error(e.message);
     res.status(500).send('Server Error');

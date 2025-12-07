@@ -37,12 +37,22 @@ const ApiKey = require('./ApiKey');
 const TrialRequest = require('./TrialRequest');
 const BehaviorRecord = require('./BehaviorRecord');
 const SchoolStats = require('./SchoolStats');
+const Assignment = require('./Assignment');
+const Submission = require('./Submission');
+const SubscriptionModule = require('./SubscriptionModule');
 
 
 // Define associations
 // School <-> Subscription (One-to-One)
 School.hasOne(Subscription, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 Subscription.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+// Subscription <-> SubscriptionModule (One-to-Many)
+Subscription.hasMany(SubscriptionModule, { foreignKey: 'subscriptionId', onDelete: 'CASCADE', hooks: true });
+SubscriptionModule.belongsTo(Subscription, { foreignKey: 'subscriptionId', onDelete: 'CASCADE' });
+
+// SubscriptionModule <-> ModuleCatalog (Many-to-One)
+SubscriptionModule.belongsTo(ModuleCatalog, { foreignKey: 'moduleId', targetKey: 'id' });
 
 // Plan <-> Subscription (One-to-Many)
 Plan.hasMany(Subscription, { foreignKey: 'planId', onDelete: 'SET NULL' });
@@ -220,6 +230,9 @@ const db = {
   PricingConfig,
   BehaviorRecord,
   SchoolStats,
+  Assignment,
+  Submission,
+  SubscriptionModule,
 };
 
 module.exports = db;
@@ -254,3 +267,23 @@ Teacher.hasMany(TeacherAttendance, { foreignKey: 'teacherId', onDelete: 'CASCADE
 TeacherAttendance.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'CASCADE' });
 School.hasMany(Job, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 Job.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+// School <-> Assignment
+School.hasMany(Assignment, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Assignment.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+// Class <-> Assignment
+Class.hasMany(Assignment, { foreignKey: 'classId', onDelete: 'CASCADE', hooks: true });
+Assignment.belongsTo(Class, { foreignKey: 'classId', onDelete: 'CASCADE' });
+
+// Teacher <-> Assignment
+Teacher.hasMany(Assignment, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
+Assignment.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
+
+// Assignment <-> Submission
+Assignment.hasMany(Submission, { foreignKey: 'assignmentId', onDelete: 'CASCADE', hooks: true });
+Submission.belongsTo(Assignment, { foreignKey: 'assignmentId', onDelete: 'CASCADE' });
+
+// Student <-> Submission
+Student.hasMany(Submission, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+Submission.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });

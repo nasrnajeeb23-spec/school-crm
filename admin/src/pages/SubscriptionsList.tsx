@@ -3,6 +3,7 @@ import { Subscription, SubscriptionStatus } from '../types';
 import * as api from '../api';
 import StatsCard from '../components/StatsCard';
 import { SubscriptionIcon, MRRIcon, CanceledIcon } from '../components/icons';
+import ManageSubscriptionModal from '../components/ManageSubscriptionModal';
 
 const statusColorMap: { [key in SubscriptionStatus]: string } = {
   [SubscriptionStatus.Active]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -14,13 +15,32 @@ const statusColorMap: { [key in SubscriptionStatus]: string } = {
 const SubscriptionsList: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchSubscriptions = async () => {
+    try {
+        const data = await api.getSubscriptions();
+        setSubscriptions(data);
+        setLoading(false);
+    } catch (error) {
+        console.error("Failed to fetch subscriptions", error);
+        setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api.getSubscriptions().then(data => {
-      setSubscriptions(data);
-      setLoading(false);
-    });
+    fetchSubscriptions();
   }, []);
+
+  const handleEditClick = (sub: Subscription) => {
+    setSelectedSubscription(sub);
+    setIsModalOpen(true);
+  };
+
+  const handleModalSave = () => {
+    fetchSubscriptions(); // Refresh list
+  };
 
   if (loading) {
     return <div className="text-center p-8">جاري تحميل الاشتراكات...</div>;
@@ -87,12 +107,15 @@ const SubscriptionsList: React.FC = () => {
                       {sub.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4">{sub.renewalDate}</td>
+                  <td className="px-6 py-4">{sub.renewalDate ? sub.renewalDate.split('T')[0] : '-'}</td>
                   <td className={`px-6 py-4 font-semibold`}>${sub.amount.toFixed(2)}</td>
                   <td className="px-6 py-4">
-                    <a href="#" className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">
+                    <button 
+                        onClick={() => handleEditClick(sub)}
+                        className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline"
+                    >
                       إدارة
-                    </a>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -100,6 +123,15 @@ const SubscriptionsList: React.FC = () => {
           </table>
         </div>
       </div>
+      
+      {selectedSubscription && (
+        <ManageSubscriptionModal
+          subscription={selectedSubscription}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleModalSave}
+        />
+      )}
     </div>
   );
 };

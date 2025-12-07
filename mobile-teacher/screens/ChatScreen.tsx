@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
+import io, { Socket } from 'socket.io-client';
 import * as api from '../api';
 import { Message } from '../types';
 import { MessagesStackParamList } from '../navigation/MessagesNavigator';
@@ -9,11 +10,44 @@ import { SendIcon } from '../components/icons';
 type Props = StackScreenProps<MessagesStackParamList, 'Chat'>;
 
 const ChatScreen: React.FC<Props> = ({ route }) => {
-    const { conversationId } = route.params;
+    const { conversationId, roomId } = route.params;
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
+    const socketRef = useRef<Socket | null>(null);
+
+    useEffect(() => {
+        // Initialize Socket
+        const socketUrl = api.API_BASE_URL.replace('/api', '');
+        console.log('Connecting to socket:', socketUrl);
+        
+        socketRef.current = io(socketUrl, {
+            transports: ['websocket'],
+            forceNew: true,
+        });
+
+        socketRef.current.on('connect', () => {
+            console.log('Connected to socket server');
+            if (roomId) {
+                console.log('Joining room:', roomId);
+                socketRef.current?.emit('join_conversation', roomId);
+            }
+        });
+
+        socketRef.current.on('receive_message', (message: Message) => {
+            console.log('Received message:', message);
+            setMessages(prev => {
+                const exists = prev.some(m => m.id === message.id);
+                if (exists) return prev;
+                return [...prev, message];
+            });
+        });
+
+        return () => {
+            socketRef.current?.disconnect();
+        };
+    }, [roomId]);
 
     useEffect(() => {
         setLoading(true);
@@ -34,8 +68,9 @@ const ChatScreen: React.FC<Props> = ({ route }) => {
         const tempMessage: Message = {
             id: `temp_${Date.now()}`,
             senderId: 'me',
+            senderRole: 'TEACHER', // Optimistic role
             text: textToSend,
-            timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+            timestamp: new Date().toISOString(),
         };
         setMessages(prev => [...prev, tempMessage]);
 
@@ -52,20 +87,26 @@ const ChatScreen: React.FC<Props> = ({ route }) => {
         }
     };
 
-    const renderItem = ({ item }: { item: Message }) => (
-        <View style={[
-            styles.messageContainer,
-            item.senderId === 'me' ? styles.myMessageContainer : styles.otherMessageContainer
-        ]}>
+    const renderItem = ({ item }: { item: Message }) => {
+        const isMyMessage = item.senderRole === 'TEACHER' || item.senderId === 'me';
+
+        return (
             <View style={[
-                styles.messageBubble,
-                item.senderId === 'me' ? styles.myMessageBubble : styles.otherMessageBubble
+                styles.messageContainer,
+                isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer
             ]}>
-                <Text style={item.senderId === 'me' ? styles.myMessageText : styles.otherMessageText}>{item.text}</Text>
+                <View style={[
+                    styles.messageBubble,
+                    isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble
+                ]}>
+                    <Text style={isMyMessage ? styles.myMessageText : styles.otherMessageText}>{item.text}</Text>
+                </View>
+                <Text style={styles.timestamp}>
+                    {new Date(item.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
             </View>
-            <Text style={styles.timestamp}>{item.timestamp}</Text>
-        </View>
-    );
+        );
+    };
 
     if (loading) {
         return <View style={styles.center}><ActivityIndicator size="large" color="#1e3a8a" /></View>;

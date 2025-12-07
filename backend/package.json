@@ -16,6 +16,7 @@
   "dependencies": {
     "@azure/msal-node": "^2.6.0",
     "@sentry/node": "^7.108.0",
+    "arabic-reshaper": "^1.1.0",
     "archiver": "^6.0.2",
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.1",

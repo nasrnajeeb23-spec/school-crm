@@ -183,9 +183,10 @@ export const superAdminLogin = async (email: string, password: string): Promise<
           return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
         }
       } catch {}
-      if (String(email).toLowerCase() === 'super@admin.com' && password === 'password') {
-        return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
-      }
+      // Hardcoded super admin fallback REMOVED for security
+      // if (String(email).toLowerCase() === 'super@admin.com' && password === 'password') {
+      //   return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
+      // }
       throw new Error('Login failed');
     }
 };
@@ -523,6 +524,10 @@ export const getSubscriptions = async (): Promise<Subscription[]> => {
     } catch {
         return [] as Subscription[];
     }
+};
+
+export const updateSubscription = async (id: string, data: { planId?: number; status?: string; renewalDate?: string; customLimits?: any; modules?: any[] }): Promise<any> => {
+    return await apiCall(`/superadmin/subscriptions/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 };
 
 export const getPlans = async (): Promise<Plan[]> => {
@@ -1379,6 +1384,7 @@ export default {
     getSchoolsList,
     getRevenueData,
     getSubscriptions,
+    updateSubscription,
     getPlans,
     updatePlan,
     getAvailableModules,

@@ -128,10 +128,16 @@ router.get('/:schoolId/stats/counts', verifyToken, requireRole('SCHOOL_ADMIN', '
 router.get('/:schoolId/subscription', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
     try {
       const schoolId = Number(req.params.schoolId);
-      const { Subscription, Plan } = require('../models');
+      const { Subscription, Plan, SubscriptionModule, ModuleCatalog } = require('../models');
       const subscription = await Subscription.findOne({ 
         where: { schoolId }, 
-        include: [Plan] 
+        include: [
+          { model: Plan },
+          { 
+            model: SubscriptionModule,
+            include: [{ model: ModuleCatalog, attributes: ['id', 'name', 'description', 'monthlyPrice'] }]
+          }
+        ] 
       });
       
       if (!subscription) {
@@ -145,21 +151,90 @@ router.get('/:schoolId/subscription', verifyToken, requireRole('SCHOOL_ADMIN', '
       const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
       const isExpired = end < now;
 
+      // Merge custom limits with plan limits
+      const planLimits = subscription.Plan?.limits || {};
+      const customLimits = subscription.customLimits || {};
+      const finalLimits = { ...planLimits, ...customLimits };
+
+      // Format modules
+      const activeModules = (subscription.SubscriptionModules || [])
+        .filter(sm => sm.active)
+        .map(sm => ({
+          moduleId: sm.moduleId,
+          name: sm.ModuleCatalog?.name || sm.moduleId,
+          price: sm.priceSnapshot,
+          activationDate: sm.activationDate
+        }));
+
       res.json({
         planName: subscription.Plan?.name || 'Unknown',
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         status: isExpired ? 'EXPIRED' : subscription.status,
         daysRemaining: isExpired ? 0 : daysRemaining,
-        limits: subscription.Plan?.limits || {},
+        limits: finalLimits,
         price: subscription.Plan?.price || 0,
-        interval: subscription.Plan?.interval || 'monthly'
+        interval: subscription.Plan?.interval || 'monthly',
+        modules: activeModules
       });
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server Error');
     }
 });
+
+// @route   GET api/school/:schoolId/subscription-state
+// @desc    Get subscription state for resource usage widget (Plan + Custom Limits)
+// @access  Private (SchoolAdmin)
+router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const { Subscription, Plan } = require('../models');
+    
+    const subscription = await Subscription.findOne({ 
+      where: { schoolId }, 
+      include: [{ model: Plan }] 
+    });
+
+    // Default Fallback
+    const defaultLimits = { students: 50, teachers: 5 };
+
+    if (!subscription) {
+       return res.json({
+         plan: { limits: defaultLimits },
+         limits: defaultLimits
+       });
+    }
+
+    const planLimits = subscription.Plan?.limits || defaultLimits;
+    const customLimits = subscription.customLimits || {};
+    
+    // Merge: Custom limits override plan limits
+    // Note: If custom limit is set, it overrides completely for that key
+    const mergedLimits = {
+        students: customLimits.students !== undefined ? customLimits.students : planLimits.students,
+        teachers: customLimits.teachers !== undefined ? customLimits.teachers : planLimits.teachers,
+        // Add other limits as needed
+    };
+
+    // Ensure numeric or 'unlimited' normalization if needed, but usually frontend handles strings
+    // But let's be safe and pass exactly what logic expects
+    
+    res.json({
+      plan: {
+        name: subscription.Plan?.name,
+        limits: planLimits
+      },
+      limits: mergedLimits,
+      status: subscription.status
+    });
+
+  } catch (err) {
+    console.error('Subscription State Error:', err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 
 // @route   GET api/school/:schoolId/stats/dashboard
 // @desc    Get comprehensive dashboard stats (uses aggregation if available)

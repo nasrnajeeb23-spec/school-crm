@@ -122,6 +122,7 @@ export interface Message {
 
 export interface Conversation {
     id: string;
+    roomId: string;
     type: ConversationType;
     participantName: string;
     participantAvatar: string;

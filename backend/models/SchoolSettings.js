@@ -100,6 +100,14 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  customLimits: {
+    type: DataTypes.JSON, // { students: 1000, teachers: 50, storage: 10 }
+    allowNull: true,
+  },
+  backupSchedule: {
+    type: DataTypes.JSON, // { daily: bool, monthly: bool, time: "00:00" }
+    allowNull: true,
+  },
   terms: {
     type: DataTypes.JSON,
     allowNull: true,

@@ -167,7 +167,7 @@ export interface Assignment {
     description: string;
     dueDate: string;
     creationDate: string;
-    status: AssignmentStatus;
+    status: string; // 'Active' | 'Archived'
     submissionCount: number;
 }
 
@@ -180,4 +180,34 @@ export interface Submission {
     status: SubmissionStatus;
     grade?: number;
     feedback?: string;
+    content?: string;
+    attachmentUrl?: string;
+}
+
+export enum ConversationType {
+    Direct = 'direct',
+    Group = 'group',
+    Announcement = 'announcement',
+}
+
+export interface Message {
+    id: string;
+    senderId: string;
+    senderRole?: string;
+    text: string;
+    timestamp: string;
+    attachmentUrl?: string;
+    attachmentType?: string;
+    attachmentName?: string;
+}
+
+export interface Conversation {
+    id: string;
+    roomId: string;
+    type: ConversationType;
+    title: string;
+    participantName?: string;
+    lastMessage?: string;
+    timestamp?: string;
+    unreadCount?: number;
 }

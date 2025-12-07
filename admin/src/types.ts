@@ -378,6 +378,8 @@ export interface Subscription {
   renewalDate: string;
   amount: number;
   trialEndDate?: string;
+  customLimits?: UsageLimit;
+  modules?: SchoolModuleSubscription[];
 }
 
 export interface RevenueData {
@@ -542,6 +544,7 @@ export interface Message {
 
 export interface Conversation {
     id: string;
+    roomId: string;
     type: ConversationType;
     participantName: string;
     participantAvatar: string;

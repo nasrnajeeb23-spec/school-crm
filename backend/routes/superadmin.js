@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Subscription, Invoice, Payment, Plan, User, BusOperator, SecurityPolicy } = require('../models');
+const { School, Subscription, Invoice, Payment, Plan, User, BusOperator, SecurityPolicy, SubscriptionModule } = require('../models');
 const { TrialRequest } = require('../models');
 const clientMetrics = require('prom-client');
 clientMetrics.collectDefaultMetrics({ prefix: 'schoolsaas_', timeout: 5000 });
@@ -56,6 +56,56 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANC
   }
 });
 
+// @route   GET api/superadmin/audit-logs
+// @desc    Get audit logs with filtering
+// @access  Private (SuperAdmin)
+router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+  try {
+    const { AuditLog } = require('../models');
+    const { startDate, endDate, action, userId } = req.query;
+    const { Op } = require('sequelize');
+    
+    const where = {};
+    if (startDate || endDate) {
+        where.timestamp = {};
+        if (startDate) where.timestamp[Op.gte] = new Date(startDate);
+        if (endDate) where.timestamp[Op.lte] = new Date(new Date(endDate).setHours(23, 59, 59));
+    }
+    if (action) where.action = { [Op.iLike]: `%${action}%` };
+    if (userId) where.userId = userId;
+
+    if (!AuditLog) {
+        // Fallback if table doesn't exist yet
+        return res.json([]);
+    }
+
+    const logs = await AuditLog.findAll({ 
+        where, 
+        order: [['timestamp', 'DESC']],
+        limit: 500
+    });
+
+    // Parse details if stored as string
+    const formatted = logs.map(log => {
+        let details = log.details;
+        try {
+            if (typeof details === 'string' && (details.startsWith('{') || details.startsWith('['))) {
+                details = JSON.parse(details);
+            }
+        } catch (e) {}
+        return {
+            ...log.toJSON(),
+            details
+        };
+    });
+
+    res.json(formatted);
+  } catch (err) {
+    console.error('Audit Logs Error:', err);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/superadmin/revenue
 // @desc    Get revenue summary for SuperAdmin (monthly series)
 // @access  Private (SuperAdmin)
@@ -93,22 +143,124 @@ router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINA
 // @access  Private (SuperAdmin)
 router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const subs = await Subscription.findAll({ include: [{ model: School, attributes: ['name'] }, { model: Plan, attributes: ['name','price'] }], order: [['id','ASC']] });
+    const subs = await Subscription.findAll({ 
+        include: [
+            { model: School, attributes: ['name'] }, 
+            { model: Plan, attributes: ['name','price', 'limits'] },
+            { model: SubscriptionModule }
+        ], 
+        order: [['id','ASC']] 
+    });
     const formatted = subs.map(sub => ({
       id: String(sub.id),
       schoolId: sub.schoolId,
       schoolName: sub.School && sub.School.name,
       plan: sub.Plan && sub.Plan.name,
+      planId: sub.planId,
       status: sub.status,
       startDate: sub.startDate ? sub.startDate.toISOString().split('T')[0] : null,
       renewalDate: sub.renewalDate ? sub.renewalDate.toISOString().split('T')[0] : null,
       amount: sub.Plan ? parseFloat(sub.Plan.price) : 0,
+      customLimits: sub.customLimits,
+      planLimits: sub.Plan ? sub.Plan.limits : {},
+      modules: sub.SubscriptionModules ? sub.SubscriptionModules.map(m => ({
+          id: m.moduleId,
+          price: m.priceSnapshot,
+          active: m.active,
+          activationDate: m.activationDate
+      })) : []
     }));
     res.json(formatted);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
   }
+});
+
+// @route   PUT api/superadmin/subscriptions/:id
+// @desc    Update subscription details (Plan, Status, Limits, Modules)
+// @access  Private (SuperAdmin)
+router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const { planId, status, renewalDate, customLimits, modules } = req.body;
+
+        const sub = await Subscription.findByPk(id);
+        if (!sub) {
+            await t.rollback();
+            return res.status(404).json({ message: 'Subscription not found' });
+        }
+
+        // Update basic fields
+        if (planId) sub.planId = planId;
+        if (status) sub.status = status;
+        if (renewalDate) sub.renewalDate = renewalDate;
+        if (customLimits) sub.customLimits = customLimits;
+
+        await sub.save({ transaction: t });
+
+        // Update Modules
+        if (modules && Array.isArray(modules)) {
+            // modules is array of { moduleId, price, active }
+            // First, get existing modules
+            const existingModules = await SubscriptionModule.findAll({ where: { subscriptionId: id }, transaction: t });
+            const existingIds = existingModules.map(m => m.moduleId);
+            const newIds = modules.map(m => m.moduleId);
+
+            // Delete removed modules (or just deactivate? Deleting for now to keep it clean as per request "integrated")
+            // Actually, let's update/create.
+            for (const m of modules) {
+                const existing = existingModules.find(em => em.moduleId === m.moduleId);
+                if (existing) {
+                    existing.active = m.active !== undefined ? m.active : existing.active;
+                    existing.priceSnapshot = m.price !== undefined ? m.price : existing.priceSnapshot;
+                    await existing.save({ transaction: t });
+                } else {
+                    await SubscriptionModule.create({
+                        subscriptionId: id,
+                        moduleId: m.moduleId,
+                        priceSnapshot: m.price || 0,
+                        active: m.active !== undefined ? m.active : true
+                    }, { transaction: t });
+                }
+            }
+
+            // Handle removals if needed. For now, we assume the UI sends the full list of *active* or *purchased* modules.
+            // If a module is not in the list, should we remove it?
+            // Let's assume the list contains ALL modules that should be associated.
+            const toRemove = existingModules.filter(em => !newIds.includes(em.moduleId));
+            for (const rm of toRemove) {
+                await rm.destroy({ transaction: t });
+            }
+        }
+
+        await t.commit();
+        
+        // Return updated data
+        const updatedSub = await Subscription.findByPk(id, {
+            include: [
+                { model: School, attributes: ['name'] },
+                { model: Plan, attributes: ['name', 'price', 'limits'] },
+                { model: SubscriptionModule }
+            ]
+        });
+
+        res.json({ 
+            success: true, 
+            subscription: {
+                id: String(updatedSub.id),
+                status: updatedSub.status,
+                customLimits: updatedSub.customLimits,
+                modules: updatedSub.SubscriptionModules
+            }
+        });
+
+    } catch (err) {
+        await t.rollback();
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
 });
 
 // Security policies (central)
@@ -367,441 +519,68 @@ router.post('/jobs/trigger', verifyToken, requireRole('SUPER_ADMIN'), async (req
       await new Promise(r => setTimeout(r, 500));
       return { ok: true, jobType, schoolId: payload.schoolId };
     }));
-    res.json({ started: ids.length, jobIds: ids });
+    res.json({ jobs: ids.length, message: 'Jobs enqueued' });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// Bulk update modules
 router.post('/bulk/modules', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { schoolIds = [], moduleId = '', enable = true } = req.body || {};
-    if (!Array.isArray(schoolIds) || schoolIds.length === 0 || !moduleId) return res.status(400).json({ message: 'Invalid payload' });
-    const enqueue = req.app.locals.enqueueJob;
-    schoolIds.forEach(sid => enqueue('modules_update', { schoolId: sid, moduleId, enable }, async () => ({ ok: true })));
-    res.json({ updated: schoolIds.length });
+    const { schoolIds, moduleId, enable } = req.body;
+    if (!Array.isArray(schoolIds) || !moduleId) return res.status(400).json({ message: 'Invalid payload' });
+
+    const { SchoolSettings } = require('../models');
+    // We need to fetch each setting, update the array, and save.
+    const settingsList = await SchoolSettings.findAll({ where: { schoolId: schoolIds } });
+    let updatedCount = 0;
+
+    for (const settings of settingsList) {
+        let active = settings.activeModules || [];
+        if (enable) {
+            if (!active.includes(moduleId)) active.push(moduleId);
+        } else {
+            active = active.filter(m => m !== moduleId);
+        }
+        settings.activeModules = active;
+        await settings.save();
+        updatedCount++;
+    }
+    res.json({ updated: updatedCount });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// Bulk update usage limits
 router.put('/bulk/usage-limits', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { schoolIds = [], planId = '', limits = {} } = req.body || {};
-    if (!Array.isArray(schoolIds) || schoolIds.length === 0) return res.status(400).json({ message: 'Invalid payload' });
-    const enqueue = req.app.locals.enqueueJob;
-    schoolIds.forEach(sid => enqueue('usage_limits_update', { schoolId: sid, planId, limits }, async () => ({ ok: true })));
-    res.json({ updated: schoolIds.length });
+    const { schoolIds, limits } = req.body; // limits: { students: 1000, ... }
+    if (!Array.isArray(schoolIds) || !limits) return res.status(400).json({ message: 'Invalid payload' });
+
+    const { SchoolSettings } = require('../models');
+    // Update customLimits json
+    const settingsList = await SchoolSettings.findAll({ where: { schoolId: schoolIds } });
+    let updatedCount = 0;
+
+    for (const settings of settingsList) {
+        const prev = settings.customLimits || {};
+        settings.customLimits = { ...prev, ...limits };
+        await settings.save();
+        updatedCount++;
+    }
+    res.json({ updated: updatedCount });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// Bulk backup schedule
 router.put('/bulk/backup-schedule', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { schoolIds = [], schedule = {} } = req.body || {};
-    const { daily = true, monthly = false, time = '02:00' } = schedule || {};
-    if (!Array.isArray(schoolIds) || schoolIds.length === 0) return res.status(400).json({ message: 'Invalid payload' });
-    const parts = String(time).split(':');
-    const hh = Math.max(0, Math.min(23, parseInt(parts[0] || '2')));
-    const mm = Math.max(0, Math.min(59, parseInt(parts[1] || '0')));
-    const day = monthly ? '1' : '*';
-    const expr = `${mm} ${hh} ${day} * *`;
-    const redis = req.app.locals.redisClient;
-    const setKey = 'backup:schedule:set';
-    for (const sid of schoolIds) {
-      const key = `backup:schedule:${sid}`;
-      if (redis) {
-        await redis.set(key, expr).catch(() => {});
-        await redis.sAdd(setKey, String(sid)).catch(() => {});
-      }
-      await req.app.locals.scheduleBackupForSchool(Number(sid), expr);
-    }
-    res.json({ scheduled: schoolIds.length });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
+    const { schoolIds, schedule } = req.body;
+    if (!Array.isArray(schoolIds) || !schedule) return res.status(400).json({ message: 'Invalid payload' });
 
-router.post('/schedule/backups/reload', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try { await req.app.locals.reloadBackupSchedules(); res.json({ reloaded: true }); } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-router.get('/backup/retention', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const redis = req.app.locals.redisClient;
-    const daysStr = redis ? await redis.get('backup:retention:days').catch(() => null) : null;
-    const days = Number(daysStr || 30) || 30;
-    res.json({ days });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-router.put('/backup/retention', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const redis = req.app.locals.redisClient;
-    const v = Number((req.body || {}).days || 30) || 30;
-    if (redis) await redis.set('backup:retention:days', String(v)).catch(() => {});
-    res.json({ days: v });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-router.post('/schools/create', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const { name, planId, adminEmail, adminUsername, adminPassword } = req.body || {};
-    if (!name || !planId || !adminEmail || !adminUsername || !adminPassword) return res.status(400).json({ message: 'Invalid payload' });
-    const bcrypt = require('bcryptjs');
-    const school = await School.create({ name });
-    const plan = await Plan.findByPk(planId);
-    if (!plan) return res.status(404).json({ message: 'Plan not found' });
-    const start = new Date();
-    const renewal = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
-    await Subscription.create({ schoolId: school.id, planId: plan.id, status: 'TRIAL', startDate: start, renewalDate: renewal });
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(String(adminPassword), salt);
-    const existing = await User.findOne({ where: { email: adminEmail } });
-    if (existing) return res.status(400).json({ message: 'Admin email already exists' });
-    const admin = await User.create({ name: adminUsername, email: adminEmail, username: adminUsername, password: hashedPassword, role: 'SchoolAdmin', schoolId: school.id, isActive: true });
-    res.json({ school: { id: school.id, name: school.name }, admin: { id: admin.id, email: admin.email, username: admin.username }, subscription: { status: 'TRIAL', renewalDate: renewal.toISOString() } });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-// @route   GET api/superadmin/team
-// @desc    Get all SuperAdmin team members
-// @access  Private (SuperAdmin and team roles)
-router.get('/team', verifyToken, async (req, res) => {
-    try {
-        // Allow all SuperAdmin team roles to view team members
-        const allowedRoles = ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'];
-        if (!allowedRoles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Access denied' });
-        }
-
-        const teamMembers = await User.findAll({
-            where: {
-                role: {
-                    [require('sequelize').Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
-                }
-            },
-            attributes: ['id', 'name', 'email', 'username', 'role', 'isActive', 'lastLoginAt', 'createdAt', 'permissions']
-        });
-
-        res.json(teamMembers);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
-    }
-});
-
-// @route   POST api/superadmin/team
-// @desc    Create a new SuperAdmin team member
-// @access  Private (SuperAdmin only)
-router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-    try {
-        const { name, email, username, password, role, permissions } = req.body;
-
-        // Validate role
-        const allowedRoles = ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'];
-        if (!allowedRoles.includes(role)) {
-            return res.status(400).json({ message: 'Invalid role for team member' });
-        }
-
-        // Check if username or email already exists
-        const existingUser = await User.findOne({
-            where: {
-                [require('sequelize').Op.or]: [
-                    { username: username },
-                    { email: email }
-                ]
-            }
-        });
-
-        if (existingUser) {
-            return res.status(400).json({ message: 'Username or email already exists' });
-        }
-
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        // Create new team member
-        const newTeamMember = await User.create({
-            name,
-            email,
-            username,
-            password: hashedPassword,
-            role,
-            permissions: permissions || getDefaultPermissions(role),
-            isActive: true,
-            schoolId: null // SuperAdmin team members don't belong to a specific school
-        });
-
-        // Remove password from response
-        const { password: _, ...memberWithoutPassword } = newTeamMember.toJSON();
-        
-        res.status(201).json(memberWithoutPassword);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
-    }
-});
-
-// @route   PUT api/superadmin/team/:id
-// @desc    Update a SuperAdmin team member
-// @access  Private (SuperAdmin only)
-router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-    try {
-        const { name, email, username, password, role, permissions } = req.body;
-        const memberId = req.params.id;
-
-        // Find the team member
-        const teamMember = await User.findOne({
-            where: {
-                id: memberId,
-                role: {
-                    [require('sequelize').Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
-                }
-            }
-        });
-
-        if (!teamMember) {
-            return res.status(404).json({ message: 'Team member not found' });
-        }
-
-        // Validate role if provided
-        if (role) {
-            const allowedRoles = ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'];
-            if (!allowedRoles.includes(role)) {
-                return res.status(400).json({ message: 'Invalid role for team member' });
-            }
-        }
-
-        // Check if new username or email already exists (excluding current member)
-        if (username || email) {
-            const existingUser = await User.findOne({
-                where: {
-                    id: {
-                        [require('sequelize').Op.ne]: memberId
-                    },
-                    [require('sequelize').Op.or]: [
-                        username ? { username: username } : null,
-                        email ? { email: email } : null
-                    ].filter(Boolean)
-                }
-            });
-
-            if (existingUser) {
-                return res.status(400).json({ message: 'Username or email already exists' });
-            }
-        }
-
-        // Update fields
-        if (name) teamMember.name = name;
-        if (email) teamMember.email = email;
-        if (username) teamMember.username = username;
-        if (role) teamMember.role = role;
-        if (permissions) teamMember.permissions = permissions;
-        
-        // Update password if provided
-        if (password) {
-            const salt = await bcrypt.genSalt(10);
-            teamMember.password = await bcrypt.hash(password, salt);
-        }
-
-        await teamMember.save();
-
-        // Remove password from response
-        const { password: _, ...memberWithoutPassword } = teamMember.toJSON();
-        
-        res.json(memberWithoutPassword);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
-    }
-});
-
-// @route   DELETE api/superadmin/team/:id
-// @desc    Delete a SuperAdmin team member
-// @access  Private (SuperAdmin only)
-router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-    try {
-        const memberId = req.params.id;
-
-        // Find the team member
-        const teamMember = await User.findOne({
-            where: {
-                id: memberId,
-                role: {
-                    [require('sequelize').Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
-                }
-            }
-        });
-
-        if (!teamMember) {
-            return res.status(404).json({ message: 'Team member not found' });
-        }
-
-        await teamMember.destroy();
-        res.json({ message: 'Team member deleted successfully' });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
-    }
-});
-
-// Helper function to get default permissions for a role
-function getDefaultPermissions(role) {
-    const defaultPermissions = {
-        'SuperAdminFinancial': ['view_financial_reports', 'manage_billing', 'view_subscriptions', 'manage_invoices'],
-        'SuperAdminTechnical': ['manage_system_settings', 'view_logs', 'manage_features', 'monitor_performance', 'manage_api_keys'],
-        'SuperAdminSupervisor': ['view_all_schools', 'manage_school_admins', 'view_reports', 'manage_content', 'view_user_analytics']
-    };
-    return defaultPermissions[role] || [];
-}
-
- 
-
-router.get('/action-items', verifyToken, async (req, res) => {
-  try {
-    const role = String(req.user.role || '').toUpperCase();
-    const isSuper = ['SUPER_ADMIN','SUPER_ADMIN_FINANCIAL','SUPER_ADMIN_TECHNICAL','SUPER_ADMIN_SUPERVISOR'].includes(role);
-    const schoolId = isSuper ? Number(req.query.schoolId || 0) : Number(req.user.schoolId || 0);
+    const { SchoolSettings } = require('../models');
+    const [count] = await SchoolSettings.update({ backupSchedule: schedule }, { where: { schoolId: schoolIds } });
     
-    let invoices = [];
-    let ops = [];
-
-    try {
-        const { Student } = require('../models');
-        if (Invoice && Student) {
-            invoices = await Invoice.findAll({ 
-                include: { model: Student, attributes: [], where: schoolId ? { schoolId } : {} }, 
-                where: {}, 
-                limit: 50 
-            });
-        }
-    } catch (dbError) {
-        console.warn('Error fetching invoices for action items (table might be missing):', dbError.message);
-    }
-
-    try {
-        if (BusOperator) {
-            ops = await BusOperator.findAll({ 
-                where: schoolId ? { schoolId, status: 'Pending' } : { status: 'Pending' }, 
-                limit: 20 
-            });
-        }
-    } catch (dbError) {
-        console.warn('Error fetching bus operators for action items (table might be missing):', dbError.message);
-    }
-
-    const unpaid = invoices.filter(i => i.status === 'UNPAID');
-    const items = [];
-    if (unpaid.length > 0) items.push({ id: 'act_inv_'+Date.now(), type: 'payment_verification', title: 'فواتير غير مدفوعة', description: `يوجد ${unpaid.length} فاتورة تحتاج متابعة`, date: new Date().toISOString(), isRead: false });
-    if (ops.length > 0) items.push({ id: 'act_drv_'+Date.now(), type: 'driver_application', title: 'طلبات سائقين قيد المراجعة', description: `يوجد ${ops.length} طلبات سائقين تنتظر الموافقة`, date: new Date().toISOString(), isRead: false });
-    res.json(items);
-  } catch (err) { console.error('Action Items Error:', err); res.status(500).send('Server Error'); }
+    res.json({ scheduled: count });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
 module.exports = router;
-function getJSON(redis, key, fallback) {
-  if (redis && typeof redis.get === 'function') {
-    return redis.get(key).then(val => {
-      try { return val ? JSON.parse(val) : fallback; } catch { return fallback; }
-    }).catch(() => fallback);
-  }
-  return Promise.resolve(fallback);
-}
-
-function setJSON(redis, key, obj) {
-  if (redis && typeof redis.set === 'function') {
-    return redis.set(key, JSON.stringify(obj)).catch(() => {});
-  }
-  return Promise.resolve();
-}
-// Operational metrics for SuperAdmin
-router.get('/metrics', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    res.setHeader('Content-Type', clientMetrics.register.contentType);
-    res.end(await clientMetrics.register.metrics());
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-// KPI analytics (MRR, ARPU, Churn)
-router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const now = new Date();
-    const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const activeCount = await Subscription.count({ where: { status: 'ACTIVE' } }).catch(() => 0);
-    const activeRows = await Subscription.findAll({ include: [{ model: Plan, attributes: ['price'] }], where: { status: 'ACTIVE' }, raw: true }).catch(() => []);
-    const mrr = (activeRows || []).reduce((sum, r) => sum + Number(r['Plan.price'] || 0), 0);
-    const arpu = activeCount > 0 ? (mrr / activeCount) : 0;
-    const churnCount = await Subscription.count({ where: { status: 'CANCELED', endDate: { [require('sequelize').Op.between]: [past30, now] } } }).catch(() => 0);
-    const churnRate = activeCount > 0 ? (churnCount / activeCount) : 0;
-    res.json({ activeSubscriptions: activeCount, mrr, arpu, churnRate });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
-router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const mem = process.memoryUsage();
-    const uptimeSec = process.uptime();
-    const schools = await School.count().catch(() => 0);
-    const subs = await Subscription.count({ where: { status: 'ACTIVE' } }).catch(() => 0);
-    res.json({
-      memory: { rssMB: Math.round(mem.rss / 1048576), heapUsedMB: Math.round(mem.heapUsed / 1048576) },
-      uptimeSec,
-      totals: { schools, activeSubscriptions: subs },
-    });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-// Plans catalog for SuperAdmin
-router.get('/plans', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const rows = await Plan.findAll({ attributes: ['id','name','price'], order: [['id','ASC']], raw: true });
-    res.json(rows.map(r => ({ id: r.id, name: r.name, price: Number(r.price || 0) })));
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-// Public onboarding request
-router.post('/public/onboard', async (req, res) => {
-  try {
-    const { schoolName, adminName, adminEmail, phone } = req.body || {};
-    if (!schoolName || !adminName || !adminEmail) return res.status(400).json({ message: 'Invalid payload' });
-    const r = await TrialRequest.create({ schoolName, adminName, adminEmail, phone });
-    res.json({ success: true, id: r.id });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-// List onboarding requests
-router.get('/onboarding/requests', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
-  try {
-    const { TrialRequest } = require('../models');
-    if (!TrialRequest) {
-        console.warn('TrialRequest model not found');
-        return res.json([]);
-    }
-    
-    try {
-        const rows = await TrialRequest.findAll({ order: [['createdAt','DESC']], raw: true });
-        res.json(rows);
-    } catch (dbError) {
-        console.warn('Error fetching trial requests (table might be missing):', dbError.message);
-        res.json([]);
-    }
-  } catch (err) { console.error('Onboarding Requests Error:', err); res.status(500).send('Server Error'); }
-});
-
-// Approve onboarding request -> create school
-router.post('/onboarding/requests/:id/approve', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const reqRow = await TrialRequest.findByPk(id);
-    if (!reqRow) return res.status(404).json({ message: 'Request not found' });
-    const { schoolName, adminName, adminEmail } = reqRow;
-    const plan = await Plan.findOne({ order: [['id','ASC']] });
-    if (!plan) return res.status(404).json({ message: 'Plan not found' });
-    const bcrypt = require('bcryptjs');
-    const school = await School.create({ name: schoolName });
-    const start = new Date();
-    const renewal = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
-    await Subscription.create({ schoolId: school.id, planId: plan.id, status: 'TRIAL', startDate: start, renewalDate: renewal });
-    const pass = Math.random().toString(36).slice(2,10);
-    const hashedPassword = await bcrypt.hash(pass, 10);
-    const admin = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashedPassword, role: 'SchoolAdmin', schoolId: school.id, isActive: true });
-    await reqRow.update({ status: 'APPROVED' });
-    res.json({ school: { id: school.id, name: school.name }, admin: { email: admin.email, tempPassword: pass }, subscription: { status: 'TRIAL', renewalDate: renewal.toISOString() } });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});

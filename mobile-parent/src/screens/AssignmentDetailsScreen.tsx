@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import * as api from '../api';
 import { Submission, SubmissionStatus } from '../types';
@@ -16,26 +16,33 @@ const statusInfo: { [key in SubmissionStatus]: { bg: string, text: string, title
 };
 
 const AssignmentDetailsScreen: React.FC<Props> = ({ route }) => {
-    const { assignment, studentId } = route.params;
+    const { assignment, studentId, parentId } = route.params;
     const [submission, setSubmission] = useState<Submission | null>(null);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [content, setContent] = useState('');
 
     const fetchSubmission = useCallback(() => {
         setLoading(true);
-        api.getSubmissionForAssignment(studentId, assignment.id)
-            .then(setSubmission)
+        api.getSubmissionForAssignment(parentId, assignment.id, studentId)
+            .then(data => {
+                setSubmission(data);
+                if (data?.content) setContent(data.content);
+            })
             .catch(err => console.error("Failed to fetch submission", err))
             .finally(() => setLoading(false));
-    }, [studentId, assignment.id]);
+    }, [parentId, assignment.id, studentId]);
 
     useFocusEffect(fetchSubmission);
 
     const handleSubmit = async () => {
-        if (!submission) return;
+        if (!content.trim()) {
+            Alert.alert('تنبيه', 'الرجاء إدخال محتوى الإجابة');
+            return;
+        }
         setIsSubmitting(true);
         try {
-            await api.submitAssignment(submission.id);
+            await api.submitAssignment(parentId, assignment.id, studentId, content);
             Alert.alert('نجاح', 'تم رفع الواجب بنجاح.');
             fetchSubmission(); // Refresh data
         } catch (error) {
@@ -46,8 +53,8 @@ const AssignmentDetailsScreen: React.FC<Props> = ({ route }) => {
     };
     
     const renderSubmissionStatus = () => {
-        if (!submission) return null;
-        const status = statusInfo[submission.status];
+        const currentStatus = submission?.status || SubmissionStatus.NotSubmitted;
+        const status = statusInfo[currentStatus];
         
         return (
             <View style={styles.statusSection}>
@@ -55,25 +62,39 @@ const AssignmentDetailsScreen: React.FC<Props> = ({ route }) => {
                     <Text style={[styles.statusText, { color: status.text }]}>{status.title}</Text>
                 </View>
 
-                {submission.status === SubmissionStatus.NotSubmitted && (
-                    <TouchableOpacity 
-                        style={[styles.submitButton, isSubmitting && styles.disabledButton]} 
-                        onPress={handleSubmit}
-                        disabled={isSubmitting}
-                    >
-                        {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>رفع الواجب</Text>}
-                    </TouchableOpacity>
+                {/* Submission Form */}
+                {currentStatus !== SubmissionStatus.Graded && (
+                    <View style={styles.formContainer}>
+                        <Text style={styles.label}>إجابة الطالب (أو ملاحظات ولي الأمر):</Text>
+                        <TextInput 
+                            style={styles.input}
+                            multiline
+                            placeholder="اكتب الإجابة هنا..."
+                            value={content}
+                            onChangeText={setContent}
+                            editable={!isSubmitting}
+                        />
+                        <TouchableOpacity 
+                            style={[styles.submitButton, (isSubmitting || !content.trim()) && styles.disabledButton]} 
+                            onPress={handleSubmit}
+                            disabled={isSubmitting || !content.trim()}
+                        >
+                            {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{submission ? 'تحديث الإجابة' : 'تسليم الواجب'}</Text>}
+                        </TouchableOpacity>
+                    </View>
                 )}
 
-                {submission.submissionDate && (
-                    <Text style={styles.submissionDate}>تاريخ التسليم: {submission.submissionDate}</Text>
+                {submission?.submissionDate && (
+                    <Text style={styles.submissionDate}>تاريخ التسليم: {new Date(submission.submissionDate).toLocaleDateString('ar-SA')}</Text>
                 )}
                 
-                {submission.status === SubmissionStatus.Graded && (
+                {currentStatus === SubmissionStatus.Graded && submission && (
                      <View style={styles.gradeBox}>
                         <Text style={styles.gradeLabel}>الدرجة</Text>
                         <Text style={styles.gradeText}>{submission.grade}/10</Text>
                         {submission.feedback && <Text style={styles.feedbackText}>ملاحظات المعلم: {submission.feedback}</Text>}
+                        <Text style={styles.contentLabel}>الإجابة المقدمة:</Text>
+                        <Text style={styles.contentText}>{submission.content}</Text>
                     </View>
                 )}
             </View>
@@ -89,7 +110,7 @@ const AssignmentDetailsScreen: React.FC<Props> = ({ route }) => {
         <ScrollView style={styles.container}>
             <View style={styles.card}>
                 <Text style={styles.title}>{assignment.title}</Text>
-                <Text style={styles.dueDate}>تاريخ التسليم: {assignment.dueDate}</Text>
+                <Text style={styles.dueDate}>تاريخ الاستحقاق: {new Date(assignment.dueDate).toLocaleDateString('ar-SA')}</Text>
                 <Text style={styles.description}>{assignment.description}</Text>
             </View>
             <View style={styles.card}>
@@ -108,17 +129,22 @@ const styles = StyleSheet.create({
     title: { fontSize: 20, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
     dueDate: { fontSize: 12, color: '#6b7280', textAlign: 'right', marginTop: 4, marginBottom: 12 },
     description: { fontSize: 14, color: '#374151', textAlign: 'right', lineHeight: 22 },
-    statusSection: { alignItems: 'flex-end' },
-    statusBadge: { borderRadius: 12, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-end' },
+    statusSection: { alignItems: 'stretch' },
+    statusBadge: { borderRadius: 12, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-end', marginBottom: 16 },
     statusText: { fontSize: 14, fontWeight: 'bold' },
-    submitButton: { backgroundColor: '#dc2626', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24, marginTop: 16 },
+    formContainer: { width: '100%' },
+    label: { textAlign: 'right', marginBottom: 8, color: '#374151', fontWeight: '500' },
+    input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, minHeight: 100, textAlign: 'right', textAlignVertical: 'top', marginBottom: 16 },
+    submitButton: { backgroundColor: '#dc2626', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
     disabledButton: { backgroundColor: '#fca5a5' },
     submitButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-    submissionDate: { fontSize: 12, color: '#6b7280', marginTop: 12 },
+    submissionDate: { fontSize: 12, color: '#6b7280', marginTop: 12, textAlign: 'right' },
     gradeBox: { marginTop: 16, backgroundColor: '#f9fafb', padding: 12, borderRadius: 8, width: '100%', alignItems: 'flex-end' },
     gradeLabel: { fontSize: 14, color: '#6b7280' },
     gradeText: { fontSize: 24, fontWeight: 'bold', color: '#166534', marginVertical: 4 },
-    feedbackText: { fontSize: 14, color: '#374151', fontStyle: 'italic', marginTop: 8 }
+    feedbackText: { fontSize: 14, color: '#374151', fontStyle: 'italic', marginTop: 8, textAlign: 'right' },
+    contentLabel: { fontSize: 12, color: '#6b7280', marginTop: 12 },
+    contentText: { fontSize: 14, color: '#374151', marginTop: 4, textAlign: 'right' }
 });
 
 export default AssignmentDetailsScreen;

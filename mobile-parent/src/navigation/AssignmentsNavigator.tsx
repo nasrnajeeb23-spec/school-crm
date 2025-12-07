@@ -5,8 +5,8 @@ import AssignmentDetailsScreen from '../screens/AssignmentDetailsScreen';
 import { User, Assignment } from '../types';
 
 export type AssignmentsStackParamList = {
-  AssignmentsList: { user: User };
-  AssignmentDetails: { assignment: Assignment; studentId: string; };
+    AssignmentsList: { user: User };
+    AssignmentDetails: { assignment: Assignment; studentId: string; parentId: string };
 };
 
 const Stack = createStackNavigator<AssignmentsStackParamList>();

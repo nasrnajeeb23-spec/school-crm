@@ -1,4 +1,5 @@
 import { networkDelay } from '../utils/networkDelay';
+import { apiCall } from '../api';
 
 export interface SuperAdminLoginRequest {
   email: string;
@@ -285,44 +286,11 @@ export const getSuperAdminAuditLogs = async (filters?: {
   action?: string;
   userId?: number;
 }): Promise<any[]> => {
-  await networkDelay(600);
-  
-  // Mock audit logs
-  const mockLogs = [
-    {
-      id: 1,
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      action: 'platform.login',
-      userId: 1,
-      userEmail: 'super@admin.com',
-      ipAddress: '127.0.0.1',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      details: { success: true, mfaUsed: true },
-      riskLevel: 'low'
-    },
-    {
-      id: 2,
-      timestamp: new Date(Date.now() - 7200000).toISOString(),
-      action: 'school.create',
-      userId: 1,
-      userEmail: 'super@admin.com',
-      ipAddress: '127.0.0.1',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      details: { schoolName: 'International School', schoolId: 123 },
-      riskLevel: 'low'
-    },
-    {
-      id: 3,
-      timestamp: new Date(Date.now() - 10800000).toISOString(),
-      action: 'platform.settings.update',
-      userId: 1,
-      userEmail: 'super@admin.com',
-      ipAddress: '127.0.0.1',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      details: { settings: ['security', 'authentication'] },
-      riskLevel: 'medium'
-    }
-  ];
+  const query = new URLSearchParams();
+  if (filters?.startDate) query.append('startDate', filters.startDate);
+  if (filters?.endDate) query.append('endDate', filters.endDate);
+  if (filters?.action) query.append('action', filters.action);
+  if (filters?.userId) query.append('userId', String(filters.userId));
 
-  return mockLogs;
+  return await apiCall(`/superadmin/audit-logs?${query.toString()}`, { method: 'GET' });
 };

@@ -8,7 +8,8 @@ import AttendanceScreen from '../screens/AttendanceScreen';
 import FinanceScreen from '../screens/FinanceScreen';
 import MoreNavigator from './MoreNavigator';
 import AssignmentsNavigator from './AssignmentsNavigator';
-import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, MoreIcon, AssignmentIcon } from '../components/icons';
+import MessagesNavigator from './MessagesNavigator';
+import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, MoreIcon, AssignmentIcon, ChatIcon } from '../components/icons';
 
 const Tab = createBottomTabNavigator();
 
@@ -25,6 +26,7 @@ const MainTabs: React.FC<Props> = ({ route }) => {
           if (route.name === 'Grades') return <GradesIcon color={color} size={size} />;
           if (route.name === 'Attendance') return <AttendanceIcon color={color} size={size} />;
           if (route.name === 'Assignments') return <AssignmentIcon color={color} size={size} />;
+          if (route.name === 'Messages') return <ChatIcon color={color} size={size} />;
           if (route.name === 'Finance') return <FinanceIcon color={color} size={size} />;
           if (route.name === 'More') return <MoreIcon color={color} size={size} />;
           return null;
@@ -47,6 +49,9 @@ const MainTabs: React.FC<Props> = ({ route }) => {
       </Tab.Screen>
       <Tab.Screen name="Assignments" options={{ title: 'الواجبات', headerShown: false }}>
         {() => <AssignmentsNavigator user={user} />}
+      </Tab.Screen>
+      <Tab.Screen name="Messages" options={{ title: 'الرسائل', headerShown: false }}>
+        {() => <MessagesNavigator />}
       </Tab.Screen>
       <Tab.Screen name="Finance" options={{ title: 'المالية' }}>
         {() => <FinanceScreen user={user} />}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { Conversation, Message, ConversationType } from '../types';
 import * as api from '../api';
 import { AnnouncementIcon, GroupIcon, UsersIcon, ComposeIcon, SparklesIcon } from '../components/icons';
@@ -26,6 +27,71 @@ const Messaging: React.FC = () => {
     const { addToast } = useToast();
 
     const socketRef = useRef<any>(null);
+    const selectedConversationIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        selectedConversationIdRef.current = selectedConversationId;
+    }, [selectedConversationId]);
+
+    // Initialize Socket.io
+    useEffect(() => {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+
+        const baseUrl = api.getApiBase().replace(/\/api\/?$/, '');
+        socketRef.current = io(baseUrl, {
+            query: { token },
+            transports: ['websocket', 'polling'],
+            withCredentials: true
+        });
+
+        socketRef.current.on('connect', () => {
+            console.log('Socket connected');
+        });
+
+        socketRef.current.on('receive_message', (message: any) => {
+            setMessages(prev => {
+                const conversationId = message.conversationId;
+                const list = prev[conversationId] || [];
+                if (list.some(m => m.id === message.id)) return prev;
+                return {
+                    ...prev,
+                    [conversationId]: [...list, message]
+                };
+            });
+
+            setConversations(prev => prev.map(c => {
+                if (c.id === message.conversationId) {
+                    const isSelected = c.id === selectedConversationIdRef.current;
+                    return {
+                        ...c,
+                        lastMessage: message.text,
+                        timestamp: message.timestamp,
+                        unreadCount: isSelected ? 0 : (c.unreadCount || 0) + 1
+                    };
+                }
+                return c;
+            }));
+        });
+
+        return () => {
+            if (socketRef.current) socketRef.current.disconnect();
+        };
+    }, []); // Run once on mount
+
+    // Join Room logic
+    useEffect(() => {
+        const currentConversation = conversations.find(c => c.id === selectedConversationId);
+        if (socketRef.current && currentConversation?.roomId) {
+            socketRef.current.emit('join_conversation', currentConversation.roomId);
+            console.log(`Joined room: ${currentConversation.roomId}`);
+            
+            return () => {
+                socketRef.current.emit('leave_conversation', currentConversation.roomId);
+                console.log(`Left room: ${currentConversation.roomId}`);
+            };
+        }
+    }, [selectedConversationId, conversations]);
 
     // Define handleSelectConversation function BEFORE using it
     const handleSelectConversation = async (conversationId: string) => {

@@ -1,6 +1,6 @@
 import { User, School, ParentRequest } from './types';
 
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
+export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crm-backend.onrender.com/api';
 
 let memoryToken: string | null = null;
 
@@ -101,4 +101,31 @@ export const getSubmissionForAssignment = async (_studentId: string, _assignment
 
 export const submitAssignment = async (_submissionId: string) => {
   throw new Error('Not implemented');
+};
+
+// Messaging
+export const getConversations = async () => {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/messaging/conversations`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch conversations');
+  return res.json();
+};
+
+export const getMessages = async (conversationId: string) => {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/messaging/conversations/${conversationId}/messages`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch messages');
+  return res.json();
+};
+
+export const sendMessage = async (conversationId: string, payload: { content: string; senderId: string }) => {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/messaging/send`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId, text: payload.content }),
+  });
+  if (!res.ok) throw new Error('Failed to send message');
+  const data = await res.json();
+  return data.data || data;
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { User, AttendanceRecord, AttendanceStatus } from '../types';
+import { User, AttendanceRecord, AttendanceStatus, Student } from '../types';
 import * as api from '../api';
 
 interface AttendanceScreenProps {
@@ -16,15 +16,30 @@ const statusInfo: { [key in AttendanceStatus]: { bg: string; text: string; } } =
 
 const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ user }) => {
     const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [currentDate, setCurrentDate] = useState(new Date());
 
     useEffect(() => {
         if (!user.parentId) { setLoading(false); return; }
-        api.getParentDashboardData(user.parentId)
-            .then(data => setAttendance(data.attendance))
-            .finally(() => setLoading(false));
+        api.getParentStudents(user.parentId).then(data => {
+            setStudents(data);
+            if (data.length > 0) setSelectedStudentId(data[0].id);
+            else setLoading(false);
+        }).catch(err => {
+            console.error(err);
+            setLoading(false);
+        });
     }, [user.parentId]);
+
+    useEffect(() => {
+        if (!user.parentId || !selectedStudentId) return;
+        setLoading(true);
+        api.getStudentAttendance(user.parentId, selectedStudentId)
+            .then(setAttendance)
+            .finally(() => setLoading(false));
+    }, [user.parentId, selectedStudentId]);
 
     const calendarData = useMemo(() => {
         const year = currentDate.getFullYear();
@@ -52,44 +67,61 @@ const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ user }) => {
         setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
     };
 
-    if (loading) {
+    if (loading && attendance.length === 0) {
         return <View style={styles.center}><ActivityIndicator size="large" color="#dc2626" /></View>;
     }
 
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.card}>
-                <View style={styles.monthHeader}>
-                    <TouchableOpacity onPress={() => changeMonth(1)}><Text style={styles.arrow}>{'>'}</Text></TouchableOpacity>
-                    <Text style={styles.monthTitle}>{currentDate.toLocaleString('ar-EG', { month: 'long', year: 'numeric' })}</Text>
-                    <TouchableOpacity onPress={() => changeMonth(-1)}><Text style={styles.arrow}>{'<'}</Text></TouchableOpacity>
-                </View>
-                <View style={styles.weekHeader}>
-                    {['س', 'ج', 'خ', 'ر', 'ث', 'ن', 'ح'].map(d => <Text key={d} style={styles.weekDay}>{d}</Text>)}
-                </View>
-                <View style={styles.calendarGrid}>
-                    {calendarData.map((day, index) => (
-                        <View key={index} style={[styles.dayCell, day?.status && { backgroundColor: statusInfo[day.status].bg }]}>
-                            {day && <Text style={[styles.dayText, day?.status && { color: statusInfo[day.status].text, fontWeight: 'bold' }]}>{day.day}</Text>}
-                        </View>
+        <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+            {students.length > 1 && (
+                <View style={styles.studentSelector}>
+                    {students.map(student => (
+                        <TouchableOpacity 
+                            key={student.id} 
+                            onPress={() => setSelectedStudentId(student.id)}
+                            style={[styles.studentTab, selectedStudentId === student.id && styles.activeStudentTab]}
+                        >
+                            <Text style={[styles.studentTabText, selectedStudentId === student.id && styles.activeStudentTabText]}>
+                                {student.name}
+                            </Text>
+                        </TouchableOpacity>
                     ))}
                 </View>
-                 <View style={styles.legendContainer}>
-                    {Object.entries(statusInfo).map(([status, info]) => (
-                        <View key={status} style={styles.legendItem}>
-                            <Text style={styles.legendText}>{status}</Text>
-                             <View style={[styles.legendColor, { backgroundColor: info.bg }]} />
-                        </View>
-                    ))}
+            )}
+            <ScrollView style={styles.container}>
+                <View style={styles.card}>
+                    <View style={styles.monthHeader}>
+                        <TouchableOpacity onPress={() => changeMonth(1)}><Text style={styles.arrow}>{'>'}</Text></TouchableOpacity>
+                        <Text style={styles.monthTitle}>{currentDate.toLocaleString('ar-EG', { month: 'long', year: 'numeric' })}</Text>
+                        <TouchableOpacity onPress={() => changeMonth(-1)}><Text style={styles.arrow}>{'<'}</Text></TouchableOpacity>
+                    </View>
+                    <View style={styles.weekHeader}>
+                        {['س', 'ج', 'خ', 'ر', 'ث', 'ن', 'ح'].map(d => <Text key={d} style={styles.weekDay}>{d}</Text>)}
+                    </View>
+                    <View style={styles.calendarGrid}>
+                        {calendarData.map((day, index) => (
+                            <View key={index} style={[styles.dayCell, day?.status && { backgroundColor: statusInfo[day.status].bg }]}>
+                                {day && <Text style={[styles.dayText, day?.status && { color: statusInfo[day.status].text, fontWeight: 'bold' }]}>{day.day}</Text>}
+                            </View>
+                        ))}
+                    </View>
+                     <View style={styles.legendContainer}>
+                        {Object.entries(statusInfo).map(([status, info]) => (
+                            <View key={status} style={styles.legendItem}>
+                                <Text style={styles.legendText}>{status}</Text>
+                                 <View style={[styles.legendColor, { backgroundColor: info.bg }]} />
+                            </View>
+                        ))}
+                    </View>
                 </View>
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f9fafb', paddingTop: 16 },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
     card: { backgroundColor: '#fff', borderRadius: 12, marginHorizontal: 16, padding: 16, elevation: 2 },
     monthHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10 },
     monthTitle: { fontSize: 18, fontWeight: 'bold', color: '#1f2937' },
@@ -103,6 +135,30 @@ const styles = StyleSheet.create({
     legendItem: { flexDirection: 'row-reverse', alignItems: 'center', margin: 4 },
     legendColor: { width: 14, height: 14, borderRadius: 7, marginRight: 6 },
     legendText: { fontSize: 12, color: '#4b5563' },
+    studentSelector: {
+        flexDirection: 'row-reverse',
+        backgroundColor: '#fff',
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb'
+    },
+    studentTab: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        marginHorizontal: 4,
+        backgroundColor: '#f3f4f6'
+    },
+    activeStudentTab: {
+        backgroundColor: '#dc2626'
+    },
+    studentTabText: {
+        color: '#374151',
+        fontWeight: '600'
+    },
+    activeStudentTabText: {
+        color: '#fff'
+    }
 });
 
 export default AttendanceScreen;

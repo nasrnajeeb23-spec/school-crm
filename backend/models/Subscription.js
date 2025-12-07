@@ -25,6 +25,11 @@ const Subscription = sequelize.define('Subscription', {
     type: DataTypes.DATE,
     allowNull: false,
   },
+  customLimits: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Overrides plan limits if set'
+  },
   // Foreign keys are added via associations in models/index.js
   // schoolId
   // planId
