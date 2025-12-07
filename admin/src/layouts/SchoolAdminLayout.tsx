@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import SchoolSidebar from '../components/SchoolSidebar';
 import Header from '../components/Header';
-import { School, Student, Teacher, InvoiceStatus, ActionItem, User, ModuleId, SchoolSettings, Permission } from '../types';
+import { School, Student, Teacher, InvoiceStatus, ActionItem, User, ModuleId, SchoolSettings, Permission, ActionItemType } from '../types';
 
 import { BackIcon, BellIcon } from '../components/icons';
 import ThemeToggle from '../components/ThemeToggle';
@@ -84,9 +84,21 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   useEffect(() => {
     if (effectiveSchoolId) {
         setLoading(true);
+
+        const actionItemsPromise = isSuperAdminView
+            ? api.getActionItems()
+            : api.getSchoolParentRequests(effectiveSchoolId).then(reqs => reqs.map(r => ({
+                id: r.id,
+                type: ActionItemType.Approval,
+                title: r.title || 'طلب جديد',
+                description: `${r.parentName || 'ولي أمر'}: ${r.description || ''}`,
+                date: r.createdAt || new Date().toISOString().split('T')[0],
+                isRead: false
+            } as ActionItem))).catch(() => []);
+
         Promise.allSettled([
             api.getSchoolById(effectiveSchoolId),
-            api.getActionItems(),
+            actionItemsPromise,
             api.getSchoolModules(effectiveSchoolId),
             api.getSchoolSettings(effectiveSchoolId)
         ]).then(results => {

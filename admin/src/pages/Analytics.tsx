@@ -85,7 +85,7 @@ const Analytics: React.FC = () => {
         </div>
       )}
 
-      {metrics && (
+      {metrics && metrics.memory && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
             <p className="text-sm text-gray-500">استخدام الذاكرة (RSS)</p>
@@ -105,8 +105,8 @@ const Analytics: React.FC = () => {
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
             <p className="text-sm text-gray-500">مدة التشغيل</p>
-            <p className="text-2xl font-bold">{Math.floor(metrics.uptimeSec / 3600)} ساعة</p>
-            <p className="text-xs text-gray-500 mt-1">{Math.floor((metrics.uptimeSec % 3600) / 60)} دقيقة</p>
+            <p className="text-2xl font-bold">{Math.floor((metrics.uptimeSec || 0) / 3600)} ساعة</p>
+            <p className="text-xs text-gray-500 mt-1">{Math.floor(((metrics.uptimeSec || 0) % 3600) / 60)} دقيقة</p>
           </div>
         </div>
       )}
