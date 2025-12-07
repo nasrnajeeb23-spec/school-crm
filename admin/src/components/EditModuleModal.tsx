@@ -24,8 +24,13 @@ const EditModuleModal: React.FC<EditModuleModalProps> = ({ module, onClose, onSa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    await onSave(formData);
-    // Parent closes modal
+    try {
+        await onSave(formData);
+    } finally {
+        // If the component is still mounted (failed to save), stop loading.
+        // If it unmounts (success), this might trigger a warning but is safe.
+        setIsSaving(false);
+    }
   };
 
   const inputStyle = "mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700";

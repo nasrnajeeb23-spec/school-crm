@@ -332,7 +332,6 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                         {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
-                                    <p className="text-xs text-gray-400 mt-2">ID: {module.id}</p>
                                 </div>
                                 <div className="mt-4 text-center">
                                     {activeModuleIds.has(module.id) ? (
@@ -374,7 +373,6 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                         {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
-                                    <p className="text-xs text-gray-400 mt-2">ID: {module.id}</p>
                                     <p className="font-semibold text-teal-600 mt-1">${module.monthlyPrice}/شهرياً</p>
                                 </div>
                                 <div className="mt-4 text-center">

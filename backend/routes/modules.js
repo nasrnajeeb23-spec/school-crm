@@ -115,6 +115,9 @@ router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
 
 router.put('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
+        // Auto-heal: Ensure schema is up to date
+        try { await ModuleCatalog.sync({ alter: true }); } catch (e) { console.error('Sync ModuleCatalog Error:', e); }
+
         const id = String(req.params.id || '');
         let row = await ModuleCatalog.findByPk(id);
         const p = req.body || {};

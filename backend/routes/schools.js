@@ -256,10 +256,17 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
 
     // 2. Normal Subscription: Return active SubscriptionModules (Intersected with SchoolSettings for local toggle)
     let activeModules = [];
-    if (sub && sub.SubscriptionModules) {
-        const provisioned = sub.SubscriptionModules
-            .filter(sm => sm.active)
-            .map(sm => sm.moduleId);
+    if (sub) {
+        // Fetch core modules which should always be available
+        const coreModules = await ModuleCatalog.findAll({ where: { isCore: true } });
+        const coreIds = coreModules.map(m => m.id);
+
+        let provisioned = sub.SubscriptionModules
+            ? sub.SubscriptionModules.filter(sm => sm.active).map(sm => sm.moduleId)
+            : [];
+
+        // Add core modules to provisioned list
+        provisioned = [...new Set([...provisioned, ...coreIds])];
 
         // Get local settings to see what school admin chose to enable
         const settings = await SchoolSettings.findOne({ where: { schoolId } });
