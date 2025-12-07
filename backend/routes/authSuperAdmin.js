@@ -461,10 +461,11 @@ router.post('/verify-mfa', [
     // Generate session token
     const token = jwt.sign(
       { 
-        userId: user.id, 
+        id: user.id, 
         email: user.email, 
         role: user.role,
-        type: 'superadmin'
+        type: 'superadmin',
+        tokenVersion: user.tokenVersion || 0
       }, 
       JWT_SECRET, 
       { expiresIn: '24h' }

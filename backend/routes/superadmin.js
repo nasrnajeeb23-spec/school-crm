@@ -72,6 +72,53 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANC
   }
 });
 
+// @route   GET api/superadmin/action-items
+// @desc    Get pending action items for SuperAdmin Dashboard
+// @access  Private (SuperAdmin)
+router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+  try {
+    const { TrialRequest, Ticket, Invoice } = require('../models');
+    
+    let trialRequests = 0;
+    let tickets = 0;
+    let pendingInvoices = 0;
+    let securityAlerts = 0; // Placeholder
+
+    // Count pending trial requests
+    try {
+        if (TrialRequest) {
+            trialRequests = await TrialRequest.count({ where: { status: 'PENDING' } });
+        }
+    } catch (e) {}
+
+    // Count open tickets
+    try {
+        if (Ticket) {
+            tickets = await Ticket.count({ where: { status: 'OPEN' } });
+        }
+    } catch (e) {}
+
+    // Count unpaid/overdue invoices
+    try {
+        if (Invoice) {
+            const { Op } = require('sequelize');
+            pendingInvoices = await Invoice.count({ where: { status: { [Op.in]: ['UNPAID', 'OVERDUE'] } } });
+        }
+    } catch (e) {}
+
+    res.json({
+        trialRequests,
+        tickets,
+        pendingInvoices,
+        securityAlerts
+    });
+  } catch (err) {
+    console.error('Action Items Error:', err.message);
+    // Return zeros on error
+    res.json({ trialRequests: 0, tickets: 0, pendingInvoices: 0, securityAlerts: 0 });
+  }
+});
+
 // @route   GET api/superadmin/audit-logs
 // @desc    Get audit logs with filtering
 // @access  Private (SuperAdmin)

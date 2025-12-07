@@ -1488,6 +1488,9 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance_fees'), async (req, res) => {
   try {
+    const { Invoice, Student } = require('../models');
+    try { await Invoice.sync(); } catch (e) {}
+
     const invoices = await Invoice.findAll({
         include: {
             model: Student,
@@ -1896,6 +1899,9 @@ router.get('/:schoolId/student/:studentId/details', verifyToken, requireRole('SC
 router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
+    // Auto-heal
+    try { await SchoolSettings.sync(); } catch (e) {}
+    
     let settings = await SchoolSettings.findOne({ where: { schoolId } });
     if (!settings) {
       const { School } = require('../models');

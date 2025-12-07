@@ -232,6 +232,9 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
     const schoolId = Number(req.params.id);
     const { Subscription, SubscriptionModule, ModuleCatalog } = require('../models');
     
+    // Auto-heal: Ensure SubscriptionModule table exists
+    try { await SubscriptionModule.sync(); } catch (e) {}
+
     // 1. Check for Trial
     const sub = await Subscription.findOne({ 
       where: { schoolId },
