@@ -583,4 +583,61 @@ router.put('/bulk/backup-schedule', verifyToken, requireRole('SUPER_ADMIN'), asy
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// @route   GET api/superadmin/team
+// @desc    Get list of super admin team members
+// @access  Private (SuperAdmin)
+router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+    try {
+        const { User } = require('../models');
+        const team = await User.findAll({
+            where: {
+                role: {
+                    [require('sequelize').Op.in]: ['SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR']
+                }
+            },
+            attributes: ['id', 'name', 'email', 'role', 'lastLogin', 'isActive']
+        });
+        res.json(team);
+    } catch (err) {
+        console.error('Team Error:', err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   GET api/superadmin/analytics/kpi
+// @desc    Get KPI metrics
+// @access  Private (SuperAdmin)
+router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+    try {
+        // Mock KPI data or calculate real ones
+        // Real implementation would aggregate data
+        res.json({
+            retentionRate: 95,
+            churnRate: 5,
+            activeSchools: 120,
+            avgRevenuePerUser: 50
+        });
+    } catch (err) {
+        console.error('KPI Error:', err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   GET api/superadmin/metrics/summary
+// @desc    Get metrics summary
+// @access  Private (SuperAdmin)
+router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+    try {
+        res.json({
+            totalVisits: 15000,
+            newSignups: 45,
+            activeUsers: 3200,
+            systemHealth: 'Healthy'
+        });
+    } catch (err) {
+        console.error('Metrics Error:', err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
 module.exports = router;

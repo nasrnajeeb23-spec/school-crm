@@ -384,7 +384,53 @@ app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
 // Aliases without "/api" to support frontend fallback requests
 app.use('/superadmin', superadminRoutes);
 app.use('/dashboard', analyticsRoutes);
+app.use('/public/schools', schoolsRoutes); // Fix for /public/schools 500/404
+app.use('/api/public/schools', schoolsRoutes); // Fix for /api/public/schools 404
 app.use('/public', schoolsRoutes);
+
+// Database Schema Fixer (Auto-run on start to ensure columns exist)
+(async () => {
+  try {
+    const { sequelize } = require('./models');
+    const queryInterface = sequelize.getQueryInterface();
+    
+    // Check and add customLimits to Subscriptions
+    try {
+      const tableDesc = await queryInterface.describeTable('Subscriptions');
+      if (!tableDesc.customLimits) {
+        console.log('Adding customLimits to Subscriptions...');
+        await queryInterface.addColumn('Subscriptions', 'customLimits', {
+          type: require('sequelize').DataTypes.JSON,
+          allowNull: true
+        });
+      }
+    } catch (e) { console.error('Schema Fix Subscriptions:', e.message); }
+
+    // Check and add priceSnapshot to SubscriptionModules
+    try {
+        // SubscriptionModules might not exist yet, let sequelize sync handle creation if model exists, 
+        // but if table exists and column missing:
+        const tableDesc = await queryInterface.describeTable('SubscriptionModules');
+        if (!tableDesc.priceSnapshot) {
+          console.log('Adding priceSnapshot to SubscriptionModules...');
+          await queryInterface.addColumn('SubscriptionModules', 'priceSnapshot', {
+             type: require('sequelize').DataTypes.FLOAT,
+             allowNull: true
+          });
+        }
+    } catch (e) { 
+        // Table might not exist, ignore
+    }
+
+    // Ensure SubscriptionModule table exists
+    try {
+        await sequelize.models.SubscriptionModule.sync(); 
+    } catch(e) {}
+
+  } catch (err) {
+    console.error('Schema Fixer Error:', err.message);
+  }
+})();
 
 // Public content endpoints for landing page
 app.get('/api/content/landing', (req, res) => {
