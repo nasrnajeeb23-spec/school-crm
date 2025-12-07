@@ -166,7 +166,7 @@ router.get('/:id/subscription', verifyToken, requireRole('SUPER_ADMIN'), async (
 router.get('/:id/billing/summary', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const { Invoice, Student } = require('../models');
-    try { await Invoice.sync(); } catch (e) {}
+    try { await Invoice.sync({ alter: true }); } catch (e) { console.error('Sync Invoice Error:', e); }
 
     const sid = Number(req.params.id);
     const rows = await Invoice.findAll({ include: [{ model: Student, where: { schoolId: sid }, attributes: [] }] });
@@ -236,7 +236,7 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
     const { Subscription, SubscriptionModule, ModuleCatalog } = require('../models');
     
     // Auto-heal: Ensure SubscriptionModule table exists
-    try { await SubscriptionModule.sync(); } catch (e) {}
+    try { await SubscriptionModule.sync({ alter: true }); } catch (e) { console.error('Sync SubModule Error:', e); }
 
     // 1. Check for Trial
     const sub = await Subscription.findOne({ 

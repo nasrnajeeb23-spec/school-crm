@@ -1493,7 +1493,7 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance_fees'), async (req, res) => {
   try {
     const { Invoice, Student } = require('../models');
-    try { await Invoice.sync(); await Student.sync(); } catch (e) { console.error('Sync error in invoices:', e); }
+    try { await Invoice.sync({ alter: true }); await Student.sync({ alter: true }); } catch (e) { console.error('Sync error in invoices:', e); }
 
     const invoices = await Invoice.findAll({
         include: {
@@ -1904,7 +1904,7 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   try {
     const schoolId = Number(req.params.schoolId);
     // Auto-heal
-    try { await SchoolSettings.sync(); } catch (e) {}
+    try { await SchoolSettings.sync({ alter: true }); } catch (e) { console.error('Sync error settings:', e); }
     
     let settings = await SchoolSettings.findOne({ where: { schoolId } });
     if (!settings) {

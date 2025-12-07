@@ -72,15 +72,15 @@ const Analytics: React.FC = () => {
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
             <p className="text-sm text-gray-500">MRR</p>
-            <p className="text-2xl font-bold">${kpis.mrr.toFixed(2)}</p>
+            <p className="text-2xl font-bold">${(kpis.mrr || 0).toFixed(2)}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
             <p className="text-sm text-gray-500">ARPU</p>
-            <p className="text-2xl font-bold">${kpis.arpu.toFixed(2)}</p>
+            <p className="text-2xl font-bold">${(kpis.arpu || 0).toFixed(2)}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
             <p className="text-sm text-gray-500">Churn</p>
-            <p className="text-2xl font-bold">{(kpis.churnRate * 100).toFixed(1)}%</p>
+            <p className="text-2xl font-bold">{((kpis.churnRate || 0) * 100).toFixed(1)}%</p>
           </div>
         </div>
       )}
