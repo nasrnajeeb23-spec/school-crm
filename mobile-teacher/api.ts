@@ -2,17 +2,28 @@
 // هذا الملف يتصل بالـ Backend الحقيقي
 
 import { User, School, Student, Class, Assignment, Submission, AttendanceRecord, Conversation, Message } from './types';
+import * as SecureStore from 'expo-secure-store';
 
 export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crm-backend.onrender.com/api';
 
-let memoryToken: string | null = null;
-
 async function getToken() {
-  return memoryToken;
+  try {
+    return await SecureStore.getItemAsync('auth_token');
+  } catch (e) {
+    return null;
+  }
 }
 
 async function setToken(token: string) {
-  memoryToken = token;
+  try {
+    if (token) {
+        await SecureStore.setItemAsync('auth_token', token);
+    } else {
+        await SecureStore.deleteItemAsync('auth_token');
+    }
+  } catch (e) {
+    console.error('Error saving token', e);
+  }
 }
 
 const authHeaders = async () => {

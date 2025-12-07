@@ -1029,6 +1029,10 @@ export const createUser = async (data: any): Promise<User> => {
     return await apiCall('/users', { method: 'POST', body: JSON.stringify(data) });
 };
 
+export const updateUser = async (userId: number | string, data: any): Promise<User> => {
+    return await apiCall(`/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
 export const deleteUser = async (userId: number | string): Promise<void> => {
     await apiCall(`/users/${userId}`, { method: 'DELETE' });
 };

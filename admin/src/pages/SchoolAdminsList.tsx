@@ -4,6 +4,7 @@ import * as api from '../api';
 import { UsersIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon } from '../components/icons';
 import { useToast } from '../contexts/ToastContext';
 import AddSchoolAdminModal from '../components/AddSchoolAdminModal';
+import EditSchoolAdminModal from '../components/EditSchoolAdminModal';
 
 const SchoolAdminsList: React.FC = () => {
   const [admins, setAdmins] = useState<User[]>([]);
@@ -12,6 +13,8 @@ const SchoolAdminsList: React.FC = () => {
   const [selectedSchool, setSelectedSchool] = useState('');
   const [schools, setSchools] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState<User | null>(null);
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -65,6 +68,23 @@ const SchoolAdminsList: React.FC = () => {
     }
   };
 
+  const handleEditClick = (admin: User) => {
+    setEditingAdmin(admin);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateAdmin = async (id: number, data: any) => {
+    try {
+      await api.updateUser(id, data);
+      addToast('تم تحديث بيانات المدير بنجاح', 'success');
+      setIsEditModalOpen(false);
+      setEditingAdmin(null);
+      fetchData();
+    } catch (error: any) {
+      addToast(error.message || 'فشل تحديث بيانات المدير', 'error');
+    }
+  };
+
   if (loading) {
     return <div className="text-center p-8">جاري تحميل بيانات مدراء المدارس...</div>;
   }
@@ -92,6 +112,18 @@ const SchoolAdminsList: React.FC = () => {
           onClose={() => setIsModalOpen(false)} 
           onSave={handleCreateAdmin} 
           schools={schools} 
+        />
+      )}
+
+      {isEditModalOpen && editingAdmin && (
+        <EditSchoolAdminModal 
+          admin={editingAdmin}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingAdmin(null);
+          }}
+          onSave={handleUpdateAdmin}
+          schools={schools}
         />
       )}
 
@@ -184,7 +216,7 @@ const SchoolAdminsList: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-2">
                       <button 
-                        onClick={() => {/* TODO: Add edit modal */}}
+                        onClick={() => handleEditClick(admin)}
                         className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                       >
                         <EditIcon className="w-4 h-4" />

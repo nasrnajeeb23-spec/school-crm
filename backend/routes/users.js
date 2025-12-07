@@ -69,12 +69,21 @@ router.put('/:id', verifyToken, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ msg: 'Invalid user id' });
-    if (req.user.id !== id) return res.status(403).json({ msg: 'Access denied' });
+    
+    // Check permissions: User can update self, or SuperAdmin can update anyone
+    const isSelf = req.user.id === id;
+    const isSuperAdmin = ['SUPERADMIN', 'SUPER_ADMIN'].includes(String(req.user.role || '').toUpperCase().replace(/[^A-Z]/g, ''));
+    
+    if (!isSelf && !isSuperAdmin) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
 
     const user = await User.findByPk(id);
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    const { name, phone, currentPassword, newPassword, mobilePushToken, appPlatform, appVersion, deviceId } = req.body || {};
+    const { name, email, phone, currentPassword, newPassword, mobilePushToken, appPlatform, appVersion, deviceId, schoolId, isActive, role } = req.body || {};
+    
+    // Update basic fields
     if (name !== undefined) user.name = name;
     if (phone !== undefined) user.phone = phone;
     if (mobilePushToken !== undefined) user.mobilePushToken = mobilePushToken;
@@ -82,9 +91,21 @@ router.put('/:id', verifyToken, async (req, res) => {
     if (appVersion !== undefined) user.appVersion = appVersion;
     if (deviceId !== undefined) user.deviceId = deviceId;
 
+    // SuperAdmin only fields
+    if (isSuperAdmin) {
+        if (email !== undefined) user.email = email;
+        if (schoolId !== undefined) user.schoolId = schoolId;
+        if (isActive !== undefined) user.isActive = isActive;
+        if (role !== undefined) user.role = role;
+    }
+
     if (newPassword) {
-      const ok = await bcrypt.compare(currentPassword || '', user.password);
-      if (!ok) return res.status(401).json({ msg: 'Invalid current password' });
+      // If updating self, require current password. SuperAdmin can reset without it.
+      if (isSelf && !isSuperAdmin) {
+        const ok = await bcrypt.compare(currentPassword || '', user.password);
+        if (!ok) return res.status(401).json({ msg: 'Invalid current password' });
+      }
+      
       if (!isStrongPassword(newPassword)) return res.status(400).json({ msg: 'Weak password' });
       user.password = await bcrypt.hash(newPassword, 10);
       user.passwordMustChange = false;

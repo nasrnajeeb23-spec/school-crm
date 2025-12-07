@@ -9,6 +9,7 @@ import { GoogleGenAI } from "@google/genai";
 import EditStudentModal from '../components/EditStudentModal';
 import { useToast } from '../contexts/ToastContext';
 import SkeletonLoader from '../components/SkeletonLoader';
+import { getApiBase } from '../api';
 
 // ... (rest of the helper components and constants remain the same)
 const statusColorMap: { [key in StudentStatus]: string } = {
@@ -103,6 +104,36 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
         addToast('تم تحديث بيانات الطالب بنجاح.', 'success');
     } catch (error) {
         addToast("فشل تحديث بيانات الطالب.", 'error');
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    if (!student) return;
+    try {
+        const token = localStorage.getItem('auth_token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        
+        const response = await fetch(`${getApiBase()}/reports/${schoolId}/student/${student.id}/card`, {
+            method: 'GET',
+            headers
+        });
+
+        if (!response.ok) throw new Error('Download failed');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Report_Card_${student.name}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        addToast('تم تحميل الشهادة بنجاح', 'success');
+    } catch (error) {
+        console.error("Download error:", error);
+        addToast('فشل تحميل الشهادة', 'error');
     }
   };
 
@@ -221,6 +252,7 @@ const StudentProfile: React.FC<StudentProfileProps> = ({ schoolId, schoolSetting
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={() => setIsEditModalOpen(true)} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700" title="تعديل"><EditIcon className="h-5 w-5" /></button>
+                    <button onClick={handleDownloadReport} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700" title="تحميل الشهادة PDF"><DownloadIcon className="h-5 w-5" /></button>
                     <button onClick={() => window.print()} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700" title="طباعة"><PrintIcon className="h-5 w-5" /></button>
                 </div>
             </div>
