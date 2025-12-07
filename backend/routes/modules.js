@@ -194,7 +194,7 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
         }
 
         // Prevent deleting core modules even if in DB
-        if (row.isCore || id === 'finance') {
+        if (row.isCore || (id === 'finance' && row.isCore)) {
              return res.status(400).json({ message: 'Cannot delete a Core module. You can disable it instead.' });
         }
         
