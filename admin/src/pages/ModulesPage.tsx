@@ -35,9 +35,18 @@ const EditModuleModal: React.FC<EditModuleModalProps> = ({ module, onClose, onSa
         }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        
+        // Validation: Ensure price is number
+        const dataToSave = {
+            ...formData,
+            monthlyPrice: Number(formData.monthlyPrice),
+            oneTimePrice: Number(formData.oneTimePrice || 0),
+            annualPrice: Number(formData.annualPrice || 0)
+        };
+
+        onSave(dataToSave);
     };
 
     return (
@@ -230,23 +239,19 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
 
     const handleSaveModule = async (data: any) => {
         try {
-            // Fix NaN warning by ensuring monthlyPrice is a valid number
-            if (data.monthlyPrice) data.monthlyPrice = Number(data.monthlyPrice) || 0;
-            
             if (editingModule) {
-                // Pass ID explicitly as first argument
                 await api.updateModule(editingModule.id, data);
-                addToast('تم تعديل الوحدة بنجاح', 'success');
+                addToast('تم تحديث الوحدة بنجاح', 'success');
             } else {
                 await api.createModule(data);
-                addToast('تم إضافة الوحدة بنجاح', 'success');
+                addToast('تم إنشاء الوحدة بنجاح', 'success');
             }
-            setEditingModule(null);
             setIsCreateModalOpen(false);
+            setEditingModule(null);
             fetchData();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            addToast('فشل حفظ الوحدة', 'error');
+            addToast(e.message || 'فشل حفظ الوحدة', 'error');
         }
     };
 
@@ -278,11 +283,24 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     // For Super Admin, we show ALL modules fetched from API (which should return everything)
     // For School Admin, we might still want to categorize them
     // Filter out finance_fees/salaries/expenses etc. from UI if parent 'finance' exists to avoid duplicates
+    // Also handle 'finance' vs 'finance_fees' duplication issue explicitly
     const uniqueModules = availableModules.filter(m => {
+        // 1. Hide sub-finance modules if parent 'finance' exists
         if (m.id === 'finance_fees' || m.id === 'finance_salaries' || m.id === 'finance_expenses') {
-             // If parent finance exists, hide these children
              return !availableModules.some(p => p.id === 'finance');
         }
+        
+        // 2. Hide 'finance' module if it's acting as a duplicate of 'finance_fees' (same name/desc)
+        // OR if we want to enforce the new split structure
+        // Actually, based on migration 010, 'finance' was renamed to 'الرسوم الدراسية' (Fees)
+        // So 'finance' IS 'finance_fees' logically now.
+        // If we have BOTH 'finance' and 'finance_fees', we should probably hide one.
+        // Let's hide 'finance_fees' if 'finance' exists, as 'finance' is the legacy ID used by schools.
+        
+        if (m.id === 'finance_fees' && availableModules.some(p => p.id === 'finance')) {
+            return false;
+        }
+
         return true;
     });
 
