@@ -301,6 +301,14 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
             return false;
         }
 
+        // 3. De-duplicate by name if prices are weird (Emergency fix for user report)
+        // If we have two modules named "الرسوم الدراسية", show the one with ID 'finance' and hide others
+        // UNLESS the other one is totally different.
+        if (m.name === 'الرسوم الدراسية' && m.id !== 'finance' && availableModules.some(p => p.id === 'finance')) {
+            // This hides the $29 duplicate if the 'finance' one is present
+            return false;
+        }
+
         return true;
     });
 
@@ -356,9 +364,11 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                 <div>
                                     <h4 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
                                         {module.name}
+                                        <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">{module.id}</span>
                                         {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
+                                    <p className="font-semibold text-teal-600 mt-1">${module.monthlyPrice}/شهرياً</p>
                                 </div>
                                 <div className="mt-4 text-center">
                                     {activeModuleIds.has(module.id) ? (
@@ -397,6 +407,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                 <div>
                                     <h4 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
                                         {module.name}
+                                        <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">{module.id}</span>
                                         {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>

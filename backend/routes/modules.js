@@ -192,11 +192,19 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
             
             return res.status(404).json({ message: 'Module not found' });
         }
+
+        // Prevent deleting core modules even if in DB
+        if (row.isCore || id === 'finance') {
+             return res.status(400).json({ message: 'Cannot delete a Core module. You can disable it instead.' });
+        }
         
         await row.destroy();
         res.json({ deleted: true });
     } catch (e) {
-        console.error(e?.message || e);
+        console.error(`Delete Module Error (${req.params.id}):`, e);
+        if (e.name === 'SequelizeForeignKeyConstraintError') {
+            return res.status(400).json({ message: 'Cannot delete this module because it is assigned to one or more schools. Please remove it from all subscriptions first.' });
+        }
         res.status(500).send('Server Error');
     }
 });
