@@ -1568,7 +1568,7 @@ router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         taxAmount,
         totalAmount 
     });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 
 // @route   POST api/school/:schoolId/invoices/:invoiceId/payments
@@ -1937,7 +1937,7 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         holidays: Array.isArray(obj.holidays) ? obj.holidays : [],
         admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : (obj.admissionForm || { studentFields: ['الاسم الكامل','تاريخ الميلاد','الجنس','الرقم الوطني','العنوان','المدينة'], parentFields: ['الاسم','هاتف الاتصال','بريد الإلكتروني'], requiredDocuments: [], registrationFee: 0, consentFormRequired: false, consentFormText: '', autoGenerateRegistrationInvoice: true, registrationFeeDueDays: 7 }),
     });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 
 // @route   PUT api/school/:schoolId/settings
@@ -1989,7 +1989,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       holidays: Array.isArray(obj.holidays) ? obj.holidays : obj.holidays,
       admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : obj.admissionForm,
     });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  } catch (err) { console.error('Error in PUT settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 
 

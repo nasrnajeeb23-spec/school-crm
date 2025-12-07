@@ -179,7 +179,7 @@ router.get('/:id/billing/summary', verifyToken, requireRole('SUPER_ADMIN'), asyn
       else { unpaid++; outstanding += amt; }
     });
     return res.json({ totalInvoices: rows.length, paidCount: paid, unpaidCount: unpaid, overdueCount: overdue, totalAmount: total, outstandingAmount: outstanding });
-  } catch (e) { console.error('Billing Summary Error:', e); res.status(500).json({ msg: 'Server Error', error: e.message }); }
+  } catch (e) { console.error('Billing Summary Error:', e); res.status(500).json({ msg: 'Server Error: ' + e.message }); }
 });
 
 // Update operational status for a school (ACTIVE/SUSPENDED)
@@ -278,7 +278,7 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
     }
     
     res.json(activeModules);
-  } catch (err) { console.error('Get Modules Error:', err); res.status(500).json({ msg: 'Server Error', error: err.message }); }
+  } catch (err) { console.error('Get Modules Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 
 router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {

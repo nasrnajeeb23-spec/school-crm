@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserRole } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { showToast } from '../utils/toast';
-import { ShieldIcon, PlusIcon, EditIcon, TrashIcon, KeyIcon, UsersIcon } from '../components/icons';
+import { ShieldIcon, PlusIcon, EditIcon, TrashIcon, KeyIcon, UsersIcon, UserIcon } from '../components/icons';
 import * as api from '../api';
 
 interface TeamMember {
