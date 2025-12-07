@@ -83,7 +83,11 @@ async function enforceActiveSubscription(req, res, next) {
     next();
   } catch (e) {
     console.error('Subscription enforcement failed:', e);
-    return res.status(500).json({ msg: 'Server Error' });
+    // Log detailed error but don't crash if possible, or return 500 with details
+    // It's better to fail safe (allow access? or block?) - sticking to block for safety but logging well.
+    // Actually, returning 500 blocks access, which is safe for subscription logic.
+    if (req.logger) req.logger.error('Subscription enforcement error', { error: e.message, stack: e.stack });
+    return res.status(500).json({ msg: 'Server Error during subscription check', error: e.message });
   }
 }
 
@@ -1489,7 +1493,7 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance_fees'), async (req, res) => {
   try {
     const { Invoice, Student } = require('../models');
-    try { await Invoice.sync(); } catch (e) {}
+    try { await Invoice.sync(); await Student.sync(); } catch (e) { console.error('Sync error in invoices:', e); }
 
     const invoices = await Invoice.findAll({
         include: {
@@ -1832,8 +1836,8 @@ router.get('/:schoolId/students/:studentId/statement', verifyToken, requireRole(
         return { ...t, balance, date: new Date(t.date).toISOString().split('T')[0] };
     });
 
-    res.json(statement);
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+    res.json(settings);
+  } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error', error: err.message }); }
 });
 
 // --- Student Profile Details ---

@@ -165,6 +165,9 @@ router.get('/:id/subscription', verifyToken, requireRole('SUPER_ADMIN'), async (
 // Billing summary for a school
 router.get('/:id/billing/summary', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
+    const { Invoice, Student } = require('../models');
+    try { await Invoice.sync(); } catch (e) {}
+
     const sid = Number(req.params.id);
     const rows = await Invoice.findAll({ include: [{ model: Student, where: { schoolId: sid }, attributes: [] }] });
     let paid = 0, unpaid = 0, overdue = 0, total = 0, outstanding = 0;
@@ -176,7 +179,7 @@ router.get('/:id/billing/summary', verifyToken, requireRole('SUPER_ADMIN'), asyn
       else { unpaid++; outstanding += amt; }
     });
     return res.json({ totalInvoices: rows.length, paidCount: paid, unpaidCount: unpaid, overdueCount: overdue, totalAmount: total, outstandingAmount: outstanding });
-  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+  } catch (e) { console.error('Billing Summary Error:', e); res.status(500).json({ msg: 'Server Error', error: e.message }); }
 });
 
 // Update operational status for a school (ACTIVE/SUSPENDED)
@@ -242,7 +245,7 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
     });
     
     const now = new Date();
-    const isTrial = sub && String(sub.status).toUpperCase() === 'TRIAL';
+    const isTrial = sub && String(sub.status || '').toUpperCase() === 'TRIAL';
     const isTrialActive = isTrial && (sub.endDate || sub.renewalDate) && new Date(sub.endDate || sub.renewalDate) > now;
 
     if (isTrialActive) {
@@ -275,7 +278,7 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
     }
     
     res.json(activeModules);
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  } catch (err) { console.error('Get Modules Error:', err); res.status(500).json({ msg: 'Server Error', error: err.message }); }
 });
 
 router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {

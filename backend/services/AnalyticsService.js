@@ -589,7 +589,7 @@ class AnalyticsService {
         type: 'operational',
         priority: 'high',
         title: 'High student risk rate',
-        description: `${(riskRate * 100).toFixed(1)}% of students are at risk`,
+        description: `${((riskRate || 0) * 100).toFixed(1)}% of students are at risk`,
         data: { riskRate },
         action: 'Implement school-wide intervention program'
       });
