@@ -626,6 +626,7 @@ export const getSchoolInvoicesCount = async (schoolId: number): Promise<number> 
     } catch { return 0; }
 };
 
+export const getLandingPageContent = async (): Promise<LandingPageContent> => {
     try {
         return await apiCall('/content/landing', { method: 'GET' });
     } catch {
