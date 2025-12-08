@@ -68,6 +68,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const [activeModules, setActiveModules] = useState<ModuleId[]>([]);
+  const [isTrial, setIsTrial] = useState<boolean>(false);
   
   const storedId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('current_school_id') || '0') : 0;
   const effectiveSchoolId = isSuperAdminView ? parseInt(urlSchoolId || '0') : (currentUser?.schoolId || storedId);
@@ -77,7 +78,10 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
     if (isSuperAdminView) return true; // Super admin has all permissions
     if (!userRolePermissions.includes(permission)) return false;
     const requiredModule = Object.entries(modulePermissions).find(([, p]) => p === permission)?.[0] as ModuleId;
-    if (requiredModule && !activeModules.includes(requiredModule)) return false;
+    if (requiredModule && !activeModules.includes(requiredModule)) {
+      if (isTrial) return true;
+      return false;
+    }
     return true;
   };
   
@@ -100,9 +104,10 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
             api.getSchoolById(effectiveSchoolId),
             actionItemsPromise,
             api.getSchoolModules(effectiveSchoolId),
-            api.getSchoolSettings(effectiveSchoolId)
+            api.getSchoolSettings(effectiveSchoolId),
+            api.getSubscriptionState(effectiveSchoolId)
         ]).then(results => {
-            const [schoolRes, actionsRes, modulesRes, settingsRes] = results;
+            const [schoolRes, actionsRes, modulesRes, settingsRes, subStateRes] = results as any;
             if (schoolRes.status === 'fulfilled') {
               setSchool(schoolRes.value);
             } else if (schoolRes.status === 'rejected') {
@@ -128,6 +133,14 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                  academicYearEnd: '',
                  notifications: { email: true, sms: false, push: true },
               } as any);
+            }
+            if (subStateRes && subStateRes.status === 'fulfilled') {
+              const ss = subStateRes.value;
+              const status = String(ss?.subscription?.status || '').toUpperCase();
+              const expired = !!ss?.subscription?.trialExpired;
+              setIsTrial(status === 'TRIAL' && !expired);
+            } else {
+              setIsTrial(false);
             }
         }).catch(err => {
             console.error('School data load error:', err);
@@ -166,6 +179,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
       <SchoolSidebar 
         permissions={userRolePermissions} 
         activeModules={activeModules}
+        isTrial={isTrial}
         schoolName={settings?.schoolName || school.name}
         schoolLogoUrl={api.getAssetUrl(settings?.schoolLogoUrl as string)}
         isSuperAdminView={isSuperAdminView}

@@ -45,7 +45,13 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
         setTeachers(prevTeachers => [newTeacher, ...prevTeachers]);
         setIsModalOpen(false);
         addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح.`, 'success');
-    } catch (error) {
+    } catch (error: any) {
+        const msg = String(error?.message || '');
+        if (msg.includes('LIMIT_EXCEEDED') || msg.includes('تم بلوغ حد الموارد')) {
+          addToast('تم بلوغ حد المعلمين. يرجى الترقية أو زيادة الحد.', 'warning');
+          try { window.location.assign('/superadmin/subscriptions'); } catch {}
+          return;
+        }
         console.error("Failed to add teacher:", error);
         addToast("فشل إضافة المعلم. الرجاء المحاولة مرة أخرى.", 'error');
     }

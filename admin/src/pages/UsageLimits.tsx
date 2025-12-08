@@ -53,32 +53,42 @@ const EditLimitsModal: React.FC<EditLimitsModalProps> = ({ plan, onClose, onSave
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
                     تعديل حدود: {plan.name}
                 </h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الطلاب</label>
-                        <input
-                            type="number"
-                            name="students"
-                            value={limits.students}
-                            onChange={handleChange}
-                            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المعلمون</label>
-                        <input
-                            type="number"
-                            name="teachers"
-                            value={limits.teachers}
-                            onChange={handleChange}
-                            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">مساحة التخزين (GB)</label>
-                        <input
-                            type="number"
-                            name="storageGB"
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الطلاب</label>
+                <input
+                    type="number"
+                    name="students"
+                    value={limits.students}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المعلمون</label>
+                <input
+                    type="number"
+                    name="teachers"
+                    value={limits.teachers}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الفواتير</label>
+                <input
+                    type="number"
+                    name="invoices"
+                    value={(limits as any).invoices || 0}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">مساحة التخزين (GB)</label>
+                <input
+                    type="number"
+                    name="storageGB"
                             value={limits.storageGB}
                             onChange={handleChange}
                             className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -165,11 +175,15 @@ const UsageLimits: React.FC = () => {
             className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 flex flex-col h-full ${plan.recommended ? 'border-2 border-indigo-500' : 'border border-gray-200 dark:border-gray-700'}`}
           >
             <h3 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-6">{plan.name}</h3>
+            <div className="mb-4 text-center">
+              <span className="inline-block text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">مصدر الحدود: الخطة</span>
+            </div>
             
             <div className="space-y-2 flex-grow">
                <LimitItem icon={StudentsIcon} label="الطلاب" value={plan.limits.students} />
                <LimitItem icon={UsersIcon} label="المعلمون" value={plan.limits.teachers} />
                <LimitItem icon={StorageIcon} label="مساحة التخزين (GB)" value={plan.limits.storageGB} />
+               <LimitItem icon={FileIcon} label="الفواتير" value={(plan.limits as any).invoices || 0} />
                <LimitItem icon={BranchesIcon} label="الفروع" value={plan.limits.branches} />
             </div>
 

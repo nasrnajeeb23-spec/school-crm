@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Plan } = require('../models');
+const { Plan, AuditLog } = require('../models');
 
 // @route   GET api/plans
 // @desc    Get all plans
@@ -47,6 +47,18 @@ router.put('/:id', async (req, res) => {
     if (recommended !== undefined) plan.recommended = recommended;
 
     await plan.save();
+
+    try {
+      await AuditLog.create({
+        action: 'PLAN_UPDATE',
+        userId: req.user?.id || null,
+        userEmail: req.user?.email || null,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        details: JSON.stringify({ planId: plan.id, changes: { name, price, pricePeriod, features, limits, recommended } }),
+        riskLevel: 'medium'
+      });
+    } catch(e) {}
 
     res.json({
       id: plan.id.toString(),

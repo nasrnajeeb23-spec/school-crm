@@ -91,7 +91,13 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
           console.warn('Parent upsert failed:', parentErr);
           addToast('تم إضافة الطالب، تعذر ربط ولي الأمر تلقائياً.', 'warning');
         }
-    } catch (error) {
+    } catch (error: any) {
+        const msg = String(error?.message || '');
+        if (msg.includes('LIMIT_EXCEEDED') || msg.includes('تم بلوغ حد الموارد')) {
+          addToast('تم بلوغ حد الطلاب. يرجى الترقية أو زيادة الحد.', 'warning');
+          try { window.location.assign('/superadmin/subscriptions'); } catch {}
+          return;
+        }
         console.error("Failed to add student:", error);
         addToast("فشل إضافة الطالب. الرجاء المحاولة مرة أخرى.", 'error');
     }

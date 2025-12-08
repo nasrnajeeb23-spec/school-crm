@@ -354,7 +354,9 @@ router.get('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 // @route   POST api/school/:schoolId/students
 // @desc    Add a new student to a school
 // @access  Private (SchoolAdmin)
-router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), validate([
+const { requireWithinLimits } = require('../middleware/limits');
+
+router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireWithinLimits('students'), validate([
   { name: 'name', required: true, type: 'string', minLength: 2 },
   { name: 'grade', required: true, type: 'string' },
   { name: 'parentName', required: true, type: 'string' },
@@ -790,7 +792,7 @@ router.get('/:schoolId/payroll/receipts/:filename', verifyToken, requireRole('SC
 // @route   POST api/school/:schoolId/teachers
 // @desc    Add a new teacher to a school
 // @access  Private (SchoolAdmin)
-router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), validate([
+router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireWithinLimits('teachers'), validate([
   { name: 'name', required: true, type: 'string', minLength: 2 },
   { name: 'subject', required: true, type: 'string' },
   { name: 'phone', required: true, type: 'string' },
@@ -1555,7 +1557,7 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 // @route   POST api/school/:schoolId/invoices
 // @desc    Create a new invoice
 // @access  Private (SchoolAdmin)
-router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), validate([
+router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), requireWithinLimits('invoices'), validate([
   { name: 'studentId', required: true, type: 'string' },
   { name: 'dueDate', required: true, type: 'string' },
   { name: 'items', required: true },
@@ -2346,8 +2348,27 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
     }
 
     // Counts
-    const studentsCount = await Student.count({ where: { schoolId } });
-    const teachersCount = await Teacher.count({ where: { schoolId } });
+    let studentsCount = 0;
+    let teachersCount = 0;
+    try {
+      const redis = req.app?.locals?.redisClient || null;
+      const cacheKey = `usage:${schoolId}`;
+      if (redis) {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          const data = JSON.parse(cached);
+          studentsCount = Number(data.students || 0);
+          teachersCount = Number(data.teachers || 0);
+        }
+      }
+      if (!studentsCount || !teachersCount) {
+        studentsCount = await Student.count({ where: { schoolId } });
+        teachersCount = await Teacher.count({ where: { schoolId } });
+        if (redis) {
+          await redis.setEx(cacheKey, 60, JSON.stringify({ students: studentsCount, teachers: teachersCount }));
+        }
+      }
+    } catch {}
 
     const allowedModules = Array.isArray(req.app?.locals?.allowedModules) ? req.app.locals.allowedModules : [];
     let activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
@@ -2372,6 +2393,7 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
     const endMs = sub?.renewalDate ? new Date(sub.renewalDate).getTime() : (sub?.endDate ? new Date(sub.endDate).getTime() : 0);
     const isTrial = String(sub?.status || '').toUpperCase() === 'TRIAL';
     const trialExpired = isTrial && endMs > 0 && now > endMs;
+    const daysLeft = endMs > now ? Math.ceil((endMs - now) / (24 * 60 * 60 * 1000)) : 0;
 
     return res.success({
       subscription: {
@@ -2380,6 +2402,7 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
         endDate: sub?.endDate || null,
         renewalDate: sub?.renewalDate || null,
         trialExpired,
+        daysLeft,
       },
       plan: plan ? plan.toJSON() : null,
       limits: { ...limits, source: limitSource },

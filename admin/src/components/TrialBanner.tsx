@@ -50,7 +50,8 @@ export default function TrialBanner() {
   }
 
   // 2. Countdown State (Less than 5 days remaining)
-  if (state?.subscription?.daysRemaining !== undefined && state.subscription.daysRemaining <= 5 && state.subscription.daysRemaining >= 0) {
+  const daysLeft = (state?.subscription?.daysLeft ?? undefined) as number | undefined
+  if (daysLeft !== undefined && daysLeft <= 5 && daysLeft >= 0) {
     return (
       <div className="mb-4">
         <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 shadow">
@@ -58,7 +59,7 @@ export default function TrialBanner() {
             <div>
               <div className="font-bold flex items-center gap-2">
                 <span>⚠️</span>
-                <span>تنبيه: متبقي {state.subscription.daysRemaining} أيام على انتهاء الفترة التجريبية</span>
+                <span>تنبيه: متبقي {daysLeft} أيام على انتهاء الفترة التجريبية</span>
               </div>
               <div className="text-sm mt-1">يرجى تجديد الاشتراك واختيار الخطة المناسبة لضمان استمرار عمل النظام دون توقف.</div>
             </div>

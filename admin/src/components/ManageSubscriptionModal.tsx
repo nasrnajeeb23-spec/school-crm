@@ -109,6 +109,15 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
     }
   };
 
+  const renderSource = () => {
+    const hasCustom = !!subscription.customLimits;
+    const source = hasCustom ? 'school_custom' : (subscription.plan ? 'plan' : 'none');
+    const text = source === 'school_custom' ? 'مصدر الحدود: مخصّصة للمدرسة' : (source === 'plan' ? 'مصدر الحدود: الخطة' : 'مصدر الحدود: غير محدد');
+    return (
+      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{text}</div>
+    );
+  };
+
   const toggleModule = (moduleId: string) => {
     setSelectedModules(prev => 
       prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]
@@ -179,6 +188,7 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
               {/* Usage Limits */}
               <div className="border-t dark:border-gray-700 pt-6">
                 <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">حدود الاستخدام (تخصيص)</h4>
+                {renderSource()}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">الطلاب</label>

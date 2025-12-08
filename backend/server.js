@@ -261,6 +261,7 @@ if (licenseKey) {
     logger.warn('Dev mode: enabling finance & transportation modules for testing');
   }
 }
+allowedModules = Array.from(new Set(allowedModules));
 app.locals.allowedModules = allowedModules;
 
 const { Job } = require('./models');

@@ -299,6 +299,19 @@ router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), async 
         }
 
         await t.commit();
+
+        try {
+            const { AuditLog } = require('../models');
+            await AuditLog.create({
+                action: 'SUBSCRIPTION_UPDATE',
+                userId: req.user?.id || null,
+                userEmail: req.user?.email || null,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'],
+                details: JSON.stringify({ subscriptionId: id, changes: { planId, status, renewalDate, customLimits, modules } }),
+                riskLevel: 'medium'
+            });
+        } catch(e) {}
         
         // Return updated data
         const updatedSub = await Subscription.findByPk(id, {

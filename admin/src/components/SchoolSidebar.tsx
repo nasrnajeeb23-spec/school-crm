@@ -7,12 +7,13 @@ import { useAppContext } from '../contexts/AppContext';
 interface SchoolSidebarProps {
   permissions: Permission[];
   activeModules: ModuleId[];
+  isTrial?: boolean;
   schoolName?: string;
   schoolLogoUrl?: string;
   isSuperAdminView?: boolean;
 }
 
-const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModules, schoolName, schoolLogoUrl, isSuperAdminView }) => {
+const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModules, isTrial = false, schoolName, schoolLogoUrl, isSuperAdminView }) => {
   const { logout } = useAppContext();
   const location = useLocation();
 
@@ -108,7 +109,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
              // The backend API now returns expanded modules, so 'finance' -> 'finance_fees' etc.
              // So if 'finance' is active, 'finance_fees' will be in activeModules list.
              
-             if (isLocked) {
+             if (isLocked && !isTrial) {
                  return (
                     <li key={item.id} className="px-2" title="هذه الوحدة غير مفعلة">
                       <div className={`${baseLinkClasses} ${lockedLinkClasses}`}>
@@ -127,7 +128,10 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
                       <>
                         {isActive && <div className="absolute right-0 h-6 w-1 bg-teal-600 dark:bg-teal-400 rounded-l-full"></div>}
                         <item.icon className="h-6 w-6" />
-                        <span className="hidden md:block mr-4">{item.label}</span>
+                        <span className="hidden md:block mr-4 flex items-center gap-2">
+                          <span>{item.label}</span>
+                          {isLocked && isTrial && (<span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">تجربة</span>)}
+                        </span>
                       </>
                     )}
                   </NavLink>

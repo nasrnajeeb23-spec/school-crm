@@ -91,7 +91,15 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
             setInvoices(prev => [newInvoice, ...prev]);
             setIsAddInvoiceModalOpen(false);
             addToast(`تم إنشاء فاتورة جديدة للطالب ${newInvoice.studentName}.`, 'success');
-        } catch (error) { addToast("فشل إنشاء الفاتورة.", 'error'); }
+        } catch (error: any) {
+            const msg = String(error?.message || '');
+            if (msg.includes('LIMIT_EXCEEDED') || msg.includes('تم بلوغ حد الموارد')) {
+                addToast('تم بلوغ حد الفواتير. يرجى الترقية أو زيادة الحد.', 'warning');
+                try { window.location.assign('/superadmin/subscriptions'); } catch {}
+                return;
+            }
+            addToast("فشل إنشاء الفاتورة.", 'error');
+        }
     };
 
     const filteredInvoices = useMemo(() => {
