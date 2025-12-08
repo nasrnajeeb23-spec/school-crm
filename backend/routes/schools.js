@@ -3,7 +3,7 @@ const router = express.Router();
 const { School, Subscription, Plan, Student, Invoice, SchoolSettings } = require('../models');
 const { sequelize } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
-const { requireModule } = require('../middleware/modules');
+const { requireModule, moduleMap } = require('../middleware/modules');
 
 // @route   GET api/schools
 // @desc    Get all schools with their subscription details
@@ -284,14 +284,6 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
         }
     }
     
-    // Expand parent modules to children
-    const moduleMap = {
-      'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
-      'transportation': ['transportation', 'transport', 'bus_management'],
-      'academic': ['academic', 'academic_management', 'grades', 'attendance'],
-      'student': ['student', 'student_management']
-    };
-
     const expandedSet = new Set();
     activeModules.forEach(am => {
         expandedSet.add(am.moduleId);

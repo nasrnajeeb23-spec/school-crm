@@ -45,7 +45,7 @@ const upload = multer({
 });
 const { scanFile, verifyFileSignature } = require('../utils/fileSecurity');
 const { validate } = require('../middleware/validate');
-const { requireModule } = require('../middleware/modules');
+const { requireModule, moduleMap } = require('../middleware/modules');
 
 async function enforceActiveSubscription(req, res, next) {
   try {
@@ -187,68 +187,7 @@ router.get('/:schoolId/subscription', verifyToken, requireRole('SCHOOL_ADMIN', '
     }
 });
 
-// @route   GET api/school/:schoolId/subscription-state
-// @desc    Get subscription state for resource usage widget (Plan + Custom Limits)
-// @access  Private (SchoolAdmin)
-router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
-  try {
-      const schoolId = Number(req.params.schoolId);
-      const { Subscription, Plan, Student, Teacher, Invoice } = require('../models');
-      
-      const subscription = await Subscription.findOne({ 
-        where: { schoolId }, 
-        include: [{ model: Plan }] 
-      });
-  
-      const [studentCount, teacherCount, invoiceCount] = await Promise.all([
-        Student.count({ where: { schoolId } }),
-        Teacher.count({ where: { schoolId } }),
-        Invoice ? Invoice.count({ include: [{ model: Student, where: { schoolId } }] }) : 0
-      ]);
-  
-      // Default Fallback
-      const defaultLimits = { students: 50, teachers: 5, storageGB: 1, branches: 1, invoices: 100 };
-  
-      if (!subscription) {
-         return res.json({
-           plan: { limits: defaultLimits },
-           limits: defaultLimits,
-           usage: { students: studentCount, teachers: teacherCount, invoices: invoiceCount },
-           status: 'No Subscription'
-         });
-      }
 
-    const planLimits = subscription.Plan?.limits || defaultLimits;
-    const customLimits = subscription.customLimits || {};
-    
-    // Merge: Custom limits override plan limits
-    const mergedLimits = {
-        students: customLimits.students !== undefined ? customLimits.students : planLimits.students,
-        teachers: customLimits.teachers !== undefined ? customLimits.teachers : planLimits.teachers,
-        storageGB: customLimits.storageGB !== undefined ? customLimits.storageGB : planLimits.storageGB,
-        branches: customLimits.branches !== undefined ? customLimits.branches : planLimits.branches,
-        invoices: customLimits.invoices !== undefined ? customLimits.invoices : planLimits.invoices,
-    };
-    
-    res.json({
-      plan: {
-        name: subscription.Plan?.name,
-        limits: planLimits
-      },
-      limits: mergedLimits,
-      usage: {
-        students: studentCount,
-        teachers: teacherCount,
-        invoices: invoiceCount
-      },
-      status: subscription.status
-    });
-
-  } catch (err) {
-    console.error('Subscription State Error:', err.message);
-    res.status(500).send('Server Error');
-  }
-});
 
 
 // @route   GET api/school/:schoolId/stats/dashboard
@@ -1565,6 +1504,23 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+router.get('/:schoolId/billing/summary', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), async (req, res) => {
+  try {
+    const sid = Number(req.params.schoolId);
+    const rows = await Invoice.findAll({ include: [{ model: Student, where: { schoolId: sid }, attributes: [] }] });
+    let paid = 0, unpaid = 0, overdue = 0, total = 0, outstanding = 0;
+    for (const r of rows) {
+      const amt = parseFloat(r.amount || 0);
+      total += amt;
+      const s = String(r.status).toUpperCase();
+      if (s === 'PAID') paid++;
+      else if (s === 'OVERDUE') { overdue++; outstanding += amt; }
+      else { unpaid++; outstanding += amt; }
+    }
+    return res.json({ totalInvoices: rows.length, paidCount: paid, unpaidCount: unpaid, overdueCount: overdue, totalAmount: total, outstandingAmount: outstanding });
+  } catch (e) { console.error(e?.message || e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
 // @route   POST api/school/:schoolId/invoices
 // @desc    Create a new invoice
 // @access  Private (SchoolAdmin)
@@ -2329,19 +2285,19 @@ router.get('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
 router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
-    const { Subscription, SchoolSettings, Plan, Student, Teacher } = require('../models');
+    const { Subscription, SchoolSettings, Plan, Student, Teacher, Invoice } = require('../models');
     const sub = await Subscription.findOne({ where: { schoolId } });
     const settings = await SchoolSettings.findOne({ where: { schoolId } });
     const plan = sub ? await Plan.findByPk(sub.planId) : null;
 
-    // Calculate Limits
-    let limits = { students: 50, teachers: 5 }; // Default
+    let limits = { students: 50, teachers: 5, invoices: 100 };
     let limitSource = 'default';
 
     // 1. Custom Limits
     if (settings && settings.customLimits) {
          if (settings.customLimits.students) limits.students = settings.customLimits.students === 'unlimited' ? 999999 : Number(settings.customLimits.students);
          if (settings.customLimits.teachers) limits.teachers = settings.customLimits.teachers === 'unlimited' ? 999999 : Number(settings.customLimits.teachers);
+         if (settings.customLimits.invoices) limits.invoices = settings.customLimits.invoices === 'unlimited' ? 999999 : Number(settings.customLimits.invoices);
          limitSource = 'custom';
     } 
     // 2. Plan Limits
@@ -2349,6 +2305,7 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
          const l = typeof plan.limits === 'string' ? JSON.parse(plan.limits) : plan.limits;
          if (l.students) limits.students = l.students === 'unlimited' ? 999999 : Number(l.students);
          if (l.teachers) limits.teachers = l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
+         if (l.invoices) limits.invoices = l.invoices === 'unlimited' ? 999999 : Number(l.invoices);
          limitSource = 'plan';
     }
     // 3. Subscription Legacy Limits
@@ -2356,11 +2313,13 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
          const l = typeof sub.customLimits === 'string' ? JSON.parse(sub.customLimits) : sub.customLimits;
          if (l.students) limits.students = l.students === 'unlimited' ? 999999 : Number(l.students);
          if (l.teachers) limits.teachers = l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
+         if (l.invoices) limits.invoices = l.invoices === 'unlimited' ? 999999 : Number(l.invoices);
     }
 
     // Counts
     let studentsCount = 0;
     let teachersCount = 0;
+    let invoicesCount = 0;
     try {
       const redis = req.app?.locals?.redisClient || null;
       const cacheKey = `usage:${schoolId}`;
@@ -2380,18 +2339,14 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
         }
       }
     } catch {}
+    try {
+      invoicesCount = await Invoice.count({ include: [{ model: Student, required: true, where: { schoolId } }] });
+    } catch {}
 
     const allowedModules = Array.isArray(req.app?.locals?.allowedModules) ? req.app.locals.allowedModules : [];
     let activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
     
     // Expand parent modules to children for frontend compatibility
-    const moduleMap = {
-      'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
-      'transportation': ['transportation', 'transport', 'bus_management'],
-      'academic': ['academic', 'academic_management', 'grades', 'attendance'],
-      'student': ['student', 'student_management']
-    };
-    
     const expandedActive = new Set(activeModules);
     activeModules.forEach(m => {
       if (moduleMap[m]) {
@@ -2417,7 +2372,7 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
       },
       plan: plan ? plan.toJSON() : null,
       limits: { ...limits, source: limitSource },
-      usage: { students: studentsCount, teachers: teachersCount },
+      usage: { students: studentsCount, teachers: teachersCount, invoices: invoicesCount },
       modules: {
         allowed: allowedModules,
         active: activeModules,

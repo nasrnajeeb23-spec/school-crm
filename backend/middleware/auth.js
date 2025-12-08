@@ -1,6 +1,27 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
+function ipv4(ip) {
+  const m = String(ip || '').match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+  return m ? m[1] : '';
+}
+
+function ipToLong(ip) {
+  const parts = String(ip).split('.').map(Number);
+  if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) return null;
+  return ((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+}
+
+function inCidr(ip, cidr) {
+  const [base, bitsStr] = String(cidr).split('/');
+  const bits = Number(bitsStr);
+  const ipNum = ipToLong(ip);
+  const baseNum = ipToLong(base);
+  if (ipNum == null || baseNum == null || isNaN(bits) || bits < 0 || bits > 32) return false;
+  const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+  return (ipNum & mask) === (baseNum & mask);
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   console.error('❌ JWT_SECRET not found in environment variables!');
   console.error('Please set JWT_SECRET in your .env file');
@@ -33,8 +54,9 @@ async function verifyToken(req, res, next) {
       // Enforce allowed IP ranges if configured
       const ranges = Array.isArray(policies.allowedIpRanges) ? policies.allowedIpRanges : [];
       if (ranges.length > 0) {
-        const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString();
-        const ok = ranges.some(r => ip.startsWith(r));
+        const ipRaw = (req.headers['x-forwarded-for'] || req.ip || '').toString();
+        const ip4 = ipv4(ipRaw);
+        const ok = ranges.some(r => String(r).includes('/') ? inCidr(ip4, String(r)) : ip4.startsWith(String(r)));
         if (!ok) return res.status(403).json({ msg: 'IP not allowed' });
       }
       // Enforce session max age if set (override JWT exp)

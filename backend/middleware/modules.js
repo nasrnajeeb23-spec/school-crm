@@ -1,5 +1,12 @@
 const { User } = require('../models');
 
+const moduleMap = {
+  finance: ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
+  transportation: ['transportation', 'transport', 'bus_management'],
+  academic: ['academic', 'academic_management', 'grades', 'attendance'],
+  student: ['student', 'student_management']
+};
+
 function requireModule(moduleId) {
   return async (req, res, next) => {
     try {
@@ -60,20 +67,13 @@ function requireModule(moduleId) {
       const settings = await SchoolSettings.findOne({ where: { schoolId } });
       const active = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
       
-      // Normalize module IDs if needed (e.g. 'transport' vs 'transportation')
-      // Define parent-child module relationships
-      const moduleMap = {
-          'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'], // Added finance_expenses
-          'transportation': ['transportation', 'transport', 'bus_management'],
-          'academic': ['academic', 'academic_management', 'grades', 'attendance'],
-          'student': ['student', 'student_management']
-      };
+      const moduleMapLocal = moduleMap;
 
       // Check if module is directly active or part of an active parent module
       const isActive = active.some(m => {
           if (m === moduleId) return true;
           // Check if 'm' is a parent that includes 'moduleId'
-          return moduleMap[m] && moduleMap[m].includes(moduleId);
+          return moduleMapLocal[m] && moduleMapLocal[m].includes(moduleId);
       });
 
       if (!isActive) {
@@ -95,8 +95,8 @@ function requireModule(moduleId) {
       // Expand allowedGlobal using the same map
       const expandedGlobal = new Set(allowedGlobal);
       allowedGlobal.forEach(m => {
-          if (moduleMap[m]) {
-              moduleMap[m].forEach(child => expandedGlobal.add(child));
+          if (moduleMapLocal[m]) {
+              moduleMapLocal[m].forEach(child => expandedGlobal.add(child));
           }
       });
 
@@ -112,4 +112,4 @@ function requireModule(moduleId) {
   };
 }
 
-module.exports = { requireModule };
+module.exports = { requireModule, moduleMap };
