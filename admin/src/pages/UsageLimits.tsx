@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api';
 import { Plan } from '../types';
-import { StudentsIcon, UsersIcon, StorageIcon, BranchesIcon } from '../components/icons';
+import { StudentsIcon, UsersIcon, StorageIcon, BranchesIcon, BillingIcon } from '../components/icons';
 import { useToast } from '../contexts/ToastContext';
 
 const LimitItem: React.FC<{ icon: React.ElementType; label: string; value: string | number }> = ({ icon: Icon, label, value }) => (
@@ -79,7 +79,7 @@ const EditLimitsModal: React.FC<EditLimitsModalProps> = ({ plan, onClose, onSave
                 <input
                     type="number"
                     name="invoices"
-                    value={(limits as any).invoices || 0}
+                    value={limits.invoices || 0}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
@@ -183,7 +183,7 @@ const UsageLimits: React.FC = () => {
                <LimitItem icon={StudentsIcon} label="الطلاب" value={plan.limits.students} />
                <LimitItem icon={UsersIcon} label="المعلمون" value={plan.limits.teachers} />
                <LimitItem icon={StorageIcon} label="مساحة التخزين (GB)" value={plan.limits.storageGB} />
-               <LimitItem icon={FileIcon} label="الفواتير" value={(plan.limits as any).invoices || 0} />
+               <LimitItem icon={BillingIcon} label="الفواتير" value={plan.limits.invoices || 0} />
                <LimitItem icon={BranchesIcon} label="الفروع" value={plan.limits.branches} />
             </div>
 

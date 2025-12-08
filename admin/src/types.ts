@@ -81,6 +81,7 @@ export enum Permission {
 export enum ModuleId {
     StudentManagement = 'student_management',
     AcademicManagement = 'academic_management',
+    Finance = 'finance',
     FinanceFees = 'finance_fees',
     FinanceSalaries = 'finance_salaries',
     FinanceExpenses = 'finance_expenses',
@@ -346,6 +347,7 @@ export interface UsageLimit {
   teachers: number | 'غير محدود';
   storageGB: number | 'غير محدود';
   branches: number | 'غير محدود';
+  invoices: number | 'غير محدود';
 }
 
 export interface Plan {

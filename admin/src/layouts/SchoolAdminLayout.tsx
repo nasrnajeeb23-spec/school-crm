@@ -121,7 +121,27 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
               setActionItems(actionsRes.value);
             }
             if (modulesRes.status === 'fulfilled') {
-              try { setActiveModules(modulesRes.value.map((sm: any) => sm.moduleId)); } catch { setActiveModules([]); }
+              try { 
+                const rawModules = modulesRes.value.map((sm: any) => sm.moduleId);
+                const expandedModules = new Set<ModuleId>();
+                
+                // Matches backend/middleware/modules.js
+                const moduleMap: Record<string, string[]> = {
+                    'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
+                    'transportation': ['transportation', 'transport', 'bus_management'],
+                    'academic': ['academic', 'academic_management', 'grades', 'attendance'],
+                    'student': ['student', 'student_management']
+                };
+
+                rawModules.forEach((m: string) => {
+                    expandedModules.add(m as ModuleId);
+                    if (moduleMap[m]) {
+                        moduleMap[m].forEach(child => expandedModules.add(child as ModuleId));
+                    }
+                });
+
+                setActiveModules(Array.from(expandedModules)); 
+              } catch { setActiveModules([]); }
             } else { setActiveModules([]); }
             if (settingsRes.status === 'fulfilled') {
               setSettings(settingsRes.value);

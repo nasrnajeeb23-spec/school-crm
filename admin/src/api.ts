@@ -606,7 +606,26 @@ export const sendMessage = async (messageData: Partial<Message>): Promise<Messag
 
 // ==================== Landing Page APIs ====================
 
-export const getLandingPageContent = async (): Promise<LandingPageContent> => {
+export const getSchoolStudentsCount = async (schoolId: number): Promise<number> => {
+    const data = await apiCall(`/school/${schoolId}/stats/counts`, { method: 'GET' });
+    return data.students || 0;
+};
+
+export const getSchoolTeachersCount = async (schoolId: number): Promise<number> => {
+    const data = await apiCall(`/school/${schoolId}/stats/counts`, { method: 'GET' });
+    return data.teachers || 0;
+};
+
+export const getSchoolInvoicesCount = async (schoolId: number): Promise<number> => {
+    // Assuming we might have an endpoint for this, or just return 0 for now if not available separately
+    // But since we updated subscription-state, we might not need this if we use that.
+    // Let's implement it via billing summary if needed
+    try {
+        const data = await apiCall(`/school/${schoolId}/billing/summary`, { method: 'GET' });
+        return data.totalInvoices || 0;
+    } catch { return 0; }
+};
+
     try {
         return await apiCall('/content/landing', { method: 'GET' });
     } catch {

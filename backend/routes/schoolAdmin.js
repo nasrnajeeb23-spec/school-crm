@@ -56,7 +56,7 @@ async function enforceActiveSubscription(req, res, next) {
       const { Plan } = require('../models');
       let plan = await Plan.findOne({ where: { recommended: true } });
       if (!plan) plan = await Plan.findOne();
-      const renewal = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const renewal = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       sub = await Subscription.create({ schoolId, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
     }
   const now = new Date();
@@ -192,37 +192,43 @@ router.get('/:schoolId/subscription', verifyToken, requireRole('SCHOOL_ADMIN', '
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const schoolId = Number(req.params.schoolId);
-    const { Subscription, Plan } = require('../models');
-    
-    const subscription = await Subscription.findOne({ 
-      where: { schoolId }, 
-      include: [{ model: Plan }] 
-    });
-
-    // Default Fallback
-    const defaultLimits = { students: 50, teachers: 5 };
-
-    if (!subscription) {
-       return res.json({
-         plan: { limits: defaultLimits },
-         limits: defaultLimits
-       });
-    }
+      const schoolId = Number(req.params.schoolId);
+      const { Subscription, Plan, Student, Teacher, Invoice } = require('../models');
+      
+      const subscription = await Subscription.findOne({ 
+        where: { schoolId }, 
+        include: [{ model: Plan }] 
+      });
+  
+      const [studentCount, teacherCount, invoiceCount] = await Promise.all([
+        Student.count({ where: { schoolId } }),
+        Teacher.count({ where: { schoolId } }),
+        Invoice ? Invoice.count({ include: [{ model: Student, where: { schoolId } }] }) : 0
+      ]);
+  
+      // Default Fallback
+      const defaultLimits = { students: 50, teachers: 5, storageGB: 1, branches: 1, invoices: 100 };
+  
+      if (!subscription) {
+         return res.json({
+           plan: { limits: defaultLimits },
+           limits: defaultLimits,
+           usage: { students: studentCount, teachers: teacherCount, invoices: invoiceCount },
+           status: 'No Subscription'
+         });
+      }
 
     const planLimits = subscription.Plan?.limits || defaultLimits;
     const customLimits = subscription.customLimits || {};
     
     // Merge: Custom limits override plan limits
-    // Note: If custom limit is set, it overrides completely for that key
     const mergedLimits = {
         students: customLimits.students !== undefined ? customLimits.students : planLimits.students,
         teachers: customLimits.teachers !== undefined ? customLimits.teachers : planLimits.teachers,
-        // Add other limits as needed
+        storageGB: customLimits.storageGB !== undefined ? customLimits.storageGB : planLimits.storageGB,
+        branches: customLimits.branches !== undefined ? customLimits.branches : planLimits.branches,
+        invoices: customLimits.invoices !== undefined ? customLimits.invoices : planLimits.invoices,
     };
-
-    // Ensure numeric or 'unlimited' normalization if needed, but usually frontend handles strings
-    // But let's be safe and pass exactly what logic expects
     
     res.json({
       plan: {
@@ -230,6 +236,11 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
         limits: planLimits
       },
       limits: mergedLimits,
+      usage: {
+        students: studentCount,
+        teachers: teacherCount,
+        invoices: invoiceCount
+      },
       status: subscription.status
     });
 

@@ -99,7 +99,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // @route   POST api/schools
-// @desc    Add a new school with 7-day trial and initial admin
+// @desc    Add a new school with 30-day trial and initial admin
 // @access  Private (SuperAdmin)
 router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
@@ -117,9 +117,9 @@ router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
 
     const school = await School.create({ name: schoolData.name, contactEmail: schoolData.contactEmail, studentCount: 0, teacherCount: 0, balance: 0 });
 
-    // 7-day trial subscription
+    // 30-day trial subscription
     const start = new Date();
-    const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await Subscription.create({ schoolId: school.id, planId: plan.id, status: 'TRIAL', startDate: start, endDate: end, renewalDate: end });
 
     // Default settings

@@ -51,8 +51,8 @@ function requireModule(moduleId) {
         if (school) {
           const createdAt = new Date(school.createdAt || Date.now());
           const diffMs = now.getTime() - createdAt.getTime();
-          const sevenDays = 7 * 24 * 60 * 60 * 1000;
-          if (diffMs <= sevenDays) return next();
+          const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+          if (diffMs <= thirtyDays) return next();
         }
       }
 
