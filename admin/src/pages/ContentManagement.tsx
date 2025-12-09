@@ -54,7 +54,8 @@ const ContentManagement: React.FC = () => {
             addToast('تم حفظ المحتوى بنجاح!', 'success');
         } catch (err) {
             console.error(err);
-            addToast('فشل حفظ المحتوى.', 'error');
+            const m = String((err as any)?.message || '');
+            addToast(m ? `فشل حفظ المحتوى: ${m}` : 'فشل حفظ المحتوى.', 'error');
         } finally {
             setIsSaving(false);
         }

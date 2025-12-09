@@ -25,6 +25,29 @@ router.get('/config', verifyToken, async (req, res) => {
   } catch (e) { console.error(e?.message || e); res.status(500).send('Server Error') }
 })
 
+router.get('/public/config', async (req, res) => {
+  try {
+    const { PricingConfig } = require('../models')
+    const row = await PricingConfig.findOne({ where: { id: 'default' } })
+    const cfg = row ? {
+      pricePerStudent: row.pricePerStudent,
+      pricePerTeacher: row.pricePerTeacher,
+      pricePerGBStorage: row.pricePerGBStorage,
+      pricePerInvoice: row.pricePerInvoice,
+      currency: row.currency,
+      yearlyDiscountPercent: row.yearlyDiscountPercent
+    } : {
+      pricePerStudent: 1.5,
+      pricePerTeacher: 2.0,
+      pricePerGBStorage: 0.2,
+      pricePerInvoice: 0.05,
+      currency: 'USD',
+      yearlyDiscountPercent: 0
+    }
+    res.json(cfg)
+  } catch (e) { console.error(e?.message || e); res.status(500).send('Server Error') }
+})
+
 router.put('/config', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const { PricingConfig } = require('../models')

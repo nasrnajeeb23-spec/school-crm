@@ -15,12 +15,20 @@ const PlansList: React.FC<PlansListProps> = ({ mode = 'admin', onSelectPlan }) =
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
-    Promise.all([api.getPlans(), api.getPricingConfig()]).then(([data, conf]) => {
-      setPlans(data);
-      setPricing(conf);
-      setLoading(false);
-    });
-  }, []);
+    (async () => {
+      try {
+        const [data, conf] = await Promise.all([
+          api.getPlans(),
+          mode === 'public' ? api.apiCall('/pricing/public/config', { method: 'GET' }) : api.getPricingConfig()
+        ]);
+        setPlans(data);
+        setPricing(conf as PricingConfig);
+      } catch {
+        try { const data = await api.getPlans(); setPlans(data); } catch {}
+        setPricing({ pricePerStudent: 0, pricePerTeacher: 0, pricePerGBStorage: 0, pricePerInvoice: 0, currency: '$', yearlyDiscountPercent: 0 });
+      } finally { setLoading(false); }
+    })();
+  }, [mode]);
 
   if (loading) {
     return <div className="text-center p-8">جاري تحميل الخطط...</div>;

@@ -1184,7 +1184,25 @@ export const addSchool = async (data: NewSchoolData): Promise<School> => {
 };
 
 export const getPricingConfig = async (): Promise<PricingConfig> => {
-    return await apiCall('/pricing/config', { method: 'GET' });
+    try {
+        return await apiCall('/pricing/config', { method: 'GET' });
+    } catch (err: any) {
+        const msg = String(err?.message || '');
+        try {
+            return await apiCall('/pricing/public/config', { method: 'GET' });
+        } catch {}
+        try {
+            return await apiCall('/public/pricing/config', { method: 'GET' });
+        } catch {}
+        return {
+            pricePerStudent: 1.5,
+            pricePerTeacher: 2.0,
+            pricePerGBStorage: 0.2,
+            pricePerInvoice: 0.05,
+            currency: 'USD',
+            yearlyDiscountPercent: 0
+        };
+    }
 };
 
 export const updatePricingConfig = async (config: PricingConfig): Promise<PricingConfig> => {
