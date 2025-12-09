@@ -78,7 +78,8 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       addToast('تم رفع شعار المدرسة بنجاح.', 'success');
     } catch (err) {
       console.error('Failed to upload logo:', err);
-      addToast('فشل رفع شعار المدرسة.', 'error');
+      const m = String((err as any)?.message || '');
+      addToast(m ? `فشل رفع شعار المدرسة: ${m}` : 'فشل رفع شعار المدرسة.', 'error');
     }
   };
 
@@ -178,7 +179,8 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
         addToast('تم حفظ الإعدادات بنجاح!', 'success');
     } catch(err) {
         console.error("Failed to save settings:", err);
-        addToast('فشل حفظ الإعدادات.', 'error');
+        const m = String((err as any)?.message || '');
+        addToast(m ? `فشل حفظ الإعدادات: ${m}` : 'فشل حفظ الإعدادات.', 'error');
     } finally {
         setSaving(false);
     }

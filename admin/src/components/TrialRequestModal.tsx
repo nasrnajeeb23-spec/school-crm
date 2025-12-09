@@ -5,9 +5,11 @@ import { SchoolIcon, UsersIcon, EmailIcon, LockIcon } from './icons';
 interface TrialRequestModalProps {
   onClose: () => void;
   onSave: (data: NewTrialRequestData) => Promise<boolean>;
+  selectedPlanId?: string;
+  selectedPlanName?: string;
 }
 
-const TrialRequestModal: React.FC<TrialRequestModalProps> = ({ onClose, onSave }) => {
+const TrialRequestModal: React.FC<TrialRequestModalProps> = ({ onClose, onSave, selectedPlanId, selectedPlanName }) => {
   const [formData, setFormData] = useState<NewTrialRequestData>({
     schoolName: '',
     adminName: '',
@@ -45,7 +47,7 @@ const TrialRequestModal: React.FC<TrialRequestModalProps> = ({ onClose, onSave }
     e.preventDefault();
     if (!validate()) return;
     setIsSaving(true);
-    const success = await onSave(formData);
+    const success = await onSave({ ...formData, planId: selectedPlanId });
     if (!success) {
       setIsSaving(false); // Only stop saving if there was an error, otherwise parent will unmount
     }
@@ -56,9 +58,17 @@ const TrialRequestModal: React.FC<TrialRequestModalProps> = ({ onClose, onSave }
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center modal-fade-in" onClick={onClose}>
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6 m-4 modal-content-scale-up" onClick={e => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">ابدأ تجربتك المجانية لمدة 7 أيام</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">ابدأ تجربتك المجانية لمدة 30 يوماً</h2>
         <p className="text-gray-500 dark:text-gray-400 mb-6">لا حاجة لبطاقة ائتمان. احصل على وصول فوري لجميع الميزات.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {selectedPlanName && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">الخطة المختارة</label>
+              <div className="mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                {selectedPlanName}
+              </div>
+            </div>
+          )}
           <div>
             <label htmlFor="schoolName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسم المدرسة</label>
             <input type="text" name="schoolName" id="schoolName" value={formData.schoolName} onChange={handleChange} required className={inputStyle} />

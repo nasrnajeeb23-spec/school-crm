@@ -205,6 +205,7 @@ export interface PricingConfig {
     pricePerGBStorage: number;
     pricePerInvoice: number;
     currency?: string;
+    yearlyDiscountPercent?: number;
 }
 
 export interface SubscriptionState {
@@ -650,6 +651,7 @@ export interface NewTrialRequestData {
     adminName: string;
     adminEmail: string;
     adminPassword: string;
+    planId?: string;
 }
 
 // --- Content Management Types ---

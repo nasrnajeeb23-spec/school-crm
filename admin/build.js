@@ -1,5 +1,5 @@
 // build.js - Build script with environment variable support
-const { build } = require('esbuild');
+const esbuild = require('esbuild');
 const { execSync } = require('child_process');
 
 // Get environment variables
@@ -9,8 +9,14 @@ const environment = process.env.REACT_APP_ENVIRONMENT || 'production';
 console.log('Building with API URL:', apiUrl);
 console.log('Environment:', environment);
 
+const args = process.argv.slice(2);
+const hasServe = args.some(a => /^--serve(=|$)/.test(a));
+const hasWatch = args.some(a => /^--watch(=|$)/.test(a));
+const portArg = args.find(a => /^--serve=/.test(a));
+const servePort = portArg ? Number(String(portArg).split('=')[1] || '3000') : 3000;
+
 // Build configuration
-build({
+const buildOptions = {
   entryPoints: ['src/index.tsx'],
   bundle: true,
   format: 'esm',
@@ -35,7 +41,9 @@ build({
   external: [],
   minify: false,
   treeShaking: true
-}).then(() => {
+};
+
+const runPostBuild = () => {
   console.log('Build completed successfully!');
   try {
     console.log('Building Tailwind CSS...');
@@ -345,17 +353,40 @@ build({
   } catch (e) {
     console.error('CSS copy failed:', e.message);
   }
-}).catch((error) => {
-  try {
-    console.error('Build failed:', error && error.message ? error.message : error);
-    if (error && error.errors) {
-      console.error('Errors:', JSON.stringify(error.errors, null, 2));
+};
+
+(async () => {
+  if (hasServe || hasWatch) {
+    try {
+      const ctx = await esbuild.context(buildOptions);
+      if (hasWatch) await ctx.watch();
+      runPostBuild();
+      if (hasServe) {
+        const srv = await ctx.serve({ port: servePort, servedir: 'dist' });
+        const host = srv.host || 'localhost';
+        const port = srv.port || servePort;
+        console.log(`Dev server running at http://${host}:${port}/`);
+      }
+    } catch (error) {
+      try {
+        console.error('Build failed:', error && error.message ? error.message : error);
+        if (error && error.errors) console.error('Errors:', JSON.stringify(error.errors, null, 2));
+        if (error && error.warnings) console.warn('Warnings:', JSON.stringify(error.warnings, null, 2));
+      } catch (e) {
+        console.error('Build failed (logging error):', e.message || e);
+      }
+      process.exit(1);
     }
-    if (error && error.warnings) {
-      console.warn('Warnings:', JSON.stringify(error.warnings, null, 2));
-    }
-  } catch (e) {
-    console.error('Build failed (logging error):', e.message || e);
+  } else {
+    esbuild.build(buildOptions).then(runPostBuild).catch((error) => {
+      try {
+        console.error('Build failed:', error && error.message ? error.message : error);
+        if (error && error.errors) console.error('Errors:', JSON.stringify(error.errors, null, 2));
+        if (error && error.warnings) console.warn('Warnings:', JSON.stringify(error.warnings, null, 2));
+      } catch (e) {
+        console.error('Build failed (logging error):', e.message || e);
+      }
+      process.exit(1);
+    });
   }
-  process.exit(1);
-});
+})();

@@ -40,6 +40,8 @@ const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [isTrialModalOpen, setIsTrialModalOpen] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [selectedPlanName, setSelectedPlanName] = useState<string>('');
   const [isBusOperatorModalOpen, setIsBusOperatorModalOpen] = useState(false);
   const [isSelfHostedModalOpen, setIsSelfHostedModalOpen] = useState(false);
   const [isAboutUsModalOpen, setIsAboutUsModalOpen] = useState(false);
@@ -85,6 +87,12 @@ const LandingPage: React.FC = () => {
       navigate('/school');
     }
     return success;
+  };
+
+  const handleSelectPlan = (plan: any) => {
+    setSelectedPlanId(String(plan?.id || ''));
+    setSelectedPlanName(String(plan?.name || ''));
+    setIsTrialModalOpen(true);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p>جاري تحميل المنصة...</p></div>;
@@ -147,7 +155,7 @@ const LandingPage: React.FC = () => {
           </div>
         </section>
 
-        <section id="pricing" className="py-20 sm:py-24"><div className="container mx-auto px-4 sm:px-6 lg:px-8"><div className="text-center mb-12"><h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">خطط أسعار مرنة تناسب الجميع</h2><p className="mt-4 text-lg text-gray-500 dark:text-gray-400">اختر الخطة التي تناسب حجم واحتياجات مدرستك.</p></div><PlansList mode="public" /></div></section>
+        <section id="pricing" className="py-20 sm:py-24"><div className="container mx-auto px-4 sm:px-6 lg:px-8"><div className="text-center mb-12"><h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">خطط أسعار مرنة تناسب الجميع</h2><p className="mt-4 text-lg text-gray-500 dark:text-gray-400">اختر الخطة التي تناسب حجم واحتياجات مدرستك.</p></div><PlansList mode="public" onSelectPlan={handleSelectPlan} /></div></section>
         
         <section id="self-hosted" className="py-20 sm:py-24 bg-gray-100 dark:bg-gray-800/50">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8"><div className="text-center"><div className="inline-block p-4 bg-indigo-100 dark:bg-indigo-900/50 rounded-full mb-4"><ServerIcon className="h-10 w-10 text-indigo-600 dark:text-indigo-400" /></div><h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">النسخة الخاصة بالمؤسسات (Self-Hosted)</h2><p className="mt-4 max-w-3xl mx-auto text-lg text-gray-500 dark:text-gray-400">هل تحتاج إلى تشغيل النظام على خوادمك الخاصة؟ نقدم نسخة خاصة يمكنك تخصيصها وشرائها لمرة واحدة، مع تحكم كامل في بياناتك وبيئتك التقنية.</p><div className="mt-8"><button onClick={() => setIsSelfHostedModalOpen(true)} className="px-8 py-3 text-lg font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">صمم نسختك الخاصة</button></div></div></div>
@@ -172,7 +180,7 @@ const LandingPage: React.FC = () => {
     </div>
     {isAdModalOpen && <AdSubmissionModal onClose={() => setIsAdModalOpen(false)} onSave={handleAdSubmit} />}
     {isBusOperatorModalOpen && <BusOperatorApplicationModal onClose={() => setIsBusOperatorModalOpen(false)} onSave={handleBusOperatorSubmit} />}
-    {isTrialModalOpen && <TrialRequestModal onClose={() => setIsTrialModalOpen(false)} onSave={handleTrialSubmit} />}
+    {isTrialModalOpen && <TrialRequestModal onClose={() => setIsTrialModalOpen(false)} onSave={handleTrialSubmit} selectedPlanId={selectedPlanId} selectedPlanName={selectedPlanName} />}
     {isSelfHostedModalOpen && <SelfHostedQuoteModal onClose={() => setIsSelfHostedModalOpen(false)} />}
     {isAboutUsModalOpen && <AboutUsModal onClose={() => setIsAboutUsModalOpen(false)} />}
     {isPrivacyModalOpen && <PrivacyPolicyModal onClose={() => setIsPrivacyModalOpen(false)} />}

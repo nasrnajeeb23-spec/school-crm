@@ -57,20 +57,40 @@ const FeatureManagement: React.FC = () => {
         }
     };
 
+    const handleYearlyDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (pricingConfig) {
+            setPricingConfig({ ...pricingConfig, yearlyDiscountPercent: parseFloat(e.target.value) || 0 });
+        }
+    };
+
+    const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (pricingConfig) {
+            setPricingConfig({ ...pricingConfig, currency: e.target.value.toUpperCase().trim() });
+        }
+    };
+
     const handleSavePricingConfig = async () => {
         if (!pricingConfig) return;
         setIsSaving(true);
         try {
+            if (!pricingConfig.currency || !String(pricingConfig.currency).trim()) {
+                addToast('أدخل رمز العملة.', 'error');
+                setIsSaving(false);
+                return;
+            }
             await api.updatePricingConfig(pricingConfig);
             await logSuperAdminAction('platform.pricing.update', { 
                 pricePerStudent: pricingConfig.pricePerStudent,
                 pricePerTeacher: pricingConfig.pricePerTeacher,
                 pricePerGBStorage: pricingConfig.pricePerGBStorage,
                 pricePerInvoice: pricingConfig.pricePerInvoice,
+                yearlyDiscountPercent: pricingConfig.yearlyDiscountPercent,
+                currency: pricingConfig.currency,
             });
             addToast('تم حفظ إعدادات التسعير بنجاح.', 'success');
         } catch (error) {
-            addToast('فشل حفظ إعدادات التسعير.', 'error');
+            const m = String((error as any)?.message || '')
+            addToast(m ? `فشل حفظ إعدادات التسعير: ${m}` : 'فشل حفظ إعدادات التسعير.', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -139,6 +159,7 @@ const FeatureManagement: React.FC = () => {
                                 onChange={handlePricePerStudentChange}
                                 className={inputStyle}
                                 step="0.1"
+                                min={0}
                             />
                         </div>
                         <div>
@@ -150,6 +171,7 @@ const FeatureManagement: React.FC = () => {
                                 onChange={handlePricePerTeacherChange}
                                 className={inputStyle}
                                 step="0.1"
+                                min={0}
                             />
                         </div>
                         <div>
@@ -161,6 +183,7 @@ const FeatureManagement: React.FC = () => {
                                 onChange={handlePricePerGBStorageChange}
                                 className={inputStyle}
                                 step="0.1"
+                                min={0}
                             />
                         </div>
                         <div>
@@ -172,6 +195,31 @@ const FeatureManagement: React.FC = () => {
                                 onChange={handlePricePerInvoiceChange}
                                 className={inputStyle}
                                 step="0.01"
+                                min={0}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="yearlyDiscountPercent" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نسبة خصم الاشتراك السنوي (%)</label>
+                            <input
+                                type="number"
+                                id="yearlyDiscountPercent"
+                                value={Number(pricingConfig.yearlyDiscountPercent || 0)}
+                                onChange={handleYearlyDiscountChange}
+                                className={inputStyle}
+                                step="0.1"
+                                min={0}
+                                max={100}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="currency" className="block text-sm font-medium text-gray-700 dark:text-gray-300">العملة (رمز)</label>
+                            <input
+                                type="text"
+                                id="currency"
+                                value={String(pricingConfig.currency || '')}
+                                onChange={handleCurrencyChange}
+                                className={inputStyle}
+                                maxLength={3}
                             />
                         </div>
                         <div className="md:col-span-2 lg:col-span-4 flex justify-end">

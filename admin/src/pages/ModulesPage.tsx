@@ -191,7 +191,8 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
             addToast('تم حذف الوحدة بنجاح', 'success');
             fetchData();
         } catch (e) {
-            addToast('فشل حذف الوحدة', 'error');
+            const m = String((e as any)?.message || '');
+            addToast(m ? `فشل حذف الوحدة: ${m}` : 'فشل حذف الوحدة', 'error');
         }
     };
 

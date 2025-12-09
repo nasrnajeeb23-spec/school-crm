@@ -95,6 +95,7 @@ router.post('/trial-signup', validate([
   { name: 'adminName', required: true, type: 'string' },
   { name: 'adminEmail', required: true, type: 'string' },
   { name: 'adminPassword', required: true, type: 'string' },
+  { name: 'planId', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
     const { schoolName, adminName, adminEmail, adminPassword } = req.body;
@@ -118,8 +119,20 @@ router.post('/trial-signup', validate([
       notifications: JSON.stringify({ email: true, sms: false, push: true })
     });
 
-    let plan = await Plan.findOne({ where: { recommended: true } });
-    if (!plan) plan = await Plan.findOne();
+    let plan = null;
+    try {
+      const inputPlanId = req.body?.planId;
+      if (inputPlanId !== undefined && inputPlanId !== null && String(inputPlanId).trim() !== '') {
+        const pid = String(inputPlanId);
+        plan = await Plan.findOne({ where: { id: pid } });
+      }
+    } catch {}
+    if (!plan) {
+      plan = await Plan.findOne({ where: { recommended: true } });
+    }
+    if (!plan) {
+      plan = await Plan.findOne();
+    }
     // 30 Days Trial Period
     const renewal = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await Subscription.create({ schoolId: school.id, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });

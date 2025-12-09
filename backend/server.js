@@ -445,6 +445,14 @@ app.use('/public', schoolsRoutes);
         console.log('Adding pricePerInvoice to pricing_config...');
         await queryInterface.addColumn('pricing_config', 'pricePerInvoice', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.05 });
       }
+      if (!tableDesc.currency) {
+        console.log('Adding currency to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'currency', { type: require('sequelize').DataTypes.STRING, allowNull: false, defaultValue: 'USD' });
+      }
+      if (!tableDesc.yearlyDiscountPercent) {
+        console.log('Adding yearlyDiscountPercent to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'yearlyDiscountPercent', { type: require('sequelize').DataTypes.FLOAT, allowNull: true, defaultValue: 0 });
+      }
     } catch (e) { try { console.warn('Schema Fix pricing_config:', e.message); } catch {} }
 
   } catch (err) {
