@@ -93,6 +93,21 @@ async function enforceActiveSubscription(req, res, next) {
 
 // Note: Do not apply global enforcement to avoid blocking benign GETs.
 
+function parseFileSizeToBytes(input){
+  try {
+    const s = String(input || '').trim().toLowerCase();
+    if (!s) return 0;
+    const numMatch = s.match(/([\d.,]+)/);
+    const num = numMatch ? parseFloat(String(numMatch[1]).replace(/,/g, '')) : 0;
+    if (s.includes('tb')) return num * 1024 * 1024 * 1024 * 1024;
+    if (s.includes('gb')) return num * 1024 * 1024 * 1024;
+    if (s.includes('mb')) return num * 1024 * 1024;
+    if (s.includes('kb')) return num * 1024;
+    if (s.includes('b') || s.includes('bytes')) return num;
+    return num;
+  } catch { return 0; }
+}
+
 // @route   GET api/school/:schoolId/stats/counts
 // @desc    Get quick counts for resource usage widget (uses aggregated stats if available)
 // @access  Private (SchoolAdmin)
@@ -304,7 +319,7 @@ router.get('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
 // @route   POST api/school/:schoolId/students
 // @desc    Add a new student to a school
 // @access  Private (SchoolAdmin)
-const { requireWithinLimits } = require('../middleware/limits');
+const { requireWithinLimits, normalizeLimits } = require('../middleware/limits');
 
 router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireWithinLimits('students'), validate([
   { name: 'name', required: true, type: 'string', minLength: 2 },
@@ -852,90 +867,13 @@ router.put('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_AD
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.get('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
-  try {
-    const users = await User.findAll({ where: { schoolId: req.params.schoolId, role: 'SchoolAdmin' }, order: [['createdAt', 'DESC']] });
-    res.json(users.map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, username: u.username, role: u.role, schoolId: u.schoolId, schoolRole: u.schoolRole, department: u.department, bankAccount: u.bankAccount, isActive: u.isActive })));
-  } catch (err) { res.status(500).send('Server Error'); }
-});
+ 
 
-router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), validate([
-  { name: 'name', required: true, type: 'string', minLength: 2 },
-  { name: 'email', required: true, type: 'string' },
-  { name: 'role', required: true, type: 'string' },
-  { name: 'phone', required: false, type: 'string' },
-]), async (req, res) => {
-  try {
-    const { name, email, role, phone, department, bankAccount, isActive } = req.body;
-    const exists = await User.findOne({ where: { [Op.or]: [{ email }, { username: email.split('@')[0] }] } });
-    if (exists) return res.status(400).json({ message: 'Email or username already exists' });
-    function genPwd(){
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_+=';
-      let s = '';
-      for(let i=0;i<14;i++){ s += chars[Math.floor(Math.random()*chars.length)]; }
-      return s;
-    }
-    const plain = genPwd();
-    const pwd = await bcrypt.hash(plain, 10);
-    const permissionsMap = {
-      'مسؤول تسجيل': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_PARENTS', 'MANAGE_ATTENDANCE'],
-      'مسؤول مالي': ['VIEW_DASHBOARD', 'MANAGE_FINANCE', 'MANAGE_REPORTS'],
-      'منسق أكاديمي': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
-      'سكرتير': ['VIEW_DASHBOARD', 'MANAGE_SCHEDULE', 'MANAGE_CALENDAR', 'MANAGE_MESSAGING'],
-      'مشرف': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
-      'مدير': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES', 'MANAGE_STAFF']
-    };
-    const user = await User.create({ name, email, phone, department: department || null, bankAccount: bankAccount || null, isActive: typeof isActive === 'boolean' ? isActive : true, username: email.split('@')[0], password: pwd, role: 'SchoolAdmin', schoolId: parseInt(req.params.schoolId, 10), schoolRole: role, permissions: permissionsMap[role] || ['VIEW_DASHBOARD'], passwordMustChange: true, tokenVersion: 0 });
-    const { password: _, ...data } = user.toJSON();
-    res.status(201).json({ id: data.id, name: data.name, email: data.email, username: data.username, role: data.role, schoolId: data.schoolId, schoolRole: data.schoolRole, department: data.department, bankAccount: data.bankAccount, isActive: data.isActive, tempPassword: plain });
-  } catch (err) { console.error(err); res.status(500).json({ msg: String(err?.message || err) }); }
-});
+ 
 
-router.put('/:schoolId/staff/:userId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
-  try {
-    const staff = await User.findOne({ where: { id: req.params.userId, schoolId: req.params.schoolId, role: 'SchoolAdmin' } });
-    if (!staff) return res.status(404).json({ message: 'Staff not found' });
-    const { name, email, role, phone, department, bankAccount, isActive } = req.body || {};
-    if (email && email !== staff.email) {
-      const dupe = await User.findOne({ where: { email, id: { [Op.ne]: staff.id } } });
-      if (dupe) return res.status(400).json({ message: 'Email already in use' });
-      staff.email = email;
-      const uname = email.split('@')[0];
-      const dupeUser = await User.findOne({ where: { username: uname, id: { [Op.ne]: staff.id } } });
-      staff.username = dupeUser ? `${uname}_${Date.now()}` : uname;
-    }
-    if (name) staff.name = name;
-    if (phone) staff.phone = phone;
-    if (department !== undefined) staff.department = department || null;
-    if (bankAccount !== undefined) staff.bankAccount = bankAccount || null;
-    if (typeof isActive === 'boolean') staff.isActive = isActive;
-    if (role) {
-      staff.schoolRole = role;
-      const permissionsMap = {
-        'مسؤول تسجيل': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_PARENTS', 'MANAGE_ATTENDANCE'],
-        'مسؤول مالي': ['VIEW_DASHBOARD', 'MANAGE_FINANCE', 'MANAGE_REPORTS'],
-        'منسق أكاديمي': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
-        'سكرتير': ['VIEW_DASHBOARD', 'MANAGE_SCHEDULE', 'MANAGE_CALENDAR', 'MANAGE_MESSAGING'],
-        'مشرف': ['VIEW_DASHBOARD', 'MANAGE_CLASSES', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_TEACHERS'],
-        'مدير': ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES', 'MANAGE_STAFF']
-      };
-      staff.permissions = permissionsMap[role] || ['VIEW_DASHBOARD'];
-    }
-    await staff.save();
-    return res.json({ id: staff.id, name: staff.name, email: staff.email, username: staff.username, role: staff.role, schoolId: staff.schoolId, schoolRole: staff.schoolRole, department: staff.department, bankAccount: staff.bankAccount, isActive: staff.isActive });
-  } catch (err) { console.error(err); res.status(500).json({ msg: String(err?.message || err) }); }
-});
+ 
 
-router.delete('/:schoolId/staff/:userId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
-  try {
-    const staff = await User.findOne({ where: { id: req.params.userId, schoolId: req.params.schoolId, role: 'SchoolAdmin' } });
-    if (!staff) return res.status(404).json({ message: 'Staff not found' });
-    if (String(staff.schoolRole || '') === 'مدير') return res.status(400).json({ message: 'Cannot delete Admin role staff' });
-    if (req.user.id === staff.id) return res.status(400).json({ message: 'Cannot delete current user' });
-    await staff.destroy();
-    return res.json({ message: 'Deleted' });
-  } catch (err) { console.error(err); res.status(500).json({ msg: String(err?.message || err) }); }
-});
+ 
 
 // @route   GET api/school/:schoolId/classes
 // @desc    Get all classes for a specific school
@@ -2285,41 +2223,22 @@ router.get('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
 router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
-    const { Subscription, SchoolSettings, Plan, Student, Teacher, Invoice } = require('../models');
+    const { Subscription, SchoolSettings, Plan, Student, Teacher, Invoice, StudentDocument, PricingConfig } = require('../models');
     const sub = await Subscription.findOne({ where: { schoolId } });
     const settings = await SchoolSettings.findOne({ where: { schoolId } });
     const plan = sub ? await Plan.findByPk(sub.planId) : null;
 
-    let limits = { students: 50, teachers: 5, invoices: 100 };
-    let limitSource = 'default';
-
-    // 1. Custom Limits
-    if (settings && settings.customLimits) {
-         if (settings.customLimits.students) limits.students = settings.customLimits.students === 'unlimited' ? 999999 : Number(settings.customLimits.students);
-         if (settings.customLimits.teachers) limits.teachers = settings.customLimits.teachers === 'unlimited' ? 999999 : Number(settings.customLimits.teachers);
-         if (settings.customLimits.invoices) limits.invoices = settings.customLimits.invoices === 'unlimited' ? 999999 : Number(settings.customLimits.invoices);
-         limitSource = 'custom';
-    } 
-    // 2. Plan Limits
-    else if (plan && plan.limits) {
-         const l = typeof plan.limits === 'string' ? JSON.parse(plan.limits) : plan.limits;
-         if (l.students) limits.students = l.students === 'unlimited' ? 999999 : Number(l.students);
-         if (l.teachers) limits.teachers = l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
-         if (l.invoices) limits.invoices = l.invoices === 'unlimited' ? 999999 : Number(l.invoices);
-         limitSource = 'plan';
-    }
-    // 3. Subscription Legacy Limits
-    else if (sub && sub.customLimits) {
-         const l = typeof sub.customLimits === 'string' ? JSON.parse(sub.customLimits) : sub.customLimits;
-         if (l.students) limits.students = l.students === 'unlimited' ? 999999 : Number(l.students);
-         if (l.teachers) limits.teachers = l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
-         if (l.invoices) limits.invoices = l.invoices === 'unlimited' ? 999999 : Number(l.invoices);
-    }
+    const norm = normalizeLimits(settings, plan, sub);
+    const limits = norm.limits;
+    const limitSource = norm.source;
+    const billingMode = norm.mode;
+    const packs = Array.isArray(norm.packs) ? norm.packs : [];
 
     // Counts
     let studentsCount = 0;
     let teachersCount = 0;
     let invoicesCount = 0;
+    let storageGB = 0;
     try {
       const redis = req.app?.locals?.redisClient || null;
       const cacheKey = `usage:${schoolId}`;
@@ -2342,6 +2261,14 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
     try {
       invoicesCount = await Invoice.count({ include: [{ model: Student, required: true, where: { schoolId } }] });
     } catch {}
+    try {
+      const docs = await StudentDocument.findAll({ include: [{ model: Student, required: true, where: { schoolId }, attributes: [] }], attributes: ['fileSize'] });
+      let totalBytes = 0;
+      for (const d of docs) {
+        totalBytes += parseFileSizeToBytes(d.fileSize);
+      }
+      storageGB = totalBytes > 0 ? (totalBytes / (1024 * 1024 * 1024)) : 0;
+    } catch {}
 
     const allowedModules = Array.isArray(req.app?.locals?.allowedModules) ? req.app.locals.allowedModules : [];
     let activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
@@ -2361,6 +2288,28 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
     const trialExpired = isTrial && endMs > 0 && now > endMs;
     const daysLeft = endMs > now ? Math.ceil((endMs - now) / (24 * 60 * 60 * 1000)) : 0;
 
+    let planPrice = 0;
+    let packTotal = 0;
+    try { planPrice = plan ? parseFloat(plan.price || 0) : 0; } catch {}
+    try { for (const p of packs) { packTotal += Number(p.price || 0); } } catch {}
+    let overageEstimate = { students: 0, teachers: 0, invoices: 0, storageGB: 0, total: 0, currency: 'USD' };
+    try {
+      const pc = await PricingConfig.findOne({ where: { id: 'default' } });
+      const pp = {
+        student: Number(pc?.pricePerStudent || 1.5),
+        teacher: Number(pc?.pricePerTeacher || 2.0),
+        invoice: Number(pc?.pricePerInvoice || 0.05),
+        storage: Number(pc?.pricePerGBStorage || 0.2),
+        currency: pc?.currency || 'USD'
+      };
+      const os = Math.max(0, studentsCount - Number(limits.students || 0)) * pp.student;
+      const ot = Math.max(0, teachersCount - Number(limits.teachers || 0)) * pp.teacher;
+      const oi = Math.max(0, invoicesCount - Number(limits.invoices || 0)) * pp.invoice;
+      const og = Math.max(0, storageGB - Number(limits.storageGB || 0)) * pp.storage;
+      const totalOv = os + ot + oi + og;
+      overageEstimate = { students: os, teachers: ot, invoices: oi, storageGB: og, total: totalOv, currency: pp.currency };
+    } catch {}
+
     return res.success({
       subscription: {
         status: sub?.status || 'UNKNOWN',
@@ -2372,11 +2321,13 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
       },
       plan: plan ? plan.toJSON() : null,
       limits: { ...limits, source: limitSource },
-      usage: { students: studentsCount, teachers: teachersCount, invoices: invoicesCount },
+      usage: { students: studentsCount, teachers: teachersCount, invoices: invoicesCount, storageGB },
       modules: {
         allowed: allowedModules,
         active: activeModules,
-      }
+      },
+      packs,
+      billing: { mode: billingMode, planPrice, packTotal, overageEstimate, totalEstimated: planPrice + packTotal + (billingMode === 'overage' ? overageEstimate.total : 0) }
     });
   } catch (e) {
     console.error(e?.message || e);
@@ -2388,20 +2339,51 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
 router.post('/:schoolId/modules/quote', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
-    const { ModuleCatalog, PricingConfig, School } = require('../models');
+    const { PricingConfig, Student, Teacher, Invoice, Subscription, Plan, SchoolSettings } = require('../models');
     const p = req.body || {};
-    const moduleIds = Array.isArray(p.moduleIds) ? p.moduleIds.map(String) : [];
     const period = String(p.period || 'monthly');
-    const modules = await ModuleCatalog.findAll({ where: { id: moduleIds } });
     const priceConfig = await PricingConfig.findOne({ where: { id: 'default' } });
-    const school = await School.findByPk(schoolId);
-    const students = Number(school?.studentCount || 0);
+    const students = await Student.count({ where: { schoolId } });
+    const teachers = await Teacher.count({ where: { schoolId } });
+    let invoices = 0;
+    try {
+      invoices = await Invoice.count({ include: [{ model: Student, where: { schoolId }, attributes: [] }] });
+    } catch {}
+    const sub = await Subscription.findOne({ where: { schoolId } });
+    const plan = sub ? await Plan.findByPk(sub.planId) : null;
+    const settings = await SchoolSettings.findOne({ where: { schoolId } });
+    const norm = normalizeLimits(settings, plan, sub);
+    const eff = norm.limits;
+    const mode = norm.mode;
+    const packs = Array.isArray(norm.packs) ? norm.packs : [];
+    const storageGB = Number(p.storageGB || 0);
+    let planPrice = 0;
+    try { planPrice = plan ? parseFloat(plan.price || 0) : 0; } catch {}
+    let packTotal = 0;
+    for (const pk of packs) { packTotal += Number(pk.price || 0); }
     const pricePerStudent = Number(priceConfig?.pricePerStudent || 1.5);
-    const base = students * pricePerStudent;
-    const items = modules.map(m => ({ id: m.id, name: m.name, price: period === 'annual' ? (m.annualPrice ?? m.monthlyPrice * 12) : m.monthlyPrice }));
-    const modulesTotal = items.reduce((s, x) => s + Number(x.price || 0), 0);
-    const total = base + modulesTotal;
-    return res.success({ period, base, items, modulesTotal, total, currency: priceConfig?.currency || 'USD' }, 'Quote generated');
+    const pricePerTeacher = Number(priceConfig?.pricePerTeacher || 2.0);
+    const pricePerInvoice = Number(priceConfig?.pricePerInvoice || 0.05);
+    const pricePerGBStorage = Number(priceConfig?.pricePerGBStorage || 0.2);
+    const ovStudentsQty = Math.max(0, students - Number(eff.students || 0));
+    const ovTeachersQty = Math.max(0, teachers - Number(eff.teachers || 0));
+    const ovInvoicesQty = Math.max(0, invoices - Number(eff.invoices || 0));
+    const ovStorageQty = Math.max(0, storageGB - Number(eff.storageGB || 0));
+    const ovStudents = ovStudentsQty * pricePerStudent;
+    const ovTeachers = ovTeachersQty * pricePerTeacher;
+    const ovInvoices = ovInvoicesQty * pricePerInvoice;
+    const ovStorage = ovStorageQty * pricePerGBStorage;
+    const overageTotal = mode === 'overage' ? (ovStudents + ovTeachers + ovInvoices + ovStorage) : 0;
+    const items = [
+      { key: 'plan', qty: 1, unitPrice: planPrice, amount: planPrice },
+      { key: 'packs', qty: packs.length, unitPrice: packTotal, amount: packTotal },
+      { key: 'overage_students', qty: ovStudentsQty, unitPrice: pricePerStudent, amount: mode === 'overage' ? ovStudents : 0 },
+      { key: 'overage_teachers', qty: ovTeachersQty, unitPrice: pricePerTeacher, amount: mode === 'overage' ? ovTeachers : 0 },
+      { key: 'overage_invoices', qty: ovInvoicesQty, unitPrice: pricePerInvoice, amount: mode === 'overage' ? ovInvoices : 0 },
+      { key: 'overage_storageGB', qty: ovStorageQty, unitPrice: pricePerGBStorage, amount: mode === 'overage' ? ovStorage : 0 },
+    ];
+    const total = planPrice + packTotal + overageTotal;
+    return res.success({ period, items, total, currency: priceConfig?.currency || 'USD' }, 'Quote generated');
   } catch (e) { console.error(e?.message || e); return res.error(500, 'SERVER_ERROR', 'Server Error'); }
 });
 
@@ -2639,18 +2621,19 @@ router.get('/:schoolId/users/last-login', verifyToken, requireRole('SUPER_ADMIN'
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
-router.get('/:schoolId/storage/usage', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+// Unified storage usage endpoint (returns storageGB computed from StudentDocument records)
+router.get('/:schoolId/storage/usage', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const sid = String(req.params.schoolId);
-    const base = path.join(__dirname, '..', 'uploads', 'backups', sid);
-    let total = 0;
-    try {
-      await fse.ensureDir(base);
-      const files = fs.readdirSync(base);
-      files.forEach(f => { try { total += fs.statSync(path.join(base, f)).size || 0; } catch {} });
-    } catch {}
-    return res.json({ bytes: total });
-  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+    const schoolId = Number(req.params.schoolId);
+    const { StudentDocument, Student } = require('../models');
+    const docs = await StudentDocument.findAll({ include: [{ model: Student, required: true, where: { schoolId }, attributes: [] }], attributes: ['fileSize'] });
+    let totalBytes = 0;
+    for (const d of docs) {
+      totalBytes += parseFileSizeToBytes(d.fileSize);
+    }
+    const storageGB = totalBytes > 0 ? (totalBytes / (1024 * 1024 * 1024)) : 0;
+    return res.json({ storageGB });
+  } catch (e) { console.error(e?.message || e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
 router.post('/:schoolId/notify', verifyToken, requireRole('SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
@@ -2991,14 +2974,7 @@ router.post('/:schoolId/teachers/attendance', verifyToken, requireSameSchoolPara
 router.get('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
-    const staff = await User.findAll({
-      where: { 
-        schoolId,
-        role: { [Op.notIn]: ['SCHOOL_ADMIN', 'TEACHER', 'PARENT', 'STUDENT', 'SUPER_ADMIN'] }
-      },
-      attributes: { exclude: ['password'] },
-      order: [['name', 'ASC']]
-    });
+    const staff = await User.findAll({ where: { schoolId, role: 'Staff' }, attributes: { exclude: ['password'] }, order: [['name', 'ASC']] });
     res.json(staff);
   } catch (err) {
     console.error(err.message);
@@ -3009,7 +2985,11 @@ router.get('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
 // @route   POST api/school/:schoolId/staff
 // @desc    Add a new staff member
 // @access  Private (SchoolAdmin)
-router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), validate([
+  { name: 'name', required: true, type: 'string' },
+  { name: 'email', required: true, type: 'string' },
+  { name: 'role', required: true, type: 'string' }
+]), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
     const { name, email, role, phone, department, bankAccount } = req.body;
@@ -3024,18 +3004,7 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(tempPassword, salt);
 
-    user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role: 'STAFF', // Generic role for DB, specific role in schoolRole
-      schoolRole: role,
-      schoolId,
-      phone,
-      department,
-      bankAccount,
-      isActive: true
-    });
+    user = await User.create({ name, email, username: email.split('@')[0], password: hashedPassword, role: 'Staff', schoolRole: role, schoolId, phone, department, bankAccount, isActive: true });
 
     const userJson = user.toJSON();
     delete userJson.password;

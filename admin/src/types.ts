@@ -201,6 +201,18 @@ export interface SchoolModuleSubscription {
 
 export interface PricingConfig {
     pricePerStudent: number;
+    pricePerTeacher: number;
+    pricePerGBStorage: number;
+    pricePerInvoice: number;
+    currency?: string;
+}
+
+export interface SubscriptionState {
+  subscription: { status: string; startDate: string | null; endDate: string | null; renewalDate: string | null; trialExpired: boolean; daysLeft?: number };
+  modules: { allowed: string[]; active: string[] };
+  plan?: any;
+  limits?: { students: number; teachers: number; invoices?: number; source: string };
+  usage?: { students: number; teachers: number; invoices?: number; storageGB?: number };
 }
 
 export interface Expense {
@@ -348,6 +360,9 @@ export interface UsageLimit {
   storageGB: number | 'غير محدود';
   branches: number | 'غير محدود';
   invoices: number | 'غير محدود';
+  packs?: Array<{ type: 'students' | 'teachers' | 'invoices' | 'storageGB'; qty: number; price?: number }>;
+  hardCap?: boolean;
+  allowOverage?: boolean;
 }
 
 export interface Plan {

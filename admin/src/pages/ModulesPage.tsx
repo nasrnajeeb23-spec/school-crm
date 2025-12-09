@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-import { School, Module, ModuleId, PaymentProofSubmission, PaymentMethod, PricingConfig } from '../types';
+import { School, Module, ModuleId, PricingConfig, SubscriptionState } from '../types';
 import { useToast } from '../contexts/ToastContext';
-import { CheckIcon, EditIcon, PlusIcon, TrashIcon } from '../components/icons';
-import PaymentProofModal from '../components/PaymentProofModal';
+import { EditIcon, PlusIcon, TrashIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface ModulesPageProps {
@@ -133,12 +132,13 @@ const EditModuleModal: React.FC<EditModuleModalProps> = ({ module, onClose, onSa
 
 const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const [availableModules, setAvailableModules] = useState<Module[]>([]);
-    const [activeModuleIds, setActiveModuleIds] = useState<Set<ModuleId>>(new Set());
     const [loading, setLoading] = useState(true);
     const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
-    const [moduleToActivate, setModuleToActivate] = useState<Module | null>(null);
+    const [subscriptionState, setSubscriptionState] = useState<SubscriptionState | null>(null);
+    const [storageGB, setStorageGB] = useState<number>(0);
     const [editingModule, setEditingModule] = useState<Module | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [quote, setQuote] = useState<any | null>(null);
     const { addToast } = useToast();
     const { currentUser } = useAppContext();
     const canManageModules = ['SUPER_ADMIN','SUPER_ADMIN_FINANCIAL','SUPER_ADMIN_TECHNICAL','SUPER_ADMIN_SUPERVISOR'].includes(String(currentUser?.role || '').toUpperCase());
@@ -147,12 +147,15 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         setLoading(true);
         Promise.all([
             api.getAvailableModules(),
-            api.getSchoolModules(school.id),
-            api.getPricingConfig()
-        ]).then(([available, active, pricing]) => {
+            api.getPricingConfig(),
+            api.getSubscriptionState(school.id)
+        ]).then(async ([available, pricing, state]) => {
             setAvailableModules(available);
-            setActiveModuleIds(new Set(active.map(m => m.moduleId)));
             setPricingConfig(pricing);
+            setSubscriptionState(state);
+            const sgb = typeof state?.usage?.storageGB === 'number' ? state!.usage!.storageGB! : await api.getStorageUsage(school.id);
+            setStorageGB(sgb);
+            try { const q = await api.getUsageQuote(school.id, sgb); setQuote(q); } catch {}
         }).catch(err => {
             console.error("Failed to fetch modules data:", err);
             addToast("فشل تحميل بيانات الوحدات.", 'error');
@@ -163,79 +166,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         fetchData();
     }, [school.id]);
     
-    const handleActivateRequest = (module: Module) => {
-        setModuleToActivate(module);
-    };
-
-    const handlePaymentSubmit = async (submission: Omit<PaymentProofSubmission, 'proofImage'>) => {
-        try {
-            await api.submitPaymentProof(submission);
-            addToast('تم إرسال إثبات الدفع بنجاح! سيتم تفعيل الوحدة بعد المراجعة.', 'success');
-            setModuleToActivate(null);
-        } catch (error) {
-            addToast('فشل إرسال إثبات الدفع.', 'error');
-        }
-    };
-
-    const handleToggleModule = async (module: Module, enable: boolean) => {
-        if (!canManageModules && !module.isCore) {
-            addToast('هذه العملية تتطلب موافقة المدير العام للمنصة.', 'error');
-            return;
-        }
-
-        // Dependency Logic:
-        // 1. If enabling a dependent module (e.g., teacher_app), ensure parent (teacher_portal) is enabled
-        if (enable) {
-            if (module.id === ModuleId.TeacherApp) {
-                const hasPortal = activeModuleIds.has(ModuleId.TeacherPortal);
-                if (!hasPortal) {
-                    if (confirm('تطبيق المعلم يتطلب تفعيل "بوابة المعلم" أولاً. هل تريد تفعيلها تلقائياً؟')) {
-                        // Activate both
-                        try {
-                            const next = new Set(activeModuleIds);
-                            next.add(ModuleId.TeacherApp);
-                            next.add(ModuleId.TeacherPortal);
-                            const updated = await api.updateSchoolModules(school.id, Array.from(next));
-                            setActiveModuleIds(new Set(updated.map(m => m.moduleId)));
-                            addToast('تم تفعيل تطبيق وبوابة المعلم بنجاح.', 'success');
-                            return;
-                        } catch (e) { addToast('فشل التفعيل.', 'error'); return; }
-                    } else {
-                        return; // Cancelled
-                    }
-                }
-            }
-        }
-        // 2. If disabling a parent module, warn about dependents
-        else {
-            if (module.id === ModuleId.TeacherPortal) {
-                const hasApp = activeModuleIds.has(ModuleId.TeacherApp);
-                if (hasApp) {
-                    if (!confirm('تعطيل "بوابة المعلم" سيؤدي لتعطيل "تطبيق المعلم" أيضاً. هل أنت متأكد؟')) return;
-                    // Disable both
-                     try {
-                        const next = new Set(activeModuleIds);
-                        next.delete(ModuleId.TeacherPortal);
-                        next.delete(ModuleId.TeacherApp);
-                        const updated = await api.updateSchoolModules(school.id, Array.from(next));
-                        setActiveModuleIds(new Set(updated.map(m => m.moduleId)));
-                        addToast('تم تعطيل البوابة والتطبيق.', 'success');
-                        return;
-                    } catch (e) { addToast('فشل التعطيل.', 'error'); return; }
-                }
-            }
-        }
-
-        try {
-            const next = new Set(activeModuleIds);
-            if (enable) next.add(module.id); else next.delete(module.id);
-            const updated = await api.updateSchoolModules(school.id, Array.from(next));
-            setActiveModuleIds(new Set(updated.map(m => m.moduleId)));
-            addToast(enable ? 'تم تفعيل الوحدة.' : 'تم تعطيل الوحدة.', 'success');
-        } catch (e) {
-            addToast('فشل تحديث حالة الوحدة.', 'error');
-        }
-    };
+    
 
     const handleSaveModule = async (data: any) => {
         try {
@@ -266,15 +197,21 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         }
     };
 
-    const { baseCost, modulesCost, totalCost } = useMemo(() => {
-        const pricePerStudent = pricingConfig?.pricePerStudent ?? 1.5;
-        const baseCost = school.students * pricePerStudent;
-        const modulesCost = availableModules
-            .filter(m => activeModuleIds.has(m.id))
-            .reduce((total, m) => total + m.monthlyPrice, 0);
-        const totalCost = baseCost + modulesCost;
-        return { baseCost, modulesCost, totalCost };
-    }, [school.students, availableModules, activeModuleIds, pricingConfig]);
+    const planPacksOverage = useMemo(() => {
+        const items = Array.isArray(quote?.items) ? quote!.items : [];
+        const planItem = items.find((i: any) => i.key === 'plan');
+        const packsItem = items.find((i: any) => i.key === 'packs');
+        const overageItems = items.filter((i: any) => String(i.key || '').startsWith('overage_'));
+        const overageTotal = overageItems.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+        const currency = quote?.currency || 'USD';
+        return {
+            planAmount: Number(planItem?.amount || 0),
+            packsAmount: Number(packsItem?.amount || 0),
+            overageTotal,
+            total: Number(quote?.total || 0),
+            currency
+        };
+    }, [quote]);
     
     if (loading) {
         return <p className="text-center p-8">جاري تحميل الوحدات...</p>;
@@ -332,19 +269,23 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                 )}
 
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">ملخص الاشتراك الحالي</h3>
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">ملخص التسعير</h3>
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                         <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">التكلفة الأساسية ({school.students} طالب × ${pricingConfig?.pricePerStudent ?? 1.5})</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">${baseCost.toFixed(2)}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">الباقة الأساسية</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.planAmount.toFixed(2)}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">تكلفة الوحدات الإضافية</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">${modulesCost.toFixed(2)}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">توسعات السعة</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.packsAmount.toFixed(2)}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">رسوم زيادة</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.overageTotal.toFixed(2)}</p>
                         </div>
                         <div className="border-r pr-4 dark:border-gray-700">
                             <p className="text-sm text-gray-500 dark:text-gray-400">الإجمالي الشهري</p>
-                            <p className="text-3xl font-bold text-teal-600 dark:text-teal-400">${totalCost.toFixed(2)}</p>
+                            <p className="text-3xl font-bold text-teal-600 dark:text-teal-400">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.total.toFixed(2)}</p>
                         </div>
                     </div>
                 </div>
@@ -370,22 +311,8 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
                                     <p className="font-semibold text-teal-600 mt-1">${module.monthlyPrice}/شهرياً</p>
                                 </div>
-                                <div className="mt-4 text-center">
-                                    {activeModuleIds.has(module.id) ? (
-                                        <button
-                                            onClick={() => handleToggleModule(module, false)}
-                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                        >
-                                            تعطيل للمدرسة
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleToggleModule(module, true)}
-                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-                                        >
-                                            تفعيل للمدرسة
-                                        </button>
-                                    )}
+                                <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-300">
+                                    متاح لجميع الخطط
                                 </div>
                             </div>
                         ))}
@@ -413,33 +340,8 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
                                     <p className="font-semibold text-teal-600 mt-1">${module.monthlyPrice}/شهرياً</p>
                                 </div>
-                                <div className="mt-4 text-center">
-                                    {activeModuleIds.has(module.id) ? (
-                                        canManageModules ? (
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm('هل أنت متأكد من تعطيل هذه الوحدة؟ سيتم إيقاف الخدمة فوراً.')) {
-                                                        handleToggleModule(module, false);
-                                                    }
-                                                }}
-                                                className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900 transition-colors"
-                                            >
-                                                تعطيل الوحدة للمدرسة
-                                            </button>
-                                        ) : (
-                                            <div className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center justify-center">
-                                                <CheckIcon className="w-5 h-5 ml-2" />
-                                                مفعلة
-                                            </div>
-                                        )
-                                    ) : (
-                                        <button
-                                            onClick={() => handleActivateRequest(module)}
-                                            className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-                                        >
-                                            طلب تفعيل
-                                        </button>
-                                    )}
+                                <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-300">
+                                    متاح لجميع الخطط
                                 </div>
                             </div>
                         ))}
@@ -447,15 +349,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                 </div>
             </div>
 
-            {moduleToActivate && (
-                <PaymentProofModal
-                    onClose={() => setModuleToActivate(null)}
-                    onSubmit={handlePaymentSubmit}
-                    amount={moduleToActivate.monthlyPrice}
-                    serviceName={`تفعيل وحدة: ${moduleToActivate.name}`}
-                    schoolName={school.name}
-                />
-            )}
+            
 
             {(isCreateModalOpen || editingModule) && (
                 <EditModuleModal

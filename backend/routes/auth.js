@@ -36,7 +36,16 @@ router.post('/login', validate([
     }
 
     const user = await User.findOne({ where: loginField });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user) {
+      return res.status(401).json({ msg: 'Invalid credentials' });
+    }
+    const stored = String(user.password || '');
+    const isBcrypt = /^\$2[aby]\$/.test(stored);
+    let ok = false;
+    try {
+      ok = isBcrypt ? await bcrypt.compare(password, stored) : (process.env.NODE_ENV !== 'production' && stored === password);
+    } catch { ok = false; }
+    if (!ok) {
       return res.status(401).json({ msg: 'Invalid credentials' });
     }
 

@@ -102,25 +102,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
       <nav className="flex-grow pt-4 overflow-y-auto">
         <ul>
           {navItems.map(item => {
-             const isLocked = item.requiredModule && !expandedActiveModules.includes(item.requiredModule);
-             
-             // Hide finance sub-modules (fees, payroll, expenses) if 'finance' parent is active to avoid clutter?
-             // No, we want to show them, but they should be UNLOCKED if finance is active.
-             // The backend API now returns expanded modules, so 'finance' -> 'finance_fees' etc.
-             // So if 'finance' is active, 'finance_fees' will be in activeModules list.
-             
-             if (isLocked && !isTrial) {
-                 return (
-                    <li key={item.id} className="px-2" title="هذه الوحدة غير مفعلة">
-                      <div className={`${baseLinkClasses} ${lockedLinkClasses}`}>
-                         <item.icon className="h-6 w-6" />
-                         <span className="hidden md:block mr-4 flex-grow">{item.label}</span>
-                         <LockIcon className="h-4 w-4 hidden md:block" />
-                      </div>
-                    </li>
-                 );
-             }
-
+             const isLocked = false;
              return (
                 <li key={item.id} className="px-2">
                   <NavLink to={item.path} className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`} end>
@@ -130,7 +112,6 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
                         <item.icon className="h-6 w-6" />
                         <span className="hidden md:block mr-4 flex items-center gap-2">
                           <span>{item.label}</span>
-                          {isLocked && isTrial && (<span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">تجربة</span>)}
                         </span>
                       </>
                     )}

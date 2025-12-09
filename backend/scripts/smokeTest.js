@@ -1,7 +1,7 @@
 const http = require('http');
 const { URL } = require('url');
 const speakeasy = require('speakeasy');
-const base = process.env.BASE_URL || 'http://127.0.0.1:5002';
+const base = process.env.BASE_URL || 'http://127.0.0.1:5000';
 
 function req(method, path, headers={}, body){
   return new Promise((resolve,reject)=>{

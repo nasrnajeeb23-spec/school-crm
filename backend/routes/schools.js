@@ -233,57 +233,9 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
 router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
   try {
     const schoolId = Number(req.params.id);
-    const { Subscription, SubscriptionModule, ModuleCatalog } = require('../models');
-    
-    // Auto-heal: Ensure SubscriptionModule table exists
-    try { await SubscriptionModule.sync({ alter: true }); } catch (e) { console.error('Sync SubModule Error:', e); }
-
-    // 1. Check for Trial
-    const sub = await Subscription.findOne({ 
-      where: { schoolId },
-      include: [{ model: SubscriptionModule }]
-    });
-    
-    const now = new Date();
-    const isTrial = sub && String(sub.status || '').toUpperCase() === 'TRIAL';
-    const isTrialActive = isTrial && (sub.endDate || sub.renewalDate) && new Date(sub.endDate || sub.renewalDate) > now;
-
-    if (isTrialActive) {
-       // Return all enabled modules from catalog
-       const allModules = await ModuleCatalog.findAll({ where: { isEnabled: true } });
-       return res.json(allModules.map(m => ({ schoolId, moduleId: m.id })));
-    }
-
-    // 2. Normal Subscription: Return active SubscriptionModules (Intersected with SchoolSettings for local toggle)
-    let activeModules = [];
-    if (sub) {
-        // Fetch core modules which should always be available
-        const coreModules = await ModuleCatalog.findAll({ where: { isCore: true } });
-        const coreIds = coreModules.map(m => m.id);
-
-        let provisioned = sub.SubscriptionModules
-            ? sub.SubscriptionModules.filter(sm => sm.active).map(sm => sm.moduleId)
-            : [];
-
-        // Add core modules to provisioned list
-        provisioned = [...new Set([...provisioned, ...coreIds])];
-
-        // Get local settings to see what school admin chose to enable
-        const settings = await SchoolSettings.findOne({ where: { schoolId } });
-        let localActive = settings?.activeModules;
-
-        // If never set locally, default to all provisioned
-        if (!localActive || !Array.isArray(localActive)) {
-             activeModules = provisioned.map(id => ({ schoolId, moduleId: id }));
-        } else {
-             // Intersect: Must be in Subscription AND in Local Settings
-             // This allows School Admin to disable a module locally, but not enable one they don't have.
-             activeModules = provisioned
-                .filter(id => localActive.includes(id))
-                .map(id => ({ schoolId, moduleId: id }));
-        }
-    }
-    
+    const { ModuleCatalog } = require('../models');
+    const allModules = await ModuleCatalog.findAll({ where: { isEnabled: true } });
+    const activeModules = allModules.map(m => ({ schoolId, moduleId: m.id }));
     const expandedSet = new Set();
     activeModules.forEach(am => {
         expandedSet.add(am.moduleId);
@@ -291,10 +243,7 @@ router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
             moduleMap[am.moduleId].forEach(child => expandedSet.add(child));
         }
     });
-    
-    // Re-format to expected output
     const finalModules = Array.from(expandedSet).map(mid => ({ schoolId, moduleId: mid }));
-
     res.json(finalModules);
   } catch (err) { console.error('Get Modules Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });

@@ -40,12 +40,35 @@ const FeatureManagement: React.FC = () => {
         }
     };
 
+    const handlePricePerTeacherChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (pricingConfig) {
+            setPricingConfig({ ...pricingConfig, pricePerTeacher: parseFloat(e.target.value) || 0 });
+        }
+    };
+
+    const handlePricePerGBStorageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (pricingConfig) {
+            setPricingConfig({ ...pricingConfig, pricePerGBStorage: parseFloat(e.target.value) || 0 });
+        }
+    };
+
+    const handlePricePerInvoiceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (pricingConfig) {
+            setPricingConfig({ ...pricingConfig, pricePerInvoice: parseFloat(e.target.value) || 0 });
+        }
+    };
+
     const handleSavePricingConfig = async () => {
         if (!pricingConfig) return;
         setIsSaving(true);
         try {
             await api.updatePricingConfig(pricingConfig);
-            await logSuperAdminAction('platform.pricing.update', { pricePerStudent: pricingConfig.pricePerStudent });
+            await logSuperAdminAction('platform.pricing.update', { 
+                pricePerStudent: pricingConfig.pricePerStudent,
+                pricePerTeacher: pricingConfig.pricePerTeacher,
+                pricePerGBStorage: pricingConfig.pricePerGBStorage,
+                pricePerInvoice: pricingConfig.pricePerInvoice,
+            });
             addToast('تم حفظ إعدادات التسعير بنجاح.', 'success');
         } catch (error) {
             addToast('فشل حفظ إعدادات التسعير.', 'error');
@@ -102,8 +125,8 @@ const FeatureManagement: React.FC = () => {
             <div className="space-y-8">
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">إعدادات التسعير الأساسية</h3>
-                    <div className="flex items-end gap-4">
-                        <div className="flex-grow">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <div>
                             <label htmlFor="pricePerStudent" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل طالب (شهرياً)</label>
                             <input
                                 type="number"
@@ -114,9 +137,44 @@ const FeatureManagement: React.FC = () => {
                                 step="0.1"
                             />
                         </div>
-                        <button onClick={handleSavePricingConfig} disabled={isSaving} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
-                            {isSaving ? 'جاري الحفظ...' : 'حفظ'}
-                        </button>
+                        <div>
+                            <label htmlFor="pricePerTeacher" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل معلم</label>
+                            <input
+                                type="number"
+                                id="pricePerTeacher"
+                                value={pricingConfig.pricePerTeacher}
+                                onChange={handlePricePerTeacherChange}
+                                className={inputStyle}
+                                step="0.1"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="pricePerGBStorage" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل 1GB تخزين</label>
+                            <input
+                                type="number"
+                                id="pricePerGBStorage"
+                                value={pricingConfig.pricePerGBStorage}
+                                onChange={handlePricePerGBStorageChange}
+                                className={inputStyle}
+                                step="0.1"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="pricePerInvoice" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل فاتورة</label>
+                            <input
+                                type="number"
+                                id="pricePerInvoice"
+                                value={pricingConfig.pricePerInvoice}
+                                onChange={handlePricePerInvoiceChange}
+                                className={inputStyle}
+                                step="0.01"
+                            />
+                        </div>
+                        <div className="md:col-span-2 lg:col-span-4 flex justify-end">
+                            <button onClick={handleSavePricingConfig} disabled={isSaving} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
+                                {isSaving ? 'جاري الحفظ...' : 'حفظ'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 

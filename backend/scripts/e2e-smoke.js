@@ -91,14 +91,15 @@ async function waitFor(url, { headers = {}, timeoutMs = 7000, intervalMs = 400 }
 
     resp = await fetch(`${base}/school/1/students`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ name: 'طالب اختبار', grade: 'الصف الرابع', parentName: 'ولي اختبار', dateOfBirth: '2015-01-01' }) });
     const stu = await resp.json();
-    const sid = stu.id;
+    const sid = (stu && (stu.id || (stu.data && stu.data.id))) || null;
     log('create_student', resp.ok, { studentId: sid });
 
     resp = await fetch(`${base}/school/1/invoices`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ studentId: sid, dueDate: '2025-12-01', items: [{ description: 'رسوم دراسية', amount: 500 }] }) });
     const inv = await resp.json();
-    log('create_invoice', resp.ok, { invoiceId: inv.id });
+    const invId = (inv && (inv.id || (inv.data && inv.data.id))) || null;
+    log('create_invoice', resp.ok, { invoiceId: invId });
 
-    resp = await fetch(`${base}/school/1/invoices/${inv.id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ amount: 500, paymentDate: '2025-11-20', paymentMethod: 'CASH', notes: '' }) });
+    resp = await fetch(`${base}/school/1/invoices/${invId}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ amount: 500, paymentDate: '2025-11-20', paymentMethod: 'CASH', notes: '' }) });
     log('pay_invoice', resp.ok);
 
     // Login parent and create conversation using real parentId

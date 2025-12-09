@@ -7,6 +7,10 @@ const Invoice = sequelize.define('Invoice', {
     autoIncrement: true,
     primaryKey: true,
   },
+  studentId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,

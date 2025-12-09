@@ -430,6 +430,23 @@ app.use('/public', schoolsRoutes);
         await sequelize.models.SubscriptionModule.sync(); 
     } catch(e) {}
 
+    // Ensure new pricing columns exist
+    try {
+      const tableDesc = await queryInterface.describeTable('pricing_config');
+      if (!tableDesc.pricePerTeacher) {
+        console.log('Adding pricePerTeacher to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'pricePerTeacher', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 2.0 });
+      }
+      if (!tableDesc.pricePerGBStorage) {
+        console.log('Adding pricePerGBStorage to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'pricePerGBStorage', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.2 });
+      }
+      if (!tableDesc.pricePerInvoice) {
+        console.log('Adding pricePerInvoice to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'pricePerInvoice', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.05 });
+      }
+    } catch (e) { try { console.warn('Schema Fix pricing_config:', e.message); } catch {} }
+
   } catch (err) {
     console.error('Schema Fixer Error:', err.message);
   }
@@ -598,7 +615,7 @@ async function syncDatabase(){
   const opts = { force: false };
   
   // Sync models in correct order to avoid foreign key constraint issues
-  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig, BehaviorRecord } = require('./models');
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig, BehaviorRecord, Invoice, Payment } = require('./models');
   
   // Sync independent tables first
   await School.sync(opts);
@@ -611,6 +628,8 @@ async function syncDatabase(){
   await Teacher.sync(isProd ? { force: false } : { alter: true });
   await Class.sync(isProd ? { force: false } : { alter: true });
   await FeeSetup.sync(isProd ? { force: false } : { alter: true });
+  await Invoice.sync(isProd ? { force: false } : { alter: true });
+  await Payment.sync(isProd ? { force: false } : { alter: true });
   
   // Then sync dependent tables
   await Subscription.sync(opts);
@@ -625,7 +644,8 @@ async function syncDatabase(){
   await TeacherAttendance.sync(isProd ? { force: false } : { alter: true });
   await Schedule.sync(isProd ? { force: false } : { alter: true });
   await Notification.sync(isProd ? { force: false } : { alter: true });
-  await ModuleCatalog.sync(isProd ? { force: false } : { alter: true });
+  try { await require('./models').sequelize.getQueryInterface().dropTable('module_catalog_backup'); } catch {}
+  await ModuleCatalog.sync({ force: false });
   await PricingConfig.sync(isProd ? { force: false } : { alter: true });
   await BehaviorRecord.sync(isProd ? { force: false } : { alter: true });
 }

@@ -1218,6 +1218,17 @@ export const updatePricingConfig = async (config: PricingConfig): Promise<Pricin
     return await apiCall('/pricing/config', { method: 'PUT', body: JSON.stringify(config) });
 };
 
+export const getStorageUsage = async (schoolId: number): Promise<number> => {
+    const data = await apiCall(`/school/${schoolId}/storage/usage`, { method: 'GET' });
+    return Number(data?.storageGB || 0);
+};
+
+export const getUsageQuote = async (schoolId: number, storageGB?: number): Promise<{ items: Array<{ key: string; qty: number; unitPrice: number; amount: number }>; total: number; currency: string; period: string }> => {
+    const payload: any = {};
+    if (typeof storageGB === 'number') payload.storageGB = storageGB;
+    return await apiCall(`/school/${schoolId}/modules/quote`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
 export const updateModule = async (moduleId: ModuleId | string | any, data: Partial<Module>): Promise<Module> => {
     const normalizeId = (input: any): string => {
         if (input === null || input === undefined) return '';

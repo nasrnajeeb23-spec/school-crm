@@ -75,14 +75,8 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   const userRolePermissions = Object.values(Permission);
 
   const hasPermission = (permission: Permission) => {
-    if (isSuperAdminView) return true; // Super admin has all permissions
-    if (!userRolePermissions.includes(permission)) return false;
-    const requiredModule = Object.entries(modulePermissions).find(([, p]) => p === permission)?.[0] as ModuleId;
-    if (requiredModule && !activeModules.includes(requiredModule)) {
-      if (isTrial) return true;
-      return false;
-    }
-    return true;
+    if (isSuperAdminView) return true;
+    return userRolePermissions.includes(permission);
   };
   
   useEffect(() => {
