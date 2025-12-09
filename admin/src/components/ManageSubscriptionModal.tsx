@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Subscription, SubscriptionStatus, Plan, Module, UsageLimit, SchoolModuleSubscription, ModuleId } from '../types';
+import { Subscription, SubscriptionStatus, Plan, UsageLimit } from '../types';
 import * as api from '../api';
 
 interface ManageSubscriptionModalProps {
@@ -13,7 +13,6 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
   
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [status, setStatus] = useState<SubscriptionStatus>(subscription.status);
@@ -31,18 +30,14 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
   const [newPackQty, setNewPackQty] = useState<number>(50);
   const [newPackPrice, setNewPackPrice] = useState<number>(0);
 
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [plansData, modulesData] = await Promise.all([
-          api.getPlans(),
-          api.getAvailableModules()
-        ]);
+        const plansData = await api.getPlans();
         setPlans(plansData);
-        setModules(modulesData);
         
         // Find plan ID based on name
         const currentPlan = plansData.find(p => p.name === subscription.plan);
@@ -71,14 +66,7 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
              setPacks([]);
         }
         
-        // Initialize modules
-        if (subscription.modules) {
-          setSelectedModules(subscription.modules.map(m => m.moduleId));
-        } else {
-            // If no modules info in subscription, maybe fetch them or assume none?
-            // Usually getSubscriptions should include them now.
-             setSelectedModules([]);
-        }
+        
       } catch (err) {
         console.error('Error fetching data:', err);
       } finally {
@@ -106,15 +94,7 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
         planId: selectedPlanId ? Number(selectedPlanId) : undefined,
         status,
         renewalDate,
-        customLimits,
-        modules: selectedModules.map(mid => {
-            const mod = modules.find(m => m.id === mid);
-            return { 
-                moduleId: mid, 
-                active: true,
-                price: mod ? mod.monthlyPrice : 0
-            };
-        })
+        customLimits
       });
       onSave();
       onClose();
@@ -135,11 +115,7 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
     );
   };
 
-  const toggleModule = (moduleId: string) => {
-    setSelectedModules(prev => 
-      prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]
-    );
-  };
+  
 
   if (!isOpen) return null;
 
@@ -396,32 +372,7 @@ const ManageSubscriptionModal: React.FC<ManageSubscriptionModalProps> = ({ subsc
                 </div>
               </div>
 
-              {/* Modules */}
-              <div className="border-t dark:border-gray-700 pt-6">
-                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">الوحدات (Modules)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {modules.map(module => (
-                    <div key={module.id} className="flex items-start space-x-3 rtl:space-x-reverse">
-                      <div className="flex h-5 items-center">
-                        <input
-                          id={`module-${module.id}`}
-                          name={`module-${module.id}`}
-                          type="checkbox"
-                          checked={selectedModules.includes(module.id)}
-                          onChange={() => toggleModule(module.id)}
-                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700"
-                        />
-                      </div>
-                      <div className="text-sm">
-                        <label htmlFor={`module-${module.id}`} className="font-medium text-gray-700 dark:text-gray-300">
-                          {module.name}
-                        </label>
-                        <p className="text-gray-500 dark:text-gray-400 text-xs">{module.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              
             </>
           )}
         </div>

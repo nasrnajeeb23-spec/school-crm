@@ -4,11 +4,19 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const { signLicense, verifyLicenseKey } = require('../utils/license');
 
 router.post('/generate', verifyToken, requireRole('SUPER_ADMIN'), (req, res) => {
-  const { schoolName, modules, domain, expiresAt } = req.body || {};
-  if (!schoolName || !Array.isArray(modules) || modules.length === 0) {
+  const { schoolName, modules, planId, planName, domain, expiresAt } = req.body || {};
+  if (!schoolName) {
     return res.status(400).json({ msg: 'Invalid payload' });
   }
-  const payload = { schoolName, modules, domain: domain || null, issuedAt: new Date().toISOString(), expiresAt: expiresAt || null };
+  const payload = {
+    schoolName,
+    modules: Array.isArray(modules) ? modules : [],
+    planId: planId || null,
+    planName: planName || null,
+    domain: domain || null,
+    issuedAt: new Date().toISOString(),
+    expiresAt: expiresAt || null
+  };
   const licenseKey = signLicense(payload);
   res.json({ licenseKey, payload });
 });

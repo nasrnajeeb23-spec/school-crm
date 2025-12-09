@@ -175,16 +175,6 @@ router.get('/:schoolId/subscription', verifyToken, requireRole('SCHOOL_ADMIN', '
       const customLimits = subscription.customLimits || {};
       const finalLimits = { ...planLimits, ...customLimits };
 
-      // Format modules
-      const activeModules = (subscription.SubscriptionModules || [])
-        .filter(sm => sm.active)
-        .map(sm => ({
-          moduleId: sm.moduleId,
-          name: sm.ModuleCatalog?.name || sm.moduleId,
-          price: sm.priceSnapshot,
-          activationDate: sm.activationDate
-        }));
-
       res.json({
         planName: subscription.Plan?.name || 'Unknown',
         startDate: subscription.startDate,
@@ -194,7 +184,7 @@ router.get('/:schoolId/subscription', verifyToken, requireRole('SCHOOL_ADMIN', '
         limits: finalLimits,
         price: subscription.Plan?.price || 0,
         interval: subscription.Plan?.interval || 'monthly',
-        modules: activeModules
+        modules: []
       });
     } catch (err) {
       console.error(err.message);
@@ -2270,17 +2260,8 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
       storageGB = totalBytes > 0 ? (totalBytes / (1024 * 1024 * 1024)) : 0;
     } catch {}
 
-    const allowedModules = Array.isArray(req.app?.locals?.allowedModules) ? req.app.locals.allowedModules : [];
-    let activeModules = Array.isArray(settings?.activeModules) ? settings.activeModules : [];
-    
-    // Expand parent modules to children for frontend compatibility
-    const expandedActive = new Set(activeModules);
-    activeModules.forEach(m => {
-      if (moduleMap[m]) {
-        moduleMap[m].forEach(child => expandedActive.add(child));
-      }
-    });
-    activeModules = Array.from(expandedActive);
+    const allowedModules = [];
+    const activeModules = [];
 
     const now = Date.now();
     const endMs = sub?.renewalDate ? new Date(sub.renewalDate).getTime() : (sub?.endDate ? new Date(sub.endDate).getTime() : 0);

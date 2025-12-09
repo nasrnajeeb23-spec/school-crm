@@ -605,26 +605,9 @@ router.post('/jobs/trigger', verifyToken, requireRole('SUPER_ADMIN'), async (req
 // Bulk update modules
 router.post('/bulk/modules', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { schoolIds, moduleId, enable } = req.body;
+    const { schoolIds, moduleId } = req.body;
     if (!Array.isArray(schoolIds) || !moduleId) return res.status(400).json({ message: 'Invalid payload' });
-
-    const { SchoolSettings } = require('../models');
-    // We need to fetch each setting, update the array, and save.
-    const settingsList = await SchoolSettings.findAll({ where: { schoolId: schoolIds } });
-    let updatedCount = 0;
-
-    for (const settings of settingsList) {
-        let active = settings.activeModules || [];
-        if (enable) {
-            if (!active.includes(moduleId)) active.push(moduleId);
-        } else {
-            active = active.filter(m => m !== moduleId);
-        }
-        settings.activeModules = active;
-        await settings.save();
-        updatedCount++;
-    }
-    res.json({ updated: updatedCount });
+    return res.json({ updated: 0, message: 'Module controls deprecated: activeModules no longer used' });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 

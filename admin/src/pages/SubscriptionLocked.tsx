@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../api';
-import { Module, ModuleId, PricingConfig, PaymentProofSubmission } from '../types';
+import { PricingConfig, PaymentProofSubmission, Plan } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { useAppContext } from '../contexts/AppContext';
 import PaymentProofModal from '../components/PaymentProofModal';
@@ -12,28 +12,49 @@ const SubscriptionLocked: React.FC = () => {
     const { addToast } = useToast();
     const { currentUser } = useAppContext();
     
-    const [modules, setModules] = useState<Module[]>([]);
-    const [activeModuleIds, setActiveModuleIds] = useState<Set<ModuleId>>(new Set());
     const [pricing, setPricing] = useState<PricingConfig | null>(null);
     const [loading, setLoading] = useState(true);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [schoolStudents, setSchoolStudents] = useState(0);
+    const [schoolTeachers, setSchoolTeachers] = useState(0);
+    const [schoolInvoices, setSchoolInvoices] = useState(0);
+    const [storageGB, setStorageGB] = useState(0);
+
+    const [plans, setPlans] = useState<Plan[]>([]);
+    const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+    const [billingMode, setBillingMode] = useState<'hard_cap' | 'overage'>('hard_cap');
+    const [packs, setPacks] = useState<Array<{ type: 'students' | 'teachers' | 'invoices' | 'storageGB'; qty: number; price?: number }>>([]);
+    const [newPackType, setNewPackType] = useState<'students' | 'teachers' | 'invoices' | 'storageGB'>('students');
+    const [newPackQty, setNewPackQty] = useState<number>(50);
+    const [newPackPrice, setNewPackPrice] = useState<number>(0);
 
     useEffect(() => {
         const fetch = async () => {
             try {
                 setLoading(true);
-                const [availModules, schoolModules, priceConf, schoolInfo] = await Promise.all([
-                    api.getAvailableModules(),
-                    api.getSchoolModules(String(currentUser?.schoolId)),
+                const [priceConf, schoolInfo, plansData, usageState, storageUsage] = await Promise.all([
                     api.getPricingConfig(),
-                    api.getSchool(String(currentUser?.schoolId))
+                    api.getSchool(String(currentUser?.schoolId)),
+                    api.getPlans(),
+                    api.getSubscriptionState(Number(currentUser?.schoolId)).catch(() => null),
+                    api.getStorageUsage(Number(currentUser?.schoolId)).catch(() => 0)
                 ]);
-                
-                setModules(availModules);
-                setActiveModuleIds(new Set(schoolModules.map(m => m.moduleId)));
                 setPricing(priceConf);
                 setSchoolStudents(schoolInfo.students || 0);
+                setSchoolTeachers(schoolInfo.teachers || 0);
+                setSchoolInvoices(0);
+                setStorageGB(Number(storageUsage || 0));
+
+                setPlans(plansData);
+                const currentPlan = plansData.find(p => p.name === schoolInfo.plan) || plansData[0];
+                if (currentPlan) setSelectedPlanId(String(currentPlan.id));
+
+                if (usageState && usageState.usage) {
+                    setSchoolStudents(Number(usageState.usage.students || schoolInfo.students || 0));
+                    setSchoolTeachers(Number(usageState.usage.teachers || schoolInfo.teachers || 0));
+                    setSchoolInvoices(Number(usageState.usage.invoices || 0));
+                    setStorageGB(Number(usageState.usage.storageGB || storageUsage || 0));
+                }
             } catch (e) {
                 console.error(e);
                 addToast('فشل تحميل بيانات الاشتراك', 'error');
@@ -44,40 +65,54 @@ const SubscriptionLocked: React.FC = () => {
         if (currentUser?.schoolId) fetch();
     }, [currentUser]);
 
-    const toggleModule = (moduleId: ModuleId) => {
-        const next = new Set(activeModuleIds);
-        if (next.has(moduleId)) next.delete(moduleId);
-        else next.add(moduleId);
-        setActiveModuleIds(next);
-    };
+    const baseCost = useMemo(() => {
+        return Number(schoolStudents) * Number(pricing?.pricePerStudent || 0);
+    }, [schoolStudents, pricing]);
 
-    const { baseCost, modulesCost, totalCost } = useMemo(() => {
-        const pricePerStudent = pricing?.pricePerStudent ?? 1.5;
-        const baseCost = schoolStudents * pricePerStudent;
-        const modulesCost = modules
-            .filter(m => !m.isCore && activeModuleIds.has(m.id))
-            .reduce((sum, m) => sum + m.monthlyPrice, 0);
-        return { baseCost, modulesCost, totalCost: baseCost + modulesCost };
-    }, [schoolStudents, modules, activeModuleIds, pricing]);
-
-    const handleProceed = async () => {
-        // Update selected modules first
-        try {
-            // Ensure core modules are included
-            const coreIds = modules.filter(m => m.isCore).map(m => m.id);
-            const selection = Array.from(activeModuleIds).filter(id => !modules.find(m => m.id === id)?.isCore);
-            const finalSelection = [...new Set([...coreIds, ...selection])];
-            
-            await api.updateSchoolModules(String(currentUser?.schoolId), finalSelection);
-            setShowPaymentModal(true);
-        } catch (e) {
-            addToast('فشل تحديث الخطة المختارة', 'error');
+    const quote = useMemo(() => {
+        const plan = plans.find(p => String(p.id) === selectedPlanId) || null;
+        const currency = pricing?.currency || 'USD';
+        const pp = {
+            student: Number(pricing?.pricePerStudent || 1.5),
+            teacher: Number(pricing?.pricePerTeacher || 2.0),
+            invoice: Number(pricing?.pricePerInvoice || 0.05),
+            storage: Number(pricing?.pricePerGBStorage || 0.2)
+        };
+        let limits = { students: 0, teachers: 0, invoices: 0, storageGB: 0 } as any;
+        if (plan && plan.limits) {
+            limits.students = plan.limits.students === 'غير محدود' ? 999999 : Number(plan.limits.students || 0);
+            limits.teachers = plan.limits.teachers === 'غير محدود' ? 999999 : Number(plan.limits.teachers || 0);
+            limits.invoices = (plan.limits as any).invoices === 'غير محدود' ? 999999 : Number((plan.limits as any).invoices || 0);
+            limits.storageGB = plan.limits.storageGB === 'غير محدود' ? 999999 : Number(plan.limits.storageGB || 0);
         }
-    };
+        const appliedPacks = Array.isArray(packs) ? packs : [];
+        for (const p of appliedPacks) {
+            const key = String(p.type).toLowerCase();
+            const qty = Number(p.qty || 0);
+            if (key === 'students') limits.students += qty;
+            else if (key === 'teachers') limits.teachers += qty;
+            else if (key === 'invoices') limits.invoices += qty;
+            else if (key === 'storagegb') limits.storageGB += qty;
+        }
+        const os = Math.max(0, schoolStudents - Number(limits.students || 0)) * pp.student;
+        const ot = Math.max(0, schoolTeachers - Number(limits.teachers || 0)) * pp.teacher;
+        const oi = Math.max(0, schoolInvoices - Number(limits.invoices || 0)) * pp.invoice;
+        const og = Math.max(0, storageGB - Number(limits.storageGB || 0)) * pp.storage;
+        const overageTotal = billingMode === 'overage' ? (os + ot + oi + og) : 0;
+        const planAmount = Number(plan?.price || 0);
+        const packsAmount = appliedPacks.reduce((s, p) => s + Number(p.price || 0), 0);
+        const total = planAmount + packsAmount + overageTotal;
+        return { currency, planAmount, packsAmount, overageTotal, total };
+    }, [plans, selectedPlanId, packs, billingMode, pricing, schoolStudents, schoolTeachers, schoolInvoices, storageGB]);
+
+    
 
     const handlePaymentSubmit = async (data: Omit<PaymentProofSubmission, 'proofImage'>) => {
         try {
-            await api.submitPaymentProof(data);
+            const planName = plans.find(p => String(p.id) === selectedPlanId)?.name || '';
+            const ref = `plan=${planName};mode=${billingMode};packs=${encodeURIComponent(JSON.stringify(packs || []))}`;
+            const payload = { ...data, reference: ref } as any;
+            await api.submitPaymentProof(payload);
             addToast('تم إرسال إثبات الدفع بنجاح. سيتم تفعيل حسابك بعد المراجعة.', 'success');
             setShowPaymentModal(false);
             // Optionally redirect to a "Pending Activation" page or stay here with a status message
@@ -103,7 +138,7 @@ const SubscriptionLocked: React.FC = () => {
                             <div>
                                 <h3 className="font-bold text-gray-900 dark:text-white">حزمة إدارة المدرسة المتكاملة</h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-300 mt-1">
-                                    تشمل: {modules.filter(m => m.isCore).map(m => m.name).join('، ')}
+                                    تشمل: {(plans.find(p => String(p.id) === selectedPlanId)?.features || []).join('، ')}
                                 </p>
                             </div>
                             <div className="text-left">
@@ -114,42 +149,170 @@ const SubscriptionLocked: React.FC = () => {
                     </div>
 
                     <div className="mb-8">
-                        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 border-b pb-2">2. الوحدات الإضافية (اختيارية)</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {modules.filter(m => !m.isCore).map(module => (
-                                <div 
-                                    key={module.id}
-                                    onClick={() => toggleModule(module.id)}
-                                    className={`cursor-pointer border-2 rounded-lg p-4 transition-all flex justify-between items-center ${
-                                        activeModuleIds.has(module.id) 
-                                        ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20' 
-                                        : 'border-gray-200 dark:border-gray-700 hover:border-teal-300'
-                                    }`}
+                        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 border-b pb-2">2. اختيار الخطة</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">الخطة</label>
+                                <select
+                                    value={selectedPlanId}
+                                    onChange={(e) => setSelectedPlanId(e.target.value)}
+                                    className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${
-                                            activeModuleIds.has(module.id) ? 'bg-teal-500 border-teal-500' : 'border-gray-400'
-                                        }`}>
-                                            {activeModuleIds.has(module.id) && <CheckIcon className="w-3 h-3 text-white" />}
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 dark:text-white">{module.name}</h4>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{module.description.substring(0, 40)}...</p>
-                                        </div>
-                                    </div>
-                                    <span className="font-bold text-teal-600 dark:text-teal-400">${module.monthlyPrice}</span>
+                                    {plans.map(plan => (
+                                        <option key={plan.id} value={plan.id}>{plan.name} - ${plan.price}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="text-center md:text-right">
+                                <p className="text-sm text-gray-500 dark:text-gray-400">سعر الخطة</p>
+                                <p className="text-xl font-bold text-gray-900 dark:text-white">${(plans.find(p => String(p.id) === selectedPlanId)?.price || 0).toFixed(2)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-8">
+                        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 border-b pb-2">3. وضع الفوترة</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">الوضع</label>
+                                <select
+                                    value={billingMode}
+                                    onChange={(e) => setBillingMode(e.target.value as 'hard_cap' | 'overage')}
+                                    className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option value="hard_cap">حماية صارمة (بدون زيادة)</option>
+                                    <option value="overage">السماح بالزيادة (محاسبة إضافية)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-8">
+                        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 border-b pb-2">4. توسعات السعة</h2>
+                        <div className="space-y-4">
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => setPacks([...(packs || []), { type: 'students', qty: 50 }])} className="px-3 py-1 text-sm rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">+50 طالب</button>
+                                <button type="button" onClick={() => setPacks([...(packs || []), { type: 'teachers', qty: 5 }])} className="px-3 py-1 text-sm rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">+5 معلم</button>
+                                <button type="button" onClick={() => setPacks([...(packs || []), { type: 'invoices', qty: 200 }])} className="px-3 py-1 text-sm rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">+200 فاتورة</button>
+                                <button type="button" onClick={() => setPacks([...(packs || []), { type: 'storageGB', qty: 10 }])} className="px-3 py-1 text-sm rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">+10GB تخزين</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">النوع</label>
+                                    <select
+                                        value={newPackType}
+                                        onChange={(e) => setNewPackType(e.target.value as 'students' | 'teachers' | 'invoices' | 'storageGB')}
+                                        className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                    >
+                                        <option value="students">طلاب</option>
+                                        <option value="teachers">معلمون</option>
+                                        <option value="invoices">فواتير</option>
+                                        <option value="storageGB">تخزين (GB)</option>
+                                    </select>
                                 </div>
-                            ))}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">الكمية</label>
+                                    <input
+                                        type="number"
+                                        value={newPackQty}
+                                        onChange={(e) => setNewPackQty(Number(e.target.value))}
+                                        className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">السعر الإضافي ($)</label>
+                                    <input
+                                        type="number"
+                                        value={newPackPrice}
+                                        onChange={(e) => setNewPackPrice(Number(e.target.value))}
+                                        className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => setPacks([...(packs || []), { type: newPackType, qty: newPackQty, price: newPackPrice }])}
+                                    className="inline-flex justify-center rounded-md border border-transparent bg-teal-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                                >
+                                    إضافة توسعة
+                                </button>
+                            </div>
+                            {Array.isArray(packs) && packs.length > 0 && (
+                                <div className="mt-4 space-y-3">
+                                    {packs.map((p, idx) => (
+                                        <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">النوع</label>
+                                                <select
+                                                    value={p.type}
+                                                    onChange={(e) => {
+                                                        const v = e.target.value as 'students' | 'teachers' | 'invoices' | 'storageGB';
+                                                        const next = [...packs];
+                                                        next[idx] = { ...next[idx], type: v };
+                                                        setPacks(next);
+                                                    }}
+                                                    className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                                >
+                                                    <option value="students">طلاب</option>
+                                                    <option value="teachers">معلمون</option>
+                                                    <option value="invoices">فواتير</option>
+                                                    <option value="storageGB">تخزين (GB)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">الكمية</label>
+                                                <input
+                                                    type="number"
+                                                    value={p.qty}
+                                                    onChange={(e) => {
+                                                        const next = [...packs];
+                                                        next[idx] = { ...next[idx], qty: Number(e.target.value) };
+                                                        setPacks(next);
+                                                    }}
+                                                    className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">السعر الإضافي ($)</label>
+                                                <input
+                                                    type="number"
+                                                    value={p.price || 0}
+                                                    onChange={(e) => {
+                                                        const next = [...packs];
+                                                        next[idx] = { ...next[idx], price: Number(e.target.value) };
+                                                        setPacks(next);
+                                                    }}
+                                                    className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                                />
+                                            </div>
+                                            <div className="flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const next = [...packs];
+                                                        next.splice(idx, 1);
+                                                        setPacks(next);
+                                                    }}
+                                                    className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                >
+                                                    حذف
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     <div className="bg-gray-100 dark:bg-gray-900 p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="text-center md:text-right">
                             <p className="text-gray-600 dark:text-gray-400">الإجمالي الشهري المطلوب</p>
-                            <p className="text-3xl font-extrabold text-gray-900 dark:text-white">${totalCost.toFixed(2)}</p>
+                            <p className="text-3xl font-extrabold text-gray-900 dark:text-white">${quote.total.toFixed(2)}</p>
                         </div>
                         <button 
-                            onClick={handleProceed}
+                            onClick={() => setShowPaymentModal(true)}
                             className="w-full md:w-auto px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white text-lg font-bold rounded-xl shadow-lg transition-transform transform hover:scale-105"
                         >
                             تأكيد الخطة والدفع
@@ -162,7 +325,7 @@ const SubscriptionLocked: React.FC = () => {
                 <PaymentProofModal
                     onClose={() => setShowPaymentModal(false)}
                     onSubmit={handlePaymentSubmit}
-                    amount={totalCost}
+                    amount={quote.total}
                     serviceName="تجديد اشتراك المدرسة"
                     schoolName={currentUser?.name || ''} // Assuming admin name roughly matches or fetches school name
                 />

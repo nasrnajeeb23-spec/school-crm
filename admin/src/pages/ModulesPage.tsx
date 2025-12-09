@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-import { School, Module, ModuleId, PricingConfig, SubscriptionState } from '../types';
+import { School, PricingConfig, SubscriptionState } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { EditIcon, PlusIcon, TrashIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
@@ -146,19 +146,17 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const fetchData = () => {
         setLoading(true);
         Promise.all([
-            api.getAvailableModules(),
             api.getPricingConfig(),
             api.getSubscriptionState(school.id)
-        ]).then(async ([available, pricing, state]) => {
-            setAvailableModules(available);
+        ]).then(async ([pricing, state]) => {
             setPricingConfig(pricing);
             setSubscriptionState(state);
             const sgb = typeof state?.usage?.storageGB === 'number' ? state!.usage!.storageGB! : await api.getStorageUsage(school.id);
             setStorageGB(sgb);
             try { const q = await api.getUsageQuote(school.id, sgb); setQuote(q); } catch {}
         }).catch(err => {
-            console.error("Failed to fetch modules data:", err);
-            addToast("فشل تحميل بيانات الوحدات.", 'error');
+            console.error("Failed to fetch subscription data:", err);
+            addToast("فشل تحميل بيانات الاشتراك.", 'error');
         }).finally(() => setLoading(false));
     };
 
@@ -214,7 +212,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     }, [quote]);
     
     if (loading) {
-        return <p className="text-center p-8">جاري تحميل الوحدات...</p>;
+        return <p className="text-center p-8">جاري تحميل البيانات...</p>;
     }
 
     // For Super Admin, we show ALL modules fetched from API (which should return everything)
@@ -249,27 +247,22 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
         return true;
     });
 
-    const coreModules = uniqueModules.filter(m => m.isCore);
-    const addonModules = uniqueModules.filter(m => !m.isCore);
+    const planName = subscriptionState?.plan?.name || school.plan;
+    const planPrice = Number(subscriptionState?.plan?.price || 0);
+    const limits = subscriptionState?.limits || ({} as any);
+    const usage = subscriptionState?.usage || ({} as any);
+    const packs = (subscriptionState as any)?.packs || [];
+    const billing = (subscriptionState as any)?.billing || { mode: 'hard_cap' };
 
     return (
         <>
             <div className="mt-6 space-y-6">
-                {/* Admin Controls */}
-                {canManageModules && (
-                    <div className="flex justify-end">
-                        <button 
-                            onClick={() => setIsCreateModalOpen(true)}
-                            className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-                        >
-                            <PlusIcon className="w-5 h-5 ml-2" />
-                            إضافة وحدة جديدة للنظام
-                        </button>
-                    </div>
-                )}
+                
 
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">ملخص التسعير</h3>
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">الباقات والاشتراكات</h3>
+                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">الخطة الحالية: {planName} — السعر: ${planPrice.toFixed(2)}</div>
+                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">وضع الفوترة: {billing.mode === 'overage' ? 'السماح بالزيادة' : 'حماية صارمة'}</div>
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400">الباقة الأساسية</p>
@@ -290,74 +283,50 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                     </div>
                 </div>
 
-                {/* Core Modules */}
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الوحدات الأساسية (Core)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {coreModules.map(module => (
-                            <div key={module.id} className="border dark:border-gray-700 rounded-lg p-6 flex flex-col justify-between relative">
-                                {canManageModules && (
-                                    <div className="absolute top-2 left-2 flex gap-2">
-                                        <button onClick={() => setEditingModule(module)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><EditIcon className="w-4 h-4" /></button>
-                                        <button onClick={() => handleDeleteModule(module.id)} className="p-1 text-red-600 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4" /></button>
-                                    </div>
-                                )}
-                                <div>
-                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                                        {module.name}
-                                        <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">{module.id}</span>
-                                        {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
-                                    </h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
-                                    <p className="font-semibold text-teal-600 mt-1">${module.monthlyPrice}/شهرياً</p>
-                                </div>
-                                <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-300">
-                                    متاح لجميع الخطط
-                                </div>
-                            </div>
-                        ))}
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">الاستخدام والحدود</h3>
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                        <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">الطلاب</p>
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">{Number(usage.students || 0)} / {String(limits.students ?? 'غير محدد')}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">المعلمون</p>
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">{Number(usage.teachers || 0)} / {String(limits.teachers ?? 'غير محدد')}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">الفواتير</p>
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">{Number(usage.invoices || 0)} / {String((limits as any).invoices ?? 'غير محدد')}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">التخزين (GB)</p>
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">{Number(storageGB || usage.storageGB || 0)} / {String(limits.storageGB ?? 'غير محدد')}</p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Add-on Modules */}
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">الوحدات الإضافية (Add-ons)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {addonModules.map(module => (
-                            <div key={module.id} className="border dark:border-gray-700 rounded-lg p-6 flex flex-col justify-between relative">
-                                {canManageModules && (
-                                    <div className="absolute top-2 left-2 flex gap-2">
-                                        <button onClick={() => setEditingModule(module)} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><EditIcon className="w-4 h-4" /></button>
-                                        <button onClick={() => handleDeleteModule(module.id)} className="p-1 text-red-600 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4" /></button>
-                                    </div>
-                                )}
-                                <div>
-                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                                        {module.name}
-                                        <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">{module.id}</span>
-                                        {!module.isEnabled && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">معطلة بالنظام</span>}
-                                    </h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 min-h-[40px]">{module.description}</p>
-                                    <p className="font-semibold text-teal-600 mt-1">${module.monthlyPrice}/شهرياً</p>
+                {Array.isArray(packs) && packs.length > 0 && (
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">توسعات السعة المفعلة</h3>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {packs.map((p: any, idx: number) => (
+                                <div key={idx} className="border dark:border-gray-700 rounded-lg p-4 text-sm flex justify-between">
+                                    <span className="text-gray-700 dark:text-gray-300">{p.type}</span>
+                                    <span className="font-bold text-gray-900 dark:text-white">+{p.qty} {p.price ? `($${Number(p.price).toFixed(2)})` : ''}</span>
                                 </div>
-                                <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-300">
-                                    متاح لجميع الخطط
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
+
+                
+
+                
             </div>
 
             
 
-            {(isCreateModalOpen || editingModule) && (
-                <EditModuleModal
-                    module={editingModule || undefined}
-                    onClose={() => { setIsCreateModalOpen(false); setEditingModule(null); }}
-                    onSave={handleSaveModule}
-                />
-            )}
+            
         </>
     );
 };

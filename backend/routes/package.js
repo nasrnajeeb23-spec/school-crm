@@ -60,21 +60,19 @@ async function zipDirectory(stagingDir, zipPath) {
 
 router.post('/generate-package', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { moduleIds = [] } = req.body || {};
-    if (!Array.isArray(moduleIds) || moduleIds.length === 0) {
-      return res.status(400).json({ msg: 'moduleIds must be a non-empty array' });
-    }
+    const { moduleIds = [], planId = null } = req.body || {};
     await fse.ensureDir(UPLOADS_DIR);
     const ts = Date.now();
     const stagingDir = path.join(UPLOADS_DIR, `staging_${ts}`);
     await fse.ensureDir(stagingDir);
-    const pathsToCopy = modulePaths(moduleIds);
+    const ids = Array.isArray(moduleIds) ? moduleIds : [];
+    const pathsToCopy = modulePaths(ids);
     await copyPaths(stagingDir, pathsToCopy);
     const zipName = `schoolsaas_selfhosted_${ts}.zip`;
     const zipPath = path.join(UPLOADS_DIR, zipName);
     await zipDirectory(stagingDir, zipPath);
     await fse.remove(stagingDir);
-    const token = signLicense({ file: zipName, issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 24*60*60*1000).toISOString() });
+    const token = signLicense({ file: zipName, planId: planId || null, issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 24*60*60*1000).toISOString() });
     tokenStore.set(token, Date.now() + 24*60*60*1000);
     res.json({ downloadUrl: `/api/superadmin/download/${encodeURIComponent(token)}` });
   } catch (e) {

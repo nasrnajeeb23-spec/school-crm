@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import SchoolSidebar from '../components/SchoolSidebar';
 import Header from '../components/Header';
-import { School, Student, Teacher, InvoiceStatus, ActionItem, User, ModuleId, SchoolSettings, Permission, ActionItemType } from '../types';
+import { School, Student, Teacher, InvoiceStatus, ActionItem, User, SchoolSettings, Permission, ActionItemType } from '../types';
 
 import { BackIcon, BellIcon } from '../components/icons';
 import ThemeToggle from '../components/ThemeToggle';
@@ -50,10 +50,7 @@ const viewTitles: { [key: string]: string } = {
     finance: 'المالية والرسوم', reports: 'التقارير', settings: 'الإعدادات', profile: 'ملفي الشخصي', modules: 'الوحدات',
 };
 
-const modulePermissions: { [key in ModuleId]?: Permission } = {
-    [ModuleId.Finance]: Permission.MANAGE_FINANCE,
-    [ModuleId.Transportation]: Permission.MANAGE_TRANSPORTATION,
-};
+
 
 const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView = false }) => {
   const { currentUser, theme, toggleTheme, logout } = useAppContext();
@@ -67,7 +64,6 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
-  const [activeModules, setActiveModules] = useState<ModuleId[]>([]);
   const [isTrial, setIsTrial] = useState<boolean>(false);
   
   const storedId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('current_school_id') || '0') : 0;
@@ -97,11 +93,10 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
         Promise.allSettled([
             api.getSchoolById(effectiveSchoolId),
             actionItemsPromise,
-            api.getSchoolModules(effectiveSchoolId),
             api.getSchoolSettings(effectiveSchoolId),
             api.getSubscriptionState(effectiveSchoolId)
         ]).then(results => {
-            const [schoolRes, actionsRes, modulesRes, settingsRes, subStateRes] = results as any;
+            const [schoolRes, actionsRes, settingsRes, subStateRes] = results as any;
             if (schoolRes.status === 'fulfilled') {
               setSchool(schoolRes.value);
             } else if (schoolRes.status === 'rejected') {
@@ -114,29 +109,6 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
             if (actionsRes.status === 'fulfilled') {
               setActionItems(actionsRes.value);
             }
-            if (modulesRes.status === 'fulfilled') {
-              try { 
-                const rawModules = modulesRes.value.map((sm: any) => sm.moduleId);
-                const expandedModules = new Set<ModuleId>();
-                
-                // Matches backend/middleware/modules.js
-                const moduleMap: Record<string, string[]> = {
-                    'finance': ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
-                    'transportation': ['transportation', 'transport', 'bus_management'],
-                    'academic': ['academic', 'academic_management', 'grades', 'attendance'],
-                    'student': ['student', 'student_management']
-                };
-
-                rawModules.forEach((m: string) => {
-                    expandedModules.add(m as ModuleId);
-                    if (moduleMap[m]) {
-                        moduleMap[m].forEach(child => expandedModules.add(child as ModuleId));
-                    }
-                });
-
-                setActiveModules(Array.from(expandedModules)); 
-              } catch { setActiveModules([]); }
-            } else { setActiveModules([]); }
             if (settingsRes.status === 'fulfilled') {
               setSettings(settingsRes.value);
             } else if (schoolRes.status === 'fulfilled') {
@@ -192,7 +164,6 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
     <>
       <SchoolSidebar 
         permissions={userRolePermissions} 
-        activeModules={activeModules}
         isTrial={isTrial}
         schoolName={settings?.schoolName || school.name}
         schoolLogoUrl={api.getAssetUrl(settings?.schoolLogoUrl as string)}
@@ -222,7 +193,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
             <Suspense fallback={<div className="text-center p-8">جاري التحميل...</div>}>
                 <Routes>
                     <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<ProtectedPage permission={Permission.VIEW_DASHBOARD}><SchoolDashboard school={school} activeModules={activeModules} /></ProtectedPage>} />
+                    <Route path="dashboard" element={<ProtectedPage permission={Permission.VIEW_DASHBOARD}><SchoolDashboard school={school} /></ProtectedPage>} />
                     <Route path="students" element={<ProtectedPage permission={Permission.MANAGE_STUDENTS}><StudentsList schoolId={school.id} /></ProtectedPage>} />
                     <Route path="students/:studentId" element={<ProtectedPage permission={Permission.MANAGE_STUDENTS}><StudentProfile schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
                     <Route path="teachers" element={<ProtectedPage permission={Permission.MANAGE_TEACHERS}><TeachersList schoolId={school.id} /></ProtectedPage>} />

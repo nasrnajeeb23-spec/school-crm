@@ -76,10 +76,6 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON, // { email: bool, sms: bool, push: bool }
     allowNull: false,
   },
-  activeModules: {
-    type: DataTypes.JSON,
-    allowNull: true,
-  },
   workingDays: {
     type: DataTypes.JSON,
     allowNull: true,

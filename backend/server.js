@@ -749,39 +749,9 @@ syncDatabase()
       await ensureIndex(db.Message, ['senderRole'], 'msg_role');
     } catch (e) { try { console.warn('Index bootstrap failed', e?.message || e); } catch {} }
     try {
-      const { SchoolSettings, Subscription } = require('./models');
-      const settingsRows = await SchoolSettings.findAll();
-      let updatedCount = 0;
-      const catalog = Array.isArray(app.locals.modulesCatalog) ? app.locals.modulesCatalog : [];
-      const allIds = catalog.map(m => m.id);
-      for (const s of settingsRows) {
-        // Migration: Replace legacy 'finance' with new granular modules
-        let modules = Array.isArray(s.activeModules) ? [...s.activeModules] : [];
-        if (modules.includes('finance')) {
-           modules = modules.filter(m => m !== 'finance');
-           if (!modules.includes('finance_fees')) modules.push('finance_fees');
-           if (!modules.includes('finance_salaries')) modules.push('finance_salaries');
-           if (!modules.includes('finance_expenses')) modules.push('finance_expenses');
-           s.activeModules = modules;
-           await s.save();
-           updatedCount++;
-           continue; // Skip trial check if we just migrated
-        }
-
-        const sub = await Subscription.findOne({ where: { schoolId: s.schoolId } });
-        if (!sub || String(sub.status).toUpperCase() !== 'TRIAL') continue;
-        const now = new Date();
-        const expiry = sub.endDate || sub.renewalDate;
-        if (expiry && now > new Date(expiry)) continue; // لا تعديل بعد انتهاء التجربة
-        const active = Array.isArray(s.activeModules) ? s.activeModules : [];
-        const nextSet = new Set([ ...active, ...allIds ]);
-        const next = Array.from(nextSet);
-        const changed = JSON.stringify(active) !== JSON.stringify(next);
-        if (changed) { s.activeModules = next; await s.save(); updatedCount++; }
-      }
-      console.log('Module sync/migration complete. Updated schools:', updatedCount);
+      console.log('Module sync disabled: activeModules no longer used');
     } catch (e) {
-      console.warn('Module sync failed:', e?.message || e);
+      console.warn('Module sync disabled with error:', e?.message || e);
     }
     io.on('connection', (socket) => {
       try {

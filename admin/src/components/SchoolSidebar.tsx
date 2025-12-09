@@ -1,19 +1,18 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { DashboardIcon, StudentsIcon, UsersIcon, ClassesIcon, FinanceIcon, ReportsIcon, AttendanceIcon, GradesIcon, ScheduleIcon, MessagingIcon, ParentsIcon, SettingsIcon, EventIcon, LogoutIcon, ProfileIcon, BusIcon, ModuleIcon, NetProfitIcon, LockIcon } from './icons';
-import { Permission, ModuleId } from '../types';
+import { Permission } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 
 interface SchoolSidebarProps {
   permissions: Permission[];
-  activeModules: ModuleId[];
   isTrial?: boolean;
   schoolName?: string;
   schoolLogoUrl?: string;
   isSuperAdminView?: boolean;
 }
 
-const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModules, isTrial = false, schoolName, schoolLogoUrl, isSuperAdminView }) => {
+const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = false, schoolName, schoolLogoUrl, isSuperAdminView }) => {
   const { logout } = useAppContext();
   const location = useLocation();
 
@@ -28,20 +27,20 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
     { id: 'staff', label: 'الموظفون', icon: UsersIcon, requiredPermission: Permission.MANAGE_STAFF, path: `${basePath}/staff` },
     { id: 'staff_attendance', label: 'حضور الموظفين', icon: AttendanceIcon, requiredPermission: Permission.MANAGE_STAFF, path: `${basePath}/staff/attendance` },
     { id: 'classes', label: 'الفصول', icon: ClassesIcon, requiredPermission: Permission.MANAGE_CLASSES, path: `${basePath}/classes` },
-    { id: 'transportation', label: 'النقل المدرسي', icon: BusIcon, requiredPermission: Permission.MANAGE_TRANSPORTATION, requiredModule: ModuleId.Transportation, path: `${basePath}/transportation` },
+    { id: 'transportation', label: 'النقل المدرسي', icon: BusIcon, requiredPermission: Permission.MANAGE_TRANSPORTATION, path: `${basePath}/transportation` },
     { id: 'attendance', label: 'الحضور والغياب', icon: AttendanceIcon, requiredPermission: Permission.MANAGE_ATTENDANCE, path: `${basePath}/attendance` },
     { id: 'schedule', label: 'الجدول الدراسي', icon: ScheduleIcon, requiredPermission: Permission.MANAGE_SCHEDULE, path: `${basePath}/schedule` },
     { id: 'calendar', label: 'التقويم والأحداث', icon: EventIcon, requiredPermission: Permission.MANAGE_CALENDAR, path: `${basePath}/calendar` },
     { id: 'grades', label: 'الدرجات', icon: GradesIcon, requiredPermission: Permission.MANAGE_GRADES, path: `${basePath}/grades` },
     { id: 'messaging', label: 'الرسائل', icon: MessagingIcon, requiredPermission: Permission.MANAGE_MESSAGING, path: `${basePath}/messaging` },
-    { id: 'finance_fees', label: 'الرسوم الدراسية', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, requiredModule: ModuleId.FinanceFees, path: `${basePath}/finance/invoices` },
-    { id: 'finance_payroll', label: 'الرواتب', icon: NetProfitIcon, requiredPermission: Permission.MANAGE_FINANCE, requiredModule: ModuleId.FinanceSalaries, path: `${basePath}/finance/payroll` },
-    { id: 'finance_expenses', label: 'المصروفات', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, requiredModule: ModuleId.FinanceExpenses, path: `${basePath}/finance/expenses` },
+    { id: 'finance_fees', label: 'الرسوم الدراسية', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, path: `${basePath}/finance/invoices` },
+    { id: 'finance_payroll', label: 'الرواتب', icon: NetProfitIcon, requiredPermission: Permission.MANAGE_FINANCE, path: `${basePath}/finance/payroll` },
+    { id: 'finance_expenses', label: 'المصروفات', icon: FinanceIcon, requiredPermission: Permission.MANAGE_FINANCE, path: `${basePath}/finance/expenses` },
     { id: 'reports', label: 'التقارير', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/reports` },
     { id: 'parent_requests', label: 'طلبات أولياء الأمور', icon: ParentsIcon, requiredPermission: Permission.MANAGE_PARENTS, path: `${basePath}/parent_requests` },
     { id: 'jobs', label: 'مهام الخلفية', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/jobs` },
     { id: 'settings', label: 'الإعدادات', icon: SettingsIcon, requiredPermission: Permission.MANAGE_SETTINGS, path: `${basePath}/settings` },
-    { id: 'modules', label: 'الوحدات', icon: ModuleIcon, requiredPermission: Permission.MANAGE_MODULES, path: `${basePath}/modules` },
+    { id: 'modules', label: 'الباقات والاشتراكات', icon: ModuleIcon, requiredPermission: Permission.MANAGE_MODULES, path: `${basePath}/modules` },
   ];
 
   const hasPermission = (item: typeof allNavItems[0]) => {
@@ -52,31 +51,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, activeModule
   };
 
   const navItems = allNavItems.filter(hasPermission);
-  
-  // Helper to expand parent modules (matching backend logic)
-   const getExpandedModules = (modules: ModuleId[]): string[] => {
-       if (!Array.isArray(modules)) return [];
-       const expanded = new Set<string>(modules as unknown as string[]);
-       
-       // Map of parent modules to their children
-      const moduleMap: Record<string, string[]> = {
-          'finance': ['finance_fees', 'finance_salaries', 'finance_expenses'],
-          'transportation': ['transportation', 'transport', 'bus_management'],
-          'academic': ['academic_management', 'grades', 'attendance'],
-          'student': ['student_management']
-      };
 
-      modules.forEach(m => {
-          const key = m as unknown as string;
-          if (moduleMap[key]) {
-              moduleMap[key].forEach(child => expanded.add(child));
-          }
-      });
-      
-      return Array.from(expanded);
-  };
-
-  const expandedActiveModules = getExpandedModules(activeModules);
 
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-1 rounded-lg transition-colors duration-200";
   const activeLinkClasses = "bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300";

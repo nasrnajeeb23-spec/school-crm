@@ -36,7 +36,8 @@ const BulkOps: React.FC = () => {
     setSaving(true);
     try {
       const res = await bulkUpdateModules({ schoolIds: selected, moduleId, enable: enableModule });
-      addToast(`تم تحديث الوحدات لعدد ${res.updated} مدرسة.`, 'success');
+      const msg = (res as any)?.message || `تم تحديث الوحدات لعدد ${res.updated} مدرسة.`;
+      addToast(msg, 'success');
     } catch (err: any) {
       const msg = String(err?.message || '');
       if (msg.includes('HTTP 404')) setUnsupported(true);

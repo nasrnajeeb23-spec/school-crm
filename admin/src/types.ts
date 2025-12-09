@@ -209,10 +209,12 @@ export interface PricingConfig {
 
 export interface SubscriptionState {
   subscription: { status: string; startDate: string | null; endDate: string | null; renewalDate: string | null; trialExpired: boolean; daysLeft?: number };
-  modules: { allowed: string[]; active: string[] };
-  plan?: any;
-  limits?: { students: number; teachers: number; invoices?: number; source: string };
+  modules?: { allowed: string[]; active: string[] };
+  plan?: { id?: string | number; name?: string; price?: number; limits?: any } | any;
+  limits?: { students: number | 'غير محدود'; teachers: number | 'غير محدود'; invoices?: number | 'غير محدود'; storageGB?: number | 'غير محدود'; source: string };
   usage?: { students: number; teachers: number; invoices?: number; storageGB?: number };
+  packs?: Array<{ type: 'students' | 'teachers' | 'invoices' | 'storageGB'; qty: number; price?: number }>;
+  billing?: { mode: 'hard_cap' | 'overage'; planPrice?: number; packTotal?: number; overageEstimate?: { students: number; teachers: number; invoices: number; storageGB: number; total: number; currency: string }; totalEstimated?: number };
 }
 
 export interface Expense {

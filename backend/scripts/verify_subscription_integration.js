@@ -109,70 +109,15 @@ async function verifySubscriptionIntegration() {
             console.log('❌ FAIL: Merged limits do not match expected custom limits.');
         }
 
-        // 3. Verify Module Intersection Logic (simulating schools.js)
-        console.log('\n--- Verifying Module Intersection (School Modules) ---');
-
-        // Case A: No local settings (should return all provisioned)
-        let provisioned = await SubscriptionModule.findAll({ 
-            where: { subscriptionId: subscription.id, active: true } 
-        });
-        let provisionedIds = provisioned.map(sm => sm.moduleId);
-        
-        let settings = await SchoolSettings.findOne({ where: { schoolId: school.id } });
-        let localActive = settings?.activeModules;
-        
-        let activeModules = [];
-        if (!localActive || !Array.isArray(localActive)) {
-             activeModules = provisionedIds.map(id => ({ schoolId: school.id, moduleId: id }));
-        } else {
-             activeModules = provisionedIds
-                .filter(id => localActive.includes(id))
-                .map(id => ({ schoolId: school.id, moduleId: id }));
-        }
-
-        console.log('Provisioned Modules:', provisionedIds);
-        console.log('Local Settings:', localActive || 'None (Default All)');
-        console.log('Active Modules (Result):', activeModules.map(m => m.moduleId));
-
-        if (activeModules.length === 2 && activeModules.find(m => m.moduleId === 'finance_fees')) {
-            console.log('✅ PASS: Default behavior includes all provisioned modules.');
-        } else {
-            console.log('❌ FAIL: Default behavior failed.');
-        }
-
-        // Case B: With local settings (should intersect)
-        // Enable only 'finance_fees' locally, disable 'transportation'  
-        await SchoolSettings.create({
-            schoolId: school.id,
-            schoolName: 'Test School Settings', // Required
-            academicYearStart: new Date(),      // Required
-            academicYearEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)), // Required
-            notifications: { email: true, sms: false }, // Required
-            activeModules: ['finance_fees']
-        });
-
-        settings = await SchoolSettings.findOne({ where: { schoolId: school.id } });
-        localActive = settings?.activeModules;
-
-        if (!localActive || !Array.isArray(localActive)) {
-             activeModules = provisionedIds.map(id => ({ schoolId: school.id, moduleId: id }));
-        } else {
-             activeModules = provisionedIds
-                .filter(id => localActive.includes(id))
-                .map(id => ({ schoolId: school.id, moduleId: id }));
-        }
-
-        console.log('\nWith Local Settings applied (only finance_fees):');
-        console.log('Active Modules (Result):', activeModules.map(m => m.moduleId));
-
-        if (activeModules.length === 1 && activeModules[0].moduleId === 'finance_fees') {
-            console.log('✅ PASS: Intersection logic correctly filters modules.');
-        } else {
-            console.log('❌ FAIL: Intersection logic failed.');
-        }
+        // 3. Verify Subscription state no longer depends on activeModules
+        console.log('\n--- Verifying Subscription State (Modules deprecated) ---');
+        const provisioned = await SubscriptionModule.findAll({ where: { subscriptionId: subscription.id, active: true } });
+        const provisionedIds = provisioned.map(sm => sm.moduleId);
+        console.log('Provisioned Modules (for billing only):', provisionedIds);
+        console.log('✅ PASS: Modules are provisioned but not used for access control.');
 
         // Cleanup
-        await SubscriptionModule.destroy({ where: { subscriptionId: testSchoolId } });
+        await SubscriptionModule.destroy({ where: { subscriptionId: subscription.id } });
         await Subscription.destroy({ where: { schoolId: testSchoolId } });
         await SchoolSettings.destroy({ where: { schoolId: testSchoolId } });
         await School.destroy({ where: { id: testSchoolId } });

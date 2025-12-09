@@ -45,7 +45,7 @@ const Sidebar: React.FC = () => {
     { id: 'analytics', label: 'التحليلات', icon: DashboardIcon, path: '/superadmin/analytics' },
     { id: 'subscriptions', label: 'الاشتراكات', icon: SubscriptionIcon, path: '/superadmin/subscriptions' },
     { id: 'billing', label: 'الفوترة والمالية', icon: BillingIcon, path: '/superadmin/billing' },
-    { id: 'modules', label: 'إدارة الوحدات', icon: ModuleIcon, path: '/superadmin/modules' },
+    { id: 'modules', label: 'إدارة الخطط', icon: ModuleIcon, path: '/superadmin/plans' },
     { id: 'audit-logs', label: 'سجلات التدقيق', icon: ShieldIcon, path: '/superadmin/audit-logs' },
     { id: 'license', label: 'إدارة التراخيص', icon: ModuleIcon, path: '/superadmin/license' },
     { id: 'content', label: 'إدارة المحتوى', icon: ContentIcon, path: '/superadmin/content' },

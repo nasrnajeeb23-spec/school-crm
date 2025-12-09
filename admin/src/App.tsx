@@ -179,6 +179,7 @@ const App: React.FC = () => {
               <Route path="subscriptions" element={<SubscriptionsList />} />
               <Route path="billing" element={<Billing />} />
               <Route path="modules" element={<FeatureManagement />} />
+              <Route path="plans" element={<FeatureManagement />} />
               <Route path="content" element={<ContentManagement />} />
               <Route path="onboarding" element={<OnboardingRequests />} />
               <Route path="usage_limits" element={<UsageLimits />} />

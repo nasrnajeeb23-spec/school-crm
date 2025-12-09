@@ -49,39 +49,7 @@ router.post('/login', validate([
       return res.status(401).json({ msg: 'Invalid credentials' });
     }
 
-    try {
-      if (user.role === 'PARENT') {
-        const allowedGlobal = req.app?.locals?.allowedModules || [];
-        let active = allowedGlobal;
-        try {
-          if (user.schoolId) {
-            const settings = await SchoolSettings.findOne({ where: { schoolId: user.schoolId } });
-            if (Array.isArray(settings?.activeModules) && (settings.activeModules || []).length > 0) {
-              active = settings.activeModules;
-            }
-          }
-        } catch {}
-        if (!active.includes('parent_portal')) {
-          return res.status(403).json({ msg: 'وحدة بوابة ولي الأمر غير مفعلة لهذه المدرسة.' });
-        }
-      }
-      if (user.role === 'TEACHER') {
-        const allowedGlobal = req.app?.locals?.allowedModules || [];
-        let active = allowedGlobal;
-        try {
-          if (user.schoolId) {
-            const settings = await SchoolSettings.findOne({ where: { schoolId: user.schoolId } });
-            if (Array.isArray(settings?.activeModules) && (settings.activeModules || []).length > 0) {
-              active = settings.activeModules;
-            }
-          }
-        } catch {}
-        const teacherAccessEnabled = active.includes('teacher_portal') || active.includes('teacher_app');
-        if (!teacherAccessEnabled) {
-          return res.status(403).json({ msg: 'وحدات دخول المعلم غير مفعّلة لهذه المدرسة.' });
-        }
-      }
-    } catch {}
+    try { /* تم إزالة قيود الوحدات: الوصول يعتمد على حالة الاشتراك فقط */ } catch {}
 
     // منع الدخول إذا كانت المدرسة موقوفة
     if (user.role !== 'SUPER_ADMIN' && user.schoolId) {
@@ -147,8 +115,7 @@ router.post('/trial-signup', validate([
       schoolAddress: '',
       academicYearStart: new Date().toISOString().split('T')[0],
       academicYearEnd: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      notifications: JSON.stringify({ email: true, sms: false, push: true }),
-      activeModules: ['student_management','academic_management','parent_portal','teacher_portal','teacher_app','finance','transportation']
+      notifications: JSON.stringify({ email: true, sms: false, push: true })
     });
 
     let plan = await Plan.findOne({ where: { recommended: true } });

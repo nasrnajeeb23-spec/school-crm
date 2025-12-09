@@ -3,7 +3,7 @@
 
 import { 
     User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
-    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord
+    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState
 } from './types';
 
 
@@ -474,13 +474,6 @@ export const getFeeSetups = async (schoolId: number): Promise<FeeSetup[]> => {
     return unwrap<FeeSetup[]>(data, 'fees', []);
 };
 
-export type SubscriptionState = {
-  subscription: { status: string; startDate: string | null; endDate: string | null; renewalDate: string | null; trialExpired: boolean; daysLeft?: number };
-  modules: { allowed: string[]; active: string[] };
-  plan?: any;
-  limits?: { students: number; teachers: number; source: string };
-  usage?: { students: number; teachers: number };
-};
 
 export const getSubscriptionState = async (schoolId: number): Promise<SubscriptionState> => {
   const data = await apiCall(`/school/${schoolId}/subscription-state`, { method: 'GET' });
@@ -671,29 +664,6 @@ export const submitPaymentProof = async (submission: Omit<PaymentProofSubmission
     });
 };
 
-export const getSchoolModules = async (schoolId: number): Promise<SchoolModuleSubscription[]> => {
-    try {
-        const data = await apiCall(`/schools/${schoolId}/modules`, { method: 'GET' });
-        const modules: SchoolModuleSubscription[] = Array.isArray(data) ? data : [];
-        const hasParent = modules.some(m => m.moduleId === ModuleId.ParentPortal);
-        return hasParent ? modules : [...modules, { schoolId, moduleId: ModuleId.ParentPortal }];
-    } catch {
-        return [{ schoolId, moduleId: ModuleId.ParentPortal }];
-    }
-};
-
-export const updateSchoolModules = async (schoolId: number, moduleIds: string[]): Promise<SchoolModuleSubscription[]> => {
-    const data = await apiCall(`/schools/${schoolId}/modules`, { method: 'PUT', body: JSON.stringify({ moduleIds }) });
-    const modules: SchoolModuleSubscription[] = Array.isArray(data) ? data : [];
-    const hasParent = modules.some(m => m.moduleId === ModuleId.ParentPortal);
-    return hasParent ? modules : [...modules, { schoolId, moduleId: ModuleId.ParentPortal }];
-};
-
-export const activateSchoolSubscription = async (schoolId: number, moduleIds: string[], renewalDate?: string): Promise<{ activated: boolean; activeModules: string[]; renewalDate: string }> => {
-    const payload: any = { moduleIds };
-    if (renewalDate) payload.renewalDate = renewalDate;
-    return await apiCall(`/schools/${schoolId}/modules/activate`, { method: 'POST', body: JSON.stringify(payload) });
-};
 
 export const getActionItems = async (): Promise<ActionItem[]> => {
     try {
@@ -1065,6 +1035,14 @@ export const updatePlan = async (id: string, data: Partial<Plan>): Promise<Plan>
     return await apiCall(`/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 };
 
+export const createPlan = async (data: Partial<Plan>): Promise<Plan> => {
+    return await apiCall('/plans', { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const deletePlan = async (id: string | number): Promise<void> => {
+    await apiCall(`/plans/${id}`, { method: 'DELETE' });
+};
+
 export const getAvailableModules = async (): Promise<Module[]> => {
     return await apiCall('/modules', { method: 'GET' });
 };
@@ -1074,18 +1052,13 @@ export const getAvailableModules = async (): Promise<Module[]> => {
 
 // Removed duplicated functions (getSchoolModules, updateSchoolModules, submitPaymentProof)
 
-export const getModulesQuote = async (schoolId: number, moduleIds: ModuleId[], period: 'monthly' | 'annual' = 'monthly'): Promise<{ period: string; base: number; items: Array<{ id: ModuleId; name: string; price: number }>; modulesTotal: number; total: number; currency: string }> => {
-    return await apiCall(`/school/${schoolId}/modules/quote`, { method: 'POST', body: JSON.stringify({ moduleIds, period }) });
-};
+ 
 
-export const activateSchoolModules = async (schoolId: number, moduleIds: ModuleId[], renewalDate?: string): Promise<{ activated: boolean; activeModules: ModuleId[]; renewalDate: string }> => {
-    return await apiCall(`/schools/${schoolId}/modules/activate`, { method: 'POST', body: JSON.stringify({ moduleIds, renewalDate }) });
-};
-
-export const generateSelfHostedPackage = async (moduleIds: ModuleId[]): Promise<string> => {
+export const generateSelfHostedPackage = async (payload: { planId?: string | number; moduleIds?: ModuleId[] } = {}): Promise<string> => {
+    const body = { planId: payload.planId ?? null, moduleIds: Array.isArray(payload.moduleIds) ? payload.moduleIds : [] } as any;
     const response: any = await apiCall('/superadmin/self-hosted/package', {
         method: 'POST',
-        body: JSON.stringify({ moduleIds }),
+        body: JSON.stringify(body),
     });
     return response?.downloadUrl || '';
 };
@@ -1271,9 +1244,9 @@ export const getRoles = async (): Promise<Role[]> => {
     return await apiCall('/roles', { method: 'GET' });
 };
 
-export const generateLicenseKey = async (payload: { schoolId: number; modules: ModuleId[] }): Promise<string> => {
-    const response: any = await apiCall('/superadmin/license/generate', { method: 'POST', body: JSON.stringify(payload) });
-    return response?.licenseKey || '';
+export const generateLicenseKey = async (payload: { schoolName: string; planId?: string | number; planName?: string; expiresAt?: string | null }): Promise<{ licenseKey: string }> => {
+    const response: any = await apiCall('/license/generate', { method: 'POST', body: JSON.stringify(payload) });
+    return { licenseKey: response?.licenseKey || '' };
 };
 
 export const createSuperAdminTeamMember = async (memberData: any): Promise<User> => {
@@ -1452,7 +1425,6 @@ export default {
     resetSuperAdminPassword,
     submitTrialRequest,
     getStudentDistribution,
-    getSchoolModules,
     getActionItems,
     getSchoolParents,
     getSchoolEvents,

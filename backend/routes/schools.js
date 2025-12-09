@@ -231,82 +231,15 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
 // @desc    Get active modules for a school (Synced with Super Admin SubscriptionModule)
 // @access  Private (SchoolAdmin, SuperAdmin)
 router.get('/:id/modules', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
-  try {
-    const schoolId = Number(req.params.id);
-    const { ModuleCatalog } = require('../models');
-    const allModules = await ModuleCatalog.findAll({ where: { isEnabled: true } });
-    const activeModules = allModules.map(m => ({ schoolId, moduleId: m.id }));
-    const expandedSet = new Set();
-    activeModules.forEach(am => {
-        expandedSet.add(am.moduleId);
-        if (moduleMap[am.moduleId]) {
-            moduleMap[am.moduleId].forEach(child => expandedSet.add(child));
-        }
-    });
-    const finalModules = Array.from(expandedSet).map(mid => ({ schoolId, moduleId: mid }));
-    res.json(finalModules);
-  } catch (err) { console.error('Get Modules Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
+  return res.status(410).json({ code: 'DEPRECATED', msg: 'School module listing is deprecated' });
 });
 
 router.put('/:id/modules', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
-  try {
-    const schoolId = Number(req.params.id);
-    const requestedIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds : [];
-    let byId = new Map();
-    try {
-      const { ModuleCatalog } = require('../models');
-      const rows = await ModuleCatalog.findAll();
-      byId = new Map(rows.map(m => [String(m.id), m.toJSON()]));
-    } catch {}
-    const role = String(req.user?.role || '').toUpperCase();
-    const isSchoolAdmin = role.includes('SCHOOL') && role.includes('ADMIN');
-
-    const settings = await SchoolSettings.findOrCreate({ where: { schoolId }, defaults: { schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } } });
-    const settingsInstance = Array.isArray(settings) ? settings[0] : settings;
-
-    let finalModuleIds = [];
-    if (isSchoolAdmin) {
-        // School Admin can only toggle Core modules.
-        // We must PRESERVE their existing Non-Core modules to prevent accidental deletion of paid features.
-        const currentActive = Array.isArray(settingsInstance.activeModules) ? settingsInstance.activeModules : [];
-        
-        const preservedNonCore = currentActive.filter(id => {
-            const m = byId.get(String(id));
-            // Keep if it's a known non-core module OR if it's unknown (legacy/custom)
-            return !m || m.isCore !== true;
-        });
-
-        const requestedCore = requestedIds.filter(id => {
-             const m = byId.get(String(id));
-             return m && m.isCore === true;
-        });
-
-        finalModuleIds = [...new Set([...preservedNonCore, ...requestedCore])];
-    } else {
-        finalModuleIds = requestedIds;
-    }
-
-    settingsInstance.activeModules = finalModuleIds;
-    await settingsInstance.save();
-    const list = finalModuleIds.map(m => ({ schoolId, moduleId: m }));
-    res.json(list);
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  return res.status(410).json({ code: 'DEPRECATED', msg: 'School module update is deprecated' });
 });
 
 router.post('/:id/modules/activate', verifyToken, requireRole('SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {
-  try {
-    const { Subscription, SchoolSettings } = require('../models');
-    const schoolId = Number(req.params.id);
-    const moduleIds = Array.isArray(req.body?.moduleIds) ? req.body.moduleIds.map(String) : [];
-    const renewalDate = req.body?.renewalDate ? new Date(req.body.renewalDate) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
-    const settings = await SchoolSettings.findOrCreate({ where: { schoolId }, defaults: { schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true }, activeModules: moduleIds } });
-    const settingsInstance = Array.isArray(settings) ? settings[0] : settings;
-    settingsInstance.activeModules = moduleIds;
-    await settingsInstance.save();
-    const sub = await Subscription.findOne({ where: { schoolId } });
-    if (sub) { sub.status = 'ACTIVE'; sub.renewalDate = renewalDate; await sub.save(); }
-    res.json({ activated: true, activeModules: moduleIds, renewalDate: renewalDate.toISOString() });
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+  return res.status(410).json({ code: 'DEPRECATED', msg: 'School module activation is deprecated' });
 });
 
 router.get('/:id/stats/student-distribution', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('id'), async (req, res) => {

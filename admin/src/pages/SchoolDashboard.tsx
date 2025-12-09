@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatsCard from '../components/StatsCard';
 import { StudentsIcon, UsersIcon, AttendanceIcon, PastDueIcon } from '../components/icons';
-import { School, InvoiceStatus, AttendanceStatus, Class, ModuleId } from '../types';
+import { School, InvoiceStatus, AttendanceStatus, Class } from '../types';
 import * as api from '../api';
 import UpcomingEvents from '../components/UpcomingEvents';
 import StatsCardSkeleton from '../components/StatsCardSkeleton';
@@ -16,7 +16,6 @@ import ResourceUsageWidget from '../components/ResourceUsageWidget';
 
 interface SchoolDashboardProps {
     school: School;
-    activeModules?: ModuleId[];
 }
 
 interface DistributionData {
@@ -24,7 +23,7 @@ interface DistributionData {
     value: number;
 }
 
-const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school, activeModules }) => {
+const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
     const [overdueInvoices, setOverdueInvoices] = useState(0);
     const [distributionData, setDistributionData] = useState<DistributionData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -40,15 +39,10 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school, activeModules
                     api.getStudentDistribution(school.id),
                     api.getSchoolClasses(school.id),
                 ]);
-                const hasFinance = Array.isArray(activeModules) && activeModules.includes(ModuleId.Finance);
-                if (hasFinance) {
-                  try {
-                    const invoicesData = await api.getSchoolInvoices(school.id);
-                    setOverdueInvoices(invoicesData.filter(inv => inv.status === InvoiceStatus.Overdue).length);
-                  } catch (e) {
-                    setOverdueInvoices(0);
-                  }
-                } else {
+                try {
+                  const invoicesData = await api.getSchoolInvoices(school.id);
+                  setOverdueInvoices(invoicesData.filter(inv => inv.status === InvoiceStatus.Overdue).length);
+                } catch (e) {
                   setOverdueInvoices(0);
                 }
                 setDistributionData(studentDistributionData);
