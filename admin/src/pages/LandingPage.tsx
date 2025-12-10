@@ -54,6 +54,11 @@ const LandingPage: React.FC = () => {
     api.getLandingPageContent().then(setContent).catch(console.error).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobileMenuOpen]);
+
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>, targetId: string) => {
     e.preventDefault();
     document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -104,38 +109,41 @@ const LandingPage: React.FC = () => {
       <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm sticky top-0 z-40">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-                    <div className="flex items-center"><LogoIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" /><span className="ml-3 rtl:mr-3 rtl:ml-0 text-2xl font-bold">SchoolSaaS</span></div>
-                    <nav className="flex items-center gap-x-4 sm:gap-x-8 text-sm sm:text-base">
+            <div className="flex items-center"><LogoIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" /><span className="ml-3 rtl:mr-3 rtl:ml-0 text-2xl font-bold">SchoolSaaS</span></div>
+            <nav className="hidden md:flex items-center gap-x-4 sm:gap-x-8 text-sm sm:text-base">
               <a href="#features" onClick={(e) => handleNavClick(e, 'features')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الميزات</a>
               <a href="#pricing" onClick={(e) => handleNavClick(e, 'pricing')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">الأسعار</a>
               <a href="#contact" onClick={(e) => handleNavClick(e, 'contact')} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">تواصل معنا</a>
               <button onClick={() => goTo('/apps')} className="px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-200 dark:hover:bg-indigo-800">تحميل التطبيقات</button>
             </nav>
-            <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-4">
                 <button onClick={() => goTo('/superadmin/login')} className="inline-flex px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all">بوابة المدير العام</button>
                 <button onClick={() => goTo('/login')} className="px-5 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-all">تسجيل الدخول</button>
                 <button onClick={() => setIsTrialModalOpen(true)} className="inline-flex px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">ابدأ تجربتك المجانية</button>
-                <button onClick={() => setIsMobileMenuOpen(v => !v)} className="md:hidden p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                  </svg>
-                </button>
             </div>
+            <button onClick={() => setIsMobileMenuOpen(v => !v)} className="md:hidden p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="فتح القائمة">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
           </div>
         </div>
       </header>
 
       {isMobileMenuOpen && (
-                <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700 z-50">
-                  <div className="container mx-auto px-4 py-3 flex flex-col gap-3">
+        <>
+        <div className="fixed inset-0 bg-black/40 md:hidden z-30" onClick={() => setIsMobileMenuOpen(false)} />
+        <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700 z-50">
+          <div className="container mx-auto px-4 py-3 flex flex-col gap-3">
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
             <a href="#contact" onClick={(e) => { handleNavClick(e, 'contact'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a>
             <button onClick={() => { goTo('/apps'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200">تحميل التطبيقات</button>
-            <button onClick={() => { goTo('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg紫-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
+            <button onClick={() => { goTo('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
             <button onClick={() => { setIsTrialModalOpen(true); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">ابدأ تجربتك المجانية</button>
           </div>
         </div>
+        </>
       )}
 
       <main>

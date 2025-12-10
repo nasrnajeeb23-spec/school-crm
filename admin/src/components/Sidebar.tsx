@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
-import { DashboardIcon, SchoolIcon, SubscriptionIcon, BillingIcon, ModuleIcon, ContentIcon, UsageLimitsIcon, PermissionsIcon, ProfileIcon, LogoutIcon, UsersIcon, ShieldIcon } from './icons';
+import { DashboardIcon, SchoolIcon, SubscriptionIcon, BillingIcon, ModuleIcon, ContentIcon, UsageLimitsIcon, PermissionsIcon, ProfileIcon, LogoutIcon, UsersIcon, ShieldIcon, CloseIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface SidebarProps {
@@ -74,9 +74,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
     <>
     <aside className={`${isMobileOpen ? 'flex' : 'hidden'} md:flex fixed top-0 right-0 h-full w-64 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex-col transition-all duration-300 shadow-lg z-30 overflow-hidden`}
     >
-      <div className="flex items-center justify-center md:justify-start md:pr-6 h-20 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-center md:justify-start md:pr-6 h-20 border-b border-gray-200 dark:border-gray-700 relative">
         <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">S</span>
         <h1 className="hidden md:block ml-2 text-2xl font-bold text-gray-800 dark:text-white">SchoolSaaS</h1>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden absolute left-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            aria-label="إغلاق القائمة"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        )}
       </div>
       <div ref={navContainerRef} className="flex-grow pt-4 overflow-y-auto" tabIndex={0}>
         <nav>
