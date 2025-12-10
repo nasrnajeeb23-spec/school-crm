@@ -624,7 +624,8 @@ async function syncDatabase(){
   await Plan.sync(opts);
   await BusOperator.sync(isProd ? { force: false } : { alter: true });
   await Parent.sync(opts);
-  await Student.sync(isProd ? { force: false } : { alter: true });
+  try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch {}
+  await Student.sync(opts);
   await Teacher.sync(isProd ? { force: false } : { alter: true });
   await Class.sync(isProd ? { force: false } : { alter: true });
   await FeeSetup.sync(isProd ? { force: false } : { alter: true });

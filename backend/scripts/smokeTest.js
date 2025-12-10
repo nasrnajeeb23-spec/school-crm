@@ -57,7 +57,8 @@ async function run(){
   const crtStu = await req('POST','/api/school/1/students', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: 'طالب smoke', grade: 'الصف الرابع', parentName: 'ولي smoke', dateOfBirth: '2015-01-01' }));
   if (!crtStu.ok) throw new Error('create student failed');
   const stuData = JSON.parse(crtStu.body);
-  const sid = stuData.id;
+  const sid = (stuData && stuData.data && stuData.data.id) ? stuData.data.id : stuData.id;
+  if (!sid) throw new Error('student id not found');
 
   const crtInv = await req('POST','/api/school/1/invoices', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ studentId: sid, dueDate: '2025-12-01', items: [{ description: 'رسوم دراسية', amount: 500 }] }));
   if (!crtInv.ok) throw new Error('create invoice failed');

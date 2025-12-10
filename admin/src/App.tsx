@@ -39,6 +39,7 @@ const ReportsCenter = React.lazy(() => import('./pages/ReportsCenter'));
 const TrialSignupPublic = React.lazy(() => import('./pages/TrialSignupPublic'));
 const OnboardingRequests = React.lazy(() => import('./pages/OnboardingRequests'));
 const SuperAdminSchoolManage = React.lazy(() => import('./pages/SuperAdminSchoolManage'));
+const SetPassword = React.lazy(() => import('./pages/SetPassword'));
 
 // School Admin Pages
 const SchoolDashboard = React.lazy(() => import('./pages/SchoolDashboard'));
@@ -89,6 +90,7 @@ const getHomeRouteForUser = (role: UserRole) => {
     case UserRole.SuperAdminSupervisor:
       return '/superadmin';
     case UserRole.SchoolAdmin: return '/school';
+    case UserRole.Staff: return '/staff';
     case UserRole.Teacher: return '/teacher';
     case UserRole.Parent: return '/parent';
     default: return '/';
@@ -166,6 +168,7 @@ const App: React.FC = () => {
           <Route path="/join" element={<TrialSignupPublic />} />
           <Route path="/login" element={<LoginPage mode="default" />} />
           <Route path="/superadmin/login" element={<LoginPage mode="superadmin" />} />
+          <Route path="/set-password" element={<SetPassword />} />
 
           {/* Super Admin Routes */}
           <Route element={<ProtectedRoute allowedRoles={[UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor]} />}>
@@ -199,10 +202,11 @@ const App: React.FC = () => {
             <Route path="/manage/school/:schoolId/*" element={<SchoolAdminLayout isSuperAdminView />} />
           </Route>
 
-          {/* School Admin Routes */}
-          <Route element={<ProtectedRoute allowedRoles={[UserRole.SchoolAdmin]} />}>
+          {/* School Admin & Staff Routes */}
+          <Route element={<ProtectedRoute allowedRoles={[UserRole.SchoolAdmin, UserRole.Staff]} />}> 
             <Route path="/school/subscription-locked" element={<SubscriptionLocked />} />
             <Route path="/school/*" element={<SchoolAdminLayout />} />
+            <Route path="/staff/*" element={<SchoolAdminLayout />} />
           </Route>
           
           {/* Teacher Routes */}

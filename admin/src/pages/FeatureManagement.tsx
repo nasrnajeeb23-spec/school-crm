@@ -51,11 +51,23 @@ const FeatureManagement: React.FC = () => {
         }
     };
 
-    const handlePricePerInvoiceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (pricingConfig) {
-            setPricingConfig({ ...pricingConfig, pricePerInvoice: parseFloat(e.target.value) || 0 });
-        }
-    };
+  const handlePricePerInvoiceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (pricingConfig) {
+          setPricingConfig({ ...pricingConfig, pricePerInvoice: parseFloat(e.target.value) || 0 });
+      }
+  };
+
+  const handlePricePerEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (pricingConfig) {
+          setPricingConfig({ ...pricingConfig, pricePerEmail: parseFloat(e.target.value) || 0 });
+      }
+  };
+
+  const handlePricePerSMSChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (pricingConfig) {
+          setPricingConfig({ ...pricingConfig, pricePerSMS: parseFloat(e.target.value) || 0 });
+      }
+  };
 
     const handleYearlyDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (pricingConfig) {
@@ -72,23 +84,25 @@ const FeatureManagement: React.FC = () => {
     const handleSavePricingConfig = async () => {
         if (!pricingConfig) return;
         setIsSaving(true);
-        try {
-            if (!pricingConfig.currency || !String(pricingConfig.currency).trim()) {
-                addToast('أدخل رمز العملة.', 'error');
-                setIsSaving(false);
-                return;
-            }
-            await api.updatePricingConfig(pricingConfig);
-            await logSuperAdminAction('platform.pricing.update', { 
-                pricePerStudent: pricingConfig.pricePerStudent,
-                pricePerTeacher: pricingConfig.pricePerTeacher,
-                pricePerGBStorage: pricingConfig.pricePerGBStorage,
-                pricePerInvoice: pricingConfig.pricePerInvoice,
-                yearlyDiscountPercent: pricingConfig.yearlyDiscountPercent,
-                currency: pricingConfig.currency,
-            });
-            addToast('تم حفظ إعدادات التسعير بنجاح.', 'success');
-        } catch (error) {
+      try {
+          if (!pricingConfig.currency || !String(pricingConfig.currency).trim()) {
+              addToast('أدخل رمز العملة.', 'error');
+              setIsSaving(false);
+              return;
+          }
+          await api.updatePricingConfig(pricingConfig);
+          await logSuperAdminAction('platform.pricing.update', { 
+              pricePerStudent: pricingConfig.pricePerStudent,
+              pricePerTeacher: pricingConfig.pricePerTeacher,
+              pricePerGBStorage: pricingConfig.pricePerGBStorage,
+              pricePerInvoice: pricingConfig.pricePerInvoice,
+              pricePerEmail: pricingConfig.pricePerEmail,
+              pricePerSMS: pricingConfig.pricePerSMS,
+              yearlyDiscountPercent: pricingConfig.yearlyDiscountPercent,
+              currency: pricingConfig.currency,
+          });
+          addToast('تم حفظ إعدادات التسعير بنجاح.', 'success');
+      } catch (error) {
             const m = String((error as any)?.message || '')
             addToast(m ? `فشل حفظ إعدادات التسعير: ${m}` : 'فشل حفظ إعدادات التسعير.', 'error');
         } finally {
@@ -186,23 +200,47 @@ const FeatureManagement: React.FC = () => {
                                 min={0}
                             />
                         </div>
-                        <div>
-                            <label htmlFor="pricePerInvoice" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل فاتورة</label>
-                            <input
-                                type="number"
-                                id="pricePerInvoice"
-                                value={pricingConfig.pricePerInvoice}
-                                onChange={handlePricePerInvoiceChange}
-                                className={inputStyle}
-                                step="0.01"
-                                min={0}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="yearlyDiscountPercent" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نسبة خصم الاشتراك السنوي (%)</label>
-                            <input
-                                type="number"
-                                id="yearlyDiscountPercent"
+                    <div>
+                        <label htmlFor="pricePerInvoice" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل فاتورة</label>
+                        <input
+                            type="number"
+                            id="pricePerInvoice"
+                            value={pricingConfig.pricePerInvoice}
+                            onChange={handlePricePerInvoiceChange}
+                            className={inputStyle}
+                            step="0.01"
+                            min={0}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="pricePerEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل رسالة بريد</label>
+                        <input
+                            type="number"
+                            id="pricePerEmail"
+                            value={Number(pricingConfig.pricePerEmail || 0)}
+                            onChange={handlePricePerEmailChange}
+                            className={inputStyle}
+                            step="0.001"
+                            min={0}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="pricePerSMS" className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعر لكل رسالة نصية</label>
+                        <input
+                            type="number"
+                            id="pricePerSMS"
+                            value={Number(pricingConfig.pricePerSMS || 0)}
+                            onChange={handlePricePerSMSChange}
+                            className={inputStyle}
+                            step="0.001"
+                            min={0}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="yearlyDiscountPercent" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نسبة خصم الاشتراك السنوي (%)</label>
+                        <input
+                            type="number"
+                            id="yearlyDiscountPercent"
                                 value={Number(pricingConfig.yearlyDiscountPercent || 0)}
                                 onChange={handleYearlyDiscountChange}
                                 className={inputStyle}

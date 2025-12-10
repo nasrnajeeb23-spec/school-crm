@@ -28,6 +28,7 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
     const [distributionData, setDistributionData] = useState<DistributionData[]>([]);
     const [loading, setLoading] = useState(true);
     const [attendancePercent, setAttendancePercent] = useState<string>('—%');
+    const [commUsage, setCommUsage] = useState<{ email: { count: number; amount: number }; sms: { count: number; amount: number }; total: number; currency: string } | null>(null);
     const navigate = useNavigate();
     const { addToast } = useToast();
 
@@ -56,6 +57,12 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
                 }
                 const pct = total > 0 ? Math.round((present / total) * 100) : 0;
                 setAttendancePercent(`${pct}%`);
+                try {
+                  const cu = await api.getSchoolCommunicationsUsage(school.id);
+                  setCommUsage(cu);
+                } catch (e) {
+                  setCommUsage(null);
+                }
             } catch (error) {
                 console.error("Failed to fetch dashboard data:", error);
                 addToast("فشل تحميل بيانات لوحة التحكم.", 'error');
@@ -129,6 +136,36 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <UpcomingEvents navigateTo={(view) => navigate(view)} schoolId={school.id} />
                 <StudentDistributionChart data={distributionData} />
+            </div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">استخدام الاتصالات</h3>
+              {commUsage ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</span>
+                      <span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.email.count} رسالة</span>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {commUsage.email.amount.toFixed(2)} {commUsage.currency}</div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">الرسائل النصية</span>
+                      <span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.sms.count} رسالة</span>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {commUsage.sms.amount.toFixed(2)} {commUsage.currency}</div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">الإجمالي</span>
+                      <span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.total.toFixed(2)} {commUsage.currency}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">يتم احتساب الرسائل عبر مزود المنصة فقط</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-600 dark:text-gray-300">لا توجد بيانات استخدام الاتصالات حالياً.</div>
+              )}
             </div>
         </div>
     );

@@ -143,6 +143,20 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = isSidebarOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSidebarOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSidebarOpen]);
+
   const getHeaderTitle = () => {
     const pathParts = location.pathname.split('/');
     const currentView = pathParts[pathParts.length - 1];

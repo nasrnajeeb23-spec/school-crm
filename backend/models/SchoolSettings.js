@@ -76,6 +76,14 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON, // { email: bool, sms: bool, push: bool }
     allowNull: false,
   },
+  emailConfig: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+  smsConfig: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   workingDays: {
     type: DataTypes.JSON,
     allowNull: true,
@@ -126,6 +134,10 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
   },
   scheduleConfig: {
     type: DataTypes.JSON,
+    allowNull: true,
+  },
+  classTemplates: {
+    type: DataTypes.JSON, // { defaultSections?: string[], byStage?: [{ stage, grades?: string[], sections?: string[] }] }
     allowNull: true,
   },
   // schoolId FK is added via association

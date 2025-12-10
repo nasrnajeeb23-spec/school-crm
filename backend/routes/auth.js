@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, School, Plan, Subscription, SchoolSettings, Parent } = require('../models');
+const { User, School, Plan, Subscription, SchoolSettings, Parent, Teacher } = require('../models');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -40,10 +40,9 @@ router.post('/login', validate([
       return res.status(401).json({ msg: 'Invalid credentials' });
     }
     const stored = String(user.password || '');
-    const isBcrypt = /^\$2[aby]\$/.test(stored);
     let ok = false;
     try {
-      ok = isBcrypt ? await bcrypt.compare(password, stored) : (process.env.NODE_ENV !== 'production' && stored === password);
+      ok = await bcrypt.compare(password, stored);
     } catch { ok = false; }
     if (!ok) {
       return res.status(401).json({ msg: 'Invalid credentials' });
@@ -215,6 +214,34 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+// Set password via invite token
+router.post('/invite/set-password', validate([
+  { name: 'token', required: true, type: 'string' },
+  { name: 'newPassword', required: true, type: 'string' }
+]), async (req, res) => {
+  try {
+    const { token, newPassword } = req.body || {};
+    let payload;
+    try { payload = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ msg: 'Invalid or expired token' }); }
+    if (String(payload.type || '') !== 'invite') return res.status(401).json({ msg: 'Invalid token type' });
+    const user = await User.findByPk(Number(payload.id));
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    const ptv = Number(payload.tokenVersion || 0);
+    const utv = Number(user.tokenVersion || 0);
+    if (ptv !== utv) return res.status(401).json({ msg: 'Token revoked' });
+    if (!isStrongPassword(newPassword)) return res.status(400).json({ msg: 'Weak password' });
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.passwordMustChange = false;
+    user.lastPasswordChangeAt = new Date();
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+    return res.json({ msg: 'Password set successfully' });
+  } catch (e) {
+    console.error(e.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
 router.post('/mfa/enroll', verifyToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
@@ -244,8 +271,9 @@ router.post('/mfa/verify', verifyToken, validate([{ name: 'token', required: tru
   }
 });
 
-router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), validate([
+router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
   { name: 'parentId', required: true, type: 'string' },
+  { name: 'channel', required: false, type: 'string' }
 ]), async (req, res) => {
   try {
     const pid = Number(req.body.parentId);
@@ -255,11 +283,12 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(parent.schoolId || 0)) {
       return res.status(403).json({ msg: 'Access denied' });
     }
+    const channel = String(req.body.channel || 'email').toLowerCase();
     let user = await User.findOne({ where: { parentId: parent.id } });
     if (!user) {
-      const rawPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
-      const hashed = await bcrypt.hash(rawPassword, 10);
-      user = await User.create({ email: parent.email, username: parent.email, password: hashed, name: parent.name, role: 'Parent', schoolId: parent.schoolId, parentId: parent.id, passwordMustChange: true });
+      const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
+      const hashed = await bcrypt.hash(placeholder, 10);
+      user = await User.create({ email: parent.email, username: parent.email, password: hashed, name: parent.name, role: 'Parent', schoolId: parent.schoolId, parentId: parent.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
     } else {
       user.email = parent.email;
       user.username = parent.email;
@@ -269,11 +298,150 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
       user.parentId = parent.id;
       user.isActive = true;
       user.passwordMustChange = true;
+      user.tokenVersion = Number(user.tokenVersion || 0) + 1;
+      user.lastPasswordChangeAt = new Date();
       await user.save();
     }
     parent.status = 'Invited';
     await parent.save();
-    return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id) });
+
+    const inviteToken = jwt.sign({ id: user.id, type: 'invite', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    if (channel === 'email') {
+      try {
+        const EmailService = require('../services/EmailService');
+        await EmailService.sendActivationInvite(parent.email, parent.name, 'Parent', activationLink, '', parent.schoolId);
+        return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: true, channel: 'email', activationLink });
+      } catch (e) {
+        return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'email' });
+      }
+    }
+    if (channel === 'sms') {
+      try {
+        const SmsService = require('../services/SmsService');
+        const ok = await SmsService.sendActivationInvite(parent.phone, parent.name, 'Parent', activationLink, '', parent.schoolId);
+        return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: !!ok, channel: 'sms', activationLink });
+      } catch (e) {
+        return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'sms' });
+      }
+    }
+    return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'manual', activationLink });
+  } catch (e) {
+    console.error(e.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+  { name: 'teacherId', required: true, type: 'string' },
+  { name: 'channel', required: false, type: 'string' }
+]), async (req, res) => {
+  try {
+    const tid = Number(req.body.teacherId);
+    if (!tid) return res.status(400).json({ msg: 'Invalid teacherId' });
+    const teacher = await Teacher.findByPk(tid);
+    if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(teacher.schoolId || 0)) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+    const channel = String(req.body.channel || 'email').toLowerCase();
+    const e = String(teacher.email || teacher.username || '').trim().toLowerCase();
+    let tUser = await User.findOne({ where: { teacherId: teacher.id } });
+    if (!tUser) {
+      const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
+      const hashed = await bcrypt.hash(placeholder, 10);
+      tUser = await User.create({ email: e || null, username: e || null, password: hashed, name: teacher.name, role: 'Teacher', schoolId: teacher.schoolId, teacherId: teacher.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
+    } else {
+      if (e) { tUser.email = e; tUser.username = e; }
+      tUser.name = teacher.name;
+      tUser.role = 'Teacher';
+      tUser.schoolId = teacher.schoolId;
+      tUser.teacherId = teacher.id;
+      tUser.isActive = true;
+      tUser.passwordMustChange = true;
+      tUser.tokenVersion = Number(tUser.tokenVersion || 0) + 1;
+      tUser.lastPasswordChangeAt = new Date();
+      await tUser.save();
+    }
+    const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    if (channel === 'email') {
+      try {
+        const EmailService = require('../services/EmailService');
+        await EmailService.sendActivationInvite(e, teacher.name, 'Teacher', activationLink, '', teacher.schoolId);
+        return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: true, channel: 'email', activationLink });
+      } catch (e2) {
+        return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'email' });
+      }
+    }
+    if (channel === 'sms') {
+      try {
+        const SmsService = require('../services/SmsService');
+        const ok = await SmsService.sendActivationInvite(teacher.phone, teacher.name, 'Teacher', activationLink, '', teacher.schoolId);
+        return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: !!ok, channel: 'sms', activationLink });
+      } catch (e) {
+        return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'sms' });
+      }
+    }
+    return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'manual', activationLink });
+  } catch (e) {
+    console.error(e.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+  { name: 'userId', required: true, type: 'string' },
+  { name: 'channel', required: false, type: 'string' }
+]), async (req, res) => {
+  try {
+    const uid = Number(req.body.userId);
+    if (!uid) return res.status(400).json({ msg: 'Invalid userId' });
+    let staff = await User.findByPk(uid);
+    if (!staff) return res.status(404).json({ msg: 'Staff not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(staff.schoolId || 0)) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+    if (String(staff.role || '').toUpperCase() !== 'STAFF' && String(staff.role || '').toUpperCase() !== 'SCHOOLADMIN') {
+      return res.status(400).json({ msg: 'Not a staff user' });
+    }
+    const channel = String(req.body.channel || 'email').toLowerCase();
+    const e = String(staff.email || staff.username || '').trim().toLowerCase();
+    if (!staff.password || staff.passwordMustChange === undefined) {
+      const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
+      const hashed = await bcrypt.hash(placeholder, 10);
+      staff.password = hashed;
+    }
+    staff.passwordMustChange = true;
+    staff.isActive = true;
+    staff.tokenVersion = Number(staff.tokenVersion || 0) + 1;
+    staff.lastPasswordChangeAt = new Date();
+    await staff.save();
+
+    const inviteToken = jwt.sign({ id: staff.id, type: 'invite', tokenVersion: staff.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    if (channel === 'email') {
+      try {
+        const EmailService = require('../services/EmailService');
+        await EmailService.sendActivationInvite(e, staff.name, 'Staff', activationLink, '', staff.schoolId);
+        return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: true, channel: 'email', activationLink });
+      } catch (e2) {
+        return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: false, channel: 'email' });
+      }
+    }
+    if (channel === 'sms') {
+      try {
+        const SmsService = require('../services/SmsService');
+        const ok = await SmsService.sendActivationInvite(staff.phone, staff.name, 'Staff', activationLink, '', staff.schoolId);
+        return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: !!ok, channel: 'sms', activationLink });
+      } catch (e3) {
+        return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: false, channel: 'sms' });
+      }
+    }
+    return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: false, channel: 'manual', activationLink });
   } catch (e) {
     console.error(e.message);
     res.status(500).json({ msg: 'Server Error' });

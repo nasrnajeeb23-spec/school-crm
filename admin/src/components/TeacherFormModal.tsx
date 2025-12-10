@@ -13,6 +13,7 @@ const TeacherFormModal: React.FC<TeacherFormModalProps> = ({ onClose, onSave }) 
     phone: '',
     department: '',
     bankAccount: '',
+    email: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof NewTeacherData, string>>>({});
@@ -30,6 +31,9 @@ const TeacherFormModal: React.FC<TeacherFormModalProps> = ({ onClose, onSave }) 
         newErrors.phone = "رقم الهاتف مطلوب.";
     } else if (!/^\d+$/.test(teacherData.phone)) {
         newErrors.phone = "رقم الهاتف يجب أن يحتوي على أرقام فقط.";
+    }
+    if (teacherData.email && !/^\S+@\S+\.\S+$/.test(teacherData.email)) {
+      newErrors.email = "بريد إلكتروني صحيح مطلوب.";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -73,6 +77,11 @@ const TeacherFormModal: React.FC<TeacherFormModalProps> = ({ onClose, onSave }) 
               <input type="tel" name="phone" id="phone" value={teacherData.phone} onChange={handleChange} required className={inputStyle} />
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
             </div>
+          </div>
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني للمعلم (للدخول)</label>
+            <input type="email" name="email" id="email" value={teacherData.email || ''} onChange={handleChange} className={inputStyle} />
+            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

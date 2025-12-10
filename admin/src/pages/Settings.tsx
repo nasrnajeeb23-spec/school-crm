@@ -1207,6 +1207,48 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label htmlFor="geoLocation" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الموقع الجغرافي</label>
                     <input type="text" name="geoLocation" id="geoLocation" value={settings.geoLocation || ''} onChange={handleInputChange} className={inputStyle} />
                 </div>
+                <div className="mt-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <h3 className="text-md font-semibold mb-3 text-gray-800 dark:text-white">إعدادات الاتصالات</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3 border border-gray-200 dark:border-gray-700 rounded">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm">البريد الإلكتروني</span>
+                        <label className="inline-flex items-center cursor-pointer">
+                          <span className="mr-2 text-xs">استخدام مزود المنصة</span>
+                          <input type="checkbox" checked={!!settings.emailConfig?.usePlatformProvider} onChange={(e)=>setSettings(prev=>prev?{...prev,emailConfig:{...(prev.emailConfig||{}),usePlatformProvider:e.target.checked}}:null)} />
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        <input type="text" placeholder="SMTP Host" value={settings.emailConfig?.host||''} onChange={(e)=>setSettings(prev=>prev?{...prev,emailConfig:{...(prev.emailConfig||{}),host:e.target.value}}:null)} className={inputStyle} disabled={!!settings.emailConfig?.usePlatformProvider} />
+                        <input type="number" placeholder="SMTP Port" value={settings.emailConfig?.port||'' as any} onChange={(e)=>setSettings(prev=>prev?{...prev,emailConfig:{...(prev.emailConfig||{}),port:Number(e.target.value)}}:null)} className={inputStyle} disabled={!!settings.emailConfig?.usePlatformProvider} />
+                        <label className="inline-flex items-center">
+                          <input type="checkbox" checked={!!settings.emailConfig?.secure} onChange={(e)=>setSettings(prev=>prev?{...prev,emailConfig:{...(prev.emailConfig||{}),secure:e.target.checked}}:null)} disabled={!!settings.emailConfig?.usePlatformProvider} />
+                          <span className="ml-2 text-sm">اتصال آمن (SSL)</span>
+                        </label>
+                        <input type="text" placeholder="SMTP User" value={settings.emailConfig?.user||''} onChange={(e)=>setSettings(prev=>prev?{...prev,emailConfig:{...(prev.emailConfig||{}),user:e.target.value}}:null)} className={inputStyle} disabled={!!settings.emailConfig?.usePlatformProvider} />
+                        <input type="password" placeholder="SMTP Password" value={settings.emailConfig?.pass||''} onChange={(e)=>setSettings(prev=>prev?{...prev,emailConfig:{...(prev.emailConfig||{}),pass:e.target.value}}:null)} className={inputStyle} disabled={!!settings.emailConfig?.usePlatformProvider} />
+                        <input type="text" placeholder="From Address" value={settings.emailConfig?.from||''} onChange={(e)=>setSettings(prev=>prev?{...prev,emailConfig:{...(prev.emailConfig||{}),from:e.target.value}}:null)} className={inputStyle} disabled={!!settings.emailConfig?.usePlatformProvider} />
+                      </div>
+                    </div>
+                    <div className="p-3 border border-gray-200 dark:border-gray-700 rounded">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm">الرسائل النصية</span>
+                        <label className="inline-flex items-center cursor-pointer">
+                          <span className="mr-2 text-xs">استخدام مزود المنصة</span>
+                          <input type="checkbox" checked={!!settings.smsConfig?.usePlatformProvider} onChange={(e)=>setSettings(prev=>prev?{...prev,smsConfig:{...(prev.smsConfig||{}),usePlatformProvider:e.target.checked}}:null)} />
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        <select value={settings.smsConfig?.provider||'twilio'} onChange={(e)=>setSettings(prev=>prev?{...prev,smsConfig:{...(prev.smsConfig||{}),provider:e.target.value}}:null)} className={inputStyle} disabled={!!settings.smsConfig?.usePlatformProvider}>
+                          <option value="twilio">Twilio</option>
+                        </select>
+                        <input type="text" placeholder="Account SID" value={settings.smsConfig?.accountSid||''} onChange={(e)=>setSettings(prev=>prev?{...prev,smsConfig:{...(prev.smsConfig||{}),accountSid:e.target.value}}:null)} className={inputStyle} disabled={!!settings.smsConfig?.usePlatformProvider} />
+                        <input type="text" placeholder="Auth Token" value={settings.smsConfig?.authToken||''} onChange={(e)=>setSettings(prev=>prev?{...prev,smsConfig:{...(prev.smsConfig||{}),authToken:e.target.value}}:null)} className={inputStyle} disabled={!!settings.smsConfig?.usePlatformProvider} />
+                        <input type="text" placeholder="From Number" value={settings.smsConfig?.from||''} onChange={(e)=>setSettings(prev=>prev?{...prev,smsConfig:{...(prev.smsConfig||{}),from:e.target.value}}:null)} className={inputStyle} disabled={!!settings.smsConfig?.usePlatformProvider} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div>
                     <label htmlFor="genderType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">نوع المدرسة (بنين/بنات/مختلط)</label>
                     <select name="genderType" id="genderType" value={settings.genderType || ''} onChange={(e) => setSettings(prev => prev ? { ...prev, genderType: e.target.value } : null)} className={inputStyle}>

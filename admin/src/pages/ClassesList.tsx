@@ -41,6 +41,8 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
   const [promotionThreshold, setPromotionThreshold] = useState<number>(50);
   const [rolloverComputing, setRolloverComputing] = useState(false);
   const [rolloverPreview, setRolloverPreview] = useState<any[]>([]);
+  const [isInitPreviewOpen, setIsInitPreviewOpen] = useState(false);
+  const [initPreview, setInitPreview] = useState<{ missingCount: number; existingCount: number; preview: { gradeLevel: string; section: string; capacity: number }[] } | null>(null);
   const stageGradeMap: Record<string, string[]> = {
     'رياض أطفال': ['رياض أطفال'],
     'ابتدائي': ['الصف الأول','الصف الثاني','الصف الثالث','الصف الرابع','الصف الخامس','الصف السادس'],
@@ -70,13 +72,23 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
     });
   };
 
-  const handleInitStructure = async () => {
+  const openInitPreview = async () => {
+    try {
+      const data = await api.getDefaultClassesPreview(schoolId);
+      setInitPreview(data);
+      setIsInitPreviewOpen(true);
+    } catch {
+      addToast('فشل تحميل المعاينة.', 'error');
+    }
+  };
+  const confirmInitStructure = async () => {
     try {
       const result = await api.initDefaultClasses(schoolId);
       addToast(`تم إنشاء الهيكل الافتراضي (${result.createdCount}).`, 'success');
+      setIsInitPreviewOpen(false);
+      setInitPreview(null);
       fetchClasses();
-    } catch (err) {
-      console.error('Failed to init structure:', err);
+    } catch {
       addToast('فشل إنشاء الهيكل الافتراضي.', 'error');
     }
   };
@@ -280,7 +292,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
       <div className="mt-6 space-y-6">
         <div className="flex justify-between items-center">
           <button 
-            onClick={handleInitStructure}
+            onClick={openInitPreview}
             className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             إنشاء الهيكل الافتراضي
@@ -508,6 +520,37 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <button onClick={() => setIsRolloverOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors">إغلاق</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isInitPreviewOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center modal-fade-in" onClick={() => setIsInitPreviewOpen(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl p-6 m-4 modal-content-scale-up" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">معاينة الهيكل الافتراضي</h2>
+            <div className="space-y-4">
+              {!initPreview ? (
+                <div className="text-gray-600 dark:text-gray-300">لا توجد بيانات.</div>
+              ) : initPreview.preview.length === 0 ? (
+                <div className="text-gray-600 dark:text-gray-300">لا توجد فصول ناقصة للإضافة.</div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto space-y-2">
+                  {initPreview.preview.map((row, idx) => (
+                    <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex justify-between">
+                      <div className="text-sm text-gray-800 dark:text-white">{row.gradeLevel} ({row.section})</div>
+                      <div className="text-sm text-gray-700 dark:text-gray-300">السعة: {row.capacity}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-between text-sm text-gray-700 dark:text-gray-300">
+                <div>سيتم إنشاء: {initPreview?.missingCount ?? 0}</div>
+                <div>الموجود مسبقًا: {initPreview?.existingCount ?? 0}</div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <button onClick={() => setIsInitPreviewOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors">إلغاء</button>
+                <button onClick={confirmInitStructure} disabled={!initPreview || initPreview.preview.length === 0} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">تأكيد الإنشاء</button>
               </div>
             </div>
           </div>

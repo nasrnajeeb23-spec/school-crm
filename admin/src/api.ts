@@ -141,11 +141,11 @@ export const login = async (emailOrUsername: string, password: string, schoolId?
     if (typeof window !== 'undefined' && token) {
         localStorage.setItem('auth_token', token);
     }
-    const mapRole = (r: string) => {
-        const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-        const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
-        return m[key] || key;
-    };
+  const mapRole = (r: string) => {
+      const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+      const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
+      return m[key] || key;
+  };
     return { ...user, role: mapRole(user.role) } as User;
 };
 
@@ -155,14 +155,14 @@ export const logout = async (): Promise<void> => {
 
 export const getCurrentUser = async (): Promise<User> => {
     const user = await apiCall('/auth/me', { method: 'GET' });
-    if (user && user.role) {
-        const mapRole = (r: string) => {
-            const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-            const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
-            return m[key] || key;
-        };
-        user.role = mapRole(user.role);
-    }
+  if (user && user.role) {
+      const mapRole = (r: string) => {
+          const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+          const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
+          return m[key] || key;
+      };
+      user.role = mapRole(user.role);
+  }
     return user;
 };
 
@@ -337,6 +337,11 @@ export const updateSchoolStaff = async (schoolId: number, userId: number | strin
 
 export const deleteSchoolStaff = async (schoolId: number, userId: number | string): Promise<void> => {
     await apiCall(`/school/${schoolId}/staff/${userId}`, { method: 'DELETE' });
+};
+
+export const inviteStaff = async (userId: string, channel: 'email' | 'sms' | 'manual' = 'email'): Promise<{ activationLink?: string; inviteSent?: boolean; channel?: string; }> => {
+    const res: any = await apiCall('/auth/staff/invite', { method: 'POST', body: JSON.stringify({ userId, channel }) });
+    return { activationLink: res?.activationLink, inviteSent: res?.inviteSent, channel: res?.channel };
 };
 
 // ==================== Payroll APIs ====================
@@ -738,6 +743,10 @@ export const initDefaultClasses = async (schoolId: number): Promise<{ createdCou
     return await apiCall(`/school/${schoolId}/classes/init`, { method: 'POST' });
 };
 
+export const getDefaultClassesPreview = async (schoolId: number): Promise<{ missingCount: number; existingCount: number; preview: { gradeLevel: string; section: string; capacity: number }[] }> => {
+    return await apiCall(`/school/${schoolId}/classes/init/preview`, { method: 'GET' });
+};
+
 export const updateClassDetails = async (schoolId: number, classId: string, data: { name?: string; capacity?: number; homeroomTeacherId?: string | number; section?: string }): Promise<Class> => {
     return await apiCall(`/school/${schoolId}/classes/${classId}/details`, { method: 'PUT', body: JSON.stringify(data) });
 };
@@ -754,8 +763,14 @@ export const upsertSchoolParent = async (schoolId: number, data: NewParentData):
     return await apiCall(`/school/${schoolId}/parents`, { method: 'POST', body: JSON.stringify(data) });
 };
 
-export const inviteParent = async (parentId: string): Promise<void> => {
-    await apiCall('/auth/parent/invite', { method: 'POST', body: JSON.stringify({ parentId }) });
+export const inviteParent = async (parentId: string, channel: 'email' | 'sms' | 'manual' = 'email'): Promise<{ activationLink?: string }> => {
+    const res: any = await apiCall('/auth/parent/invite', { method: 'POST', body: JSON.stringify({ parentId, channel }) });
+    return { activationLink: res?.activationLink };
+};
+
+export const inviteTeacher = async (teacherId: string, channel: 'email' | 'sms' | 'manual' = 'email'): Promise<{ activationLink?: string }> => {
+    const res: any = await apiCall('/auth/teacher/invite', { method: 'POST', body: JSON.stringify({ teacherId, channel }) });
+    return { activationLink: res?.activationLink };
 };
 
 export const getSchoolEvents = async (schoolId: number): Promise<SchoolEvent[]> => {
@@ -1214,6 +1229,19 @@ export const getStorageUsage = async (schoolId: number): Promise<number> => {
     return Number(data?.storageGB || 0);
 };
 
+export const getSchoolCommunicationsUsage = async (
+    schoolId: number,
+    params?: { startDate?: string; endDate?: string; groupBy?: 'day' | 'month'; channel?: 'email' | 'sms' | 'all' }
+): Promise<{ email: { count: number; amount: number }; sms: { count: number; amount: number }; total: number; currency: string; breakdown?: Array<{ period: string; email: { count: number; amount: number }; sms: { count: number; amount: number }; total: number }> }> => {
+    const qs: string[] = [];
+    if (params?.startDate) qs.push(`startDate=${encodeURIComponent(params.startDate)}`);
+    if (params?.endDate) qs.push(`endDate=${encodeURIComponent(params.endDate)}`);
+    if (params?.groupBy) qs.push(`groupBy=${encodeURIComponent(params.groupBy)}`);
+    if (params?.channel) qs.push(`channel=${encodeURIComponent(params.channel)}`);
+    const suffix = qs.length ? `?${qs.join('&')}` : '';
+    return await apiCall(`/school/${schoolId}/communications/usage${suffix}`, { method: 'GET' });
+};
+
 export const getUsageQuote = async (schoolId: number, storageGB?: number): Promise<{ items: Array<{ key: string; qty: number; unitPrice: number; amount: number }>; total: number; currency: string; period: string }> => {
     const payload: any = {};
     if (typeof storageGB === 'number') payload.storageGB = storageGB;
@@ -1405,8 +1433,10 @@ export default {
     addSchoolStaff,
     updateSchoolStaff,
     deleteSchoolStaff,
+    inviteStaff,
     getInvoices,
     getSchoolInvoices,
+    getSchoolCommunicationsUsage,
     getStudentStatement,
     sendInvoiceReminder,
     addInvoice,

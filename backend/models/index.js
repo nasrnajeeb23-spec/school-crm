@@ -40,6 +40,7 @@ const SchoolStats = require('./SchoolStats');
 const Assignment = require('./Assignment');
 const Submission = require('./Submission');
 const SubscriptionModule = require('./SubscriptionModule');
+const CommunicationUsage = require('./CommunicationUsage');
 
 
 // Define associations
@@ -189,6 +190,8 @@ Conversation.belongsTo(Parent, { foreignKey: 'parentId', onDelete: 'SET NULL' })
 School.hasMany(Conversation, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 Conversation.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
+School.hasMany(CommunicationUsage, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+CommunicationUsage.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 const db = {
   sequelize,
@@ -233,6 +236,7 @@ const db = {
   Assignment,
   Submission,
   SubscriptionModule,
+  CommunicationUsage,
 };
 
 module.exports = db;

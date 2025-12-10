@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { School, Student, Teacher, Class, Parent, Invoice, Expense, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord } = require('../models');
-const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
+const { verifyToken, requireRole, requireSameSchoolParam, requirePermission, JWT_SECRET } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { SalaryStructure, SalarySlip } = require('../models');
@@ -393,7 +394,7 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         status: statusMap[newStudent.status] || newStudent.status
     };
 
-    return res.success(formattedStudent, 'Student created', 'CREATED');
+    return res.status(201).json(formattedStudent);
   } catch (err) {
     console.error(err.message);
     return res.error(500, 'SERVER_ERROR', 'Server Error');
@@ -747,16 +748,17 @@ router.get('/:schoolId/payroll/receipts/:filename', verifyToken, requireRole('SC
 // @route   POST api/school/:schoolId/teachers
 // @desc    Add a new teacher to a school
 // @access  Private (SchoolAdmin)
-router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireWithinLimits('teachers'), validate([
+router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requireSameSchoolParam('schoolId'), requireWithinLimits('teachers'), validate([
   { name: 'name', required: true, type: 'string', minLength: 2 },
   { name: 'subject', required: true, type: 'string' },
   { name: 'phone', required: true, type: 'string' },
   { name: 'department', required: false, type: 'string' },
   { name: 'bankAccount', required: false, type: 'string' },
+  { name: 'email', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
     const { schoolId } = req.params;
-    const { name, subject, phone, department, bankAccount } = req.body;
+    const { name, subject, phone, department, bankAccount, email } = req.body;
 
     const school = await School.findByPk(req.user.schoolId);
     if (!school) return res.status(404).json({ msg: 'School not found' });
@@ -819,6 +821,38 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         ...newTeacher.toJSON(),
         status: statusMap[newTeacher.status] || newTeacher.status
     };
+
+    try {
+      const e = String(email || '').trim().toLowerCase();
+      if (e) {
+        const { User } = require('../models');
+        const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
+        const hashed = await bcrypt.hash(placeholder, 10);
+        let tUser = await User.findOne({ where: { email: e } });
+        if (!tUser) {
+          tUser = await User.create({ email: e, username: e, password: hashed, name, role: 'Teacher', schoolId: parseInt(schoolId), teacherId: newTeacher.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
+        } else {
+          tUser.email = e;
+          tUser.username = e;
+          tUser.name = name;
+          tUser.role = 'Teacher';
+          tUser.schoolId = parseInt(schoolId);
+          tUser.teacherId = newTeacher.id;
+          tUser.passwordMustChange = true;
+          tUser.isActive = true;
+          tUser.tokenVersion = Number(tUser.tokenVersion || 0) + 1;
+          tUser.lastPasswordChangeAt = new Date();
+          await tUser.save();
+        }
+        try {
+          const EmailService = require('../services/EmailService');
+          const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+          const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+          const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+          await EmailService.sendActivationInvite(e, name, 'Teacher', activationLink, school.name || '', parseInt(schoolId));
+        } catch {}
+      }
+    } catch {}
 
     res.status(201).json(formattedTeacher);
   } catch (err) {
@@ -916,27 +950,74 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.post('/:schoolId/classes/init', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/classes/init/preview', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
     const settings = await SchoolSettings.findOne({ where: { schoolId } });
-    const stages = (settings && Array.isArray(settings.availableStages) && settings.availableStages.length > 0) ? settings.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
-    const map = {
+    const stages = Array.isArray(settings?.availableStages) && settings.availableStages.length > 0 ? settings.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
+    const defaultMap = {
       "رياض أطفال": ["رياض أطفال"],
       "ابتدائي": ["الصف الأول","الصف الثاني","الصف الثالث","الصف الرابع","الصف الخامس","الصف السادس"],
       "إعدادي": ["أول إعدادي","ثاني إعدادي","ثالث إعدادي"],
       "ثانوي": ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
     };
-    const created = [];
+    const tpl = settings?.classTemplates || null;
+    const defSections = Array.isArray(tpl?.defaultSections) && tpl.defaultSections.length > 0 ? tpl.defaultSections : ['أ'];
+    const byStage = Array.isArray(tpl?.byStage) ? tpl.byStage : [];
+    const byStageMap = new Map(byStage.map(r => [String(r.stage), r]));
+    const candidates = [];
     for (const stage of stages) {
-      const grades = map[stage] || [];
+      const row = byStageMap.get(String(stage)) || null;
+      const grades = row && Array.isArray(row.grades) && row.grades.length > 0 ? row.grades : (defaultMap[stage] || []);
+      const sections = row && Array.isArray(row.sections) && row.sections.length > 0 ? row.sections : defSections;
       for (const g of grades) {
-        const exists = await Class.findOne({ where: { schoolId, gradeLevel: g } });
-        if (!exists) {
-          const cls = await Class.create({ id: `cls_${Date.now()}_${Math.floor(Math.random()*1000)}`, name: g, section: 'أ', gradeLevel: g, homeroomTeacherName: 'غير محدد', studentCount: 0, capacity: 30, schoolId, homeroomTeacherId: null });
-          created.push(cls.toJSON());
+        for (const s of sections) {
+          candidates.push({ gradeLevel: g, section: s, capacity: 30 });
         }
       }
+    }
+    const existing = await Class.findAll({ where: { schoolId }, attributes: ['gradeLevel','section'] });
+    const existSet = new Set(existing.map(e => `${e.gradeLevel}|${e.section || 'أ'}`));
+    const toCreate = candidates.filter(c => !existSet.has(`${c.gradeLevel}|${c.section}`));
+    res.json({ missingCount: toCreate.length, existingCount: candidates.length - toCreate.length, preview: toCreate });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:schoolId/classes/init', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const settings = await SchoolSettings.findOne({ where: { schoolId } });
+    const stages = Array.isArray(settings?.availableStages) && settings.availableStages.length > 0 ? settings.availableStages : ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
+    const defaultMap = {
+      "رياض أطفال": ["رياض أطفال"],
+      "ابتدائي": ["الصف الأول","الصف الثاني","الصف الثالث","الصف الرابع","الصف الخامس","الصف السادس"],
+      "إعدادي": ["أول إعدادي","ثاني إعدادي","ثالث إعدادي"],
+      "ثانوي": ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
+    };
+    const tpl = settings?.classTemplates || null;
+    const defSections = Array.isArray(tpl?.defaultSections) && tpl.defaultSections.length > 0 ? tpl.defaultSections : ['أ'];
+    const byStage = Array.isArray(tpl?.byStage) ? tpl.byStage : [];
+    const byStageMap = new Map(byStage.map(r => [String(r.stage), r]));
+    const candidates = [];
+    for (const stage of stages) {
+      const row = byStageMap.get(String(stage)) || null;
+      const grades = row && Array.isArray(row.grades) && row.grades.length > 0 ? row.grades : (defaultMap[stage] || []);
+      const sections = row && Array.isArray(row.sections) && row.sections.length > 0 ? row.sections : defSections;
+      for (const g of grades) {
+        for (const s of sections) {
+          candidates.push({ gradeLevel: g, section: s, capacity: 30 });
+        }
+      }
+    }
+    const existing = await Class.findAll({ where: { schoolId }, attributes: ['gradeLevel','section'] });
+    const existSet = new Set(existing.map(e => `${e.gradeLevel}|${e.section || 'أ'}`));
+    const toCreate = candidates.filter(c => !existSet.has(`${c.gradeLevel}|${c.section}`));
+    const { randomUUID } = require('crypto');
+    const created = [];
+    for (const c of toCreate) {
+      const id = typeof randomUUID === 'function' ? randomUUID() : `cls_${Date.now()}_${Math.floor(Math.random()*1000000)}`;
+      const cls = await Class.create({ id, name: c.gradeLevel, section: c.section, gradeLevel: c.gradeLevel, homeroomTeacherName: 'غير محدد', studentCount: 0, capacity: c.capacity || 30, schoolId, homeroomTeacherId: null });
+      created.push(cls.toJSON());
     }
     res.status(201).json({ createdCount: created.length, created });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
@@ -1330,7 +1411,7 @@ router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 
 // @route   GET api/school/:schoolId/parents
 // @desc    Get all parents for a specific school
 // @access  Private (SchoolAdmin)
-router.get('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'STAFF'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const parents = await Parent.findAll({ 
         where: { schoolId: req.params.schoolId },
@@ -1565,7 +1646,8 @@ router.post('/:schoolId/invoices/:invoiceId/payments', verifyToken, requireRole(
                     amount,
                     '$', 
                     `PAY-${payment.id}`,
-                    paymentDate
+                    paymentDate,
+                    Number(req.params.schoolId)
                 );
             }
         }
@@ -1626,7 +1708,8 @@ router.post('/:schoolId/invoices/:invoiceId/remind', verifyToken, requireRole('S
             student.Parent.email,
             student.name,
             `${inv.remainingAmount || inv.amount} $`,
-            inv.dueDate.toISOString().split('T')[0]
+            inv.dueDate.toISOString().split('T')[0],
+            Number(req.params.schoolId)
         );
     } else {
         // If no email, at least we sent the internal notification
@@ -1848,6 +1931,8 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         academicYearStart: start,
         academicYearEnd: end,
         notifications: { email: true, sms: false, push: true },
+        emailConfig: { usePlatformProvider: true },
+        smsConfig: { usePlatformProvider: true },
         availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
         scheduleConfig: { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
       });
@@ -1866,6 +1951,7 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         holidays: Array.isArray(obj.holidays) ? obj.holidays : [],
         admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : (obj.admissionForm || { studentFields: ['الاسم الكامل','تاريخ الميلاد','الجنس','الرقم الوطني','العنوان','المدينة'], parentFields: ['الاسم','هاتف الاتصال','بريد الإلكتروني'], requiredDocuments: [], registrationFee: 0, consentFormRequired: false, consentFormText: '', autoGenerateRegistrationInvoice: true, registrationFeeDueDays: 7 }),
         scheduleConfig: obj.scheduleConfig && typeof obj.scheduleConfig === 'object' ? obj.scheduleConfig : { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
+        classTemplates: obj.classTemplates && typeof obj.classTemplates === 'object' ? obj.classTemplates : null,
     });
   } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
@@ -1878,7 +1964,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const { 
       schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
       genderType, levelType, ownershipType, availableStages, workingHoursStart, workingHoursEnd, workingDays,
-      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays, admissionForm, scheduleConfig
+      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays, admissionForm, scheduleConfig, classTemplates
     } = req.body;
     const emailStr = String(contactEmail || '').trim();
     const phoneStr = String(contactPhone || '').trim();
@@ -1911,6 +1997,8 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     settings.academicYearStart = academicYearStart;
     settings.academicYearEnd = academicYearEnd;
     settings.notifications = notifications;
+    if (req.body.emailConfig !== undefined) settings.emailConfig = req.body.emailConfig;
+    if (req.body.smsConfig !== undefined) settings.smsConfig = req.body.smsConfig;
     settings.lessonStartTime = lessonStartTime || settings.lessonStartTime;
     settings.lateThresholdMinutes = typeof lateThresholdMinutes === 'number' ? lateThresholdMinutes : settings.lateThresholdMinutes;
     settings.departureTime = departureTime || settings.departureTime;
@@ -1959,6 +2047,20 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       }
       settings.scheduleConfig = { periodCount: pc, periodDurationMinutes: pd, startTime: stStr || (settings.scheduleConfig?.startTime || '08:00'), gapMinutes: gap, ...(templates ? { templates } : {}) };
     }
+    if (classTemplates !== undefined) {
+      const ct = typeof classTemplates === 'string' ? JSON.parse(classTemplates) : classTemplates;
+      const defSecs = Array.isArray(ct?.defaultSections) ? ct.defaultSections.filter(s => typeof s === 'string' && s.trim().length > 0).map(s => s.trim()) : null;
+      const byStage = Array.isArray(ct?.byStage) ? ct.byStage : [];
+      const nextByStage = [];
+      for (const row of byStage) {
+        const stage = String(row?.stage || '').trim();
+        const grades = Array.isArray(row?.grades) ? row.grades.filter(g => typeof g === 'string' && g.trim().length > 0).map(g => g.trim()) : undefined;
+        const sections = Array.isArray(row?.sections) ? row.sections.filter(s => typeof s === 'string' && s.trim().length > 0).map(s => s.trim()) : undefined;
+        if (!stage) continue;
+        nextByStage.push({ stage, ...(grades ? { grades } : {}), ...(sections ? { sections } : {}) });
+      }
+      settings.classTemplates = { ...(defSecs ? { defaultSections: defSecs } : {}), ...(nextByStage.length > 0 ? { byStage: nextByStage } : {}) };
+    }
     
     await settings.save();
     const obj = settings.toJSON();
@@ -1972,6 +2074,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       holidays: Array.isArray(obj.holidays) ? obj.holidays : obj.holidays,
       admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : obj.admissionForm,
       scheduleConfig: obj.scheduleConfig && typeof obj.scheduleConfig === 'object' ? obj.scheduleConfig : { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
+      classTemplates: obj.classTemplates && typeof obj.classTemplates === 'object' ? obj.classTemplates : null,
     });
   } catch (err) { console.error('Error in PUT settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
@@ -2673,6 +2776,51 @@ router.get('/:schoolId/storage/usage', verifyToken, requireRole('SCHOOL_ADMIN', 
   } catch (e) { console.error(e?.message || e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
+router.get('/:schoolId/communications/usage', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const sid = Number(req.params.schoolId);
+    const { CommunicationUsage, PricingConfig } = require('../models');
+    const { Op } = require('sequelize');
+    try { await CommunicationUsage.sync({ alter: true }); } catch {}
+    const startStr = String(req.query.startDate || '').trim();
+    const endStr = String(req.query.endDate || '').trim();
+    const groupBy = String(req.query.groupBy || '').trim().toLowerCase();
+    const channelFilter = String(req.query.channel || '').trim().toLowerCase();
+    const where = { schoolId: sid };
+    if (startStr && endStr) {
+      const start = new Date(startStr);
+      const end = new Date(endStr);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        (where as any).createdAt = { [Op.between]: [start, end] };
+      }
+    }
+    const rows = await CommunicationUsage.findAll({ where, order: [['createdAt','DESC']] });
+    let emailCount = 0, smsCount = 0, emailAmount = 0, smsAmount = 0;
+    const breakdownMap = new Map();
+    for (const r of rows) {
+      const ch = String(r.channel).toLowerCase();
+      if (channelFilter && channelFilter !== 'all' && ch !== channelFilter) continue;
+      if (ch === 'email') { emailCount += Number(r.units || 0); emailAmount += parseFloat(r.amount || 0); }
+      else if (ch === 'sms') { smsCount += Number(r.units || 0); smsAmount += parseFloat(r.amount || 0); }
+      if (groupBy === 'day' || groupBy === 'month') {
+        const dt = r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt);
+        const key = groupBy === 'day' ? dt.toISOString().slice(0,10) : dt.toISOString().slice(0,7);
+        if (!breakdownMap.has(key)) breakdownMap.set(key, { email: { count: 0, amount: 0 }, sms: { count: 0, amount: 0 } });
+        const cur = breakdownMap.get(key);
+        if (ch === 'email') { cur.email.count += Number(r.units || 0); cur.email.amount += parseFloat(r.amount || 0); }
+        else if (ch === 'sms') { cur.sms.count += Number(r.units || 0); cur.sms.amount += parseFloat(r.amount || 0); }
+      }
+    }
+    const cfg = await PricingConfig.findOne({ where: { id: 'default' } });
+    const currency = cfg ? (cfg.currency || 'USD') : 'USD';
+    let breakdown;
+    if (breakdownMap.size > 0) {
+      breakdown = Array.from(breakdownMap.entries()).sort((a,b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(([period, v]) => ({ period, email: v.email, sms: v.sms, total: Number(v.email.amount || 0) + Number(v.sms.amount || 0) }));
+    }
+    return res.json({ email: { count: emailCount, amount: emailAmount }, sms: { count: smsCount, amount: smsAmount }, total: emailAmount + smsAmount, currency, breakdown });
+  } catch (e) { console.error(e?.message || e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
 router.post('/:schoolId/notify', verifyToken, requireRole('SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const msg = String(req.body?.message || '').trim();
@@ -3037,16 +3185,22 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
       return res.status(400).json({ msg: 'User already exists' });
     }
 
-    const tempPassword = Math.random().toString(36).slice(-8);
+    const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(tempPassword, salt);
+    const hashedPassword = await bcrypt.hash(placeholder, salt);
 
-    user = await User.create({ name, email, username: email.split('@')[0], password: hashedPassword, role: 'Staff', schoolRole: role, schoolId, phone, department, bankAccount, isActive: true });
+    user = await User.create({ name, email, username: email.split('@')[0], password: hashedPassword, role: 'Staff', schoolRole: role, schoolId, phone, department, bankAccount, isActive: true, passwordMustChange: true, tokenVersion: 0 });
 
     const userJson = user.toJSON();
     delete userJson.password;
-    userJson.tempPassword = tempPassword; // Return temp password for admin to share
-
+    try {
+      const EmailService = require('../services/EmailService');
+      const inviteToken = jwt.sign({ id: user.id, type: 'invite', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+      const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+      await EmailService.sendActivationInvite(user.email, user.name, 'Staff', activationLink, '', schoolId);
+      userJson.inviteSent = true;
+    } catch {}
     res.status(201).json(userJson);
   } catch (err) {
     console.error(err.message);

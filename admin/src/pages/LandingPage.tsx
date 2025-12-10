@@ -59,6 +59,15 @@ const LandingPage: React.FC = () => {
     return () => { document.body.style.overflow = ''; };
   }, [isMobileMenuOpen]);
 
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMobileMenuOpen]);
+
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>, targetId: string) => {
     e.preventDefault();
     document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -121,7 +130,8 @@ const LandingPage: React.FC = () => {
                 <button onClick={() => goTo('/login')} className="px-5 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-all">تسجيل الدخول</button>
                 <button onClick={() => setIsTrialModalOpen(true)} className="inline-flex px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">ابدأ تجربتك المجانية</button>
             </div>
-            <button onClick={() => setIsMobileMenuOpen(v => !v)} className="md:hidden p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="فتح القائمة">
+            <button onClick={() => setIsMobileMenuOpen(v => !v)} className="md:hidden p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="فتح القائمة" aria-expanded={isMobileMenuOpen}
+            >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>

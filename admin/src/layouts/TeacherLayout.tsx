@@ -28,6 +28,20 @@ const TeacherLayout: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    document.body.style.overflow = isSidebarOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSidebarOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setIsNotificationsOpen(false);
@@ -53,7 +67,7 @@ const TeacherLayout: React.FC = () => {
       <TeacherSidebar isMobileOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <main className="md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-wrap justify-between items-start gap-4">
              <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)} />
              <div className="flex items-center gap-4">
                 <div className="relative" ref={notificationRef}>

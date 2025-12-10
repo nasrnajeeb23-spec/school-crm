@@ -87,7 +87,8 @@ function requireRole(...allowedRoles) {
         SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
         SCHOOLADMIN: 'SCHOOL_ADMIN',
         TEACHER: 'TEACHER',
-        PARENT: 'PARENT'
+        PARENT: 'PARENT',
+        STAFF: 'STAFF'
       };
       return map[key] || String(role).toUpperCase();
     };
@@ -117,7 +118,8 @@ function requireSameSchoolParam(paramName = 'schoolId') {
         SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
         SCHOOLADMIN: 'SCHOOL_ADMIN',
         TEACHER: 'TEACHER',
-        PARENT: 'PARENT'
+        PARENT: 'PARENT',
+        STAFF: 'STAFF'
       };
       return map[key] || String(role).toUpperCase();
     };
@@ -150,7 +152,8 @@ function requirePermission(...requiredPerms) {
         SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
         SCHOOLADMIN: 'SCHOOL_ADMIN',
         TEACHER: 'TEACHER',
-        PARENT: 'PARENT'
+        PARENT: 'PARENT',
+        STAFF: 'STAFF'
       };
       return map[key] || String(role).toUpperCase();
     };
@@ -187,7 +190,8 @@ function requireSameSchoolQuery(paramName = 'schoolId') {
         SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
         SCHOOLADMIN: 'SCHOOL_ADMIN',
         TEACHER: 'TEACHER',
-        PARENT: 'PARENT'
+        PARENT: 'PARENT',
+        STAFF: 'STAFF'
       };
       return map[key] || String(role).toUpperCase();
     };

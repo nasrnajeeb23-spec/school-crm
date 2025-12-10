@@ -44,7 +44,28 @@ function validate(requiredSpec) {
         errors.push(`${spec.name} must be at least ${spec.minLength} chars`);
       }
     }
-    if (errors.length) return res.error(400, 'VALIDATION_FAILED', 'Validation failed', errors);
+    if (errors.length) {
+      const schema = requiredSpec.map(s => {
+        const out = { name: s.name };
+        if (s.type) out.type = s.type;
+        if (s.required) out.required = true;
+        if (Array.isArray(s.enum)) out.enum = s.enum;
+        if (s.minLength) out.minLength = s.minLength;
+        if (s.element && typeof s.element === 'object') {
+          const el = {};
+          for (const [k, rule] of Object.entries(s.element)) {
+            const r = {};
+            if (rule.type) r.type = rule.type;
+            if (rule.required) r.required = true;
+            if (Array.isArray(rule.enum)) r.enum = rule.enum;
+            el[k] = r;
+          }
+          out.element = el;
+        }
+        return out;
+      });
+      return res.error(400, 'VALIDATION_FAILED', 'Validation failed', { errors, schema });
+    }
     next();
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -23,6 +23,20 @@ const SuperAdminLayout: React.FC = () => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    document.body.style.overflow = isSidebarOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSidebarOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSidebarOpen]);
+
   const getTitle = () => {
     const currentPath = location.pathname.split('/').pop() || 'dashboard';
     return viewTitles[currentPath] || 'لوحة التحكم';
@@ -33,7 +47,7 @@ const SuperAdminLayout: React.FC = () => {
       <Sidebar isMobileOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <main className="md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-wrap justify-between items-start gap-4">
              <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)} />
              <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
           </div>

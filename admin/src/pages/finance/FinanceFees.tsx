@@ -28,6 +28,11 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [feeSetups, setFeeSetups] = useState<FeeSetup[]>([]);
     const [loading, setLoading] = useState(true);
+    const [commUsage, setCommUsage] = useState<{ email: { count: number; amount: number }; sms: { count: number; amount: number }; total: number; currency: string; breakdown?: Array<{ period: string; email: { count: number; amount: number }; sms: { count: number; amount: number }; total: number }> } | null>(null);
+    const [commStartDate, setCommStartDate] = useState<string>('');
+    const [commEndDate, setCommEndDate] = useState<string>('');
+    const [commGroupBy, setCommGroupBy] = useState<'none'|'day'|'month'>('month');
+    const [commChannel, setCommChannel] = useState<'all'|'email'|'sms'>('all');
     
     // Invoice State
     const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
@@ -56,14 +61,21 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
 
     const fetchData = () => {
         setLoading(true);
+        const usageParams: any = {};
+        if (commStartDate && commEndDate) { usageParams.startDate = commStartDate; usageParams.endDate = commEndDate; }
+        if (commGroupBy && commGroupBy !== 'none') { usageParams.groupBy = commGroupBy; }
+        if (commChannel && commChannel !== 'all') { usageParams.channel = commChannel; }
         Promise.all([
             api.getSchoolInvoices(schoolId),
             api.getFeeSetups(schoolId),
-        ]).then(([invoicesData, feesData]) => {
+            api.getSchoolCommunicationsUsage(schoolId, usageParams),
+        ]).then(([invoicesData, feesData, usageData]) => {
             setInvoices(invoicesData);
             setFeeSetups(feesData);
+            setCommUsage(usageData);
         }).catch(err => {
             console.error("Failed to fetch fee data:", err);
+            setCommUsage(null);
             addToast("فشل تحميل بيانات الرسوم.", 'error');
         }).finally(() => setLoading(false));
     };
@@ -172,7 +184,7 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                 <button onClick={() => setActiveTab('fees')} className={`px-4 py-2 rounded-lg ${activeTab === 'fees' ? 'bg-teal-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>إعداد الرسوم</button>
             </div>
 
-            {activeTab === 'invoices' ? (
+            {activeTab === 'invoices' ? (<>
                 <BrandableCard schoolSettings={schoolSettings}>
                     <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
                         <div className="flex items-center gap-4">
@@ -199,7 +211,64 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                         )}
                     </div>
                 </BrandableCard>
-            ) : (
+                <BrandableCard schoolSettings={schoolSettings}>
+                    <div className="p-1">
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">استخدام الاتصالات</h3>
+                        <div className="flex flex-wrap items-center gap-3 mb-4">
+                            <input type="date" value={commStartDate} onChange={e => setCommStartDate(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                            <input type="date" value={commEndDate} onChange={e => setCommEndDate(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                            <select value={commGroupBy} onChange={e => setCommGroupBy(e.target.value as any)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                                <option value="none">بدون تجميع</option>
+                                <option value="month">شهري</option>
+                                <option value="day">يومي</option>
+                            </select>
+                            <select value={commChannel} onChange={e => setCommChannel(e.target.value as any)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                                <option value="all">كل القنوات</option>
+                                <option value="email">البريد الإلكتروني</option>
+                                <option value="sms">SMS</option>
+                            </select>
+                            <button onClick={fetchData} className="px-3 py-2 bg-teal-600 text-white rounded-lg">تطبيق</button>
+                        </div>
+                        {commUsage ? (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</span><span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.email.count} رسالة</span></div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {commUsage.email.amount.toFixed(2)} {commUsage.currency}</div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium text-gray-700 dark:text-gray-300">الرسائل النصية</span><span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.sms.count} رسالة</span></div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {commUsage.sms.amount.toFixed(2)} {commUsage.currency}</div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium text-gray-700 dark:text-gray-300">المجموع</span><span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.total.toFixed(2)} {commUsage.currency}</span></div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">الفوترة حسب مزود المنصة فقط</div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-sm text-gray-600 dark:text-gray-300">لا توجد بيانات استخدام الاتصالات حالياً.</div>
+                        )}
+                        {commUsage && Array.isArray(commUsage.breakdown) && commUsage.breakdown.length > 0 ? (
+                            <div className="mt-4 overflow-x-auto">
+                                <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                        <tr><th className="px-6 py-3">الفترة</th><th className="px-6 py-3">البريد (عدد/تكلفة)</th><th className="px-6 py-3">SMS (عدد/تكلفة)</th><th className="px-6 py-3">الإجمالي</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {commUsage.breakdown.map((b) => (
+                                            <tr key={b.period} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{b.period}</td>
+                                                <td className="px-6 py-4">{b.email.count} / {b.email.amount.toFixed(2)} {commUsage.currency}</td>
+                                                <td className="px-6 py-4">{b.sms.count} / {b.sms.amount.toFixed(2)} {commUsage.currency}</td>
+                                                <td className="px-6 py-4 font-semibold">{b.total.toFixed(2)} {commUsage.currency}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : null}
+                    </div>
+                </BrandableCard>
+            </>) : (
                 <BrandableCard schoolSettings={schoolSettings}>
                     <div className="flex items-center justify-between mb-4"><h4 className="font-semibold">إعداد الرسوم الدراسية</h4></div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">

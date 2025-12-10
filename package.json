@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Root package for SchoolSaaS CRM",
   "scripts": {
-    "build": "cd admin && npm install && npm run build",
+    "build": "cd admin && npm run build",
     "start": "cd admin && npm start",
     "dev": "cd admin && npm run dev"
   },

@@ -48,6 +48,7 @@ export enum UserRole {
   Teacher = 'TEACHER',
   Parent = 'PARENT',
   Driver = 'DRIVER', // New role for bus drivers
+  Staff = 'STAFF',
 }
 
 export enum SchoolRole {
@@ -200,12 +201,14 @@ export interface SchoolModuleSubscription {
 }
 
 export interface PricingConfig {
-    pricePerStudent: number;
-    pricePerTeacher: number;
-    pricePerGBStorage: number;
-    pricePerInvoice: number;
-    currency?: string;
-    yearlyDiscountPercent?: number;
+  pricePerStudent: number;
+  pricePerTeacher: number;
+  pricePerGBStorage: number;
+  pricePerInvoice: number;
+  pricePerEmail?: number;
+  pricePerSMS?: number;
+  currency?: string;
+  yearlyDiscountPercent?: number;
 }
 
 export interface SubscriptionState {
@@ -282,6 +285,22 @@ export interface SchoolSettings {
         email: boolean;
         sms: boolean;
         push: boolean;
+    };
+    emailConfig?: {
+        usePlatformProvider?: boolean;
+        host?: string;
+        port?: number;
+        secure?: boolean;
+        user?: string;
+        pass?: string;
+        from?: string;
+    };
+    smsConfig?: {
+        usePlatformProvider?: boolean;
+        provider?: 'twilio' | string;
+        accountSid?: string;
+        authToken?: string;
+        from?: string;
     };
     scheduleConfig?: {
         periodCount: number;
@@ -485,6 +504,7 @@ export interface NewTeacherData {
     phone: string;
     department?: string;
     bankAccount?: string;
+    email?: string;
 }
 
 export interface UpdatableTeacherData {
