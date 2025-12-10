@@ -3,7 +3,12 @@ import { NavLink } from 'react-router-dom';
 import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, ScheduleIcon, RequestIcon, LogoutIcon, ProfileIcon, BusIcon, MessagingIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
-const ParentSidebar: React.FC = () => {
+interface ParentSidebarProps {
+  isMobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+const ParentSidebar: React.FC<ParentSidebarProps> = ({ isMobileOpen = false, onClose }) => {
   const { currentUser, logout } = useAppContext();
 
   const navItems = [
@@ -22,7 +27,9 @@ const ParentSidebar: React.FC = () => {
   const inactiveLinkClasses = "hover:bg-gray-100 dark:hover:bg-gray-700";
 
   return (
-    <aside className="fixed top-0 right-0 h-full w-16 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex flex-col transition-all duration-300 shadow-lg z-30">
+    <>
+    <aside className={`${isMobileOpen ? 'flex' : 'hidden'} md:flex fixed top-0 right-0 h-full w-64 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex-col transition-all duration-300 shadow-lg z-30`}
+    >
       <div className="flex items-center justify-center md:justify-start md:pr-6 h-20 border-b border-gray-200 dark:border-gray-700">
         <span className="text-2xl font-bold text-rose-600 dark:text-rose-400">P</span>
         <h1 className="hidden md:block ml-2 rtl:mr-2 rtl:ml-0 text-xl font-bold text-gray-800 dark:text-white">بوابة ولي الأمر</h1>
@@ -76,6 +83,10 @@ const ParentSidebar: React.FC = () => {
         </div>
       </div>
     </aside>
+    {isMobileOpen && (
+      <div className="fixed inset-0 bg-black/40 md:hidden z-20" onClick={onClose} />
+    )}
+    </>
   );
 };
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -21,6 +21,7 @@ const viewTitles: { [key: string]: string } = {
 const SuperAdminLayout: React.FC = () => {
   const { theme, toggleTheme } = useAppContext();
   const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const getTitle = () => {
     const currentPath = location.pathname.split('/').pop() || 'dashboard';
@@ -29,11 +30,11 @@ const SuperAdminLayout: React.FC = () => {
 
   return (
     <>
-      <Sidebar />
-      <main className="pr-16 md:pr-64 transition-all duration-300">
+      <Sidebar isMobileOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <main className="md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
           <div className="flex justify-between items-start">
-             <Header title={getTitle()} />
+             <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)} />
              <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
           </div>
           <Outlet />

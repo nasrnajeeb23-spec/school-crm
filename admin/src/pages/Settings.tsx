@@ -96,8 +96,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     }
   };
 
-  const allStages = ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
-  const stages = settings?.availableStages && settings.availableStages.length > 0 ? settings.availableStages : allStages;
+  
   const handleStageToggle = (stage: string) => {
     setSettings(prev => {
       if (!prev) return prev;
@@ -108,9 +107,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   };
 
-  const allDays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const arDays: Record<string, string> = { Sunday: 'الأحد', Monday: 'الاثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس', Friday: 'الجمعة', Saturday: 'السبت' };
-  const workingDays = settings?.workingDays && settings.workingDays.length > 0 ? settings.workingDays : ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+  
   const handleDayToggle = (day: string) => {
     setSettings(prev => {
       if (!prev) return prev;
@@ -121,7 +118,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   };
 
-  const attendanceMethods = settings?.attendanceMethods && settings.attendanceMethods.length > 0 ? settings.attendanceMethods : ['Manual'];
+  
   const handleAttendanceMethodToggle = (m: 'QR'|'RFID'|'Manual') => {
     setSettings(prev => {
       if (!prev) return prev;
@@ -132,7 +129,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   };
 
-  const terms = settings?.terms && settings.terms.length > 0 ? settings.terms : [ { name: 'الفصل الأول', start: settings?.academicYearStart || '', end: '' }, { name: 'الفصل الثاني', start: '', end: settings?.academicYearEnd || '' } ];
+  
   const addTerm = () => {
     setSettings(prev => prev ? { ...prev, terms: [ ...(prev.terms || []), { name: '', start: '', end: '' } ] } : null);
   };
@@ -155,7 +152,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     });
   };
 
-  const holidays = settings?.holidays && settings.holidays.length > 0 ? settings.holidays : [];
+  
   const addHoliday = () => {
     setSettings(prev => prev ? { ...prev, holidays: [ ...(prev.holidays || []), { date: '', title: '' } ] } : null);
   };
@@ -218,6 +215,18 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
   }
 
   const inputStyle = "mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700";
+
+  const allStages = ["رياض أطفال","ابتدائي","إعدادي","ثانوي"];
+  const stages = Array.isArray(settings.availableStages) && settings.availableStages.length > 0 ? settings.availableStages : allStages;
+  const allDays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const arDays: Record<string, string> = { Sunday: 'الأحد', Monday: 'الاثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس', Friday: 'الجمعة', Saturday: 'السبت' };
+  const workingDays = Array.isArray(settings.workingDays) && settings.workingDays.length > 0 ? settings.workingDays : ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+  const attendanceMethods = Array.isArray(settings.attendanceMethods) && settings.attendanceMethods.length > 0 ? settings.attendanceMethods : ['Manual'];
+  const terms = Array.isArray(settings.terms) && settings.terms.length > 0 ? settings.terms : [
+    { name: 'الفصل الأول', start: settings.academicYearStart || '', end: '' },
+    { name: 'الفصل الثاني', start: '', end: settings.academicYearEnd || '' }
+  ];
+  const holidays = Array.isArray(settings.holidays) && settings.holidays.length > 0 ? settings.holidays : [];
 
   const toCSV = (headers: string[], rows: any[]) => {
     const esc = (v: any) => {

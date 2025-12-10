@@ -21,6 +21,7 @@ const ParentLayout: React.FC = () => {
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     api.getParentActionItems().then(setActionItems);
@@ -49,11 +50,11 @@ const ParentLayout: React.FC = () => {
 
   return (
     <>
-      <ParentSidebar />
-      <main className="pr-16 md:pr-64 transition-all duration-300">
+      <ParentSidebar isMobileOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <main className="md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
           <div className="flex justify-between items-start">
-             <Header title={getTitle()} />
+             <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)} />
              <div className="flex items-center gap-4">
                 <div className="relative" ref={notificationRef}>
                   <button 

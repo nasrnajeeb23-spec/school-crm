@@ -64,6 +64,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTrial, setIsTrial] = useState<boolean>(false);
   
   const storedId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('current_school_id') || '0') : 0;
@@ -168,11 +169,13 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
         schoolName={settings?.schoolName || school.name}
         schoolLogoUrl={api.getAssetUrl(settings?.schoolLogoUrl as string)}
         isSuperAdminView={isSuperAdminView}
+        isMobileOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
-      <main className="pr-16 md:pr-64 transition-all duration-300">
+      <main className="md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
-                <Header title={getHeaderTitle()} schoolName={settings?.schoolName || school.name} />
+                <Header title={getHeaderTitle()} schoolName={settings?.schoolName || school.name} onMenuToggle={() => setIsSidebarOpen(true)} />
                 <div className="flex items-center gap-4">
                     {isSuperAdminView && (
                         <button onClick={() => navigate('/superadmin/schools')} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
