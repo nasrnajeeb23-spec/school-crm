@@ -923,7 +923,7 @@ export const bulkUpdateUsageLimits = async (payload: { schoolIds: number[]; plan
     return await apiCall('/superadmin/bulk/usage-limits', { method: 'PUT', body: JSON.stringify(payload) });
 };
 
-export const bulkBackupSchedule = async (payload: { schoolIds: number[]; schedule: { daily?: boolean; monthly?: boolean; time?: string } }): Promise<{ scheduled: number }> => {
+export const bulkBackupSchedule = async (payload: { schoolIds: number[]; schedule: { daily?: boolean; monthly?: boolean; time?: string; monthlyDay?: number } }): Promise<{ scheduled: number }> => {
     return await apiCall('/superadmin/bulk/backup-schedule', { method: 'PUT', body: JSON.stringify(payload) });
 };
 

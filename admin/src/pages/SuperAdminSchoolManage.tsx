@@ -17,7 +17,7 @@ const SuperAdminSchoolManage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [distribution, setDistribution] = useState<Array<{ name: string; value: number }>>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [schedule, setSchedule] = useState<{ daily?: boolean; monthly?: boolean; time?: string }>({ daily: true, time: '02:00' });
+  const [schedule, setSchedule] = useState<{ daily?: boolean; monthly?: boolean; time?: string; monthlyDay?: number }>({ daily: true, time: '02:00', monthlyDay: 1 });
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -26,11 +26,12 @@ const SuperAdminSchoolManage: React.FC = () => {
   const [lastLoginAt, setLastLoginAt] = useState<string | null>(null);
   const [storageUsageBytes, setStorageUsageBytes] = useState<number>(0);
   const [classesCount, setClassesCount] = useState<number>(0);
+  const [backupTypes, setBackupTypes] = useState<string[]>([]);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [s, dist, invs, sts, sub, bill, bks, lastLogin, storage, classes] = await Promise.all([
+      const [s, dist, invs, sts, sub, bill, bks, lastLogin, storage, classes, cfg] = await Promise.all([
         api.getSchoolById(id),
         api.getStudentDistribution(id),
         api.getSchoolInvoices(id),
@@ -40,7 +41,8 @@ const SuperAdminSchoolManage: React.FC = () => {
         api.getSchoolBackups(id),
         api.getSchoolLastLogin(id),
         api.getSchoolStorageUsage(id),
-        api.getSchoolClasses(id)
+        api.getSchoolClasses(id),
+        api.getBackupConfig(id)
       ]);
       setSchool(s);
       setDistribution(Array.isArray(dist) ? dist : []);
@@ -52,6 +54,9 @@ const SuperAdminSchoolManage: React.FC = () => {
       setLastLoginAt(lastLogin?.lastLoginAt || null);
       setStorageUsageBytes(Number(storage?.bytes || 0));
       setClassesCount(Array.isArray(classes) ? classes.length : 0);
+      const timeStr = cfg?.enabledDaily ? (cfg?.dailyTime || '02:00') : (cfg?.monthlyTime || '03:00');
+      setSchedule({ daily: !!cfg?.enabledDaily, monthly: !!cfg?.enabledMonthly, time: timeStr, monthlyDay: Number(cfg?.monthlyDay || 1) });
+      setBackupTypes(Array.isArray(cfg?.types) ? cfg.types : []);
     } catch (e: any) {
       addToast('فشل تحميل بيانات المدرسة.', 'error');
     } finally {
@@ -65,6 +70,51 @@ const SuperAdminSchoolManage: React.FC = () => {
     const price = subscription?.amount || 0;
     return price;
   }, [subscription]);
+
+  const cronExpr = useMemo(() => {
+    const time = String(schedule.time || '02:00').split(':');
+    const hh = String(time[0] || '02').padStart(2, '0');
+    const mm = String(time[1] || '00').padStart(2, '0');
+    if (schedule.daily) return `${mm} ${hh} * * *`;
+    if (schedule.monthly) {
+      const day = Math.max(1, Math.min(Number(schedule.monthlyDay || 1), 31));
+      return `${mm} ${hh} ${day} * *`;
+    }
+    return '-';
+  }, [schedule]);
+
+  const nextRunLabel = useMemo(() => {
+    const now = new Date();
+    const parts = String(schedule.time || '02:00').split(':');
+    const hh = Number(parts[0] || 2);
+    const mm = Number(parts[1] || 0);
+    if (schedule.daily) {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0);
+      const next = today.getTime() > now.getTime() ? today : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hh, mm, 0, 0);
+      return next.toLocaleString();
+    }
+    if (schedule.monthly) {
+      const day = Math.max(1, Math.min(Number(schedule.monthlyDay || 1), 31));
+      const daysThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const targetDayThis = Math.min(day, daysThisMonth);
+      let next = new Date(now.getFullYear(), now.getMonth(), targetDayThis, hh, mm, 0, 0);
+      if (next.getTime() <= now.getTime()) {
+        const y = now.getFullYear();
+        const m = now.getMonth() + 1;
+        const daysNext = new Date(y, m + 1, 0).getDate();
+        const targetDayNext = Math.min(day, daysNext);
+        next = new Date(y, m, targetDayNext, hh, mm, 0, 0);
+      }
+      return next.toLocaleString();
+    }
+    return 'غير مفعل';
+  }, [schedule]);
+
+  const latestBackup = useMemo(() => {
+    const arr = Array.isArray(backups) ? backups.slice() : [];
+    arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return arr[0] || null;
+  }, [backups]);
 
   const activateSubscription = async () => {
     setSaving(true);
@@ -210,7 +260,7 @@ const SuperAdminSchoolManage: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-semibold text-gray-800 dark:text-white">جدولة النسخ الاحتياطي</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium">يومي</label>
             <select value={String(schedule.daily)} onChange={e => setSchedule(p => ({ ...p, daily: e.target.value === 'true' }))} className={inputStyle}>
@@ -229,10 +279,32 @@ const SuperAdminSchoolManage: React.FC = () => {
             <label className="block text-sm font-medium">الوقت</label>
             <input type="time" value={schedule.time || ''} onChange={e => setSchedule(p => ({ ...p, time: e.target.value }))} className={inputStyle} />
           </div>
+          <div>
+            <label className="block text-sm font-medium">اليوم الشهري</label>
+            <input type="number" min={1} max={31} value={Number(schedule.monthlyDay || 1)} onChange={e => setSchedule(p => ({ ...p, monthlyDay: Number(e.target.value || 1) }))} className={inputStyle} />
+          </div>
           <div className="flex items-end gap-2">
             <button onClick={scheduleBackup} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:bg-indigo-400">جدولة</button>
             <button onClick={reloadBackup} disabled={saving} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg">إعادة تحميل</button>
           </div>
+        </div>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="text-sm text-gray-500 dark:text-gray-300">التشغيل القادم</div>
+            <div className="text-gray-900 dark:text-white">{nextRunLabel}</div>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="text-sm text-gray-500 dark:text-gray-300">آخر نسخة</div>
+            <div className="text-gray-900 dark:text-white">{latestBackup ? `${new Date(latestBackup.createdAt).toLocaleString()} — ${Math.round(Number(latestBackup.size||0)/1024)} KB — ${latestBackup.file}` : '-'}</div>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="text-sm text-gray-500 dark:text-gray-300">الأنواع</div>
+            <div className="text-gray-900 dark:text-white">{backupTypes && backupTypes.length ? backupTypes.join(', ') : 'الكل'}</div>
+          </div>
+        </div>
+        <div className="mt-4">
+          <div className="text-sm text-gray-500 dark:text-gray-300">التعبير الفعّال</div>
+          <div className="font-mono text-gray-900 dark:text-white">{cronExpr}</div>
         </div>
       </div>
 

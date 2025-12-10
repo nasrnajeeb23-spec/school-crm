@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-import { ScheduleEntry } from '../types';
+import { ScheduleEntry, SchoolSettings } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 
 interface TeacherScheduleProps {}
 
-const timeSlots = [
-    "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00",
-];
+function buildTimeSlots(settings: SchoolSettings | null) {
+    const sc = settings?.scheduleConfig || { periodCount: 5, periodDurationMinutes: 60, startTime: settings?.workingHoursStart || '08:00', gapMinutes: 0 };
+    const toMin = (hm: string) => { const t = String(hm).split(':'), h = Number(t[0]), m = Number(t[1]); return h*60 + m; };
+    const toHM = (min: number) => { const h = Math.floor(min/60), m = min%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; };
+    const arr: string[] = [];
+    let s = toMin(sc.startTime || '08:00');
+    for (let i=0;i<Number(sc.periodCount||5);i++) { const e = s + Number(sc.periodDurationMinutes||60); arr.push(`${toHM(s)} - ${toHM(e)}`); s = e + Number(sc.gapMinutes||0); }
+    return arr;
+}
 const days: ('Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday')[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
 const dayTranslations: { [key: string]: string } = {
     Sunday: 'الأحد', Monday: 'الاثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس',
@@ -27,6 +33,7 @@ const TeacherSchedule: React.FC<TeacherScheduleProps> = () => {
     const { currentUser: user } = useAppContext();
     const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [settings, setSettings] = useState<SchoolSettings | null>(null);
 
     useEffect(() => {
         if (!user?.teacherId) { setLoading(false); return; }
@@ -34,6 +41,7 @@ const TeacherSchedule: React.FC<TeacherScheduleProps> = () => {
             .then(setSchedule)
             .catch(err => console.error("Failed to fetch schedule", err))
             .finally(() => setLoading(false));
+        if (user?.schoolId) { api.getSchoolSettings(user.schoolId).then(setSettings).catch(() => {}); }
     }, [user?.teacherId]);
 
     const scheduleGrid = useMemo(() => {
@@ -44,20 +52,26 @@ const TeacherSchedule: React.FC<TeacherScheduleProps> = () => {
         });
         return grid;
     }, [schedule]);
+    const timeSlots = useMemo(() => buildTimeSlots(settings), [settings]);
 
     if (loading) {
         return <div className="text-center p-8">جاري تحميل الجدول الدراسي...</div>;
     }
 
+    const daysList = useMemo(() => {
+        const wd = settings?.workingDays && Array.isArray(settings.workingDays) ? settings.workingDays : days;
+        return days.filter(d => wd.includes(d));
+    }, [settings]);
+
     return (
         <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md overflow-x-auto">
-            <div className="grid grid-cols-[auto_repeat(5,minmax(120px,1fr))] min-w-[750px]">
+            <div className="grid min-w-[750px]" style={{ gridTemplateColumns: `auto repeat(${daysList.length}, minmax(120px,1fr))` }}>
                 <div className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">الوقت</div>
-                {days.map(day => (<div key={day} className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">{dayTranslations[day]}</div>))}
+                {daysList.map(day => (<div key={day} className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">{dayTranslations[day]}</div>))}
                 {timeSlots.map(timeSlot => (
                     <React.Fragment key={timeSlot}>
                         <div className="font-semibold text-center p-3 border-l border-b border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-400 flex items-center justify-center">{timeSlot}</div>
-                        {days.map(day => {
+                        {daysList.map(day => {
                             const entry = scheduleGrid[timeSlot]?.[day];
                             const colorClass = entry ? (subjectColors[entry.subject] || subjectColors.default) : 'bg-white dark:bg-gray-800';
                             return (

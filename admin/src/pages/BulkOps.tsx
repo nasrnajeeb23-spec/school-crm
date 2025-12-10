@@ -15,7 +15,7 @@ const BulkOps: React.FC = () => {
   const [planId, setPlanId] = useState('default');
   const [limits, setLimits] = useState<Record<string, number>>({ students: 1000, teachers: 200, storageGb: 10 });
 
-  const [schedule, setSchedule] = useState<{ daily?: boolean; monthly?: boolean; time?: string }>({ daily: true, time: '02:00' });
+  const [schedule, setSchedule] = useState<{ daily?: boolean; monthly?: boolean; time?: string; monthlyDay?: number }>({ daily: true, time: '02:00', monthlyDay: 1 });
 
   const [unsupported, setUnsupported] = useState(false);
   useEffect(() => {
@@ -102,17 +102,17 @@ const BulkOps: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium">معرف الوحدة</label>
-            <input type="text" value={moduleId} onChange={e => setModuleId(e.target.value)} className={inputStyle} />
+            <input type="text" value={moduleId} onChange={e => setModuleId(e.target.value)} className={inputStyle} disabled={unsupported} />
           </div>
           <div>
             <label className="block text-sm font-medium">الحالة</label>
-            <select value={String(enableModule)} onChange={e => setEnableModule(e.target.value === 'true')} className={inputStyle}>
+            <select value={String(enableModule)} onChange={e => setEnableModule(e.target.value === 'true')} className={inputStyle} disabled={unsupported}>
               <option value="true">تفعيل</option>
               <option value="false">تعطيل</option>
             </select>
           </div>
           <div className="flex items-end">
-            <button onClick={runBulkModules} disabled={saving || selected.length === 0} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">تنفيذ</button>
+            <button onClick={runBulkModules} disabled={unsupported || saving || selected.length === 0} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">تنفيذ</button>
           </div>
         </div>
       </div>
@@ -136,7 +136,7 @@ const BulkOps: React.FC = () => {
 
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="font-semibold mb-3">جدولة النسخ الاحتياطي</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium">يومي</label>
             <select value={String(schedule.daily)} onChange={e => setSchedule(p => ({ ...p, daily: e.target.value === 'true' }))} className={inputStyle}>
@@ -154,6 +154,10 @@ const BulkOps: React.FC = () => {
           <div>
             <label className="block text-sm font-medium">الوقت</label>
             <input type="time" value={schedule.time || ''} onChange={e => setSchedule(p => ({ ...p, time: e.target.value }))} className={inputStyle} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">اليوم الشهري</label>
+            <input type="number" min={1} max={31} value={Number(schedule.monthlyDay || 1)} onChange={e => setSchedule(p => ({ ...p, monthlyDay: Number(e.target.value || 1) }))} className={inputStyle} />
           </div>
           <div className="flex items-end">
             <button onClick={runBulkBackup} disabled={saving || selected.length === 0} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">تنفيذ</button>

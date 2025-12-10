@@ -640,9 +640,59 @@ router.put('/bulk/backup-schedule', verifyToken, requireRole('SUPER_ADMIN'), asy
 
     const { SchoolSettings } = require('../models');
     const [count] = await SchoolSettings.update({ backupSchedule: schedule }, { where: { schoolId: schoolIds } });
-    
+    try {
+      const settingsList = await SchoolSettings.findAll({ where: { schoolId: schoolIds } });
+      for (const s of settingsList) {
+        const prev = s.backupConfig || {};
+        const timeStr = String(schedule.time || '02:00');
+        const merged = {
+          ...prev,
+          enabledDaily: !!schedule.daily,
+          dailyTime: timeStr,
+          enabledMonthly: !!schedule.monthly,
+          monthlyDay: Math.max(1, Math.min(Number(schedule.monthlyDay || 1), 31)),
+          monthlyTime: timeStr,
+          types: Array.isArray(prev.types) ? prev.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'],
+          retainDays: Number(prev.retainDays || 30)
+        };
+        s.backupConfig = merged;
+        await s.save();
+      }
+    } catch {}
+    const redis = req.app?.locals?.redisClient || null;
+    if (redis) {
+      const time = String(schedule.time || '02:00');
+      const parts = time.split(':');
+      const hh = String(parts[0] || '02').padStart(2, '0');
+      const mm = String(parts[1] || '00').padStart(2, '0');
+      let expr = `${mm} ${hh} * * *`;
+      if (!schedule.daily && schedule.monthly) {
+        const day = Math.max(1, Math.min(Number(schedule.monthlyDay || 1), 31));
+        expr = `${mm} ${hh} ${day} * *`;
+      }
+      for (const sid of schoolIds) {
+        try {
+          await redis.sAdd('backup:schedule:set', String(sid));
+          await redis.set(`backup:schedule:${sid}`, expr);
+        } catch {}
+      }
+      try { const fn = req.app?.locals?.reloadBackupSchedules; if (typeof fn === 'function') await fn(); } catch {}
+    }
     res.json({ scheduled: count });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+router.post('/schedule/backups/reload', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const fn = req.app?.locals?.reloadBackupSchedules;
+    if (typeof fn !== 'function') {
+      return res.status(404).json({ reloaded: false, message: 'Reload handler not available' });
+    }
+    await fn();
+    return res.json({ reloaded: true });
+  } catch (err) {
+    console.error(err?.message || err);
+    res.status(500).json({ reloaded: false, message: 'Server Error' });
+  }
 });
 
 // @route   GET api/superadmin/onboarding/requests

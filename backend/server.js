@@ -296,27 +296,19 @@ app.locals.scheduleBackupForSchool = async (schoolId, cronExpr) => {
   if (!cronExpr || typeof cronExpr !== 'string') return;
   const task = nodeCron.schedule(cronExpr, () => {
     try {
-      app.locals.enqueueJob('backup_store', { schoolId }, async (payload) => {
-        const archiver = require('archiver');
-        const { PassThrough } = require('stream');
-        const out = new PassThrough();
-        const chunks = [];
-        out.on('data', (d) => chunks.push(d));
-        const zipDone = new Promise((resolve, reject) => {
-          out.on('end', () => resolve(Buffer.concat(chunks)));
-          out.on('error', reject);
-        });
-        const zip = archiver('zip', { zlib: { level: 9 } });
-        zip.pipe(out);
-        const { School, Subscription, Plan } = require('./models');
-        const school = await School.findByPk(schoolId, { attributes: ['id','name'], raw: true }).catch(() => null);
-        const subs = await Subscription.findAll({ include: [{ model: Plan, attributes: ['name','price'] }], where: { schoolId }, raw: true }).catch(() => []);
-        zip.append(JSON.stringify({ school, subscriptions: subs }, null, 2), { name: 'data.json' });
-        const header = ['SubscriptionId','Plan','Status','Price'].join(',');
-        const body = (subs || []).map(r => [r.id, r['Plan.name'], r.status, r['Plan.price'] || 0].join(',')).join('\n');
-        zip.append(header + '\n' + body, { name: 'subscriptions.csv' });
-        await zip.finalize();
-        const buffer = await zipDone;
+      app.locals.enqueueJob('backup_store', { schoolId }, async ({ schoolId }) => {
+        const { SchoolSettings, AuditLog } = require('./models');
+        const s = await SchoolSettings.findOne({ where: { schoolId } }).catch(() => null);
+        const cfg = s?.backupConfig || {};
+        const types = Array.isArray(cfg.types) ? cfg.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'];
+        const full = await storeBackupZip(Number(schoolId), types, {});
+        const fs = require('fs');
+        const path = require('path');
+        const buffer = fs.readFileSync(full);
+        try {
+          const stat = fs.statSync(full);
+          await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(schoolId), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
+        } catch {}
         return { ok: true, jobType: 'backup_store', schoolId, zip: buffer };
       });
     } catch {}

@@ -34,6 +34,19 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
   const [backupConfig, setBackupConfig] = useState<{enabledDaily:boolean;dailyTime:string;enabledMonthly:boolean;monthlyDay:number;monthlyTime:string;retainDays:number;types?:string[]}>({enabledDaily:false,dailyTime:'02:00',enabledMonthly:false,monthlyDay:1,monthlyTime:'03:00',retainDays:30,types:[]});
   const [backupsList, setBackupsList] = useState<any[]>([]);
 
+  const setScheduleCfg = (update: Partial<{ periodCount: number; periodDurationMinutes: number; startTime: string; gapMinutes?: number }>) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const base = {
+        periodCount: prev.scheduleConfig?.periodCount ?? 5,
+        periodDurationMinutes: prev.scheduleConfig?.periodDurationMinutes ?? 60,
+        startTime: prev.scheduleConfig?.startTime ?? '08:00',
+        gapMinutes: prev.scheduleConfig?.gapMinutes ?? 0,
+      };
+      return { ...prev, scheduleConfig: { ...base, ...update } };
+    });
+  };
+
   useEffect(() => {
     api.getBackupConfig(schoolId).then(cfg => {
       setBackupConfig({
@@ -224,6 +237,16 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     a.href = url; a.download = filename; document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
   };
+
+  const previewTimeSlots = (() => {
+    const sc = settings.scheduleConfig || { periodCount: 5, periodDurationMinutes: 60, startTime: settings.workingHoursStart || '08:00', gapMinutes: 0 };
+    const toMin = (hm: string) => { const t = String(hm).split(':'); const h = Number(t[0]); const m = Number(t[1]); return h*60 + m; };
+    const toHM = (min: number) => { const h = Math.floor(min/60); const m = min%60; const hh = String(h).padStart(2,'0'); const mm = String(m).padStart(2,'0'); return `${hh}:${mm}`; };
+    const arr: string[] = [];
+    let s = toMin(sc.startTime || '08:00');
+    for (let i=0;i<Number(sc.periodCount||5);i++) { const e = s + Number(sc.periodDurationMinutes||60); arr.push(`${toHM(s)} - ${toHM(e)}`); s = e + Number(sc.gapMinutes||0); }
+    return arr;
+  })();
 
   const buildRefStagesGrades = () => {
     const map: Record<string,string[]> = {
@@ -545,6 +568,43 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       return obj;
     });
     return { headers, rows };
+  };
+
+  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+  const computeNextRunLabel = (): string => {
+    const cfg = backupConfig;
+    const now = new Date();
+    if (cfg.enabledDaily) {
+      const parts = String(cfg.dailyTime || '02:00').split(':');
+      const hh = Number(parts[0] || 0);
+      const mm = Number(parts[1] || 0);
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0);
+      const next = today.getTime() > now.getTime() ? today : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hh, mm, 0, 0);
+      return next.toLocaleString();
+    }
+    if (cfg.enabledMonthly) {
+      const parts = String(cfg.monthlyTime || '03:00').split(':');
+      const hh = Number(parts[0] || 0);
+      const mm = Number(parts[1] || 0);
+      const day = Math.max(1, Math.min(Number(cfg.monthlyDay || 1), 31));
+      const daysThisMonth = getDaysInMonth(now.getFullYear(), now.getMonth());
+      const targetDayThis = Math.min(day, daysThisMonth);
+      let next = new Date(now.getFullYear(), now.getMonth(), targetDayThis, hh, mm, 0, 0);
+      if (next.getTime() <= now.getTime()) {
+        const y = now.getFullYear();
+        const m = now.getMonth() + 1;
+        const daysNext = getDaysInMonth(y, m);
+        const targetDayNext = Math.min(day, daysNext);
+        next = new Date(y, m, targetDayNext, hh, mm, 0, 0);
+      }
+      return next.toLocaleString();
+    }
+    return 'غير مفعل';
+  };
+  const getLatestBackupLabel = (): string => {
+    if (!Array.isArray(backupsList) || backupsList.length === 0) return 'لا توجد نسخ بعد';
+    const latest = backupsList.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    return new Date(latest.createdAt).toLocaleString();
   };
 
   const toEnDay = (d: string) => {
@@ -1333,6 +1393,16 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
           <div>
             <button type="button" onClick={saveBackupSchedule} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">حفظ الجدولة</button>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="text-sm text-gray-500 dark:text-gray-300">التشغيل القادم</div>
+              <div className="text-gray-900 dark:text-white">{computeNextRunLabel()}</div>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="text-sm text-gray-500 dark:text-gray-300">آخر نسخة مكتملة</div>
+              <div className="text-gray-900 dark:text-white">{getLatestBackupLabel()}</div>
+            </div>
+          </div>
           <div>
             <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">النسخ المخزنة</h4>
             {backupsList.length === 0 ? (
@@ -1583,3 +1653,32 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
 };
 
 export default Settings;
+                <div className="md:col-span-2">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">إعداد الجدول الدراسي</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">وقت بداية الحصص</label>
+                      <input type="time" value={settings.scheduleConfig?.startTime || settings.workingHoursStart || ''} onChange={(e) => setScheduleCfg({ startTime: e.target.value })} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">عدد الحصص يوميًا</label>
+                      <input type="number" min={1} max={20} value={String(settings.scheduleConfig?.periodCount ?? 5)} onChange={(e) => setScheduleCfg({ periodCount: Number(e.target.value || 5) })} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">مدة الحصة (دقائق)</label>
+                      <input type="number" min={10} max={180} value={String(settings.scheduleConfig?.periodDurationMinutes ?? 60)} onChange={(e) => setScheduleCfg({ periodDurationMinutes: Number(e.target.value || 60) })} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">فاصل بين الحصص (دقائق)</label>
+                      <input type="number" min={0} max={60} value={String(settings.scheduleConfig?.gapMinutes ?? 0)} onChange={(e) => setScheduleCfg({ gapMinutes: Number(e.target.value || 0) })} className={inputStyle} />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">معاينة الفترات الزمنية</label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {previewTimeSlots.map((ts, idx) => (
+                        <span key={idx} className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">{ts}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>

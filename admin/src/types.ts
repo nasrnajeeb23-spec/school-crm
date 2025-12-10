@@ -283,6 +283,12 @@ export interface SchoolSettings {
         sms: boolean;
         push: boolean;
     };
+    scheduleConfig?: {
+        periodCount: number;
+        periodDurationMinutes: number;
+        startTime: string;
+        gapMinutes?: number;
+    };
     admissionForm?: {
         studentFields?: string[];
         parentFields?: string[];

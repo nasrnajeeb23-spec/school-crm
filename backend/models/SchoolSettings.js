@@ -124,6 +124,10 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  scheduleConfig: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   // schoolId FK is added via association
 });
 

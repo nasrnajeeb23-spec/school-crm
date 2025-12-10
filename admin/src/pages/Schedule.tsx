@@ -1,15 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Class, ScheduleEntry, Teacher } from '../types';
+import { Class, ScheduleEntry, Teacher, SchoolSettings } from '../types';
 import { showToast } from '../utils/toast';
 import * as api from '../api';
 
-const timeSlots = [
-    "08:00 - 09:00",
-    "09:00 - 10:00",
-    "10:00 - 11:00",
-    "11:00 - 12:00",
-    "12:00 - 13:00",
-];
+function buildTimeSlots(settings: SchoolSettings | null) {
+    const sc = settings?.scheduleConfig || { periodCount: 5, periodDurationMinutes: 60, startTime: settings?.workingHoursStart || '08:00', gapMinutes: 0 };
+    const toMin = (hm: string) => { const t = String(hm).split(':'); const h = Number(t[0]); const m = Number(t[1]); return h*60 + m; };
+    const toHM = (min: number) => { const h = Math.floor(min/60); const m = min%60; const hh = String(h).padStart(2,'0'); const mm = String(m).padStart(2,'0'); return `${hh}:${mm}`; };
+    const arr: string[] = [];
+    let s = toMin(sc.startTime || '08:00');
+    for (let i=0;i<Number(sc.periodCount||5);i++) { const e = s + Number(sc.periodDurationMinutes||60); arr.push(`${toHM(s)} - ${toHM(e)}`); s = e + Number(sc.gapMinutes||0); }
+    return arr;
+}
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
 const dayTranslations: { [key: string]: string } = {
@@ -48,6 +50,9 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
     const [subjectsEdit, setSubjectsEdit] = useState<string[]>([]);
     const [newSubject, setNewSubject] = useState('');
     const [savingSubjects, setSavingSubjects] = useState(false);
+    const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
+    const [subjectFilter, setSubjectFilter] = useState('');
+    const [autoFillPattern, setAutoFillPattern] = useState<'balanced'|'repeat_first_day'>('balanced');
 
     useEffect(() => {
         // FIX: Corrected function call from getClasses to getSchoolClasses and passed the schoolId.
@@ -58,6 +63,7 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
             }
         });
         api.getSchoolTeachers(schoolId).then(setTeachers);
+        api.getSchoolSettings(schoolId).then(setSchoolSettings).catch(() => {});
     }, [schoolId]);
 
     useEffect(() => {
@@ -88,6 +94,80 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
         });
         return grid;
     }, [schedule]);
+    const timeSlots = useMemo(() => buildTimeSlots(schoolSettings), [schoolSettings]);
+    const daysList = useMemo(() => {
+        const wd = schoolSettings?.workingDays && Array.isArray(schoolSettings.workingDays) ? schoolSettings.workingDays : days;
+        return days.filter(d => wd.includes(d));
+    }, [schoolSettings]);
+    const parseSlot = (s: string) => {
+        try {
+            const parts = String(s).split('-');
+            const a = (parts[0] || '').trim();
+            const b = (parts[1] || '').trim();
+            const toMin = (hm: string) => { const t = String(hm).split(':'); const h = Number(t[0]); const m = Number(t[1]); return h*60 + m; };
+            const start = toMin(a);
+            const end = toMin(b);
+            return { start, end, ok: Number.isFinite(start) && Number.isFinite(end) && start < end };
+        } catch { return { start: 0, end: 0, ok: false }; }
+    };
+    const isDirty = useMemo(() => {
+        const scheduleMap: Record<string, string> = {};
+        schedule.forEach(e => { scheduleMap[`${e.day}|${e.timeSlot}`] = e.subject; });
+        const currentMap: Record<string, string> = {};
+        timeSlots.forEach(ts => {
+            daysList.forEach(d => {
+                const subj = gridSubjects[ts]?.[d] || '';
+                if (subj) currentMap[`${d}|${ts}`] = subj;
+            });
+        });
+        const keys1 = Object.keys(scheduleMap);
+        const keys2 = Object.keys(currentMap);
+        if (keys1.length !== keys2.length) return true;
+        for (const k of keys1) {
+            if ((currentMap[k] || '') !== scheduleMap[k]) return true;
+        }
+        return false;
+    }, [schedule, gridSubjects, timeSlots, daysList]);
+
+    const teacherNameMap = useMemo(() => {
+        const m: Record<string, string> = {};
+        teachers.forEach(t => { m[String(t.id)] = t.name; });
+        return m;
+    }, [teachers]);
+
+    const unassignedCount = useMemo(() => {
+        let c = 0;
+        timeSlots.forEach(ts => {
+            daysList.forEach(d => {
+                const subj = gridSubjects[ts]?.[d] || '';
+                if (subj && !mapping[subj]) c++;
+            });
+        });
+        return c;
+    }, [gridSubjects, mapping, timeSlots, daysList]);
+
+    const overlapWarnings = useMemo(() => {
+        const warnings: Array<{ teacherId: string; teacherName: string; day: string; timeSlot: string; otherTimeSlot: string; }> = [];
+        const byTeacherDay: Record<string, Array<{ start: number; end: number; timeSlot: string }>> = {};
+        timeSlots.forEach(ts => {
+            const ps = parseSlot(ts);
+            if (!ps.ok) return;
+            daysList.forEach(d => {
+                const subj = gridSubjects[ts]?.[d] || '';
+                const tId = subj ? String(mapping[subj] || '') : '';
+                if (!tId) return;
+                const key = `${tId}:${d}`;
+                if (!byTeacherDay[key]) byTeacherDay[key] = [];
+                for (const prev of byTeacherDay[key]) {
+                    if (ps.start < prev.end && prev.start < ps.end) {
+                        warnings.push({ teacherId: tId, teacherName: teacherNameMap[tId] || '', day: d, timeSlot: ts, otherTimeSlot: prev.timeSlot });
+                    }
+                }
+                byTeacherDay[key].push({ start: ps.start, end: ps.end, timeSlot: ts });
+            });
+        });
+        return warnings;
+    }, [gridSubjects, mapping, timeSlots, daysList, teacherNameMap]);
 
     const currentClass = useMemo(() => classes.find(c => c.id === selectedClass) || null, [classes, selectedClass]);
     const classSubjects = useMemo(() => (currentClass?.subjects || []), [currentClass]);
@@ -101,7 +181,8 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
         if (!currentClass) return;
         setSavingMapping(true);
         try {
-            await api.updateSubjectTeacherMap(schoolId, currentClass.id, mapping);
+            const updated = await api.updateSubjectTeacherMap(schoolId, currentClass.id, mapping);
+            setClasses(prev => prev.map(c => c.id === updated.id ? updated : c));
         } finally {
             setSavingMapping(false);
         }
@@ -114,11 +195,48 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
         }));
     };
 
+    const filteredSubjects = useMemo(() => {
+        const list = classSubjects;
+        const f = subjectFilter.trim();
+        if (!f) return list;
+        return list.filter(s => s.toLowerCase().includes(f.toLowerCase()));
+    }, [classSubjects, subjectFilter]);
+
+    const applyAutoFill = () => {
+        if (autoFillPattern === 'balanced') {
+            if (!classSubjects || classSubjects.length === 0) return;
+            let i = 0;
+            const next: Record<string, Record<string, string>> = {};
+            timeSlots.forEach(ts => {
+                next[ts] = {};
+                daysList.forEach(d => {
+                    next[ts][d] = classSubjects[i % classSubjects.length];
+                    i++;
+                });
+            });
+            setGridSubjects(next);
+        } else if (autoFillPattern === 'repeat_first_day') {
+            if (!classSubjects || classSubjects.length === 0) return;
+            const next: Record<string, Record<string, string>> = {};
+            const firstDay = daysList[0];
+            let i = 0;
+            timeSlots.forEach(ts => {
+                const base = gridSubjects[ts]?.[firstDay] || classSubjects[i % classSubjects.length];
+                i++;
+                next[ts] = {};
+                daysList.forEach(d => { next[ts][d] = base; });
+            });
+            setGridSubjects(next);
+        }
+    };
+
     const saveSchedule = async () => {
         if (!selectedClass) return;
+        if (unassignedCount > 0) { showToast('لا يمكن الحفظ مع مواد غير مسندة لمعلم', 'error'); return; }
+        if (overlapWarnings.length > 0) { showToast('يوجد تعارضات زمنية داخل الفصل. عدّلها ثم احفظ.', 'warning'); return; }
         const entries: { day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday'; timeSlot: string; subject: string; }[] = [];
         timeSlots.forEach(ts => {
-            days.forEach(d => {
+            daysList.forEach(d => {
                 const subj = gridSubjects[ts]?.[d] || '';
                 if (subj) entries.push({ day: d as any, timeSlot: ts, subject: subj });
             });
@@ -161,7 +279,8 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
         if (!currentClass) return;
         setSavingSubjects(true);
         try {
-            await api.updateClassSubjects(schoolId, currentClass.id, subjectsEdit);
+            const updated = await api.updateClassSubjects(schoolId, currentClass.id, subjectsEdit);
+            setClasses(prev => prev.map(c => c.id === updated.id ? updated : c));
         } finally {
             setSavingSubjects(false);
         }
@@ -189,9 +308,9 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
 
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md overflow-x-auto">
                 {loading ? <div className="text-center py-8">جاري تحميل الجدول...</div> : (
-                    <div className="grid grid-cols-6 min-w-[900px]">
+                    <div className="grid min-w-[900px]" style={{ gridTemplateColumns: `auto repeat(${daysList.length}, minmax(140px, 1fr))` }}>
                         <div className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">الوقت</div>
-                        {days.map(day => (
+                        {daysList.map(day => (
                             <div key={day} className="font-bold text-center p-3 border-b-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">
                                 {dayTranslations[day]}
                             </div>
@@ -202,28 +321,36 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
                                 <div className="font-semibold text-center p-3 border-l border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-400 flex items-center justify-center">
                                     {timeSlot}
                                 </div>
-                                {days.map(day => {
+                                {daysList.map(day => {
                                     const entry = scheduleData[timeSlot]?.[day];
                                     const colorClass = entry ? (subjectColors[entry.subject] || subjectColors.default) : '';
                                     const isEditing = editing;
+                                    const subj = gridSubjects[timeSlot]?.[day] || '';
+                                    const unassigned = subj && !mapping[subj];
+                                    const dayIdx = daysList.indexOf(day);
+                                    const timeIdx = timeSlots.indexOf(timeSlot);
+                                    const shadeClass = isEditing ? (dayIdx % 2 === 1 ? 'bg-gray-50 dark:bg-gray-800' : 'bg-gray-100 dark:bg-gray-700') : '';
                                     return (
-                                        <div key={`${timeSlot}-${day}`} className={`p-2 border-b border-l border-gray-200 dark:border-gray-600 ${entry && !isEditing ? colorClass : ''}`}>
+                                        <div key={`${timeSlot}-${day}`} className={`p-2 border-b border-l border-gray-200 dark:border-gray-600 ${entry && !isEditing ? colorClass : ''} ${entry && !isEditing && !entry.teacherName ? 'ring-2 ring-red-400' : ''} ${shadeClass}`}>
                                             {isEditing ? (
-                                                <select
-                                                    value={gridSubjects[timeSlot]?.[day] || ''}
-                                                    onChange={(e) => handleSubjectSelect(timeSlot, day, e.target.value)}
-                                                    className="w-full text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
-                                                >
-                                                    <option value="">—</option>
-                                                    {classSubjects.map(s => (
-                                                        <option key={s} value={s}>{s}</option>
-                                                    ))}
-                                                </select>
+                                                <>
+                                                    <select
+                                                        value={subj}
+                                                        onChange={(e) => handleSubjectSelect(timeSlot, day, e.target.value)}
+                                                        className="w-full text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
+                                                    >
+                                                        <option value="">—</option>
+                                                        {filteredSubjects.map(s => (
+                                                            <option key={s} value={s}>{s}</option>
+                                                        ))}
+                                                    </select>
+                                                    {unassigned ? (<div className="mt-1 text-xs text-red-600">غير مسند لمعلم</div>) : null}
+                                                </>
                                             ) : (
                                                 entry && (
                                                     <div className="text-center">
                                                         <p className="font-bold text-sm">{entry.subject}</p>
-                                                        <p className="text-xs">{entry.teacherName}</p>
+                                                        <p className={`text-xs ${!entry.teacherName ? 'text-red-600' : ''}`}>{entry.teacherName || 'غير مسند'}</p>
                                                     </div>
                                                 )
                                             )}
@@ -241,19 +368,45 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
                         {editing ? 'إنهاء التحرير' : 'تحرير الجدول'}
                     </button>
                     {editing && (
-                        <button onClick={saveSchedule} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">حفظ الجدول</button>
+                        <>
+                            <input value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} placeholder="فلترة المواد" className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700" />
+                            <select value={autoFillPattern} onChange={(e) => setAutoFillPattern(e.target.value as any)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                                <option value="balanced">ملء تلقائي (توزيع بالتساوي)</option>
+                                <option value="repeat_first_day">ملء تلقائي (تكرار اليوم الأول)</option>
+                            </select>
+                            <button onClick={applyAutoFill} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">تطبيق الملء</button>
+                            <div className="flex items-center gap-3 text-sm">
+                                <span className={`px-2 py-1 rounded ${unassignedCount>0?'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300':'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>مواد غير مسندة: {unassignedCount}</span>
+                                <span className={`px-2 py-1 rounded ${overlapWarnings.length>0?'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300':'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>تعارض فترات: {overlapWarnings.length}</span>
+                            </div>
+                            <button onClick={saveSchedule} disabled={!isDirty || unassignedCount>0 || overlapWarnings.length>0} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-teal-400 disabled:cursor-not-allowed">حفظ الجدول</button>
+                        </>
                     )}
                 </div>
+                {editing && overlapWarnings.length>0 && (
+                    <div className="mt-2 p-3 rounded bg-yellow-50 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 text-sm">
+                        {overlapWarnings.slice(0,8).map((w,i)=>(
+                            <div key={`${w.teacherId}-${w.day}-${w.timeSlot}-${i}`}>{w.teacherName || 'معلم'} — {dayTranslations[w.day] || w.day}: {w.timeSlot} يتعارض مع {w.otherTimeSlot}</div>
+                        ))}
+                    </div>
+                )}
                 {currentClass && (
                     <div>
                         <h4 className="font-semibold mb-3 text-gray-700 dark:text-gray-300">إدارة المواد للفصل المختار</h4>
                         <div className="flex flex-wrap gap-2 mb-3">
-                            {subjectsEdit.map(s => (
-                                <span key={s} className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            {subjectsEdit.map(s => {
+                                const unassigned = !mapping[s];
+                                const chipClass = unassigned
+                                  ? "px-2 py-1 text-xs font-medium rounded-full bg-red-50 text-red-700 border border-red-400 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700 flex items-center gap-2"
+                                  : "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 flex items-center gap-2";
+                                return (
+                                  <span key={s} className={chipClass}>
                                     {s}
+                                    {unassigned && <span className="ml-1 text-[10px]">غير مسند</span>}
                                     <button onClick={() => removeSubject(s)} className="text-red-600 hover:text-red-700">×</button>
-                                </span>
-                            ))}
+                                  </span>
+                                );
+                            })}
                         </div>
                         <div className="flex items-center gap-2 mb-4">
                             <input value={newSubject} onChange={(e) => setNewSubject(e.target.value)} placeholder="أضف مادة جديدة" className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700" />
@@ -271,6 +424,7 @@ const Schedule: React.FC<ScheduleProps> = ({ schoolId }) => {
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
                                     </select>
+                                    {!mapping[subj] && <span className="text-xs text-red-600">غير مسند</span>}
                                 </div>
                             ))}
                         </div>

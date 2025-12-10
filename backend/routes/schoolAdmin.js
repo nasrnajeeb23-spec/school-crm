@@ -1849,6 +1849,7 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         academicYearEnd: end,
         notifications: { email: true, sms: false, push: true },
         availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
+        scheduleConfig: { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
       });
     }
     const obj = settings.toJSON();
@@ -1864,6 +1865,7 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         terms: Array.isArray(obj.terms) ? obj.terms : [ { name: 'الفصل الأول', start: obj.academicYearStart, end: '' }, { name: 'الفصل الثاني', start: '', end: obj.academicYearEnd } ],
         holidays: Array.isArray(obj.holidays) ? obj.holidays : [],
         admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : (obj.admissionForm || { studentFields: ['الاسم الكامل','تاريخ الميلاد','الجنس','الرقم الوطني','العنوان','المدينة'], parentFields: ['الاسم','هاتف الاتصال','بريد الإلكتروني'], requiredDocuments: [], registrationFee: 0, consentFormRequired: false, consentFormText: '', autoGenerateRegistrationInvoice: true, registrationFeeDueDays: 7 }),
+        scheduleConfig: obj.scheduleConfig && typeof obj.scheduleConfig === 'object' ? obj.scheduleConfig : { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
     });
   } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
@@ -1876,8 +1878,20 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const { 
       schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
       genderType, levelType, ownershipType, availableStages, workingHoursStart, workingHoursEnd, workingDays,
-      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays, admissionForm
+      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays, admissionForm, scheduleConfig
     } = req.body;
+    const emailStr = String(contactEmail || '').trim();
+    const phoneStr = String(contactPhone || '').trim();
+    const timeRx = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+    const dateRx = /^\d{4}-\d{2}-\d{2}$/;
+    if (emailStr && !/^.+@.+\..+$/.test(emailStr)) return res.status(400).json({ msg: 'بريد إلكتروني غير صالح' });
+    if (phoneStr && !/^[0-9+\-()\s]{5,}$/.test(phoneStr)) return res.status(400).json({ msg: 'رقم هاتف غير صالح' });
+    if (workingHoursStart && !timeRx.test(String(workingHoursStart))) return res.status(400).json({ msg: 'وقت غير صالح' });
+    if (workingHoursEnd && !timeRx.test(String(workingHoursEnd))) return res.status(400).json({ msg: 'وقت غير صالح' });
+    if (lessonStartTime && !timeRx.test(String(lessonStartTime))) return res.status(400).json({ msg: 'وقت غير صالح' });
+    if (departureTime && !timeRx.test(String(departureTime))) return res.status(400).json({ msg: 'وقت غير صالح' });
+    if (academicYearStart && !dateRx.test(String(academicYearStart))) return res.status(400).json({ msg: 'تاريخ غير صالح' });
+    if (academicYearEnd && !dateRx.test(String(academicYearEnd))) return res.status(400).json({ msg: 'تاريخ غير صالح' });
     const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
     if (!settings) return res.status(404).json({ msg: 'Settings not found' });
 
@@ -1904,6 +1918,47 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     if (terms !== undefined) settings.terms = Array.isArray(terms) ? terms : settings.terms;
     if (holidays !== undefined) settings.holidays = Array.isArray(holidays) ? holidays : settings.holidays;
     if (admissionForm !== undefined) settings.admissionForm = admissionForm;
+    if (scheduleConfig !== undefined) {
+      const sc = typeof scheduleConfig === 'string' ? JSON.parse(scheduleConfig) : scheduleConfig;
+      const pcRaw = Number(sc?.periodCount);
+      const pdRaw = Number(sc?.periodDurationMinutes);
+      const gapRaw = sc?.gapMinutes === undefined ? 0 : Number(sc?.gapMinutes);
+      const stStr = String(sc?.startTime || '');
+      if (stStr && !timeRx.test(stStr)) return res.status(400).json({ msg: 'وقت بداية الحصص غير صالح' });
+      const pc = Number.isFinite(pcRaw) ? pcRaw : 5;
+      const pd = Number.isFinite(pdRaw) ? pdRaw : 60;
+      const gap = Number.isFinite(gapRaw) ? gapRaw : 0;
+      if (pc < 1 || pc > 20) return res.status(400).json({ msg: 'عدد الحصص غير صالح' });
+      if (pd < 10 || pd > 180) return res.status(400).json({ msg: 'مدة الحصة غير صالحة' });
+      if (gap < 0 || gap > 60) return res.status(400).json({ msg: 'فاصل الحصص غير صالح' });
+      let templates = sc?.templates || null;
+      if (templates && typeof templates === 'object') {
+        const validDays = new Set(['Sunday','Monday','Tuesday','Wednesday','Thursday']);
+        const normalizeSlots = (arr) => {
+          const list = Array.isArray(arr) ? arr.map(x => String(x || '').trim()).filter(Boolean) : [];
+          if (list.length > pc) return list.slice(0, pc);
+          if (list.length < pc) return list.concat(Array(pc - list.length).fill(''));
+          return list;
+        };
+        const week = templates.week && typeof templates.week === 'object' ? templates.week : null;
+        const nextWeek = {};
+        if (week) {
+          Object.keys(week).forEach(d => { if (validDays.has(d)) nextWeek[d] = normalizeSlots(week[d]); });
+        }
+        const byStage = Array.isArray(templates.byStage) ? templates.byStage : [];
+        const nextByStage = [];
+        for (const row of byStage) {
+          const stage = String(row?.stage || '').trim();
+          const w = row?.week && typeof row.week === 'object' ? row.week : null;
+          if (!stage || !w) continue;
+          const out = {};
+          Object.keys(w).forEach(d => { if (validDays.has(d)) out[d] = normalizeSlots(w[d]); });
+          nextByStage.push({ stage, week: out });
+        }
+        templates = { week: nextWeek, byStage: nextByStage };
+      }
+      settings.scheduleConfig = { periodCount: pc, periodDurationMinutes: pd, startTime: stStr || (settings.scheduleConfig?.startTime || '08:00'), gapMinutes: gap, ...(templates ? { templates } : {}) };
+    }
     
     await settings.save();
     const obj = settings.toJSON();
@@ -1916,6 +1971,7 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       terms: Array.isArray(obj.terms) ? obj.terms : obj.terms,
       holidays: Array.isArray(obj.holidays) ? obj.holidays : obj.holidays,
       admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : obj.admissionForm,
+      scheduleConfig: obj.scheduleConfig && typeof obj.scheduleConfig === 'object' ? obj.scheduleConfig : { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
     });
   } catch (err) { console.error('Error in PUT settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
