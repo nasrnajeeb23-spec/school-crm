@@ -2791,7 +2791,7 @@ router.get('/:schoolId/communications/usage', verifyToken, requireRole('SCHOOL_A
       const start = new Date(startStr);
       const end = new Date(endStr);
       if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-        (where as any).createdAt = { [Op.between]: [start, end] };
+        where.createdAt = { [Op.between]: [start, end] };
       }
     }
     const rows = await CommunicationUsage.findAll({ where, order: [['createdAt','DESC']] });
