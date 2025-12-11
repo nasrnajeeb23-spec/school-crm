@@ -70,7 +70,10 @@ const LandingPage: React.FC = () => {
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>, targetId: string) => {
     e.preventDefault();
-    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setIsMobileMenuOpen(false);
+    setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
   
   const handleAdSubmit = async (data: NewAdRequestData) => {
@@ -142,14 +145,15 @@ const LandingPage: React.FC = () => {
 
       {isMobileMenuOpen && (
         <>
-        <div className="fixed inset-0 bg-black/40 md:hidden z-30" onClick={() => setIsMobileMenuOpen(false)} />
-        <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700 z-50">
+          <div className="fixed inset-0 bg-black/40 md:hidden z-30" onClick={() => setIsMobileMenuOpen(false)} />
+        <div className="md:hidden bg-white dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700 z-50 relative">
           <div className="container mx-auto px-4 py-3 flex flex-col gap-3">
             <a href="#features" onClick={(e) => { handleNavClick(e, 'features'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الميزات</a>
             <a href="#pricing" onClick={(e) => { handleNavClick(e, 'pricing'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">الأسعار</a>
             <a href="#contact" onClick={(e) => { handleNavClick(e, 'contact'); setIsMobileMenuOpen(false); }} className="py-2 text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">تواصل معنا</a>
             <button onClick={() => { goTo('/apps'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200">تحميل التطبيقات</button>
             <button onClick={() => { goTo('/superadmin/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">بوابة المدير العام</button>
+            <button onClick={() => { goTo('/login'); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200">تسجيل الدخول</button>
             <button onClick={() => { setIsTrialModalOpen(true); setIsMobileMenuOpen(false); }} className="py-2 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">ابدأ تجربتك المجانية</button>
           </div>
         </div>
