@@ -399,6 +399,10 @@ export const approveSalarySlip = async (schoolId: number, slipId: string): Promi
     return await apiCall(`/school/${schoolId}/payroll/salary-slips/${slipId}/approve`, { method: 'PUT' });
 };
 
+export const updateSalarySlip = async (schoolId: number, slipId: string, payload: { baseAmount?: number; allowances?: { name: string; amount: number; }[]; deductions?: { name: string; amount: number; }[]; }): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/payroll/salary-slips/${slipId}`, { method: 'PUT', body: JSON.stringify(payload) });
+};
+
 export const submitPayrollReceipt = async (schoolId: number, slipId: string, data: { receiptNumber?: string; receiptDate?: string; receivedBy?: string; attachment?: File | null; }): Promise<any> => {
     const form = new FormData();
     if (data.receiptNumber) form.append('receiptNumber', data.receiptNumber);
@@ -1394,7 +1398,7 @@ export const getStaffAttendance = async (schoolId: number, date: string): Promis
 };
 
 export const saveStaffAttendance = async (schoolId: number, date: string, records: { userId: number, status: AttendanceStatus }[]): Promise<void> => {
-    await apiCall(`/school/${schoolId}/staff-attendance`, { method: 'POST', body: JSON.stringify({ date, records }) });
+    await apiCall(`/school/${schoolId}/staff-attendance/bulk`, { method: 'POST', body: JSON.stringify({ date, records }) });
 };
 
 export const sendInvoiceReminder = async (schoolId: number, invoiceId: string): Promise<any> => {

@@ -54,6 +54,21 @@ const SalarySlip = sequelize.define('SalarySlip', {
     type: DataTypes.JSON, // [{ name, amount }]
     allowNull: true,
   },
+  absenceDays: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+  },
+  lateMinutes: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+  },
+  overtimeMinutes: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+  },
   status: {
     type: DataTypes.STRING, // Draft | Approved
     allowNull: false,
@@ -76,6 +91,10 @@ const SalarySlip = sequelize.define('SalarySlip', {
     allowNull: true,
   },
   receiptAttachmentUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  receivedBy: {
     type: DataTypes.STRING,
     allowNull: true,
   },

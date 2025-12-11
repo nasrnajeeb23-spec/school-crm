@@ -455,12 +455,26 @@ router.get('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADMI
 router.post('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), validate([
   { name: 'name', required: true, type: 'string', minLength: 2 },
   { name: 'type', required: true, type: 'string' },
-  { name: 'baseAmount', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
     const id = 'salstr_' + Date.now();
     const payload = req.body || {};
-    const row = await SalaryStructure.create({ id, schoolId: parseInt(req.params.schoolId, 10), name: payload.name, type: payload.type, baseAmount: payload.baseAmount || 0, hourlyRate: payload.hourlyRate || null, lessonRate: payload.lessonRate || null, allowances: Array.isArray(payload.allowances) ? payload.allowances : [], deductions: Array.isArray(payload.deductions) ? payload.deductions : [], absencePenaltyPerDay: payload.absencePenaltyPerDay || null, latePenaltyPerMinute: payload.latePenaltyPerMinute || null, overtimeRatePerMinute: payload.overtimeRatePerMinute || null, appliesTo: payload.appliesTo || 'staff', isDefault: !!payload.isDefault });
+    const type = String(payload.type || 'Fixed');
+    const appliesTo = String(payload.appliesTo || 'staff');
+    if (!['Fixed','Hourly','PartTime','PerLesson'].includes(type)) return res.status(400).json({ msg: 'Invalid type' });
+    if (!['staff','teacher'].includes(appliesTo)) return res.status(400).json({ msg: 'Invalid appliesTo' });
+    const baseAmount = Number(payload.baseAmount || 0);
+    const hourlyRate = payload.hourlyRate != null ? Number(payload.hourlyRate) : null;
+    const lessonRate = payload.lessonRate != null ? Number(payload.lessonRate) : null;
+    if ((type === 'Fixed' || type === 'PartTime') && baseAmount < 0) return res.status(400).json({ msg: 'baseAmount must be >= 0' });
+    if (type === 'Hourly' && (!hourlyRate || hourlyRate <= 0)) return res.status(400).json({ msg: 'hourlyRate must be > 0' });
+    if (type === 'PerLesson' && (!lessonRate || lessonRate <= 0)) return res.status(400).json({ msg: 'lessonRate must be > 0' });
+    const allowances = Array.isArray(payload.allowances) ? payload.allowances.map(a => ({ name: String(a.name || ''), amount: Math.max(0, Number(a.amount || 0)) })) : [];
+    const deductions = Array.isArray(payload.deductions) ? payload.deductions.map(d => ({ name: String(d.name || ''), amount: Math.max(0, Number(d.amount || 0)) })) : [];
+    const absencePenaltyPerDay = payload.absencePenaltyPerDay != null ? Math.max(0, Number(payload.absencePenaltyPerDay)) : null;
+    const latePenaltyPerMinute = payload.latePenaltyPerMinute != null ? Math.max(0, Number(payload.latePenaltyPerMinute)) : null;
+    const overtimeRatePerMinute = payload.overtimeRatePerMinute != null ? Math.max(0, Number(payload.overtimeRatePerMinute)) : null;
+    const row = await SalaryStructure.create({ id, schoolId: parseInt(req.params.schoolId, 10), name: payload.name, type, baseAmount, hourlyRate, lessonRate, allowances, deductions, absencePenaltyPerDay, latePenaltyPerMinute, overtimeRatePerMinute, appliesTo, isDefault: !!payload.isDefault });
     res.status(201).json(row.toJSON());
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
@@ -469,17 +483,37 @@ router.put('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHOOL_
     const row = await SalaryStructure.findOne({ where: { id: req.params.id, schoolId: req.params.schoolId } });
     if (!row) return res.status(404).json({ msg: 'Not Found' });
     const p = req.body || {};
-    if (p.name !== undefined) row.name = p.name;
-    if (p.type !== undefined) row.type = p.type;
-    if (p.baseAmount !== undefined) row.baseAmount = p.baseAmount;
-    if (p.hourlyRate !== undefined) row.hourlyRate = p.hourlyRate;
-    if (p.lessonRate !== undefined) row.lessonRate = p.lessonRate;
-    if (p.allowances !== undefined) row.allowances = Array.isArray(p.allowances) ? p.allowances : [];
-    if (p.deductions !== undefined) row.deductions = Array.isArray(p.deductions) ? p.deductions : [];
-    if (p.absencePenaltyPerDay !== undefined) row.absencePenaltyPerDay = p.absencePenaltyPerDay;
-    if (p.latePenaltyPerMinute !== undefined) row.latePenaltyPerMinute = p.latePenaltyPerMinute;
-    if (p.overtimeRatePerMinute !== undefined) row.overtimeRatePerMinute = p.overtimeRatePerMinute;
-    if (p.appliesTo !== undefined) row.appliesTo = p.appliesTo;
+    if (p.name !== undefined) row.name = String(p.name);
+    if (p.type !== undefined) {
+      const type = String(p.type);
+      if (!['Fixed','Hourly','PartTime','PerLesson'].includes(type)) return res.status(400).json({ msg: 'Invalid type' });
+      row.type = type;
+    }
+    if (p.baseAmount !== undefined) {
+      const v = Number(p.baseAmount);
+      if (v < 0) return res.status(400).json({ msg: 'baseAmount must be >= 0' });
+      row.baseAmount = v;
+    }
+    if (p.hourlyRate !== undefined) {
+      const v = Number(p.hourlyRate);
+      if (v <= 0) return res.status(400).json({ msg: 'hourlyRate must be > 0' });
+      row.hourlyRate = v;
+    }
+    if (p.lessonRate !== undefined) {
+      const v = Number(p.lessonRate);
+      if (v <= 0) return res.status(400).json({ msg: 'lessonRate must be > 0' });
+      row.lessonRate = v;
+    }
+    if (p.allowances !== undefined) row.allowances = Array.isArray(p.allowances) ? p.allowances.map(a => ({ name: String(a.name || ''), amount: Math.max(0, Number(a.amount || 0)) })) : [];
+    if (p.deductions !== undefined) row.deductions = Array.isArray(p.deductions) ? p.deductions.map(d => ({ name: String(d.name || ''), amount: Math.max(0, Number(d.amount || 0)) })) : [];
+    if (p.absencePenaltyPerDay !== undefined) row.absencePenaltyPerDay = Math.max(0, Number(p.absencePenaltyPerDay));
+    if (p.latePenaltyPerMinute !== undefined) row.latePenaltyPerMinute = Math.max(0, Number(p.latePenaltyPerMinute));
+    if (p.overtimeRatePerMinute !== undefined) row.overtimeRatePerMinute = Math.max(0, Number(p.overtimeRatePerMinute));
+    if (p.appliesTo !== undefined) {
+      const at = String(p.appliesTo);
+      if (!['staff','teacher'].includes(at)) return res.status(400).json({ msg: 'Invalid appliesTo' });
+      row.appliesTo = at;
+    }
     if (p.isDefault !== undefined) row.isDefault = !!p.isDefault;
     await row.save();
     res.json(row.toJSON());
@@ -556,11 +590,15 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
       const struct = structMap.get(structId);
       if (!struct) return null;
       let base = Number(struct.baseAmount || 0);
-      if (String(struct.type).toLowerCase() === 'hourly') {
-        const rows = staffAttendanceByUser.get(String(id)) || [];
-        const totalHours = rows.reduce((sum, r) => sum + Number(r.hoursWorked || 0), 0);
-        const rate = Number(struct.hourlyRate || 0);
-        base = totalHours * rate;
+      const isHourly = String(struct.type).toLowerCase() === 'hourly';
+      const isPerLesson = String(struct.type).toLowerCase() === 'perlesson';
+      if (isHourly || isPerLesson) {
+        const rows = personType === 'staff'
+          ? (staffAttendanceByUser.get(String(id)) || [])
+          : (teacherAttendanceByTeacher.get(String(id)) || []);
+        const totalUnits = rows.reduce((sum, r) => sum + Number(r.hoursWorked || 0), 0);
+        const rate = isHourly ? Number(struct.hourlyRate || 0) : Number(struct.lessonRate || 0);
+        base = totalUnits * rate;
       }
       const allowancesArr = Array.isArray(struct.allowances) ? [...struct.allowances] : [];
       const deductionsArr = Array.isArray(struct.deductions) ? [...struct.deductions] : [];
@@ -591,6 +629,9 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
         netAmount: net,
         allowances: allowancesArr,
         deductions: deductionsArr,
+        absenceDays,
+        lateMinutes,
+        overtimeMinutes,
         status: 'Draft',
       };
     }
@@ -624,10 +665,18 @@ router.get('/:schoolId/staff-attendance', verifyToken, requireRole('SCHOOL_ADMIN
 });
 router.post('/:schoolId/staff-attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const { userId, date, checkIn, checkOut, hoursWorked, status, overtimeMinutes } = req.body || {};
+    const { userId, date, checkIn, checkOut, hoursWorked, status, overtimeMinutes, lateMinutes } = req.body || {};
     if (!userId || !date) return res.error(400, 'VALIDATION_FAILED', 'userId and date required');
+    const schoolId = Number(req.params.schoolId);
+    const uid = Number(userId);
+    const hw = hoursWorked != null ? Number(hoursWorked) : null;
+    const otm = overtimeMinutes != null ? Number(overtimeMinutes) : 0;
+    const lm = lateMinutes != null ? Number(lateMinutes) : 0;
+    if (hw != null && (isNaN(hw) || hw < 0 || hw > 24)) return res.error(400, 'VALIDATION_FAILED', 'hoursWorked must be between 0 and 24');
+    if (isNaN(otm) || otm < 0 || otm > 24 * 60) return res.error(400, 'VALIDATION_FAILED', 'overtimeMinutes must be between 0 and 1440');
+    if (isNaN(lm) || lm < 0 || lm > 24 * 60) return res.error(400, 'VALIDATION_FAILED', 'lateMinutes must be between 0 and 1440');
     const id = 'stfatt_' + Date.now();
-    const row = await StaffAttendance.create({ id, schoolId: Number(req.params.schoolId), userId: Number(userId), date, checkIn: checkIn || null, checkOut: checkOut || null, hoursWorked: hoursWorked || null, status: status || 'Present', overtimeMinutes: overtimeMinutes || 0 });
+    const row = await StaffAttendance.create({ id, schoolId, userId: uid, date, checkIn: checkIn || null, checkOut: checkOut || null, hoursWorked: hw, status: status || 'Present', overtimeMinutes: otm, lateMinutes: lm });
     return res.success(row.toJSON(), 'Staff attendance created', 'CREATED');
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
@@ -660,6 +709,36 @@ router.get('/:schoolId/payroll/salary-slips', verifyToken, requireRole('SCHOOL_A
     if (month) where.month = month;
     const rows = await SalarySlip.findAll({ where, order: [['createdAt','DESC']] });
     res.json(rows.map(r => r.toJSON()));
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Update salary slip (Draft only)
+router.put('/:schoolId/payroll/salary-slips/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
+  try {
+    const row = await SalarySlip.findOne({ where: { id: req.params.id, schoolId: req.params.schoolId } });
+    if (!row) return res.status(404).json({ msg: 'Not Found' });
+    if (row.status !== 'Draft') return res.status(400).json({ msg: 'Only Draft slips can be edited' });
+    const payload = req.body || {};
+    if (payload.baseAmount !== undefined) {
+      const base = Number(payload.baseAmount);
+      if (isNaN(base) || base < 0) return res.status(400).json({ msg: 'Invalid baseAmount' });
+      row.baseAmount = base;
+    }
+    if (payload.allowances !== undefined) {
+      const arr = Array.isArray(payload.allowances) ? payload.allowances : [];
+      row.allowances = arr.map(a => ({ name: String(a.name || ''), amount: Math.max(0, Number(a.amount || 0)) }));
+    }
+    if (payload.deductions !== undefined) {
+      const arr = Array.isArray(payload.deductions) ? payload.deductions : [];
+      row.deductions = arr.map(d => ({ name: String(d.name || ''), amount: Math.max(0, Number(d.amount || 0)) }));
+    }
+    const allowancesTotal = (Array.isArray(row.allowances) ? row.allowances : []).reduce((sum, a) => sum + Number(a.amount || 0), 0);
+    const deductionsTotal = (Array.isArray(row.deductions) ? row.deductions : []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    row.allowancesTotal = allowancesTotal;
+    row.deductionsTotal = deductionsTotal;
+    row.netAmount = Number(row.baseAmount || 0) + allowancesTotal - deductionsTotal;
+    await row.save();
+    res.json(row.toJSON());
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -3282,7 +3361,7 @@ router.delete('/:schoolId/staff/:id', verifyToken, requireRole('SCHOOL_ADMIN', '
 // @route   GET api/school/:schoolId/staff-attendance
 // @desc    Get staff attendance for a specific date
 // @access  Private (SchoolAdmin)
-router.get('/:schoolId/staff-attendance', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+router.get('/:schoolId/staff-attendance/by-date', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
     const { date } = req.query;
@@ -3307,7 +3386,7 @@ router.get('/:schoolId/staff-attendance', verifyToken, requireSameSchoolParam('s
 // @route   POST api/school/:schoolId/staff-attendance
 // @desc    Save staff attendance
 // @access  Private (SchoolAdmin)
-router.post('/:schoolId/staff-attendance', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+router.post('/:schoolId/staff-attendance/bulk', verifyToken, requireSameSchoolParam('schoolId'), requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
     const { date, records } = req.body; // records: [{ userId, status }]
