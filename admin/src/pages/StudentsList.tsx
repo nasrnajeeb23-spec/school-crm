@@ -36,6 +36,9 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
   const [genIncludeUniform, setGenIncludeUniform] = useState<boolean>(true);
   const [genIncludeActivities, setGenIncludeActivities] = useState<boolean>(true);
   const [genDiscounts, setGenDiscounts] = useState<string[]>([]);
+  const [showManualShare, setShowManualShare] = useState(false);
+  const [manualLink, setManualLink] = useState('');
+  const [sharing, setSharing] = useState(false);
   
 
   useEffect(() => {
@@ -81,11 +84,12 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
             studentId: newStudent.id,
           });
           try {
-            await api.inviteParent(parent.id);
-            addToast(`تم ربط ولي الأمر "${parent.name}" ودعوته عبر البريد.`, 'info');
+            const res = await api.inviteParent(parent.id, 'manual');
+            if (res.activationLink) { setManualLink(res.activationLink); setShowManualShare(true); }
+            addToast(`تم ربط ولي الأمر "${parent.name}". تم إنشاء رابط التفعيل للمشاركة اليدوية.`, 'success');
           } catch (inviteErr) {
             console.warn('Parent invite failed:', inviteErr);
-            addToast('تم ربط ولي الأمر، تعذر إرسال الدعوة الآن.', 'warning');
+            addToast('تم ربط ولي الأمر، تعذر تجهيز رابط التفعيل الآن.', 'warning');
           }
         } catch (parentErr) {
           console.warn('Parent upsert failed:', parentErr);
@@ -221,6 +225,43 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
           onSave={handleAddStudent}
           schoolId={schoolId}
         />
+      )}
+      {showManualShare && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[90%] max-w-lg text-right">
+            <h3 className="text-lg font-semibold mb-3">رابط التفعيل للمشاركة اليدوية</h3>
+            <a href={manualLink} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 underline">{manualLink}</a>
+            <div className="flex gap-3 mt-4 justify-end">
+              <button
+                onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); } }}
+                className="px-3 py-2 bg-teal-600 text-white rounded-md"
+              >نسخ الرابط</button>
+              <button
+                onClick={async () => {
+                  try {
+                    setSharing(true);
+                    const anyNav = navigator as any;
+                    if (anyNav.share) {
+                      await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
+                      addToast('تمت المشاركة بنجاح.', 'success');
+                    } else {
+                      await navigator.clipboard.writeText(manualLink);
+                      addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
+                    }
+                  } catch {
+                    try { await navigator.clipboard.writeText(manualLink); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+                  } finally {
+                    setSharing(false);
+                  }
+                }}
+                disabled={sharing}
+                aria-disabled={sharing}
+                className={`px-3 py-2 ${sharing ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+              >{sharing ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
+              <button onClick={() => setShowManualShare(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -42,11 +42,55 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
   const [channelByParent, setChannelByParent] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
   const [showManualShare, setShowManualShare] = useState(false);
   const [manualLink, setManualLink] = useState('');
+  const [cooldownByParent, setCooldownByParent] = useState<Record<string, number>>({});
+
+  const ManualShareModal: React.FC<{ link: string; onClose: () => void; }> = ({ link, onClose }) => {
+    const [sharing, setSharing] = useState(false);
+    const onShare = async () => {
+      try {
+        setSharing(true);
+        const anyNav = navigator as any;
+        if (anyNav.share) {
+          await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: link });
+          addToast('تمت المشاركة بنجاح.', 'success');
+        } else {
+          await navigator.clipboard.writeText(link);
+          addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
+        }
+      } catch {
+        try { await navigator.clipboard.writeText(link); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+      } finally {
+        setSharing(false);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[90%] max-w-lg text-right">
+          <h3 className="text-lg font-semibold mb-3">رابط التفعيل للمشاركة اليدوية</h3>
+          <a href={link} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 underline">{link}</a>
+          <div className="flex gap-3 mt-4 justify-end">
+            <button
+              onClick={() => { try { navigator.clipboard.writeText(link); addToast('تم نسخ الرابط.', 'success'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); } }}
+              className="px-3 py-2 bg-teal-600 text-white rounded-md"
+            >نسخ الرابط</button>
+            <button
+              onClick={onShare}
+              disabled={sharing}
+              aria-disabled={sharing}
+              className={`px-3 py-2 ${sharing ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+            >{sharing ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
+            <button onClick={onClose} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const handleInvite = async (parentId: string | number, channelOverride?: 'email' | 'sms' | 'manual') => {
     try {
       setSendingId(parentId);
-      const channel = channelOverride || channelByParent[String(parentId)] || 'email';
+      const channel = channelOverride || channelByParent[String(parentId)] || 'manual';
       const res = await api.inviteParent(String(parentId), channel);
       if (channel === 'manual') {
         if (res.activationLink) {
@@ -64,6 +108,7 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
       addToast('فشل إرسال الدعوة لولي الأمر.', 'error');
     } finally {
       setSendingId(null);
+      setCooldownByParent(prev => ({ ...prev, [String(parentId)]: Date.now() + 2500 }));
     }
   };
 
@@ -120,21 +165,29 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <select
-                        value={channelByParent[String(parent.id)] || 'email'}
+                        value={channelByParent[String(parent.id)] || 'manual'}
                         onChange={(e) => setChannelByParent(prev => ({ ...prev, [String(parent.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
                         className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
                       >
-                        <option value="email">البريد الإلكتروني (مدفوع)</option>
-                        <option value="sms">رسالة نصية (مدفوعة)</option>
+                        <option value="email" disabled={!parent.email}>البريد الإلكتروني (مدفوع)</option>
+                        <option value="sms" disabled={!parent.phone || String(parent.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
                         <option value="manual">مشاركة يدوية (مجاني)</option>
                       </select>
-                      <button
-                        onClick={() => handleInvite(parent.id)}
-                        disabled={sendingId === parent.id}
-                        className={`font-medium ${sendingId === parent.id ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
-                      >
-                        {sendingId === parent.id ? 'جاري الإرسال...' : (parent.status === ParentAccountStatus.Invited ? 'إعادة إرسال' : 'إرسال الدعوة')}
-                      </button>
+                      {(() => {
+                        const cool = (cooldownByParent[String(parent.id)] || 0) > Date.now();
+                        const disabled = sendingId === parent.id || cool;
+                        const label = sendingId === parent.id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : (parent.status === ParentAccountStatus.Invited ? 'إعادة إرسال' : 'إرسال الدعوة');
+                        return (
+                          <button
+                            onClick={() => handleInvite(parent.id)}
+                            disabled={disabled}
+                            aria-disabled={disabled}
+                            className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })()}
                       <button className="font-medium text-red-600 dark:text-red-500 hover:underline">إلغاء التنشيط</button>
                     </div>
                   </td>
@@ -144,36 +197,9 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
           </table>
         )}
       </div>
-      {showManualShare ? (
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[90%] max-w-lg text-right">
-          <h3 className="text-lg font-semibold mb-3">رابط التفعيل للمشاركة اليدوية</h3>
-          <p dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">{manualLink}</p>
-          <div className="flex gap-3 mt-4 justify-end">
-            <button
-              onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch {} }}
-              className="px-3 py-2 bg-teal-600 text-white rounded-md"
-            >نسخ الرابط</button>
-            <button
-              onClick={async () => {
-                try {
-                  // @ts-ignore
-                  if (navigator.share) {
-                    // @ts-ignore
-                    await navigator.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
-                  } else {
-                    await navigator.clipboard.writeText(manualLink);
-                    addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
-                  }
-                } catch {}
-              }}
-              className="px-3 py-2 bg-indigo-600 text-white rounded-md"
-            >مشاركة</button>
-            <button onClick={() => setShowManualShare(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
-          </div>
-        </div>
-      </div>
-      ) : null}
+      {showManualShare && (
+        <ManualShareModal link={manualLink} onClose={() => setShowManualShare(false)} />
+      )}
     </div>
   );
 };

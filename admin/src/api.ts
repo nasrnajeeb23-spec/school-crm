@@ -339,7 +339,7 @@ export const deleteSchoolStaff = async (schoolId: number, userId: number | strin
     await apiCall(`/school/${schoolId}/staff/${userId}`, { method: 'DELETE' });
 };
 
-export const inviteStaff = async (userId: string, channel: 'email' | 'sms' | 'manual' = 'email'): Promise<{ activationLink?: string; inviteSent?: boolean; channel?: string; }> => {
+export const inviteStaff = async (userId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string; inviteSent?: boolean; channel?: string; }> => {
     const res: any = await apiCall('/auth/staff/invite', { method: 'POST', body: JSON.stringify({ userId, channel }) });
     return { activationLink: res?.activationLink, inviteSent: res?.inviteSent, channel: res?.channel };
 };
@@ -486,11 +486,13 @@ export const getSubscriptionState = async (schoolId: number): Promise<Subscripti
 };
 
 export const createFeeSetup = async (schoolId: number, payload: Partial<FeeSetup>): Promise<FeeSetup> => {
-    return await apiCall(`/school/${schoolId}/fees`, { method: 'POST', body: JSON.stringify(payload) });
+    const resp = await apiCall(`/school/${schoolId}/fees`, { method: 'POST', body: JSON.stringify(payload) });
+    return unwrap<FeeSetup>(resp);
 };
 
 export const updateFeeSetup = async (schoolId: number, id: string | number, payload: Partial<FeeSetup>): Promise<FeeSetup> => {
-    return await apiCall(`/school/${schoolId}/fees/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    const resp = await apiCall(`/school/${schoolId}/fees/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    return unwrap<FeeSetup>(resp);
 };
 
 export const deleteFeeSetup = async (schoolId: number, id: string | number): Promise<void> => {
@@ -763,12 +765,12 @@ export const upsertSchoolParent = async (schoolId: number, data: NewParentData):
     return await apiCall(`/school/${schoolId}/parents`, { method: 'POST', body: JSON.stringify(data) });
 };
 
-export const inviteParent = async (parentId: string, channel: 'email' | 'sms' | 'manual' = 'email'): Promise<{ activationLink?: string }> => {
+export const inviteParent = async (parentId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string }> => {
     const res: any = await apiCall('/auth/parent/invite', { method: 'POST', body: JSON.stringify({ parentId, channel }) });
     return { activationLink: res?.activationLink };
 };
 
-export const inviteTeacher = async (teacherId: string, channel: 'email' | 'sms' | 'manual' = 'email'): Promise<{ activationLink?: string }> => {
+export const inviteTeacher = async (teacherId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string }> => {
     const res: any = await apiCall('/auth/teacher/invite', { method: 'POST', body: JSON.stringify({ teacherId, channel }) });
     return { activationLink: res?.activationLink };
 };

@@ -65,11 +65,13 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
   const [channelByTeacher, setChannelByTeacher] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
   const [showManualShare, setShowManualShare] = useState(false);
   const [manualLink, setManualLink] = useState('');
+  const [cooldownByTeacher, setCooldownByTeacher] = useState<Record<string, number>>({});
+  const [sharing, setSharing] = useState(false);
 
   const handleInviteTeacher = async (teacherId: string | number) => {
     try {
       setSendingId(teacherId);
-      const channel = channelByTeacher[String(teacherId)] || 'email';
+      const channel = channelByTeacher[String(teacherId)] || 'manual';
       const res = await api.inviteTeacher(String(teacherId), channel);
       if (channel === 'manual') {
         if (res.activationLink) {
@@ -86,6 +88,7 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
       addToast('فشل إرسال دعوة المعلم.', 'error');
     } finally {
       setSendingId(null);
+      setCooldownByTeacher(prev => ({ ...prev, [String(teacherId)]: Date.now() + 2500 }));
     }
   };
 
@@ -156,21 +159,29 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                           عرض التفاصيل
                         </Link>
                         <select
-                          value={channelByTeacher[String(teacher.id)] || 'email'}
+                          value={channelByTeacher[String(teacher.id)] || 'manual'}
                           onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
                           className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
                         >
-                          <option value="email">البريد الإلكتروني (مدفوع)</option>
-                          <option value="sms">رسالة نصية (مدفوعة)</option>
+                          <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
+                          <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
                           <option value="manual">مشاركة يدوية (مجاني)</option>
                         </select>
-                        <button
-                          onClick={() => handleInviteTeacher(teacher.id)}
-                          disabled={sendingId === teacher.id}
-                          className={`font-medium ${sendingId === teacher.id ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
-                        >
-                          {sendingId === teacher.id ? 'جاري الإرسال...' : 'دعوة'}
-                        </button>
+                        {(() => {
+                          const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
+                          const disabled = sendingId === teacher.id || cool;
+                          const label = sendingId === teacher.id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : 'دعوة';
+                          return (
+                            <button
+                              onClick={() => handleInviteTeacher(teacher.id)}
+                              disabled={disabled}
+                              aria-disabled={disabled}
+                              className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>
@@ -190,27 +201,34 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[90%] max-w-lg text-right">
             <h3 className="text-lg font-semibold mb-3">رابط التفعيل للمشاركة اليدوية</h3>
-            <p dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">{manualLink}</p>
+            <a href={manualLink} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 underline">{manualLink}</a>
             <div className="flex gap-3 mt-4 justify-end">
               <button
-                onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch {} }}
+                onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); } }}
                 className="px-3 py-2 bg-teal-600 text-white rounded-md"
               >نسخ الرابط</button>
               <button
                 onClick={async () => {
                   try {
-                    // @ts-ignore
-                    if (navigator.share) {
-                      // @ts-ignore
-                      await navigator.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
+                    setSharing(true);
+                    const anyNav = navigator as any;
+                    if (anyNav.share) {
+                      await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
+                      addToast('تمت المشاركة بنجاح.', 'success');
                     } else {
                       await navigator.clipboard.writeText(manualLink);
                       addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
                     }
-                  } catch {}
+                  } catch {
+                    try { await navigator.clipboard.writeText(manualLink); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+                  } finally {
+                    setSharing(false);
+                  }
                 }}
-                className="px-3 py-2 bg-indigo-600 text-white rounded-md"
-              >مشاركة</button>
+                disabled={sharing}
+                aria-disabled={sharing}
+                className={`px-3 py-2 ${sharing ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+              >{sharing ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
               <button onClick={() => setShowManualShare(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
             </div>
           </div>

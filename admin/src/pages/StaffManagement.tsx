@@ -50,11 +50,13 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
   const [channelByStaff, setChannelByStaff] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
   const [showManualShare, setShowManualShare] = useState(false);
   const [manualLink, setManualLink] = useState('');
+  const [cooldownByStaff, setCooldownByStaff] = useState<Record<string, number>>({});
+  const [sharing, setSharing] = useState(false);
 
   const handleInviteStaff = async (userId: string | number) => {
     try {
       setSendingId(userId);
-      const channel = channelByStaff[String(userId)] || 'email';
+      const channel = channelByStaff[String(userId)] || 'manual';
       const res = await api.inviteStaff(String(userId), channel);
       if (channel === 'manual') {
         if (res.activationLink) { setManualLink(res.activationLink); setShowManualShare(true); }
@@ -72,6 +74,7 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
       addToast('فشل إرسال دعوة الموظف.', 'error');
     } finally {
       setSendingId(null);
+      setCooldownByStaff(prev => ({ ...prev, [String(userId)]: Date.now() + 2500 }));
     }
   };
 
@@ -250,21 +253,29 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <select
-                          value={channelByStaff[String((member as any).id)] || 'email'}
+                          value={channelByStaff[String((member as any).id)] || 'manual'}
                           onChange={(e) => setChannelByStaff(prev => ({ ...prev, [String((member as any).id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
                           className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
                         >
-                          <option value="email">البريد الإلكتروني (مدفوع)</option>
-                          <option value="sms">رسالة نصية (مدفوعة)</option>
+                          <option value="email" disabled={!((member as any).email && String((member as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
+                          <option value="sms" disabled={!((member as any).phone && String((member as any).phone).trim() !== '')}>رسالة نصية (مدفوعة)</option>
                           <option value="manual">مشاركة يدوية (مجاني)</option>
                         </select>
-                        <button
-                          onClick={() => handleInviteStaff((member as any).id)}
-                          disabled={sendingId === (member as any).id}
-                          className={`font-medium ${sendingId === (member as any).id ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
-                        >
-                          {sendingId === (member as any).id ? 'جاري الإرسال...' : 'دعوة'}
-                        </button>
+                        {(() => {
+                          const cool = (cooldownByStaff[String((member as any).id)] || 0) > Date.now();
+                          const disabled = sendingId === (member as any).id || cool;
+                          const label = sendingId === (member as any).id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : 'دعوة';
+                          return (
+                            <button
+                              onClick={() => handleInviteStaff((member as any).id)}
+                              disabled={disabled}
+                              aria-disabled={disabled}
+                              className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })()}
                         <button onClick={() => { setEditing(member); setIsModalOpen(true); }} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">تعديل</button>
                         <button onClick={() => handleDeleteStaff(member)} disabled={member.schoolRole === SchoolRole.Admin} className="font-medium text-red-600 dark:text-red-500 hover:underline disabled:text-red-300 disabled:cursor-not-allowed">حذف</button>
                       </div>
@@ -289,27 +300,34 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[90%] max-w-lg text-right">
             <h3 className="text-lg font-semibold mb-3">رابط التفعيل للمشاركة اليدوية</h3>
-            <p dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">{manualLink}</p>
+            <a href={manualLink} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 underline">{manualLink}</a>
             <div className="flex gap-3 mt-4 justify-end">
               <button
-                onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch {} }}
+                onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); } }}
                 className="px-3 py-2 bg-teal-600 text-white rounded-md"
               >نسخ الرابط</button>
               <button
                 onClick={async () => {
                   try {
-                    // @ts-ignore
-                    if (navigator.share) {
-                      // @ts-ignore
-                      await navigator.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
+                    setSharing(true);
+                    const anyNav = navigator as any;
+                    if (anyNav.share) {
+                      await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
+                      addToast('تمت المشاركة بنجاح.', 'success');
                     } else {
                       await navigator.clipboard.writeText(manualLink);
                       addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
                     }
-                  } catch {}
+                  } catch {
+                    try { await navigator.clipboard.writeText(manualLink); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+                  } finally {
+                    setSharing(false);
+                  }
                 }}
-                className="px-3 py-2 bg-indigo-600 text-white rounded-md"
-              >مشاركة</button>
+                disabled={sharing}
+                aria-disabled={sharing}
+                className={`px-3 py-2 ${sharing ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+              >{sharing ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
               <button onClick={() => setShowManualShare(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
             </div>
           </div>

@@ -2529,6 +2529,12 @@ router.post('/:schoolId/modules/quote', verifyToken, requireRole('SCHOOL_ADMIN',
 
 router.post('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), requireSameSchoolParam('schoolId'), requireModule('finance'), validate([
   { name: 'stage', required: true, type: 'string' },
+  { name: 'tuitionFee', type: 'number' },
+  { name: 'bookFees', type: 'number' },
+  { name: 'uniformFees', type: 'number' },
+  { name: 'activityFees', type: 'number' },
+  { name: 'paymentPlanType', type: 'string', enum: ['Monthly','Termly','Installments'] },
+  { name: 'discounts', type: 'array', element: { type: { type: 'string', enum: ['Sibling','TopAchiever','Orphan'] }, percentage: { type: 'number' } } }
 ]), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
@@ -2536,6 +2542,10 @@ router.post('/:schoolId/fees', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
   const exists = await FeeSetup.findOne({ where: { schoolId, stage } });
     if (exists) return res.error(400, 'DUPLICATE', 'Stage already configured');
   const payload = req.body || {};
+  const amounts = [Number(payload.tuitionFee || 0), Number(payload.bookFees || 0), Number(payload.uniformFees || 0), Number(payload.activityFees || 0)];
+  if (amounts.some(v => v < 0)) return res.error(400, 'VALIDATION_FAILED', 'Amounts must be non-negative');
+  const disc = Array.isArray(payload.discounts) ? payload.discounts : [];
+  for (const d of disc) { const p = Number(d.percentage || 0); if (p < 0 || p > 100) return res.error(400, 'VALIDATION_FAILED', 'Invalid discount percentage'); }
   const row = await FeeSetup.create({ schoolId, stage: String(payload.stage), tuitionFee: Number(payload.tuitionFee || 0), bookFees: Number(payload.bookFees || 0), uniformFees: Number(payload.uniformFees || 0), activityFees: Number(payload.activityFees || 0), paymentPlanType: payload.paymentPlanType || 'Monthly', paymentPlanDetails: payload.paymentPlanDetails || {}, discounts: Array.isArray(payload.discounts) ? payload.discounts : [] });
   let planResp; try { planResp = typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : (row.paymentPlanDetails || {}); } catch { planResp = {}; }
   let discResp = row.discounts; if (typeof discResp === 'string') { try { discResp = JSON.parse(discResp); } catch { discResp = []; } }
@@ -2836,14 +2846,23 @@ router.put('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const row = await FeeSetup.findOne({ where: { id: Number(req.params.id), schoolId: Number(req.params.schoolId) } });
     if (!row) return res.error(404, 'NOT_FOUND', 'Fee setup not found');
     const p = req.body || {};
-    if (p.stage !== undefined) row.stage = String(p.stage);
-    if (p.tuitionFee !== undefined) row.tuitionFee = Number(p.tuitionFee || 0);
-    if (p.bookFees !== undefined) row.bookFees = Number(p.bookFees || 0);
-    if (p.uniformFees !== undefined) row.uniformFees = Number(p.uniformFees || 0);
-    if (p.activityFees !== undefined) row.activityFees = Number(p.activityFees || 0);
+    if (p.stage !== undefined) {
+      const candidate = String(p.stage);
+      const dup = await FeeSetup.findOne({ where: { schoolId: Number(req.params.schoolId), stage: candidate } });
+      if (dup && dup.id !== row.id) return res.error(400, 'DUPLICATE', 'Stage already configured');
+      row.stage = candidate;
+    }
+    if (p.tuitionFee !== undefined) { const v = Number(p.tuitionFee || 0); if (v < 0) return res.error(400, 'VALIDATION_FAILED', 'Amounts must be non-negative'); row.tuitionFee = v; }
+    if (p.bookFees !== undefined) { const v = Number(p.bookFees || 0); if (v < 0) return res.error(400, 'VALIDATION_FAILED', 'Amounts must be non-negative'); row.bookFees = v; }
+    if (p.uniformFees !== undefined) { const v = Number(p.uniformFees || 0); if (v < 0) return res.error(400, 'VALIDATION_FAILED', 'Amounts must be non-negative'); row.uniformFees = v; }
+    if (p.activityFees !== undefined) { const v = Number(p.activityFees || 0); if (v < 0) return res.error(400, 'VALIDATION_FAILED', 'Amounts must be non-negative'); row.activityFees = v; }
     if (p.paymentPlanType !== undefined) row.paymentPlanType = p.paymentPlanType;
     if (p.paymentPlanDetails !== undefined) row.paymentPlanDetails = p.paymentPlanDetails;
-    if (p.discounts !== undefined) row.discounts = Array.isArray(p.discounts) ? p.discounts : [];
+    if (p.discounts !== undefined) {
+      const arr = Array.isArray(p.discounts) ? p.discounts : [];
+      for (const d of arr) { const v = Number(d.percentage || 0); if (v < 0 || v > 100) return res.error(400, 'VALIDATION_FAILED', 'Invalid discount percentage'); }
+      row.discounts = arr;
+    }
   await row.save();
   let planResp2; try { planResp2 = typeof row.paymentPlanDetails === 'string' ? JSON.parse(row.paymentPlanDetails) : (row.paymentPlanDetails || {}); } catch { planResp2 = {}; }
   let discResp2 = row.discounts; if (typeof discResp2 === 'string') { try { discResp2 = JSON.parse(discResp2); } catch { discResp2 = []; } }

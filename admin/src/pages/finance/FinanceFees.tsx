@@ -147,17 +147,37 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
     const saveFee = async () => {
         try {
             if (!newFee.stage) { addToast('اختر المرحلة.', 'error'); return; }
-            if (editingFeeId) {
+            const plan = String(newFee.paymentPlanType || 'Monthly');
+            if (!['Monthly','Termly','Installments'].includes(plan)) { addToast('خطة الدفع غير صحيحة.', 'error'); return; }
+            const tf = Number(newFee.tuitionFee || 0);
+            const bf = Number(newFee.bookFees || 0);
+            const uf = Number(newFee.uniformFees || 0);
+            const af = Number(newFee.activityFees || 0);
+            if (tf < 0 || bf < 0 || uf < 0 || af < 0) { addToast('القيم يجب أن تكون غير سالبة.', 'error'); return; }
+            const ds = Array.isArray(newFee.discounts) ? newFee.discounts : [];
+            for (const d of ds) {
+                const pct = Number(d.percentage || 0);
+                if (pct < 0 || pct > 100) { addToast('نسبة الخصم بين 0 و 100%.', 'error'); return; }
+            }
+            if (!editingFeeId) {
+                const dup = feeSetups.some(f => f.stage === newFee.stage);
+                if (dup) { addToast('هذه المرحلة مضافة مسبقًا.', 'error'); return; }
+                const created = await api.createFeeSetup(schoolId, newFee as any);
+                setFeeSetups(prev => [created, ...prev]);
+            } else {
+                const dupEdit = feeSetups.some(f => f.stage === newFee.stage && f.id !== editingFeeId);
+                if (dupEdit) { addToast('مرحلة مكررة. عدّل إلى مرحلة فريدة.', 'error'); return; }
                 const updated = await api.updateFeeSetup(schoolId, editingFeeId, newFee as any);
                 setFeeSetups(prev => prev.map(f => f.id === editingFeeId ? updated : f));
                 setEditingFeeId('');
-            } else {
-                const created = await api.createFeeSetup(schoolId, newFee as any);
-                setFeeSetups(prev => [created, ...prev]);
             }
             setNewFee({ stage: '', tuitionFee: 0, bookFees: 0, uniformFees: 0, activityFees: 0, paymentPlanType: 'Monthly', discounts: [] });
             addToast('تم حفظ إعداد الرسوم.', 'success');
-        } catch { addToast('فشل حفظ إعداد الرسوم.', 'error'); }
+        } catch (e: any) {
+            const msg = String(e?.message || '');
+            if (msg.includes('DUPLICATE') || msg.includes('Stage already configured')) { addToast('هذه المرحلة مضافة مسبقًا.', 'error'); return; }
+            addToast('فشل حفظ إعداد الرسوم.', 'error');
+        }
     };
 
     const deleteFee = async (id: string) => {
@@ -223,7 +243,7 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                             <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th className="px-6 py-3">اسم الطالب</th><th className="px-6 py-3">تاريخ الاستحقاق</th><th className="px-6 py-3">المبلغ</th><th className="px-6 py-3">المدفوع</th><th className="px-6 py-3">المتبقي</th><th className="px-6 py-3">الحالة</th><th className="px-6 py-3">إجراءات</th></tr></thead>
                                 <tbody>
-                                    {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4 text-green-600">${(invoice.paidAmount || 0).toFixed(2)}</td><td className="px-6 py-4 text-red-600">${(invoice.remainingAmount ?? invoice.totalAmount).toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>{invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}</div></td></tr>))}
+                                    {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4 text-green-600">${(invoice.paidAmount || 0).toFixed(2)}</td><td className="px-6 py-4 text-red-600">${((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))).toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>{invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}</div></td></tr>))}
                                 </tbody>
                             </table>
                         ) : (
