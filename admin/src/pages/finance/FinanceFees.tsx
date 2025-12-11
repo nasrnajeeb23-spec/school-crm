@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Invoice, InvoiceStatus, PaymentData, NewInvoiceData, FeeSetup, DiscountRule, PaymentPlanType, SchoolSettings } from '../../types';
+import { Invoice, InvoiceStatus, PaymentData, NewInvoiceData, FeeSetup, DiscountRule, PaymentPlanType, SchoolSettings, SubscriptionState } from '../../types';
 import * as api from '../../api';
 import { FileIcon, PlusIcon } from '../../components/icons';
 import AddInvoiceModal from '../../components/AddInvoiceModal';
@@ -10,6 +10,7 @@ import { useToast } from '../../contexts/ToastContext';
 import TableSkeleton from '../../components/TableSkeleton';
 import EmptyState from '../../components/EmptyState';
 import BrandableCard from '../../components/BrandableCard';
+import ResourceUsageWidget from '../../components/ResourceUsageWidget';
 
 const invoiceStatusColorMap: { [key in InvoiceStatus]: string } = {
   [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -33,6 +34,7 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
     const [commEndDate, setCommEndDate] = useState<string>('');
     const [commGroupBy, setCommGroupBy] = useState<'none'|'day'|'month'>('month');
     const [commChannel, setCommChannel] = useState<'all'|'email'|'sms'>('all');
+    const [subscriptionState, setSubscriptionState] = useState<SubscriptionState | null>(null);
     
     // Invoice State
     const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
@@ -69,10 +71,12 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
             api.getSchoolInvoices(schoolId),
             api.getFeeSetups(schoolId),
             api.getSchoolCommunicationsUsage(schoolId, usageParams),
-        ]).then(([invoicesData, feesData, usageData]) => {
+            api.getSubscriptionState(schoolId)
+        ]).then(([invoicesData, feesData, usageData, subState]) => {
             setInvoices(invoicesData);
             setFeeSetups(feesData);
             setCommUsage(usageData);
+            setSubscriptionState(subState);
         }).catch(err => {
             console.error("Failed to fetch fee data:", err);
             setCommUsage(null);
@@ -163,11 +167,16 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
     const generateInvoices = async () => {
         if (!genStage || !genDueDate) { addToast('اختر المرحلة وحدد تاريخ الاستحقاق.', 'error'); return; }
         try {
+            const limits = (subscriptionState?.limits || subscriptionState?.plan?.limits || { invoices: 100 }) as any;
+            const currentInv = (subscriptionState?.usage?.invoices ?? invoices.length) as number;
+            const maxInv = limits?.invoices === 'غير محدود' ? Infinity : Number(limits?.invoices || 100);
+            if (currentInv >= maxInv) { addToast('تم بلوغ حد الفواتير. يرجى الترقية أو زيادة الحد.', 'warning'); return; }
             const res = await api.generateInvoicesFromFees(schoolId, { stage: genStage, dueDate: genDueDate, include: { books: genIncludeBooks, uniform: genIncludeUniform, activities: genIncludeActivities }, defaultDiscounts: genDiscounts });
             addToast(`تم إنشاء ${res.createdCount} فاتورة.`, 'success');
             const invs = await api.getSchoolInvoices(schoolId);
             setInvoices(invs);
             setGenStage('');
+            try { const s = await api.getSubscriptionState(schoolId); setSubscriptionState(s); } catch {}
         } catch { addToast('فشل إنشاء الفواتير.', 'error'); }
     };
 
@@ -177,6 +186,13 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
 
     if (loading) return <TableSkeleton />;
 
+    const canCreateInvoice = useMemo(() => {
+        const limits = (subscriptionState?.limits || subscriptionState?.plan?.limits || { invoices: 100 }) as any;
+        const currentInv = (subscriptionState?.usage?.invoices ?? invoices.length) as number;
+        const maxInv = limits?.invoices === 'غير محدود' ? Infinity : Number(limits?.invoices || 100);
+        return currentInv < maxInv;
+    }, [subscriptionState, invoices]);
+
     return (
         <div className="mt-6 space-y-6">
             <div className="flex gap-4 mb-4">
@@ -185,6 +201,7 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
             </div>
 
             {activeTab === 'invoices' ? (<>
+                <ResourceUsageWidget schoolId={schoolId} />
                 <BrandableCard schoolSettings={schoolSettings}>
                     <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
                         <div className="flex items-center gap-4">
@@ -196,7 +213,10 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                                 <option value={InvoiceStatus.Overdue}>متأخرة</option>
                             </select>
                         </div>
-                        <button onClick={() => setIsAddInvoiceModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إنشاء فاتورة</button>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setIsAddInvoiceModalOpen(true)} disabled={!canCreateInvoice} className={`flex items-center px-4 py-2 rounded-lg transition-colors ${canCreateInvoice ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'}`}><PlusIcon className="h-5 w-5 ml-2" />إنشاء فاتورة</button>
+                          {!canCreateInvoice && <span className="text-xs text-red-600 dark:text-red-400">تم بلوغ حد الفواتير</span>}
+                        </div>
                     </div>
                     <div className="overflow-x-auto">
                         {filteredInvoices.length > 0 ? (
