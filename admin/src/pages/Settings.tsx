@@ -1325,7 +1325,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                       <input type="time" name="departureTime" id="departureTime" value={settings.departureTime || ''} onChange={handleInputChange} className={inputStyle} />
                     </div>
                   </div>
-                  <div className="mt-4">
+                <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">طرق الحضور</label>
                     <div className="mt-2 flex flex-wrap gap-4">
                       {(['QR','RFID','Manual'] as ('QR'|'RFID'|'Manual')[]).map(m => (
@@ -1333,6 +1333,35 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                           <input type="checkbox" checked={attendanceMethods.includes(m)} onChange={() => handleAttendanceMethodToggle(m)} className="form-checkbox h-5 w-5 text-teal-600" />
                           <span className="text-gray-700 dark:text-gray-300">{m === 'Manual' ? 'يدوي' : m}</span>
                         </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">إعداد الجدول الدراسي</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">وقت بداية الحصص</label>
+                      <input type="time" value={settings.scheduleConfig?.startTime || settings.workingHoursStart || ''} onChange={(e) => setScheduleCfg({ startTime: e.target.value })} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">عدد الحصص يوميًا</label>
+                      <input type="number" min={1} max={20} value={String(settings.scheduleConfig?.periodCount ?? 5)} onChange={(e) => setScheduleCfg({ periodCount: Number(e.target.value || 5) })} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">مدة الحصة (دقائق)</label>
+                      <input type="number" min={10} max={180} value={String(settings.scheduleConfig?.periodDurationMinutes ?? 60)} onChange={(e) => setScheduleCfg({ periodDurationMinutes: Number(e.target.value || 60) })} className={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">فاصل بين الحصص (دقائق)</label>
+                      <input type="number" min={0} max={60} value={String(settings.scheduleConfig?.gapMinutes ?? 0)} onChange={(e) => setScheduleCfg({ gapMinutes: Number(e.target.value || 0) })} className={inputStyle} />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">معاينة الفترات الزمنية</label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {previewTimeSlots.map((ts, idx) => (
+                        <span key={idx} className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">{ts}</span>
                       ))}
                     </div>
                   </div>
@@ -1704,32 +1733,3 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
 };
 
 export default Settings;
-                <div className="md:col-span-2">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">إعداد الجدول الدراسي</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">وقت بداية الحصص</label>
-                      <input type="time" value={settings.scheduleConfig?.startTime || settings.workingHoursStart || ''} onChange={(e) => setScheduleCfg({ startTime: e.target.value })} className={inputStyle} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">عدد الحصص يوميًا</label>
-                      <input type="number" min={1} max={20} value={String(settings.scheduleConfig?.periodCount ?? 5)} onChange={(e) => setScheduleCfg({ periodCount: Number(e.target.value || 5) })} className={inputStyle} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">مدة الحصة (دقائق)</label>
-                      <input type="number" min={10} max={180} value={String(settings.scheduleConfig?.periodDurationMinutes ?? 60)} onChange={(e) => setScheduleCfg({ periodDurationMinutes: Number(e.target.value || 60) })} className={inputStyle} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">فاصل بين الحصص (دقائق)</label>
-                      <input type="number" min={0} max={60} value={String(settings.scheduleConfig?.gapMinutes ?? 0)} onChange={(e) => setScheduleCfg({ gapMinutes: Number(e.target.value || 0) })} className={inputStyle} />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">معاينة الفترات الزمنية</label>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {previewTimeSlots.map((ts, idx) => (
-                        <span key={idx} className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">{ts}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
