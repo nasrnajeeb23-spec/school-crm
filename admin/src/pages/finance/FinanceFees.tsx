@@ -204,14 +204,14 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
         setGenDiscounts(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
     };
 
-    if (loading) return <TableSkeleton />;
-
     const canCreateInvoice = useMemo(() => {
         const limits = (subscriptionState?.limits || subscriptionState?.plan?.limits || { invoices: 100 }) as any;
         const currentInv = (subscriptionState?.usage?.invoices ?? invoices.length) as number;
         const maxInv = limits?.invoices === 'غير محدود' ? Infinity : Number(limits?.invoices || 100);
         return currentInv < maxInv;
     }, [subscriptionState, invoices]);
+
+    if (loading) return <TableSkeleton />;
 
     return (
         <div className="mt-6 space-y-6">

@@ -67,7 +67,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
               const isSilentCheck = endpoint === '/auth/me';
               const hadToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
               const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
-              if (!isAuthFlow && !isSilentCheck && hadToken && onProtectedRoute) {
+              if (!isAuthFlow && (isSilentCheck || (hadToken && onProtectedRoute))) {
                 try {
                   if (typeof window !== 'undefined') {
                     localStorage.removeItem('auth_token');
@@ -1241,7 +1241,11 @@ export const getSchoolCommunicationsUsage = async (
     if (params?.groupBy) qs.push(`groupBy=${encodeURIComponent(params.groupBy)}`);
     if (params?.channel) qs.push(`channel=${encodeURIComponent(params.channel)}`);
     const suffix = qs.length ? `?${qs.join('&')}` : '';
-    return await apiCall(`/school/${schoolId}/communications/usage${suffix}`, { method: 'GET' });
+    try {
+      return await apiCall(`/school/${schoolId}/communications/usage${suffix}`, { method: 'GET' });
+    } catch {
+      return { email: { count: 0, amount: 0 }, sms: { count: 0, amount: 0 }, total: 0, currency: 'USD', breakdown: [] };
+    }
 };
 
 export const getUsageQuote = async (schoolId: number, storageGB?: number): Promise<{ items: Array<{ key: string; qty: number; unitPrice: number; amount: number }>; total: number; currency: string; period: string }> => {
