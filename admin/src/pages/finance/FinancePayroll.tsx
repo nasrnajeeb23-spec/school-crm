@@ -35,6 +35,8 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
     const [editSlipAllowAmount, setEditSlipAllowAmount] = useState<string>('');
     const [editSlipDeductName, setEditSlipDeductName] = useState<string>('');
     const [editSlipDeductAmount, setEditSlipDeductAmount] = useState<string>('');
+    const [detailDelimiter, setDetailDelimiter] = useState<string>('; ');
+    const [csvCurrency, setCsvCurrency] = useState<string>('SAR');
     
     // Assignment State
     const [assignTargetType, setAssignTargetType] = useState<'staff' | 'teacher'>('staff');
@@ -159,6 +161,172 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
 
     const handleApprove = async (id: string) => {
         try { const updated = await api.approveSalarySlip(schoolId, id); setSalarySlips(prev => prev.map(s => s.id === id ? updated : s)); addToast('تمت الموافقة على الكشف.', 'success'); } catch { addToast('فشل الموافقة.', 'error'); }
+    };
+
+    const handleExportSlipsCsv = () => {
+        const rows = salarySlips.filter(s => (slipsStatusFilter === 'all' || String(s.status) === slipsStatusFilter) && String(personName(s.personType, String(s.personId))).toLowerCase().includes(String(slipsSearch || '').trim().toLowerCase()));
+        const header = ['رقم الكشف','الاسم','النوع','الشهر','الأساسي','إجمالي العلاوات','إجمالي الخصومات','الصافي','الحالة','رقم السند','تاريخ السند','العملة'];
+        const fmt = (v: any) => {
+            const str = v == null ? '' : String(v);
+            if (/[",\n]/.test(str)) return `"${str.replace(/"/g,'""')}"`;
+            return str;
+        };
+        const lines = [header.join(',')];
+        for (const s of rows) {
+            const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
+            const name = personName(s.personType, String(s.personId));
+            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const base = Number(s.baseAmount || 0).toFixed(2);
+            const at = Number(s.allowancesTotal || 0).toFixed(2);
+            const dt = Number(s.deductionsTotal || 0).toFixed(2);
+            const net = Number(s.netAmount || 0).toFixed(2);
+            const status = s.status || '';
+            const rn = s.receiptNumber || '';
+            const rd = s.receiptDate || '';
+            lines.push([num,name,type,s.month,base,at,dt,net,status,rn,rd,csvCurrency].map(fmt).join(','));
+        }
+        const csv = '\ufeff' + lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PayrollSlips_${schoolId}_${month}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportSummaryCsv = () => {
+        const groups = ['Draft','Approved','Paid'];
+        const calc = (st?: string) => {
+            const arr = salarySlips.filter(s => (!st ? true : String(s.status) === st));
+            const count = arr.length;
+            const total = arr.reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
+            return { count, total: total.toFixed(2) };
+        };
+        const all = calc();
+        const header = ['الحالة','عدد الكشوف','إجمالي الصافي','العملة'];
+        const lines = [header.join(',')];
+        for (const g of groups) {
+            const r = calc(g);
+            lines.push([g, String(r.count), r.total, csvCurrency].join(','));
+        }
+        lines.push(['All', String(all.count), all.total, csvCurrency].join(','));
+        const csv = '\ufeff' + lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PayrollSummary_${schoolId}_${month}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportSlipsByStatusCsv = (st: 'Draft' | 'Approved' | 'Paid') => {
+        const rows = salarySlips.filter(s => String(s.status) === st);
+        const header = ['رقم الكشف','الاسم','النوع','الشهر','الأساسي','إجمالي العلاوات','إجمالي الخصومات','الصافي','الحالة','رقم السند','تاريخ السند','العملة'];
+        const fmt = (v: any) => {
+            const str = v == null ? '' : String(v);
+            if (/[",\n]/.test(str)) return `"${str.replace(/"/g,'""')}"`;
+            return str;
+        };
+        const lines = [header.join(',')];
+        for (const s of rows) {
+            const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
+            const name = personName(s.personType, String(s.personId));
+            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const base = Number(s.baseAmount || 0).toFixed(2);
+            const at = Number(s.allowancesTotal || 0).toFixed(2);
+            const dt = Number(s.deductionsTotal || 0).toFixed(2);
+            const net = Number(s.netAmount || 0).toFixed(2);
+            const status = s.status || '';
+            const rn = s.receiptNumber || '';
+            const rd = s.receiptDate || '';
+            lines.push([num,name,type,s.month,base,at,dt,net,status,rn,rd,csvCurrency].map(fmt).join(','));
+        }
+        const csv = '\ufeff' + lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PayrollSlips_${schoolId}_${month}_${st}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportComponentsCsv = () => {
+        const header = ['رقم الكشف','الاسم','النوع','الشهر','الفئة','البند','المبلغ','العملة'];
+        const fmt = (v: any) => {
+            const str = v == null ? '' : String(v);
+            if (/[",\n]/.test(str)) return `"${str.replace(/"/g,'""')}"`;
+            return str;
+        };
+        const lines = [header.join(',')];
+        for (const s of salarySlips) {
+            const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
+            const name = personName(s.personType, String(s.personId));
+            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const monthStr = s.month;
+            const allowances = Array.isArray(s.allowances) ? s.allowances : [];
+            const deductions = Array.isArray(s.deductions) ? s.deductions : [];
+            for (const a of allowances) {
+                lines.push([num,name,type,monthStr,'علاوة', String(a.name || ''), Number(a.amount || 0).toFixed(2), csvCurrency].map(fmt).join(','));
+            }
+            for (const d of deductions) {
+                lines.push([num,name,type,monthStr,'خصم', String(d.name || ''), Number(d.amount || 0).toFixed(2), csvCurrency].map(fmt).join(','));
+            }
+        }
+        const csv = '\ufeff' + lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PayrollComponents_${schoolId}_${month}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportUnifiedCsv = () => {
+        const rows = salarySlips.filter(s => (slipsStatusFilter === 'all' || String(s.status) === slipsStatusFilter) && String(personName(s.personType, String(s.personId))).toLowerCase().includes(String(slipsSearch || '').trim().toLowerCase()));
+        const header = ['رقم الكشف','الاسم','النوع','الشهر','الأساسي','إجمالي العلاوات','إجمالي الخصومات','الصافي','الحالة','رقم السند','تاريخ السند','تفاصيل العلاوات','تفاصيل الخصومات','العملة'];
+        const fmt = (v: any) => {
+            const str = v == null ? '' : String(v);
+            if (/[",\n]/.test(str)) return `"${str.replace(/"/g,'""')}"`;
+            return str;
+        };
+        const lines = [header.join(',')];
+        for (const s of rows) {
+            const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
+            const name = personName(s.personType, String(s.personId));
+            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const base = Number(s.baseAmount || 0).toFixed(2);
+            const at = Number(s.allowancesTotal || 0).toFixed(2);
+            const dt = Number(s.deductionsTotal || 0).toFixed(2);
+            const net = Number(s.netAmount || 0).toFixed(2);
+            const status = s.status || '';
+            const rn = s.receiptNumber || '';
+            const rd = s.receiptDate || '';
+            const allowList = (Array.isArray(s.allowances) ? s.allowances : []).map((a: any) => `${String(a.name || '')}:${Number(a.amount || 0).toFixed(2)}`).join(detailDelimiter);
+            const deductList = (Array.isArray(s.deductions) ? s.deductions : []).map((d: any) => `${String(d.name || '')}:${Number(d.amount || 0).toFixed(2)}`).join(detailDelimiter);
+            lines.push([num,name,type,s.month,base,at,dt,net,status,rn,rd,allowList,deductList,csvCurrency].map(fmt).join(','));
+        }
+        const csv = '\ufeff' + lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PayrollUnified_${schoolId}_${month}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     const handleSubmitReceipt = async () => {
@@ -430,6 +598,23 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                       <option value="Approved">موافق عليه</option>
                       <option value="Paid">مدفوع</option>
                     </select>
+                    <button onClick={handleExportSlipsCsv} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">تصدير CSV</button>
+                    <button onClick={() => handleExportSlipsByStatusCsv('Draft')} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">تصدير مسودة</button>
+                    <button onClick={() => handleExportSlipsByStatusCsv('Approved')} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">تصدير موافق</button>
+                    <button onClick={() => handleExportSlipsByStatusCsv('Paid')} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">تصدير مدفوع</button>
+                    <button onClick={handleExportComponentsCsv} className="px-4 py-2 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700">تصدير تفاصيل العلاوات/الخصومات</button>
+                    <button onClick={handleExportUnifiedCsv} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">تصدير CSV موحد</button>
+                    <select value={detailDelimiter} onChange={e => setDetailDelimiter(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                      <option value="; ">فاصل التفاصيل: ;</option>
+                      <option value=" | ">فاصل التفاصيل: |</option>
+                      <option value=" / ">فاصل التفاصيل: /</option>
+                    </select>
+                    <select value={csvCurrency} onChange={e => setCsvCurrency(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                      <option value="SAR">العملة: SAR</option>
+                      <option value="USD">العملة: USD</option>
+                      <option value="YER">العملة: YER</option>
+                      <option value="EGP">العملة: EGP</option>
+                    </select>
                 </div>
                 <div className="overflow-x-auto mt-4">
                     <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
@@ -483,6 +668,41 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                     </div>
                   </div>
                 )}
+            </BrandableCard>
+            <BrandableCard schoolSettings={schoolSettings}>
+                <div className="flex items-center justify-between mb-4"><h4 className="font-semibold">تقرير شهري مجمل حسب الحالة</h4></div>
+                {(() => {
+                    const calc = (st?: string) => {
+                        const arr = salarySlips.filter(s => (!st ? true : String(s.status) === st));
+                        const count = arr.length;
+                        const total = arr.reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
+                        return { count, total: total.toFixed(2) };
+                    };
+                    const draft = calc('Draft');
+                    const approved = calc('Approved');
+                    const paid = calc('Paid');
+                    const all = calc();
+                    return (
+                        <div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                        <tr><th className="px-6 py-3">الحالة</th><th className="px-6 py-3">عدد الكشوف</th><th className="px-6 py-3">إجمالي الصافي</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr className="bg-white dark:bg-gray-800 border-b dark:border-gray-700"><td className="px-6 py-3">مسودة</td><td className="px-6 py-3">{draft.count}</td><td className="px-6 py-3">{draft.total}</td></tr>
+                                        <tr className="bg-white dark:bg-gray-800 border-b dark:border-gray-700"><td className="px-6 py-3">موافق عليه</td><td className="px-6 py-3">{approved.count}</td><td className="px-6 py-3">{approved.total}</td></tr>
+                                        <tr className="bg-white dark:bg-gray-800 border-b dark:border-gray-700"><td className="px-6 py-3">مدفوع</td><td className="px-6 py-3">{paid.count}</td><td className="px-6 py-3">{paid.total}</td></tr>
+                                        <tr className="bg-white dark:bg-gray-800"><td className="px-6 py-3 font-semibold">الكل</td><td className="px-6 py-3 font-semibold">{all.count}</td><td className="px-6 py-3 font-semibold">{all.total}</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="mt-4">
+                                <button onClick={handleExportSummaryCsv} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">تصدير CSV للتقرير</button>
+                            </div>
+                        </div>
+                    );
+                })()}
             </BrandableCard>
             {detailSlip && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
