@@ -46,7 +46,7 @@ export const logout = async () => {
 
 export const getSchools = async (): Promise<School[]> => {
   try {
-    const resp = await fetch(`${API_BASE_URL}/schools`);
+    const resp = await fetch(`${API_BASE_URL}/schools/public`);
     if (!resp.ok) throw new Error('failed');
     const data = await resp.json();
     return data.map(({ id, name }: any) => ({ id, name }));

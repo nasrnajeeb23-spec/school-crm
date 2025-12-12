@@ -16,8 +16,24 @@ const LoginScreen: React.FC<Props> = ({ route }) => {
   const [isSchoolSelectorOpen, setIsSchoolSelectorOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSchoolsLoading, setIsSchoolsLoading] = useState(true);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showIosInstructions, setShowIosInstructions] = useState(false);
+  const [isWeb, setIsWeb] = useState(Platform.OS === 'web');
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Check if running in standalone mode (PWA installed)
+      const isRunningStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+      setIsStandalone(isRunningStandalone);
+
+      // Listen for the beforeinstallprompt event (Android/Chrome)
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        setInstallPrompt(e);
+      });
+    }
+
     api.getSchools().then(data => {
       setSchools(data);
       if (data.length > 0) {
@@ -25,6 +41,21 @@ const LoginScreen: React.FC<Props> = ({ route }) => {
       }
     }).finally(() => setIsSchoolsLoading(false));
   }, []);
+
+  const handleInstallClick = () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+        }
+        setInstallPrompt(null);
+      });
+    } else {
+      // If no prompt is available (e.g. iOS), show instructions
+      setShowIosInstructions(true);
+    }
+  };
 
   const handleLogin = async () => {
     if (!selectedSchool) {
@@ -118,6 +149,25 @@ const LoginScreen: React.FC<Props> = ({ route }) => {
             <Text style={styles.loginButtonText}>تسجيل الدخول</Text>
           )}
         </TouchableOpacity>
+
+        {isWeb && !isStandalone && (
+          <View style={styles.installContainer}>
+            <TouchableOpacity 
+              style={styles.installButton} 
+              onPress={handleInstallClick}
+            >
+              <Text style={styles.installButtonText}>📲 تثبيت التطبيق على جهازك</Text>
+            </TouchableOpacity>
+            
+            {showIosInstructions && (
+              <View style={styles.iosInstructions}>
+                <Text style={styles.iosText}>لتثبيت التطبيق على آيفون/آيباد:</Text>
+                <Text style={styles.iosText}>1. اضغط على زر المشاركة <Text style={{fontWeight: 'bold'}}>Share</Text> في المتصفح</Text>
+                <Text style={styles.iosText}>2. اختر <Text style={{fontWeight: 'bold'}}>Add to Home Screen</Text> (إضافة للشاشة الرئيسية)</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -133,6 +183,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  installContainer: {
+    marginTop: 30,
+    width: '100%',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 20,
+  },
+  installButton: {
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  installButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  iosInstructions: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    width: '100%',
+  },
+  iosText: {
+    textAlign: 'center',
+    color: '#4b5563',
+    marginBottom: 5,
+    fontSize: 14,
   },
   title: {
     fontSize: 32,
