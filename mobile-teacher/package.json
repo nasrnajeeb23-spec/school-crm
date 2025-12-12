@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "apk:eas": "eas build -p android --profile production",
-    "apk:local": "expo prebuild && cd android && .\\gradlew assembleRelease"
+    "apk:local": "expo prebuild && cd android && .\\gradlew assembleRelease",
+    "eas-build-pre-install": "chmod +x android/gradlew"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",

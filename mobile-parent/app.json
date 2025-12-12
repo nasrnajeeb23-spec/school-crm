@@ -4,6 +4,7 @@
     "slug": "mobile-parent",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#ffffff"
@@ -19,7 +20,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/icon.png"
       },
       "package": "com.schoolsaas.parent",
       "versionCode": 1,
@@ -47,6 +49,18 @@
           ]
         }
       ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "SchoolSaaS - Parent",
+      "shortName": "SchoolParent",
+      "description": "School Management System - Parent Portal",
+      "themeColor": "#4f46e5",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "scope": "/apps/parent/",
+      "startUrl": "/apps/parent/",
+      "lang": "ar"
     },
     "plugins": [
       "expo-secure-store",

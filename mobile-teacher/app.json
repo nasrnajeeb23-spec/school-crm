@@ -4,6 +4,7 @@
     "slug": "mobile-teacher",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#ffffff"
@@ -19,7 +20,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/icon.png"
       },
       "package": "com.schoolsaas.teacher",
       "versionCode": 1,
@@ -44,6 +46,18 @@
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "SchoolSaaS - Teacher",
+      "shortName": "SchoolTeacher",
+      "description": "School Management System - Teacher Portal",
+      "themeColor": "#0d9488",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "scope": "/apps/teacher/",
+      "startUrl": "/apps/teacher/",
+      "lang": "ar"
     },
     "plugins": [
       "expo-secure-store",

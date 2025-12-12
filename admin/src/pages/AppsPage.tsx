@@ -146,7 +146,9 @@ const AppsPage: React.FC = () => {
         </div>
 
         <div className="mt-12 bg-indigo-50 dark:bg-indigo-900/40 p-6 rounded-xl text-center">
-          <p className="text-sm text-indigo-800 dark:text-indigo-200">سنضيف روابط التحميل والنسخة الويب بعد تجهيز الحزم وبناء PWA. هذه الصفحة ستبقى هي المكان الرسمي للحصول عليها.</p>
+          <p className="text-sm text-indigo-800 dark:text-indigo-200">
+            يمكنك الآن استخدام النسخة الويب وتثبيتها على جهازك مباشرة. لطلب نسخة APK مخصصة، يرجى التواصل مع الدعم الفني.
+          </p>
         </div>
       </main>
     </div>
