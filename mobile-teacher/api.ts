@@ -54,6 +54,10 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
 
 // ==================== Authentication APIs ====================
 
+export const getSchools = async (): Promise<School[]> => {
+    return await apiCall('/schools');
+};
+
 export const login = async (email: string, password: string, schoolId: number): Promise<User> => {
     const response: any = await apiCall('/auth/login', {
         method: 'POST',
