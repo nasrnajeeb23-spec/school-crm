@@ -6,7 +6,7 @@ import {
     RequestType, RequestStatus, Assignment, Submission, AttendanceStatus, Conversation, Message
 } from './types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://school-crm-backend.onrender.com/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 const authHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -72,7 +72,30 @@ export const getCurrentUser = async (): Promise<User> => {
 };
 
 export const getSchools = async (): Promise<School[]> => {
-    return await apiCall('/schools');
+    const urls = [
+        `${API_BASE_URL}/schools`,
+        `${API_BASE_URL}/schools/public`,
+        `${API_BASE_URL}/public/schools`,
+        `${API_BASE_URL.replace(/\/api\/?$/, '')}/schools`,
+        `${API_BASE_URL.replace(/\/api\/?$/, '')}/public/schools`
+    ];
+
+    for (const url of urls) {
+        try {
+            const resp = await fetch(url);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (Array.isArray(data)) return data;
+                if (data && Array.isArray(data.data)) return data.data;
+            }
+        } catch {}
+    }
+    // Try original apiCall as last resort if authenticated
+    try {
+        return await apiCall('/schools');
+    } catch {
+        return [];
+    }
 };
 
 export const getParentStudents = async (parentId: string): Promise<Student[]> => {
