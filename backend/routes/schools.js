@@ -5,6 +5,33 @@ const { sequelize } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const { requireModule, moduleMap } = require('../middleware/modules');
 
+// Public endpoint alias to list schools without auth
+router.get('/public', async (req, res) => {
+  try {
+    const schools = await School.findAll({
+      include: { model: Subscription, include: { model: Plan } },
+      order: [['name', 'ASC']],
+    });
+    const formattedSchools = schools.map(school => {
+      const s = school.toJSON();
+      return {
+        id: s.id,
+        name: s.name,
+        plan: s.Subscription?.Plan?.name || 'N/A',
+        status: s.Subscription?.status || 'N/A',
+        students: s.studentCount,
+        teachers: s.teacherCount,
+        balance: parseFloat(s.balance),
+        joinDate: new Date(s.createdAt).toISOString().split('T')[0],
+      };
+    });
+    res.json(formattedSchools);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/schools
 // @desc    Get all schools with their subscription details
 // @access  Private (SuperAdmin) / Public for login screen
@@ -36,33 +63,6 @@ router.get('/', async (req, res) => {
       }
     });
 
-    res.json(formattedSchools);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
-
-// Public endpoint alias to list schools without auth
-router.get('/public', async (req, res) => {
-  try {
-    const schools = await School.findAll({
-      include: { model: Subscription, include: { model: Plan } },
-      order: [['name', 'ASC']],
-    });
-    const formattedSchools = schools.map(school => {
-      const s = school.toJSON();
-      return {
-        id: s.id,
-        name: s.name,
-        plan: s.Subscription?.Plan?.name || 'N/A',
-        status: s.Subscription?.status || 'N/A',
-        students: s.studentCount,
-        teachers: s.teacherCount,
-        balance: parseFloat(s.balance),
-        joinDate: new Date(s.createdAt).toISOString().split('T')[0],
-      };
-    });
     res.json(formattedSchools);
   } catch (err) {
     console.error(err.message);
