@@ -121,11 +121,17 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
 
   const handleAddStaff = async (staffData: NewStaffData) => {
     try {
-      const newStaff = await api.addSchoolStaff(schoolId, staffData);
+      const newStaff: any = await api.addSchoolStaff(schoolId, staffData);
       setStaff(prev => [newStaff, ...prev]);
       setIsModalOpen(false);
       const uname = (newStaff as any).username || (newStaff.email?.split('@')[0] || '');
-      addToast(`تمت إضافة الموظف "${newStaff.name}". اسم المستخدم: ${uname}. تم تجهيز الحساب بنجاح.`, 'success');
+      if (newStaff.activationLink) {
+          setManualLink(newStaff.activationLink);
+          setShowManualShare(true);
+          addToast(`تمت إضافة الموظف "${newStaff.name}". تم تجهيز رابط التفعيل.`, 'success');
+      } else {
+          addToast(`تمت إضافة الموظف "${newStaff.name}". اسم المستخدم: ${uname}. تم تجهيز الحساب بنجاح.`, 'success');
+      }
     } catch (error) {
       console.error("Failed to add staff:", error);
       addToast("فشل إضافة الموظف. قد يكون البريد الإلكتروني مستخدمًا.", 'error');

@@ -238,3 +238,19 @@ export const getTeacherSalarySlips = async (teacherId: string): Promise<any[]> =
 export const getTeacherFinanceSummary = async (teacherId: string): Promise<any> => {
     return await apiCall(`/teachers/${teacherId}/finance-summary`);
 };
+
+// ==================== Settings ====================
+
+export const updateTeacherProfile = async (teacherId: string, data: any): Promise<User> => {
+    return await apiCall(`/users/${teacherId}`, { // Assuming user endpoint or specific teacher endpoint
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+};
+
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+    await apiCall('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+    });
+};

@@ -41,10 +41,16 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
 
   const handleAddTeacher = async (teacherData: NewTeacherData) => {
     try {
-        const newTeacher = await api.addSchoolTeacher(schoolId, teacherData);
+        const newTeacher: any = await api.addSchoolTeacher(schoolId, teacherData);
         setTeachers(prevTeachers => [newTeacher, ...prevTeachers]);
         setIsModalOpen(false);
-        addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح.`, 'success');
+        if (newTeacher.activationLink) {
+            setManualLink(newTeacher.activationLink);
+            setShowManualShare(true);
+            addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح. تم إنشاء رابط التفعيل.`, 'success');
+        } else {
+            addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح.`, 'success');
+        }
     } catch (error: any) {
         const msg = String(error?.message || '');
         if (msg.includes('LIMIT_EXCEEDED') || msg.includes('تم بلوغ حد الموارد')) {

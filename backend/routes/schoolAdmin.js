@@ -901,6 +901,8 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         status: statusMap[newTeacher.status] || newTeacher.status
     };
 
+    let linkToReturn = null;
+
     try {
       const e = String(email || '').trim().toLowerCase();
       if (e) {
@@ -928,12 +930,13 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
           const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
           const base = process.env.FRONTEND_URL || 'http://localhost:3000';
           const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+          linkToReturn = activationLink;
           await EmailService.sendActivationInvite(e, name, 'Teacher', activationLink, school.name || '', parseInt(schoolId));
         } catch {}
       }
     } catch {}
 
-    res.status(201).json(formattedTeacher);
+    res.status(201).json({ ...formattedTeacher, activationLink: linkToReturn });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
@@ -1550,8 +1553,20 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     student.parentId = parent.id;
     await student.save();
 
+    let user = await User.findOne({ where: { parentId: parent.id } });
+    if (!user) {
+        // Create user account if not exists
+        const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
+        const hashed = await bcrypt.hash(placeholder, 10);
+        user = await User.create({ email: parent.email, username: parent.email, password: hashed, name: parent.name, role: 'Parent', schoolId: parent.schoolId, parentId: parent.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
+    }
+
+    const inviteToken = jwt.sign({ id: user.id, type: 'invite', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+
     const statusMap = { 'Active': 'نشط', 'Invited': 'مدعو' };
-    return res.status(201).json({ id: String(parent.id), name: parent.name, email: parent.email, phone: parent.phone, status: statusMap[parent.status] || parent.status, studentId: student.id, studentName: student.name });
+    return res.status(201).json({ id: String(parent.id), name: parent.name, email: parent.email, phone: parent.phone, status: statusMap[parent.status] || parent.status, studentId: student.id, studentName: student.name, activationLink });
   } catch (e) {
     console.error(e.message);
     return res.status(500).json({ msg: 'Server Error' });
@@ -3315,6 +3330,7 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
       const inviteToken = jwt.sign({ id: user.id, type: 'invite', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
       const base = process.env.FRONTEND_URL || 'http://localhost:3000';
       const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+      userJson.activationLink = activationLink; // Add link to response
       await EmailService.sendActivationInvite(user.email, user.name, 'Staff', activationLink, '', schoolId);
       userJson.inviteSent = true;
     } catch {}

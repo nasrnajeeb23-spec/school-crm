@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, Button, StyleSheet } from 'react-native';
 import MoreScreen from '../screens/MoreScreen';
 import TeacherFinanceScreen from '../screens/TeacherFinanceScreen';
+import TeacherProfileScreen from '../screens/TeacherProfileScreen';
 import { User } from '../types';
 
 export type MoreStackParamList = {
@@ -12,24 +13,6 @@ export type MoreStackParamList = {
 };
 
 const Stack = createStackNavigator<MoreStackParamList>();
-
-interface ProfileScreenProps {
-    user: User;
-    onLogout: () => void;
-}
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) => {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.profileTitle}>ملفي الشخصي</Text>
-      <Text style={styles.profileText}>الاسم: {user.name}</Text>
-      <Text style={styles.profileText}>البريد الإلكتروني: {user.email}</Text>
-      <View style={styles.logoutButton}>
-        <Button title="تسجيل الخروج" onPress={onLogout} color="#d9534f" />
-      </View>
-    </View>
-  );
-}
-
 
 interface MoreNavigatorProps {
     user: User;
@@ -62,7 +45,7 @@ const MoreNavigator: React.FC<MoreNavigatorProps> = ({ user, onLogout }) => {
         name="Profile"
         options={{ title: 'ملفي الشخصي' }}
       >
-        {() => <ProfileScreen user={user} onLogout={onLogout} />}
+        {() => <TeacherProfileScreen user={user} onLogout={onLogout} />}
       </Stack.Screen>
     </Stack.Navigator>
   );

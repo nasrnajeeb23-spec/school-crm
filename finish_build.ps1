@@ -9,7 +9,7 @@ if (-not (Test-Path $ndkPath)) {
 
 $sourceProp = Join-Path $ndkPath "source.properties"
 if (-not (Test-Path $sourceProp)) {
-    Write-Warning "NDK folder exists but source.properties is missing. Download/Extraction might still be in progress."
+    Write-Warning "NDK folder exists but source.properties0 is missing. Download/Extraction might still be in progress."
     exit
 }
 

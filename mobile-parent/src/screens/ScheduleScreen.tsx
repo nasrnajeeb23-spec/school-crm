@@ -25,8 +25,10 @@ const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ user }) => {
         }
         api.getStudentAndScheduleByParentId(user.parentId)
             .then(data => {
-                setStudent(data.student);
-                setSchedule(data.schedule);
+                if (data) {
+                    setStudent(data.student || null);
+                    setSchedule(data.schedule || []);
+                }
             })
             .catch(err => console.error("Failed to fetch schedule data", err))
             .finally(() => setLoading(false));
