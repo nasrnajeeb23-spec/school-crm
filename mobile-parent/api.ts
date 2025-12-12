@@ -1,6 +1,6 @@
 import { User, School, ParentRequest } from './types';
 
-export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crm-backend.onrender.com/api';
+export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 let memoryToken: string | null = null;
 
@@ -45,14 +45,24 @@ export const logout = async () => {
 };
 
 export const getSchools = async (): Promise<School[]> => {
-  try {
-    const resp = await fetch(`${API_BASE_URL}/schools/public`);
-    if (!resp.ok) throw new Error('failed');
-    const data = await resp.json();
-    return data.map(({ id, name }: any) => ({ id, name }));
-  } catch {
-    return [];
+  const urls = [
+    `${API_BASE_URL}/schools`,
+    `${API_BASE_URL}/schools/public`,
+    `${API_BASE_URL}/public/schools`,
+    `${API_BASE_URL.replace(/\/api\/?$/, '')}/schools`,
+    `${API_BASE_URL.replace(/\/api\/?$/, '')}/public/schools`
+  ];
+
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data)) return data.map(({ id, name }: any) => ({ id, name }));
+      }
+    } catch {}
   }
+  return [];
 };
 
 export const getParentDashboardData = async (parentId: string) => {

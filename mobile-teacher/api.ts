@@ -4,7 +4,7 @@
 import { User, School, Student, Class, Assignment, Submission, AttendanceRecord, Conversation, Message } from './types';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crm-backend.onrender.com/api';
+export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 async function getToken() {
   try {
@@ -55,7 +55,26 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
 // ==================== Authentication APIs ====================
 
 export const getSchools = async (): Promise<School[]> => {
-    return await apiCall('/schools/public');
+    const urls = [
+        `${API_BASE_URL}/schools`,
+        `${API_BASE_URL}/schools/public`,
+        `${API_BASE_URL}/public/schools`,
+        `${API_BASE_URL.replace(/\/api\/?$/, '')}/schools`,
+        `${API_BASE_URL.replace(/\/api\/?$/, '')}/public/schools`
+    ];
+
+    for (const url of urls) {
+        try {
+            const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+            if (response.ok) {
+                const data = await response.json();
+                if (Array.isArray(data)) return data;
+            }
+        } catch (e) {
+            console.log(`Failed to fetch schools from ${url}`);
+        }
+    }
+    return [];
 };
 
 export const login = async (email: string, password: string, schoolId: number): Promise<User> => {
