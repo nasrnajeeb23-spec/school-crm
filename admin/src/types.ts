@@ -281,6 +281,8 @@ export interface SchoolSettings {
     attendanceMethods?: ('QR'|'RFID'|'Manual')[];
     terms?: { name: string; start: string; end: string; }[];
     holidays?: { date: string; title: string; }[];
+    defaultCurrency?: string;
+    allowedCurrencies?: string[];
     notifications: {
         email: boolean;
         sms: boolean;

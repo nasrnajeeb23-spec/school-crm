@@ -43,3 +43,9 @@ temp/
 **/google-service-account-key.json
 mobile-parent/google-service-account-key.json
 mobile-teacher/google-service-account-key.json
+/.gradle_cache/
+/android-sdk/
+/mobile-parent/android/.gradle/
+/mobile-parent/android/build/
+/mobile-teacher/android/.gradle/
+/mobile-teacher/android/build/

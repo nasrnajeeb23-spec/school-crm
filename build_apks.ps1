@@ -1,6 +1,19 @@
 
 Write-Host "Starting build process for Mobile Apps..."
 
+# Fix for Arabic/Special characters in User Home path (Gradle Cache issue)
+$LocalGradleHome = Join-Path $PWD ".gradle_cache"
+if (-not (Test-Path $LocalGradleHome)) {
+    Write-Host "Creating local Gradle cache directory to avoid encoding issues: $LocalGradleHome"
+    New-Item -ItemType Directory -Force -Path $LocalGradleHome | Out-Null
+}
+$env:GRADLE_USER_HOME = $LocalGradleHome
+Write-Host "Set GRADLE_USER_HOME to: $env:GRADLE_USER_HOME"
+
+# Set JAVA_HOME to Android Studio's JBR
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+Write-Host "Set JAVA_HOME to: $env:JAVA_HOME"
+
 # Check for Arabic characters in path
 if ($PWD.Path -match "[^\x00-\x7F]") {
     Write-Warning "Your project path contains non-English characters: $($PWD.Path)"
@@ -26,7 +39,9 @@ function Build-App {
     Push-Location $androidDir
     try {
         if ($IsWindows) {
-            .\gradlew.bat assembleRelease
+            # Use JBR explicitly
+            $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+            .\gradlew.bat assembleRelease -Dorg.gradle.java.home="C:\Program Files\Android\Android Studio\jbr"
         } else {
             ./gradlew assembleRelease
         }
@@ -52,5 +67,8 @@ function Build-App {
 
 Build-App "parent"
 Build-App "teacher"
+
+Write-Host "Updating app hashes in apps.json..."
+node admin/scripts/update_apps_hash.js
 
 Write-Host "Build process completed."

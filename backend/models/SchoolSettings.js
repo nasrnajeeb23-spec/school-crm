@@ -140,6 +140,15 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON, // { defaultSections?: string[], byStage?: [{ stage, grades?: string[], sections?: string[] }] }
     allowNull: true,
   },
+  defaultCurrency: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'SAR',
+  },
+  allowedCurrencies: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   // schoolId FK is added via association
 });
 

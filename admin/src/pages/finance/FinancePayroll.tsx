@@ -60,6 +60,13 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
     const [attendanceOvertimeMinutes, setAttendanceOvertimeMinutes] = useState<string>('');
 
     const { addToast } = useToast();
+    const [lastErrorToastAt, setLastErrorToastAt] = useState<number>(0);
+    const addErrorOnce = (msg: string) => {
+        const now = Date.now();
+        if (now - lastErrorToastAt < 3000) return;
+        setLastErrorToastAt(now);
+        addToast(msg, 'error');
+    };
 
     useEffect(() => {
         fetchData();
@@ -71,7 +78,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                 const slips = await api.getSalarySlipsForSchool(schoolId, month);
                 setSalarySlips(slips);
             } catch (e) {
-                addToast('فشل تحديث كشوف الرواتب للشهر المحدد.', 'error');
+                addErrorOnce('فشل تحديث كشوف الرواتب للشهر المحدد.');
             }
         })();
     }, [month]);
@@ -82,15 +89,13 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
             api.getSalaryStructures(schoolId),
             api.getSchoolStaff(schoolId),
             api.getSchoolTeachers(schoolId),
-            api.getSalarySlipsForSchool(schoolId, month),
-        ]).then(([structuresData, staffData, teachersData, slipsData]) => {
+        ]).then(([structuresData, staffData, teachersData]) => {
             setSalaryStructures(structuresData);
             setStaff(staffData);
             setTeachers(teachersData);
-            setSalarySlips(slipsData);
         }).catch(err => {
             console.error("Failed to fetch payroll data:", err);
-            addToast("فشل تحميل بيانات الرواتب.", 'error');
+            addErrorOnce("فشل تحميل بيانات الرواتب.");
         }).finally(() => setLoading(false));
     };
 
@@ -620,24 +625,34 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                     <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th className="px-6 py-3">الشخص</th><th className="px-6 py-3">النوع</th><th className="px-6 py-3">الشهر</th><th className="px-6 py-3">الصافي</th><th className="px-6 py-3">الحالة</th><th className="px-6 py-3">إجراءات</th></tr></thead>
                         <tbody>
-                            {salarySlips.filter(s => (slipsStatusFilter === 'all' || String(s.status) === slipsStatusFilter) && String(personName(s.personType, String(s.personId))).toLowerCase().includes(String(slipsSearch || '').trim().toLowerCase())).map(s => (
-                                <tr key={s.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{personName(s.personType, String(s.personId))}</td>
-                                    <td className="px-6 py-4">{s.personType === 'staff' ? 'الموظف' : 'المعلم'}</td>
-                                    <td className="px-6 py-4">{s.month}</td>
-                                    <td className="px-6 py-4 font-semibold">{Number(s.netAmount || 0).toFixed(2)}</td>
-                                    <td className="px-6 py-4">{s.status}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex gap-2">
-                                            {s.status === 'Draft' && (<button onClick={() => handleApprove(s.id)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">موافقة</button>)}
-                                            <button onClick={() => { setDetailSlip(s); setEditSlipBase(String(Number(s.baseAmount || 0))); }} className="font-medium text-blue-600 dark:text-blue-500 hover:underline">تفاصيل</button>
-                                            {s.status !== 'Paid' && (
-                                              <button onClick={() => setReceiptSlipId(s.id)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">سند استلام</button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {(() => {
+                                const filteredSlips = salarySlips.filter(s => (slipsStatusFilter === 'all' || String(s.status) === slipsStatusFilter) && String(personName(s.personType, String(s.personId))).toLowerCase().includes(String(slipsSearch || '').trim().toLowerCase()));
+                                if (filteredSlips.length === 0) {
+                                    return (
+                                        <tr className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                                            <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">لا توجد كشوف رواتب للشهر المحدد.</td>
+                                        </tr>
+                                    );
+                                }
+                                return filteredSlips.map(s => (
+                                    <tr key={s.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{personName(s.personType, String(s.personId))}</td>
+                                        <td className="px-6 py-4">{s.personType === 'staff' ? 'الموظف' : 'المعلم'}</td>
+                                        <td className="px-6 py-4">{s.month}</td>
+                                        <td className="px-6 py-4 font-semibold">{Number(s.netAmount || 0).toFixed(2)}</td>
+                                        <td className="px-6 py-4">{s.status}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex gap-2">
+                                                {s.status === 'Draft' && (<button onClick={() => handleApprove(s.id)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">موافقة</button>)}
+                                                <button onClick={() => { setDetailSlip(s); setEditSlipBase(String(Number(s.baseAmount || 0))); }} className="font-medium text-blue-600 dark:text-blue-500 hover:underline">تفاصيل</button>
+                                                {s.status !== 'Paid' && (
+                                                  <button onClick={() => setReceiptSlipId(s.id)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">سند استلام</button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ));
+                            })()}
                         </tbody>
                     </table>
                 </div>

@@ -4,7 +4,7 @@ const { verifyToken, requireRole } = require('../middleware/auth')
 
 router.get('/config', verifyToken, async (req, res) => {
   try {
-    const { PricingConfig } = require('../models')
+    const { PricingConfig, SchoolSettings } = require('../models')
     const row = await PricingConfig.findOne({ where: { id: 'default' } })
     const cfg = row ? {
       pricePerStudent: row.pricePerStudent,
@@ -24,6 +24,13 @@ router.get('/config', verifyToken, async (req, res) => {
       pricePerSMS: 0.03,
       currency: 'USD',
       yearlyDiscountPercent: 0
+    }
+    const schoolId = Number(req.user?.schoolId || 0)
+    if (schoolId) {
+      const settings = await SchoolSettings.findOne({ where: { schoolId } }).catch(() => null)
+      if (settings && settings.defaultCurrency) {
+        cfg.currency = String(settings.defaultCurrency).trim().toUpperCase()
+      }
     }
     res.json(cfg)
   } catch (e) { console.error(e?.message || e); res.status(500).send('Server Error') }
@@ -31,8 +38,8 @@ router.get('/config', verifyToken, async (req, res) => {
 
 router.get('/public/config', async (req, res) => {
   try {
-    const { PricingConfig } = require('../models')
-    const row = await PricingConfig.findOne({ where: { id: 'default' } })
+    const { PricingConfig, SchoolSettings } = require('../models')
+    const row = await PricingConfig.findOne({ where: { id: 'default' } }).catch(() => null)
     const cfg = row ? {
       pricePerStudent: row.pricePerStudent,
       pricePerTeacher: row.pricePerTeacher,
@@ -52,8 +59,15 @@ router.get('/public/config', async (req, res) => {
       currency: 'USD',
       yearlyDiscountPercent: 0
     }
+    const schoolId = parseInt((req.query && req.query.schoolId) || '', 10)
+    if (Number.isFinite(schoolId) && schoolId > 0) {
+      const settings = await SchoolSettings.findOne({ where: { schoolId } }).catch(() => null)
+      if (settings && settings.defaultCurrency) {
+        cfg.currency = String(settings.defaultCurrency).trim().toUpperCase()
+      }
+    }
     res.json(cfg)
-  } catch (e) { console.error(e?.message || e); res.status(500).send('Server Error') }
+  } catch (e) { console.error(e?.message || e); res.json({ pricePerStudent: 1.5, pricePerTeacher: 2.0, pricePerGBStorage: 0.2, pricePerInvoice: 0.05, pricePerEmail: 0.01, pricePerSMS: 0.03, currency: 'USD', yearlyDiscountPercent: 0 }) }
 })
 
 router.put('/config', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {

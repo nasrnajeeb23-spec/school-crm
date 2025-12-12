@@ -707,9 +707,9 @@ router.get('/:schoolId/payroll/salary-slips', verifyToken, requireRole('SCHOOL_A
     const month = String(req.query.month || '').trim();
     const where = { schoolId: req.params.schoolId };
     if (month) where.month = month;
-    const rows = await SalarySlip.findAll({ where, order: [['createdAt','DESC']] });
-    res.json(rows.map(r => r.toJSON()));
-  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+    const rows = await SalarySlip.findAll({ where, order: [['createdAt','DESC']] }).catch(() => []);
+    res.json(Array.isArray(rows) ? rows.map(r => r.toJSON()) : []);
+  } catch (e) { console.error(e); res.json([]); }
 });
 
 // Update salary slip (Draft only)
@@ -2014,6 +2014,8 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         smsConfig: { usePlatformProvider: true },
         availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"],
         scheduleConfig: { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
+        defaultCurrency: 'SAR',
+        allowedCurrencies: ['SAR','USD','YER','EGP'],
       });
     }
     const obj = settings.toJSON();
@@ -2031,6 +2033,8 @@ router.get('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : (obj.admissionForm || { studentFields: ['الاسم الكامل','تاريخ الميلاد','الجنس','الرقم الوطني','العنوان','المدينة'], parentFields: ['الاسم','هاتف الاتصال','بريد الإلكتروني'], requiredDocuments: [], registrationFee: 0, consentFormRequired: false, consentFormText: '', autoGenerateRegistrationInvoice: true, registrationFeeDueDays: 7 }),
         scheduleConfig: obj.scheduleConfig && typeof obj.scheduleConfig === 'object' ? obj.scheduleConfig : { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
         classTemplates: obj.classTemplates && typeof obj.classTemplates === 'object' ? obj.classTemplates : null,
+        defaultCurrency: String(obj.defaultCurrency || 'SAR'),
+        allowedCurrencies: Array.isArray(obj.allowedCurrencies) && obj.allowedCurrencies.length > 0 ? obj.allowedCurrencies : ['SAR','USD','YER','EGP'],
     });
   } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
@@ -2043,7 +2047,8 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const { 
       schoolName, schoolAddress, schoolLogoUrl, contactPhone, contactEmail, geoLocation,
       genderType, levelType, ownershipType, availableStages, workingHoursStart, workingHoursEnd, workingDays,
-      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays, admissionForm, scheduleConfig, classTemplates
+      academicYearStart, academicYearEnd, notifications, lessonStartTime, lateThresholdMinutes, departureTime, attendanceMethods, terms, holidays, admissionForm, scheduleConfig, classTemplates,
+      defaultCurrency, allowedCurrencies
     } = req.body;
     const emailStr = String(contactEmail || '').trim();
     const phoneStr = String(contactPhone || '').trim();
@@ -2126,6 +2131,18 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       }
       settings.scheduleConfig = { periodCount: pc, periodDurationMinutes: pd, startTime: stStr || (settings.scheduleConfig?.startTime || '08:00'), gapMinutes: gap, ...(templates ? { templates } : {}) };
     }
+    if (allowedCurrencies !== undefined) {
+      const arr = Array.isArray(allowedCurrencies) ? allowedCurrencies.filter(c => typeof c === 'string' && c.trim().length > 0).map(c => c.trim().toUpperCase()) : settings.allowedCurrencies;
+      settings.allowedCurrencies = arr;
+    }
+    if (defaultCurrency !== undefined) {
+      const cur = String(defaultCurrency || '').trim().toUpperCase();
+      if (cur) {
+        const list = Array.isArray(settings.allowedCurrencies) ? settings.allowedCurrencies : [];
+        if (!list.includes(cur)) settings.allowedCurrencies = [...list, cur];
+        settings.defaultCurrency = cur;
+      }
+    }
     if (classTemplates !== undefined) {
       const ct = typeof classTemplates === 'string' ? JSON.parse(classTemplates) : classTemplates;
       const defSecs = Array.isArray(ct?.defaultSections) ? ct.defaultSections.filter(s => typeof s === 'string' && s.trim().length > 0).map(s => s.trim()) : null;
@@ -2154,6 +2171,8 @@ router.put('/:schoolId/settings', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       admissionForm: typeof obj.admissionForm === 'string' ? JSON.parse(obj.admissionForm) : obj.admissionForm,
       scheduleConfig: obj.scheduleConfig && typeof obj.scheduleConfig === 'object' ? obj.scheduleConfig : { periodCount: 5, periodDurationMinutes: 60, startTime: '08:00', gapMinutes: 0 },
       classTemplates: obj.classTemplates && typeof obj.classTemplates === 'object' ? obj.classTemplates : null,
+      defaultCurrency: String(obj.defaultCurrency || 'SAR'),
+      allowedCurrencies: Array.isArray(obj.allowedCurrencies) && obj.allowedCurrencies.length > 0 ? obj.allowedCurrencies : ['SAR','USD','YER','EGP'],
     });
   } catch (err) { console.error('Error in PUT settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });

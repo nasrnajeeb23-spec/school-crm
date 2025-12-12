@@ -41,13 +41,21 @@
               "pathPrefix": "/parent"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
     "plugins": [
       "expo-secure-store",
       "expo-localization"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ff875e66-21e4-45eb-9912-6608e0e1acaa"
+      }
+    }
   }
 }
