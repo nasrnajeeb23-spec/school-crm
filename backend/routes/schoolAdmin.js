@@ -1573,6 +1573,93 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   }
 });
 
+// @route   PUT api/school/:schoolId/parents/:parentId
+// @desc    Update parent details (name, email, phone). Email change syncs to user account.
+// @access  Private (SchoolAdmin)
+router.put('/:schoolId/parents/:parentId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('parent_portal'), validate([
+  { name: 'name', required: false, type: 'string', minLength: 2 },
+  { name: 'email', required: false, type: 'string' },
+  { name: 'phone', required: false, type: 'string' },
+  { name: 'studentId', required: false, type: 'string' },
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const parentId = Number(req.params.parentId);
+    const { name, email, phone } = req.body || {};
+    const emailStr = String(email || '').trim();
+    const phoneStr = String(phone || '').trim();
+    if (emailStr && !/^.+@.+\..+$/.test(emailStr)) return res.status(400).json({ msg: 'بريد إلكتروني غير صالح' });
+    if (phoneStr && !/^[0-9+\-()\s]{5,}$/.test(phoneStr)) return res.status(400).json({ msg: 'رقم هاتف غير صالح' });
+
+    const parent = await Parent.findByPk(parentId);
+    if (!parent) return res.status(404).json({ msg: 'Parent not found' });
+    if (Number(parent.schoolId) !== schoolId) return res.status(403).json({ msg: 'Access denied' });
+
+    if (name) parent.name = name;
+    if (phoneStr) parent.phone = phoneStr;
+    if (emailStr) parent.email = emailStr.toLowerCase();
+    await parent.save();
+
+    try {
+      const user = await User.findOne({ where: { parentId: parent.id } });
+      if (user) {
+        if (emailStr) {
+          user.email = emailStr.toLowerCase();
+          user.username = emailStr.toLowerCase();
+        }
+        user.name = parent.name;
+        await user.save();
+      }
+    } catch (e) {}
+
+    const statusMap = { 'Active': 'نشط', 'Invited': 'مدعو' };
+    return res.json({ id: String(parent.id), name: parent.name, email: parent.email, phone: parent.phone, status: statusMap[parent.status] || parent.status, studentId: String(await (async () => {
+      try {
+        const s = await Student.findOne({ where: { parentId: parent.id } });
+        return s ? s.id : '';
+      } catch { return ''; }
+    })()), studentName: await (async () => {
+      try {
+        const s = await Student.findOne({ where: { parentId: parent.id } });
+        return s ? s.name : '';
+      } catch { return ''; }
+    })() });
+  } catch (e) {
+    console.error(e.message);
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// @route   PUT api/school/:schoolId/parents/:parentId/status
+// @desc    Activate or deactivate parent user account; updates Parent.status accordingly
+// @access  Private (SchoolAdmin)
+router.put('/:schoolId/parents/:parentId/status', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('parent_portal'), validate([
+  { name: 'isActive', required: true, type: 'boolean' }
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const parentId = Number(req.params.parentId);
+    const { isActive } = req.body || {};
+    const parent = await Parent.findByPk(parentId);
+    if (!parent) return res.status(404).json({ msg: 'Parent not found' });
+    if (Number(parent.schoolId) !== schoolId) return res.status(403).json({ msg: 'Access denied' });
+
+    let user = await User.findOne({ where: { parentId: parent.id } });
+    if (user) {
+      user.isActive = !!isActive;
+      await user.save();
+    }
+    parent.status = !!isActive ? 'Active' : 'Invited';
+    await parent.save();
+
+    const statusMap = { 'Active': 'نشط', 'Invited': 'مدعو' };
+    return res.json({ parentId: String(parent.id), isActive: !!isActive, status: statusMap[parent.status] || parent.status });
+  } catch (e) {
+    console.error(e.message);
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
 // @route   GET api/school/:schoolId/invoices
 // @desc    Get all invoices for a specific school
 // @access  Private (SchoolAdmin)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Parent, ParentAccountStatus } from '../types';
 import * as api from '../api';
 import { useToast } from '../contexts/ToastContext';
@@ -43,8 +44,7 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
   const [showManualShare, setShowManualShare] = useState(false);
   const [manualLink, setManualLink] = useState('');
   const [cooldownByParent, setCooldownByParent] = useState<Record<string, number>>({});
-  const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
-  const [showManagement, setShowManagement] = useState(false);
+  const location = useLocation();
 
   const ManualShareModal: React.FC<{ link: string; onClose: () => void; }> = ({ link, onClose }) => {
     const [sharing, setSharing] = useState(false);
@@ -89,168 +89,7 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
     );
   };
 
-  const ParentManagementModal: React.FC<{ parent: Parent; onClose: () => void; }> = ({ parent, onClose }) => {
-    const [inviteLink, setInviteLink] = useState('');
-    const [creating, setCreating] = useState(false);
-    const [sharing, setSharing] = useState(false);
-
-    const handleGenerateLink = async () => {
-      try {
-        setCreating(true);
-        const res = await api.inviteParent(String(parent.id), 'manual');
-        if (res.activationLink) {
-          setInviteLink(res.activationLink);
-          addToast('تم إنشاء رابط الدعوة بنجاح.', 'success');
-        } else {
-          addToast('لم يتم استلام رابط دعوة من الخادم.', 'error');
-        }
-      } catch {
-        addToast('فشل إنشاء رابط الدعوة.', 'error');
-      } finally {
-        setCreating(false);
-      }
-    };
-
-    const handleCopy = async () => {
-      if (!inviteLink) {
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(inviteLink);
-        addToast('تم نسخ الرابط.', 'success');
-      } catch {
-        addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error');
-      }
-    };
-
-    const handleShare = async () => {
-      if (!inviteLink) {
-        return;
-      }
-      try {
-        setSharing(true);
-        const anyNav = navigator as any;
-        if (anyNav.share) {
-          await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: inviteLink });
-          addToast('تمت المشاركة بنجاح.', 'success');
-        } else {
-          await navigator.clipboard.writeText(inviteLink);
-          addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
-        }
-      } catch {
-        try { await navigator.clipboard.writeText(inviteLink); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
-      } finally {
-        setSharing(false);
-      }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[95%] max-w-2xl text-right">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-              إدارة ولي الأمر
-            </h3>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
-            >
-              ×
-            </button>
-          </div>
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">اسم ولي الأمر</p>
-                <p className="font-medium text-gray-900 dark:text-white">{parent.name}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">اسم الطالب</p>
-                <p className="font-medium text-gray-900 dark:text-white">{parent.studentName}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">البريد الإلكتروني</p>
-                <p className="font-medium text-gray-900 dark:text-white">{parent.email || 'غير متوفر'}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">رقم الهاتف</p>
-                <p className="font-medium text-gray-900 dark:text-white">{parent.phone || 'غير متوفر'}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">رقم الطالب</p>
-                <p className="font-medium text-gray-900 dark:text-white">{parent.studentId}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">حالة الحساب</p>
-                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[parent.status]}`}>
-                  {parent.status}
-                </span>
-              </div>
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <h4 className="font-semibold mb-2 text-gray-800 dark:text-white">رابط الدعوة</h4>
-              {inviteLink ? (
-                <>
-                  <a
-                    href={inviteLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    dir="ltr"
-                    className="block break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 underline"
-                  >
-                    {inviteLink}
-                  </a>
-                  <div className="flex flex-wrap gap-3 justify-end mt-3">
-                    <button
-                      type="button"
-                      onClick={handleCopy}
-                      className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md"
-                    >
-                      نسخ الرابط
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleShare}
-                      disabled={sharing}
-                      aria-disabled={sharing}
-                      className={`px-3 py-2 ${sharing ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
-                    >
-                      {sharing ? 'جارٍ المشاركة...' : 'مشاركة'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleGenerateLink}
-                      disabled={creating}
-                      aria-disabled={creating}
-                      className={`px-3 py-2 ${creating ? 'bg-gray-400' : 'bg-red-600 hover:bg-red-700'} text-white rounded-md`}
-                    >
-                      {creating ? 'جاري الإنشاء...' : 'إنشاء رابط جديد'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-wrap gap-3 justify-between items-center">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    لم يتم إنشاء رابط دعوة في هذه الجلسة. يمكنك إنشاء رابط جديد وإرساله إلى ولي الأمر.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleGenerateLink}
-                    disabled={creating}
-                    aria-disabled={creating}
-                    className={`px-3 py-2 ${creating ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
-                  >
-                    {creating ? 'جاري الإنشاء...' : 'إنشاء رابط دعوة'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // إدارة ولي الأمر تم نقلها إلى صفحة مستقلة عبر مسار parents/:parentId
 
   const handleInvite = async (parentId: string | number, channelOverride?: 'email' | 'sms' | 'manual') => {
     try {
@@ -320,16 +159,9 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
               {filteredParents.map((parent) => (
                 <tr key={parent.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                   <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedParent(parent);
-                        setShowManagement(true);
-                      }}
-                      className="w-full text-right hover:underline"
-                    >
+                    <Link to={`${location.pathname}/${parent.id}`} className="w-full inline-block text-right hover:underline">
                       {parent.name}
-                    </button>
+                    </Link>
                   </td>
                   <td className="px-6 py-4">{parent.studentName}</td>
                   <td className="px-6 py-4">{parent.email}</td>
@@ -364,16 +196,12 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
                           </button>
                         );
                       })()}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedParent(parent);
-                          setShowManagement(true);
-                        }}
+                      <Link
+                        to={`${location.pathname}/${parent.id}`}
                         className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
                       >
                         إدارة
-                      </button>
+                      </Link>
                       <button className="font-medium text-red-600 dark:text-red-500 hover:underline">إلغاء التنشيط</button>
                     </div>
                   </td>
@@ -386,15 +214,7 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
       {showManualShare && (
         <ManualShareModal link={manualLink} onClose={() => setShowManualShare(false)} />
       )}
-      {showManagement && selectedParent && (
-        <ParentManagementModal
-          parent={selectedParent}
-          onClose={() => {
-            setShowManagement(false);
-            setSelectedParent(null);
-          }}
-        />
-      )}
+      {/* صفحة إدارة ولي الأمر مستقلة عبر المسار */}
     </div>
   );
 };

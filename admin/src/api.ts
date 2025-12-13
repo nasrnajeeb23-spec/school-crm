@@ -2,7 +2,7 @@
 // هذا الملف يتصل بالـ Backend الحقيقي على Render
 
 import { 
-    User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
+    User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ParentAccountStatus, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
     PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState
 } from './types';
 
@@ -772,6 +772,10 @@ export const upsertSchoolParent = async (schoolId: number, data: NewParentData):
 export const inviteParent = async (parentId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string }> => {
     const res: any = await apiCall('/auth/parent/invite', { method: 'POST', body: JSON.stringify({ parentId, channel }) });
     return { activationLink: res?.activationLink };
+};
+
+export const updateParentActiveStatus = async (schoolId: number, parentId: string, isActive: boolean): Promise<{ parentId: string; isActive: boolean; status: ParentAccountStatus }> => {
+    return await apiCall(`/school/${schoolId}/parents/${parentId}/status`, { method: 'PUT', body: JSON.stringify({ isActive }) });
 };
 
 export const inviteTeacher = async (teacherId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string }> => {

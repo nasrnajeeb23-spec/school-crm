@@ -28,6 +28,7 @@ const FinancePayroll = React.lazy(() => import('../pages/finance/FinancePayroll'
 const FinanceExpenses = React.lazy(() => import('../pages/finance/FinanceExpenses'));
 const Reports = React.lazy(() => import('../pages/Reports'));
 const ParentsList = React.lazy(() => import('../pages/ParentsList'));
+const ParentManagement = React.lazy(() => import('../pages/ParentManagement'));
 const Settings = React.lazy(() => import('../pages/Settings'));
 const Calendar = React.lazy(() => import('../pages/Calendar'));
 const UserProfile = React.lazy(() => import('../pages/UserProfile'));
@@ -163,6 +164,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
     const parentView = pathParts[pathParts.length - 2];
     if (parentView === 'students' && currentView !== 'students') return 'ملف الطالب';
     if (parentView === 'teachers' && currentView !== 'teachers') return 'ملف المعلم';
+    if (parentView === 'parents' && currentView !== 'parents') return 'إدارة ولي الأمر';
     return viewTitles[currentView] || 'لوحة التحكم';
   };
 
@@ -217,6 +219,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="teachers/:teacherId" element={<ProtectedPage permission={Permission.MANAGE_TEACHERS}><TeacherProfile schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
                     <Route path="teachers/attendance" element={<ProtectedPage permission={Permission.MANAGE_ATTENDANCE}><TeachersAttendance schoolId={school.id} /></ProtectedPage>} />
                     <Route path="parents" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><ParentsList schoolId={school.id} /></ProtectedPage>} />
+                    <Route path="parents/:parentId" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><ParentManagement schoolId={school.id} /></ProtectedPage>} />
                     <Route path="staff" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffManagement schoolId={school.id} /></ProtectedPage>} />
                     <Route path="staff/attendance" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffAttendance schoolId={school.id} /></ProtectedPage>} />
                     <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} /></ProtectedPage>} />
