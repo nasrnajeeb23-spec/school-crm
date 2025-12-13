@@ -3021,12 +3021,16 @@ router.get('/:schoolId/communications/usage', verifyToken, requireRole('SCHOOL_A
         else if (ch === 'sms') { cur.sms.count += Number(r.units || 0); cur.sms.amount += parseFloat(r.amount || 0); }
       }
     }
-    const cfg = await PricingConfig.findOne({ where: { id: 'default' } });
-    const currency = cfg ? (cfg.currency || 'USD') : 'USD';
-    let breakdown;
-    if (breakdownMap.size > 0) {
-      breakdown = Array.from(breakdownMap.entries()).sort((a,b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(([period, v]) => ({ period, email: v.email, sms: v.sms, total: Number(v.email.amount || 0) + Number(v.sms.amount || 0) }));
-    }
+    let currency = 'USD';
+    try {
+      const cfg = await PricingConfig.findOne({ where: { id: 'default' } });
+      if (cfg && cfg.currency) currency = cfg.currency;
+    } catch {}
+    const breakdown = breakdownMap.size > 0
+      ? Array.from(breakdownMap.entries())
+          .sort((a,b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)
+          .map(([period, v]) => ({ period, email: v.email, sms: v.sms, total: Number(v.email.amount || 0) + Number(v.sms.amount || 0) }))
+      : [];
     return res.json({ email: { count: emailCount, amount: emailAmount }, sms: { count: smsCount, amount: smsAmount }, total: emailAmount + smsAmount, currency, breakdown });
   } catch (e) { console.error(e?.message || e); res.status(500).json({ msg: 'Server Error' }); }
 });
