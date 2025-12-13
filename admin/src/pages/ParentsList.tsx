@@ -45,6 +45,7 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
   const [manualLink, setManualLink] = useState('');
   const [cooldownByParent, setCooldownByParent] = useState<Record<string, number>>({});
   const location = useLocation();
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
   const ManualShareModal: React.FC<{ link: string; onClose: () => void; }> = ({ link, onClose }) => {
     const [sharing, setSharing] = useState(false);
@@ -113,6 +114,21 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
     } finally {
       setSendingId(null);
       setCooldownByParent(prev => ({ ...prev, [String(parentId)]: Date.now() + 2500 }));
+    }
+  };
+
+  const handleDeleteParent = async (parentId: string | number, parentName: string) => {
+    try {
+      if (!confirm(`هل أنت متأكد من حذف ولي الأمر "${parentName}"؟`)) return;
+      setDeletingId(parentId);
+      await api.deleteSchoolParent(schoolId, parentId);
+      setParents(prev => prev.filter(p => String(p.id) !== String(parentId)));
+      addToast('تم حذف ولي الأمر بنجاح.', 'success');
+    } catch (e) {
+      console.error('Failed to delete parent:', e);
+      addToast('فشل حذف ولي الأمر.', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -202,7 +218,14 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
                       >
                         إدارة
                       </Link>
-                      <button className="font-medium text-red-600 dark:text-red-500 hover:underline">إلغاء التنشيط</button>
+                      <button
+                        onClick={() => handleDeleteParent(parent.id, parent.name)}
+                        disabled={deletingId === parent.id}
+                        aria-disabled={deletingId === parent.id}
+                        className={`font-medium ${deletingId === parent.id ? 'text-red-400 dark:text-red-400' : 'text-red-600 dark:text-red-500'} hover:underline`}
+                      >
+                        {deletingId === parent.id ? 'جارٍ الحذف...' : 'حذف'}
+                      </button>
                     </div>
                   </td>
                 </tr>

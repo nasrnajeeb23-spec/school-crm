@@ -398,8 +398,12 @@ export const processPayrollForMonth = async (schoolId: number, month: string): P
     return await apiCall(`/school/${schoolId}/payroll/process?month=${encodeURIComponent(month)}`, { method: 'POST' });
 };
 
-export const getSalarySlipsForSchool = async (schoolId: number, month?: string): Promise<any[]> => {
-    const q = month ? `?month=${encodeURIComponent(month)}` : '';
+export const getSalarySlipsForSchool = async (schoolId: number, month?: string, options?: { personType?: 'staff' | 'teacher'; personId?: string | number }): Promise<any[]> => {
+    const qs: string[] = [];
+    if (month) qs.push(`month=${encodeURIComponent(month)}`);
+    if (options?.personType) qs.push(`personType=${encodeURIComponent(options.personType)}`);
+    if (options?.personId !== undefined) qs.push(`personId=${encodeURIComponent(String(options.personId))}`);
+    const q = qs.length ? `?${qs.join('&')}` : '';
     return await apiCall(`/school/${schoolId}/payroll/salary-slips${q}`, { method: 'GET' });
 };
 
@@ -786,9 +790,21 @@ export const updateParentActiveStatus = async (schoolId: number, parentId: strin
     return await apiCall(`/school/${schoolId}/parents/${parentId}/status`, { method: 'PUT', body: JSON.stringify({ isActive }) });
 };
 
+export const deleteSchoolParent = async (schoolId: number, parentId: string | number): Promise<{ msg: string }> => {
+    return await apiCall(`/school/${schoolId}/parents/${parentId}`, { method: 'DELETE' });
+};
+
 export const inviteTeacher = async (teacherId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string }> => {
     const res: any = await apiCall('/auth/teacher/invite', { method: 'POST', body: JSON.stringify({ teacherId, channel }) });
     return { activationLink: res?.activationLink };
+};
+
+export const updateTeacherActiveStatus = async (schoolId: number, teacherId: string | number, isActive: boolean): Promise<{ teacherId: string; isActive: boolean; status: string }> => {
+    return await apiCall(`/school/${schoolId}/teachers/${teacherId}/status`, { method: 'PUT', body: JSON.stringify({ isActive }) });
+};
+
+export const deleteSchoolTeacher = async (schoolId: number, teacherId: string | number): Promise<{ msg: string }> => {
+    return await apiCall(`/school/${schoolId}/teachers/${teacherId}`, { method: 'DELETE' });
 };
 
 export const getSchoolEvents = async (schoolId: number): Promise<SchoolEvent[]> => {

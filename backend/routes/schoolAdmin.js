@@ -707,6 +707,10 @@ router.get('/:schoolId/payroll/salary-slips', verifyToken, requireRole('SCHOOL_A
     const month = String(req.query.month || '').trim();
     const where = { schoolId: req.params.schoolId };
     if (month) where.month = month;
+    const pt = String(req.query.personType || '').trim();
+    if (pt) where.personType = pt;
+    const pid = req.query.personId != null ? String(req.query.personId) : '';
+    if (pid) where.personId = pid;
     const rows = await SalarySlip.findAll({ where, order: [['createdAt','DESC']] }).catch(() => []);
     res.json(Array.isArray(rows) ? rows.map(r => r.toJSON()) : []);
   } catch (e) { console.error(e); res.json([]); }
@@ -842,6 +846,26 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     const school = await School.findByPk(req.user.schoolId);
     if (!school) return res.status(404).json({ msg: 'School not found' });
 
+    // Duplicate prevention within this school
+    try {
+      const dupByPhone = await Teacher.findOne({ where: { schoolId: req.user.schoolId, phone: String(phone || '').trim() } });
+      if (dupByPhone) {
+        return res.status(409).json({ msg: 'المعلم موجود مسبقًا برقم الهاتف نفسه.', code: 'DUPLICATE' });
+      }
+      const dupByNameSubject = await Teacher.findOne({ where: { schoolId: req.user.schoolId, name: String(name || '').trim(), subject: String(subject || '').trim() } });
+      if (dupByNameSubject) {
+        return res.status(409).json({ msg: 'يوجد معلم بنفس الاسم والمادة.', code: 'DUPLICATE' });
+      }
+      if (email && String(email).trim() !== '') {
+        const existingUser = await User.findOne({ where: { email: String(email).toLowerCase() } });
+        if (existingUser && String(existingUser.schoolId || '') === String(req.user.schoolId) && String(existingUser.role || '').toUpperCase() === 'TEACHER') {
+          return res.status(409).json({ msg: 'البريد الإلكتروني مستخدم لمعلم آخر.', code: 'DUPLICATE_EMAIL' });
+        }
+      }
+    } catch (e) {
+      // Fail-safe: continue if duplicate checks error
+    }
+
     // Check plan limits
     const { Subscription, Plan, SchoolSettings } = require('../models');
     const subscription = await Subscription.findOne({ where: { schoolId: req.user.schoolId }, include: [Plan] });
@@ -971,6 +995,60 @@ router.put('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_AD
     const statusMap = { 'Active': 'نشط', 'OnLeave': 'في إجازة' };
     res.json({ ...teacher.toJSON(), status: statusMap[teacher.status] || teacher.status });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// @route   PUT api/school/:schoolId/teachers/:teacherId/status
+// @desc    Activate or deactivate teacher user account; updates Teacher.status accordingly
+// @access  Private (SchoolAdmin)
+router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('teacher_portal'), validate([
+  { name: 'isActive', required: true, type: 'boolean' }
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const teacherId = Number(req.params.teacherId);
+    const { isActive } = req.body || {};
+    const teacher = await Teacher.findByPk(teacherId);
+    if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (Number(teacher.schoolId) !== schoolId) return res.status(403).json({ msg: 'Access denied' });
+
+    let user = await User.findOne({ where: { teacherId: teacher.id } });
+    if (user) {
+      user.isActive = !!isActive;
+      await user.save();
+    }
+    teacher.status = !!isActive ? 'Active' : 'OnLeave';
+    await teacher.save();
+
+    const statusMap = { 'Active': 'نشط', 'OnLeave': 'في إجازة' };
+    return res.json({ teacherId: String(teacher.id), isActive: !!isActive, status: statusMap[teacher.status] || teacher.status });
+  } catch (e) {
+    console.error(e.message);
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// @route   DELETE api/school/:schoolId/teachers/:teacherId
+// @desc    Delete a teacher from a school
+// @access  Private (SchoolAdmin)
+router.delete('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const teacherId = Number(req.params.teacherId);
+    const teacher = await Teacher.findOne({ where: { id: teacherId, schoolId } });
+    if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    await Class.update({ homeroomTeacherId: null, homeroomTeacherName: 'غير محدد' }, { where: { homeroomTeacherId: teacher.id, schoolId } });
+    try {
+      const user = await User.findOne({ where: { teacherId: teacher.id } });
+      if (user) await user.destroy();
+    } catch {}
+    const school = await School.findByPk(schoolId);
+    await teacher.destroy();
+    try { if (school) await school.decrement('teacherCount'); } catch {}
+    return res.json({ msg: 'Teacher removed' });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).json({ msg: 'Server Error' });
+  }
 });
 
  
@@ -1536,18 +1614,24 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     if (!student || Number(student.schoolId) !== schoolId) return res.status(404).json({ msg: 'Student not found' });
 
     let parent = await Parent.findOne({ where: { email } });
-    if (!parent) {
-      parent = await Parent.create({ name, email, phone, status: 'Invited', schoolId });
-    } else {
-      // Ensure parent belongs to this school; if not, create a new record scoped to this school
+    if (parent) {
       if (Number(parent.schoolId || 0) !== schoolId) {
-        parent = await Parent.create({ name, email, phone, status: 'Invited', schoolId });
-      } else {
-        parent.name = name;
-        parent.phone = phone;
-        if (!parent.status) parent.status = 'Invited';
-        await parent.save();
+        return res.status(409).json({ msg: 'البريد الإلكتروني مستخدم في مدرسة أخرى.', code: 'DUPLICATE_EMAIL' });
       }
+      const existingByPhone = await Parent.findOne({ where: { schoolId, phone: String(phone || '').trim() } });
+      if (existingByPhone && Number(existingByPhone.id) !== Number(parent.id)) {
+        return res.status(409).json({ msg: 'رقم الهاتف مستخدم لولي أمر آخر.', code: 'DUPLICATE_PHONE' });
+      }
+      parent.name = name;
+      parent.phone = String(phone || '').trim();
+      if (!parent.status) parent.status = 'Invited';
+      await parent.save();
+    } else {
+      const existingByPhone = await Parent.findOne({ where: { schoolId, phone: String(phone || '').trim() } });
+      if (existingByPhone) {
+        return res.status(409).json({ msg: 'رقم الهاتف مستخدم لولي أمر آخر.', code: 'DUPLICATE_PHONE' });
+      }
+      parent = await Parent.create({ name, email, phone: String(phone || '').trim(), status: 'Invited', schoolId });
     }
 
     student.parentId = parent.id;
@@ -1656,6 +1740,29 @@ router.put('/:schoolId/parents/:parentId/status', verifyToken, requireRole('SCHO
     return res.json({ parentId: String(parent.id), isActive: !!isActive, status: statusMap[parent.status] || parent.status });
   } catch (e) {
     console.error(e.message);
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// @route   DELETE api/school/:schoolId/parents/:parentId
+// @desc    Delete a parent and unlink from student
+// @access  Private (SchoolAdmin)
+router.delete('/:schoolId/parents/:parentId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('parent_portal'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const parentId = Number(req.params.parentId);
+    const parent = await Parent.findByPk(parentId);
+    if (!parent) return res.status(404).json({ msg: 'Parent not found' });
+    if (Number(parent.schoolId) !== schoolId) return res.status(403).json({ msg: 'Access denied' });
+    await Student.update({ parentId: null }, { where: { parentId: parent.id } });
+    try {
+      const user = await User.findOne({ where: { parentId: parent.id } });
+      if (user) await user.destroy();
+    } catch {}
+    await parent.destroy();
+    return res.json({ msg: 'Parent removed' });
+  } catch (err) {
+    console.error(err.message);
     return res.status(500).json({ msg: 'Server Error' });
   }
 });

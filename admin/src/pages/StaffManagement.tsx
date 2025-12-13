@@ -52,6 +52,8 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
   const [manualLink, setManualLink] = useState('');
   const [cooldownByStaff, setCooldownByStaff] = useState<Record<string, number>>({});
   const [sharing, setSharing] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | number | null>(null);
+  const [savedLinks, setSavedLinks] = useState<Record<string, string>>({});
 
   const handleInviteStaff = async (userId: string | number) => {
     try {
@@ -59,14 +61,28 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
       const channel = channelByStaff[String(userId)] || 'manual';
       const res = await api.inviteStaff(String(userId), channel);
       if (channel === 'manual') {
-        if (res.activationLink) { setManualLink(res.activationLink); setShowManualShare(true); }
+        if (res.activationLink) { 
+          setManualLink(res.activationLink); 
+          setShowManualShare(true); 
+          try { 
+            localStorage.setItem(`staff_invite_link_${String(userId)}`, res.activationLink); 
+            setSavedLinks(prev => ({ ...prev, [String(userId)]: res.activationLink }));
+          } catch {} 
+        }
         addToast('تم إنشاء رابط التفعيل للمشاركة اليدوية.', 'success');
       } else {
         if (res.inviteSent) {
           if (channel === 'sms') addToast('تم إرسال الدعوة عبر الرسائل النصية.', 'success');
           else addToast('تم إرسال الدعوة عبر البريد الإلكتروني.', 'success');
         } else {
-          if (res.activationLink) { setManualLink(res.activationLink); setShowManualShare(true); }
+          if (res.activationLink) { 
+            setManualLink(res.activationLink); 
+            setShowManualShare(true); 
+            try { 
+              localStorage.setItem(`staff_invite_link_${String(userId)}`, res.activationLink); 
+              setSavedLinks(prev => ({ ...prev, [String(userId)]: res.activationLink }));
+            } catch {} 
+          }
           addToast('تعذّر الإرسال عبر القناة المحددة. تم تجهيز رابط يدوي.', 'warning');
         }
       }
@@ -75,6 +91,21 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
     } finally {
       setSendingId(null);
       setCooldownByStaff(prev => ({ ...prev, [String(userId)]: Date.now() + 2500 }));
+    }
+  };
+  
+  const handleToggleActive = async (member: User) => {
+    try {
+      const id = (member as any).id;
+      setUpdatingId(id);
+      const current = ((member as any).isActive ?? true) as boolean;
+      const updated = await api.updateSchoolStaff(schoolId, id, { isActive: !current });
+      setStaff(prev => prev.map(s => ((s as any).id === id ? updated : s)));
+      addToast(!current ? 'تم تفعيل حساب الموظف.' : 'تم إلغاء تفعيل حساب الموظف.', 'success');
+    } catch (e) {
+      addToast('فشل تحديث حالة حساب الموظف.', 'error');
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -118,6 +149,19 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
 
     return sorted;
   }, [staff, roleFilter, searchQuery, sortBy]);
+
+  useEffect(() => {
+    try {
+      const map: Record<string, string> = {};
+      for (const m of staff) {
+        const id = String((m as any).id);
+        const k = `staff_invite_link_${id}`;
+        const v = typeof window !== 'undefined' ? localStorage.getItem(k) : null;
+        if (v) map[id] = v;
+      }
+      setSavedLinks(map);
+    } catch {}
+  }, [staff]);
 
   const handleAddStaff = async (staffData: NewStaffData) => {
     try {
@@ -279,6 +323,39 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                               className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
                             >
                               {label}
+                            </button>
+                          );
+                        })()}
+                        {(() => {
+                          const id = (member as any).id;
+                          const isActive = ((member as any).isActive ?? true) as boolean;
+                          const disabled = updatingId === id;
+                          const label = disabled ? 'جاري التحديث...' : (isActive ? 'إلغاء التفعيل' : 'تفعيل');
+                          const color = disabled ? 'text-gray-400 dark:text-gray-500' : (isActive ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500');
+                          return (
+                            <button
+                              onClick={() => handleToggleActive(member)}
+                              disabled={disabled}
+                              aria-disabled={disabled}
+                              className={`font-medium ${color} hover:underline`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })()}
+                        {(() => {
+                          const id = String((member as any).id);
+                          const link = savedLinks[id];
+                          if (!link) return null;
+                          const disabled = sharing;
+                          return (
+                            <button
+                              onClick={() => { setManualLink(link); setShowManualShare(true); }}
+                              disabled={disabled}
+                              aria-disabled={disabled}
+                              className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-teal-600 dark:text-teal-500'} hover:underline`}
+                            >
+                              عرض الرابط المحفوظ
                             </button>
                           );
                         })()}

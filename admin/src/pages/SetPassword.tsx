@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useToast } from '../contexts/ToastContext';
-import { apiCall } from '../api';
+import { apiCall, getCurrentUser } from '../api';
 
 const isStrong = (pwd: string) => {
   const lengthOk = typeof pwd === 'string' && pwd.length >= 10;
@@ -25,13 +25,49 @@ const SetPassword: React.FC = () => {
       setToken(t);
     } catch {}
   }, []);
+  useEffect(() => {
+    try {
+      const hasAuth = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
+      if (hasAuth) {
+        getCurrentUser().then(u => {
+          const roleRaw = String(u?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
+          let target = '/login';
+          if (roleRaw === 'PARENT') target = '/parent';
+          else if (roleRaw === 'TEACHER') target = '/teacher';
+          else if (roleRaw === 'SCHOOL_ADMIN' || roleRaw === 'STAFF') target = '/school';
+          else if (roleRaw === 'SUPER_ADMIN' || roleRaw === 'SUPERADMIN' || roleRaw.startsWith('SUPER_ADMIN_')) target = '/superadmin';
+          addToast('أنت مسجّل دخول بالفعل. تم توجيهك للوحة التحكم.', 'info');
+          setTimeout(() => { window.location.href = target; }, 500);
+        }).catch(() => {});
+      }
+    } catch {}
+  }, [addToast]);
+  useEffect(() => {
+    if (!token) {
+      addToast('الرابط منتهي أو غير صالح. يرجى تسجيل الدخول.', 'error');
+      setTimeout(() => { window.location.href = '/login'; }, 800);
+      return;
+    }
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const b64 = (s: string) => s.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(atob(b64(parts[1])));
+        const expMs = Number(payload?.exp || 0) * 1000;
+        if (expMs && Date.now() > expMs) {
+          addToast('انتهت صلاحية الرابط. يرجى تسجيل الدخول.', 'warning');
+          setTimeout(() => { window.location.href = '/login'; }, 800);
+        }
+      }
+    } catch {}
+  }, [token, addToast]);
 
   const strengthOk = useMemo(() => isStrong(pwd), [pwd]);
   const match = useMemo(() => pwd.length > 0 && pwd === confirm, [pwd, confirm]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) { addToast('رمز الدعوة غير موجود أو منتهي.', 'error'); return; }
+    if (!token) { addToast('رمز الدعوة غير موجود أو منتهي.', 'error'); setTimeout(() => { window.location.href = '/login'; }, 800); return; }
     if (!strengthOk) { addToast('كلمة المرور ضعيفة. يجب أن تكون 10 خانات على الأقل مع حرف كبير، صغير، رقم ورمز.', 'warning'); return; }
     if (!match) { addToast('كلمتا المرور غير متطابقتين.', 'warning'); return; }
     try {
@@ -55,7 +91,8 @@ const SetPassword: React.FC = () => {
         setTimeout(() => { window.location.href = '/login'; }, 500);
       }
     } catch (error: any) {
-      addToast('فشل تعيين كلمة المرور. تحقق من صلاحية الرابط وحاول مجددًا.', 'error');
+      addToast('الرابط منتهي أو غير صالح. يرجى تسجيل الدخول بكلمتك الجديدة.', 'error');
+      setTimeout(() => { window.location.href = '/login'; }, 800);
     } finally {
       setSubmitting(false);
     }

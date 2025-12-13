@@ -58,6 +58,10 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
           try { window.location.assign('/superadmin/subscriptions'); } catch {}
           return;
         }
+        if (msg.includes('409') || msg.includes('DUPLICATE') || msg.includes('موجود مسبقًا') || msg.includes('البريد الإلكتروني مستخدم')) {
+          addToast('لا يمكن إضافة معلم مكرر. تحقق من البريد أو الهاتف أو الاسم والمادة.', 'warning');
+          return;
+        }
         console.error("Failed to add teacher:", error);
         addToast("فشل إضافة المعلم. الرجاء المحاولة مرة أخرى.", 'error');
     }
@@ -73,6 +77,7 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
   const [manualLink, setManualLink] = useState('');
   const [cooldownByTeacher, setCooldownByTeacher] = useState<Record<string, number>>({});
   const [sharing, setSharing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
   const handleInviteTeacher = async (teacherId: string | number) => {
     try {
@@ -95,6 +100,21 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
     } finally {
       setSendingId(null);
       setCooldownByTeacher(prev => ({ ...prev, [String(teacherId)]: Date.now() + 2500 }));
+    }
+  };
+
+  const handleDeleteTeacher = async (teacherId: string | number, teacherName: string) => {
+    try {
+      if (!confirm(`هل أنت متأكد من حذف المعلم "${teacherName}"؟`)) return;
+      setDeletingId(teacherId);
+      await api.deleteSchoolTeacher(schoolId, teacherId);
+      setTeachers(prev => prev.filter(t => String(t.id) !== String(teacherId)));
+      addToast('تم حذف المعلم بنجاح.', 'success');
+    } catch (e) {
+      console.error('Failed to delete teacher:', e);
+      addToast('فشل حذف المعلم.', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -188,6 +208,14 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                             </button>
                           );
                         })()}
+                        <button
+                          onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+                          disabled={deletingId === teacher.id}
+                          aria-disabled={deletingId === teacher.id}
+                          className={`font-medium ${deletingId === teacher.id ? 'text-red-400 dark:text-red-400' : 'text-red-600 dark:text-red-500'} hover:underline`}
+                        >
+                          {deletingId === teacher.id ? 'جارٍ الحذف...' : 'حذف'}
+                        </button>
                       </div>
                     </td>
                   </tr>
