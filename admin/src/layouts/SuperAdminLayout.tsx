@@ -15,6 +15,7 @@ const viewTitles: { [key: string]: string } = {
   usage_limits: 'إدارة حدود الاستخدام',
   permissions: 'إدارة الصلاحيات والأدوار',
   content: 'إدارة محتوى الواجهة',
+  messages: 'رسائل تواصل معنا',
   profile: 'ملفي الشخصي',
 };
 

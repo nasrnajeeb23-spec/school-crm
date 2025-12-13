@@ -39,6 +39,7 @@ const helpRoutes = require('./routes/help');
 const modulesRoutes = require('./routes/modules');
 const pricingRoutes = require('./routes/pricing');
 const billingRoutes = require('./routes/billing');
+const contactRoutes = require('./routes/contact');
 const reportsRoutes = require('./routes/reports');
 const CronService = require('./services/CronService');
 const nodeCron = require('node-cron');
@@ -615,7 +616,7 @@ async function syncDatabase(){
   const opts = { force: false };
   
   // Sync models in correct order to avoid foreign key constraint issues
-  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig, BehaviorRecord, Invoice, Payment } = require('./models');
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig, BehaviorRecord, Invoice, Payment, ContactMessage } = require('./models');
   
   // Sync independent tables first
   await School.sync(opts);
@@ -649,6 +650,7 @@ async function syncDatabase(){
   await ModuleCatalog.sync({ force: false });
   await PricingConfig.sync(isProd ? { force: false } : { alter: true });
   await BehaviorRecord.sync(isProd ? { force: false } : { alter: true });
+  await ContactMessage.sync(isProd ? { force: false } : { alter: true });
 }
 syncDatabase()
   .then(async () => {

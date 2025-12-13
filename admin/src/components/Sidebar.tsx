@@ -62,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
     { id: 'api-keys', label: 'مفاتيح API', icon: ShieldIcon, path: '/superadmin/api-keys' },
     { id: 'sso', label: 'SSO', icon: ShieldIcon, path: '/superadmin/sso' },
     { id: 'tasks', label: 'مركز المهام', icon: DashboardIcon, path: '/superadmin/tasks' },
+    { id: 'messages', label: 'رسائل تواصل معنا', icon: ContentIcon, path: '/superadmin/messages' },
     { id: 'mfa', label: 'MFA', icon: ShieldIcon, path: '/superadmin/mfa' },
     { id: 'reports-center', label: 'مركز التقارير', icon: DashboardIcon, path: '/superadmin/reports_center' },
   ];

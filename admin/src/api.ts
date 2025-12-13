@@ -1411,6 +1411,14 @@ export const getStudentStatement = async (schoolId: number, studentId: string): 
 
 
 
+export const submitContactMessage = async (data: { name: string; email: string; message: string }) => {
+    return await apiCall('/contact', { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getContactMessages = async () => {
+    return await apiCall('/contact', { method: 'GET' });
+};
+
 // تصدير جميع الدوال
 export default {
     login,
@@ -1508,4 +1516,6 @@ export default {
     getRoutes,
     addRoute,
     updateRouteStudents,
+    submitContactMessage,
+    getContactMessages,
 }

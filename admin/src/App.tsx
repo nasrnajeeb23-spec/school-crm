@@ -39,6 +39,7 @@ const ReportsCenter = React.lazy(() => import('./pages/ReportsCenter'));
 const TrialSignupPublic = React.lazy(() => import('./pages/TrialSignupPublic'));
 const OnboardingRequests = React.lazy(() => import('./pages/OnboardingRequests'));
 const SuperAdminSchoolManage = React.lazy(() => import('./pages/SuperAdminSchoolManage'));
+const SuperAdminMessages = React.lazy(() => import('./pages/SuperAdminMessages'));
 const SetPassword = React.lazy(() => import('./pages/SetPassword'));
 
 // School Admin Pages
@@ -194,6 +195,7 @@ const App: React.FC = () => {
               <Route path="api-keys" element={<ApiKeys />} />
               <Route path="sso" element={<SsoSettings />} />
               <Route path="tasks" element={<TaskCenter />} />
+              <Route path="messages" element={<SuperAdminMessages />} />
               <Route path="mfa" element={<MfaSettings />} />
               <Route path="reports_center" element={<ReportsCenter />} />
               <Route path="license" element={<LicenseManagement />} />
