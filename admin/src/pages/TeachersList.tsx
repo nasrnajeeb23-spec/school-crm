@@ -84,6 +84,11 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
       setSendingId(teacherId);
       const channel = channelByTeacher[String(teacherId)] || 'manual';
       const res = await api.inviteTeacher(String(teacherId), channel);
+      // Refresh server data to sync lastInviteAt/lastInviteChannel across devices
+      try {
+        const list = await api.getSchoolTeachers(schoolId);
+        setTeachers(list);
+      } catch {}
       if (channel === 'manual') {
         if (res.activationLink) {
           setManualLink(res.activationLink);
@@ -93,7 +98,12 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
       } else if (channel === 'sms') {
         addToast('تم تسجيل طلب إرسال رسالة نصية. قد يتطلب إعداد مزوّد SMS.', 'info');
       } else {
-        addToast('تم إرسال الدعوة عبر البريد الإلكتروني.', 'success');
+        if (res.inviteSent) {
+          addToast('تم إرسال الدعوة عبر البريد الإلكتروني.', 'success');
+        } else {
+          if (res.activationLink) { setManualLink(res.activationLink); setShowManualShare(true); }
+          addToast('لا يوجد بريد صالح. تم إنشاء رابط للمشاركة اليدوية.', 'warning');
+        }
       }
     } catch (e) {
       addToast('فشل إرسال دعوة المعلم.', 'error');
@@ -178,17 +188,35 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                         {teacher.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">{teacher.joinDate}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
-                          عرض التفاصيل
-                        </Link>
-                        <select
-                          value={channelByTeacher[String(teacher.id)] || 'manual'}
-                          onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
-                          className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
-                        >
+                  <td className="px-6 py-4">{teacher.joinDate}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
+                        عرض التفاصيل
+                      </Link>
+                      {(() => {
+                        const lastInviteAt = (teacher as any).lastInviteAt ? new Date(String((teacher as any).lastInviteAt)) : null;
+                        let ago = 'لا يوجد';
+                        let valid = false;
+                        if (lastInviteAt && !isNaN(lastInviteAt.getTime())) {
+                          const diff = Math.max(0, Date.now() - lastInviteAt.getTime());
+                          const mins = Math.floor(diff / 60000);
+                          const hours = Math.floor(diff / 3600000);
+                          const days = Math.floor(diff / 86400000);
+                          ago = days > 0 ? `${days} يوم` : hours > 0 ? `${hours} ساعة` : `${mins} دقيقة`;
+                          valid = lastInviteAt.getTime() + 72 * 3600 * 1000 > Date.now();
+                        }
+                        return (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            آخر دعوة: {ago} • حالة الرابط: {ago === 'لا يوجد' ? 'لا يوجد' : (valid ? 'صالح' : 'منتهي')}
+                          </span>
+                        );
+                      })()}
+                      <select
+                        value={channelByTeacher[String(teacher.id)] || 'manual'}
+                        onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
+                        className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
+                      >
                           <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
                           <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
                           <option value="manual">مشاركة يدوية (مجاني)</option>

@@ -151,6 +151,14 @@ const User = sequelize.define('User', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  lastInviteAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  lastInviteChannel: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   createdAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

@@ -382,14 +382,18 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
       return res.status(403).json({ msg: 'Access denied' });
     }
     const channel = String(req.body.channel || 'email').toLowerCase();
-    const e = String(teacher.email || teacher.username || '').trim().toLowerCase();
+    const rawIdentifier = String(teacher.email || teacher.username || '').trim().toLowerCase();
+    const isValidEmail = /.+@.+\..+/.test(rawIdentifier);
+    const emailForUser = isValidEmail ? rawIdentifier : `teacher-${teacher.id}-school-${teacher.schoolId}@no-reply.example.com`;
+    const usernameForUser = isValidEmail ? rawIdentifier : (String(teacher.username || '').trim() || `teacher_${teacher.id}`);
     let tUser = await User.findOne({ where: { teacherId: teacher.id } });
     if (!tUser) {
       const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
       const hashed = await bcrypt.hash(placeholder, 10);
-      tUser = await User.create({ email: e || null, username: e || null, password: hashed, name: teacher.name, role: 'Teacher', schoolId: teacher.schoolId, teacherId: teacher.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
+      tUser = await User.create({ email: emailForUser, username: usernameForUser || null, password: hashed, name: teacher.name, role: 'Teacher', schoolId: teacher.schoolId, teacherId: teacher.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
     } else {
-      if (e) { tUser.email = e; tUser.username = e; }
+      tUser.email = emailForUser;
+      if (usernameForUser) tUser.username = usernameForUser;
       tUser.name = teacher.name;
       tUser.role = 'Teacher';
       tUser.schoolId = teacher.schoolId;
@@ -403,10 +407,12 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
     const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
-    if (channel === 'email') {
+    // Record invite metadata
+    try { tUser.lastInviteAt = new Date(); tUser.lastInviteChannel = channel; await tUser.save(); } catch {}
+    if (channel === 'email' && isValidEmail) {
       try {
         const EmailService = require('../services/EmailService');
-        await EmailService.sendActivationInvite(e, teacher.name, 'Teacher', activationLink, '', teacher.schoolId);
+        await EmailService.sendActivationInvite(rawIdentifier, teacher.name, 'Teacher', activationLink, '', teacher.schoolId);
         return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: true, channel: 'email', activationLink });
       } catch (e2) {
         return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'email' });

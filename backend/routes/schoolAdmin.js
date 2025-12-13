@@ -437,11 +437,25 @@ router.get('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   try {
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
     const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
-    const teachers = await Teacher.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']], limit, offset });
+    const teachers = await Teacher.findAll({ 
+      where: { schoolId: req.params.schoolId }, 
+      include: [{ model: User, attributes: ['id','lastInviteAt','lastInviteChannel'], required: false }],
+      order: [['name', 'ASC']], 
+      limit, 
+      offset 
+    });
     if (!teachers) return res.error(404, 'NOT_FOUND', 'No teachers found');
-    
     const statusMap = { 'Active': 'نشط', 'OnLeave': 'في إجازة' };
-    return res.success({ teachers: teachers.map(t => ({ ...t.toJSON(), status: statusMap[t.status] || t.status })), limit, offset });
+    return res.success({ teachers: teachers.map(t => {
+      const json = t.toJSON();
+      const u = (t && t.User) ? t.User : null;
+      return { 
+        ...json, 
+        status: statusMap[t.status] || t.status,
+        lastInviteAt: u && u.lastInviteAt ? new Date(u.lastInviteAt).toISOString() : null,
+        lastInviteChannel: u && u.lastInviteChannel ? String(u.lastInviteChannel) : null
+      };
+    }), limit, offset });
   } catch (err) { console.error(err.message); return res.error(500, 'SERVER_ERROR', 'Server Error'); }
 });
 
@@ -956,6 +970,7 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
           const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
           linkToReturn = activationLink;
           await EmailService.sendActivationInvite(e, name, 'Teacher', activationLink, school.name || '', parseInt(schoolId));
+          try { tUser.lastInviteAt = new Date(); tUser.lastInviteChannel = 'email'; await tUser.save(); } catch {}
         } catch {}
       }
     } catch {}
@@ -1030,22 +1045,22 @@ router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SC
 // @route   DELETE api/school/:schoolId/teachers/:teacherId
 // @desc    Delete a teacher from a school
 // @access  Private (SchoolAdmin)
-router.delete('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  router.delete('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
     const teacherId = Number(req.params.teacherId);
     const teacher = await Teacher.findOne({ where: { id: teacherId, schoolId } });
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
-    await Class.update({ homeroomTeacherId: null, homeroomTeacherName: 'غير محدد' }, { where: { homeroomTeacherId: teacher.id, schoolId } });
+    try { await Class.update({ homeroomTeacherId: null, homeroomTeacherName: 'غير محدد' }, { where: { homeroomTeacherId: teacher.id, schoolId } }); } catch {}
     try {
       const user = await User.findOne({ where: { teacherId: teacher.id } });
       if (user) await user.destroy();
     } catch {}
     const school = await School.findByPk(schoolId);
-    await TeacherAttendance.destroy({ where: { teacherId: teacher.id } });
-    await SalarySlip.destroy({ where: { personType: 'teacher', personId: String(teacher.id) } });
-    await Schedule.update({ teacherId: null }, { where: { teacherId: teacher.id } });
-    await teacher.destroy();
+    try { await TeacherAttendance.destroy({ where: { teacherId: teacher.id } }); } catch {}
+    try { await SalarySlip.destroy({ where: { personType: 'teacher', personId: String(teacher.id) } }); } catch {}
+    try { await Schedule.update({ teacherId: null }, { where: { teacherId: teacher.id } }); } catch {}
+    try { await teacher.destroy(); } catch {}
     try { if (school) await school.decrement('teacherCount'); } catch {}
     return res.json({ msg: 'Teacher removed' });
   } catch (err) {

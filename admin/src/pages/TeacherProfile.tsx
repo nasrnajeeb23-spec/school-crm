@@ -61,13 +61,7 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
   }, [teacherId, schoolId, addToast]);
   
   useEffect(() => {
-    try {
-      if (teacherId) {
-        const k = `teacher_invite_link_${teacherId}`;
-        const stored = typeof window !== 'undefined' ? localStorage.getItem(k) : '';
-        if (stored) setInviteLink(stored);
-      }
-    } catch {}
+    // دعوة المعلم: لا نعتمد على التخزين المحلي للرابط أو التوقيت
   }, [teacherId]);
   
   useEffect(() => {
@@ -131,7 +125,11 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
       const res = await api.inviteTeacher(String(teacher.id), 'manual');
       if (res.activationLink) {
         setInviteLink(res.activationLink);
-        try { if (teacherId) localStorage.setItem(`teacher_invite_link_${teacherId}`, res.activationLink); } catch {}
+        try {
+          const list = await api.getSchoolTeachers(schoolId);
+          const updated = list.find(t => String(t.id) === String(teacherId));
+          if (updated) setTeacher(updated);
+        } catch {}
         addToast('تم إنشاء رابط الدعوة بنجاح.', 'success');
       } else {
         addToast('لم يتم استلام رابط دعوة من الخادم.', 'error');
@@ -261,6 +259,26 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
               >
                 {inviteLink}
               </a>
+              {(() => {
+                let valid = false;
+                let ago = 'لا يوجد';
+                try {
+                  const lastInviteAt = (teacher as any)?.lastInviteAt ? new Date(String((teacher as any).lastInviteAt)) : null;
+                  if (lastInviteAt && !isNaN(lastInviteAt.getTime())) {
+                    const diff = Math.max(0, Date.now() - lastInviteAt.getTime());
+                    const mins = Math.floor(diff / 60000);
+                    const hours = Math.floor(diff / 3600000);
+                    const days = Math.floor(diff / 86400000);
+                    ago = days > 0 ? `${days} يوم` : hours > 0 ? `${hours} ساعة` : `${mins} دقيقة`;
+                    valid = lastInviteAt.getTime() + 72 * 3600 * 1000 > Date.now();
+                  }
+                } catch {}
+                return (
+                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                    آخر دعوة: {ago} • حالة الرابط: {valid ? 'صالح' : 'منتهي'}
+                  </div>
+                );
+              })()}
               <div className="flex flex-wrap gap-3 justify-end mt-3">
                 <button
                   onClick={handleCopy}

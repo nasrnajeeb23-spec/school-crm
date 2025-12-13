@@ -794,9 +794,9 @@ export const deleteSchoolParent = async (schoolId: number, parentId: string | nu
     return await apiCall(`/school/${schoolId}/parents/${parentId}`, { method: 'DELETE' });
 };
 
-export const inviteTeacher = async (teacherId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string }> => {
+export const inviteTeacher = async (teacherId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string; inviteSent?: boolean; channel?: string }> => {
     const res: any = await apiCall('/auth/teacher/invite', { method: 'POST', body: JSON.stringify({ teacherId, channel }) });
-    return { activationLink: res?.activationLink };
+    return { activationLink: res?.activationLink, inviteSent: res?.inviteSent, channel: res?.channel };
 };
 
 export const updateTeacherActiveStatus = async (schoolId: number, teacherId: string | number, isActive: boolean): Promise<{ teacherId: string; isActive: boolean; status: string }> => {
