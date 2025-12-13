@@ -15,6 +15,9 @@ const ParentTransportation: React.FC = () => {
     } | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const mapEl = useRef<HTMLDivElement | null>(null);
+    const mapInst = useRef<any>(null);
+
     useEffect(() => {
         if (!user?.parentId) {
             setLoading(false);
@@ -25,6 +28,18 @@ const ParentTransportation: React.FC = () => {
             .catch(err => console.error("Failed to fetch transportation details:", err))
             .finally(() => setLoading(false));
     }, [user?.parentId]);
+
+    useEffect(() => {
+        const s = details?.nearestStop;
+        if (!s || typeof s.lat !== 'number' || typeof s.lng !== 'number') return;
+        if (!mapEl.current) return;
+        if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; }
+        const m = L.map(mapEl.current).setView([s.lat, s.lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(m);
+        L.marker([s.lat, s.lng]).addTo(m).bindPopup(s.name || 'نقطة توقف');
+        mapInst.current = m;
+        return () => { if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; } };
+    }, [details?.nearestStop?.lat, details?.nearestStop?.lng]);
 
     if (loading) {
         return (
@@ -37,25 +52,12 @@ const ParentTransportation: React.FC = () => {
             </div>
         );
     }
-    
+
     if (!details || !details.operator) {
         return <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-md">الطالب غير مسجل في خدمة النقل المدرسي حاليًا.</div>;
     }
 
     const { route, operator } = details;
-    const mapEl = useRef<HTMLDivElement | null>(null);
-    const mapInst = useRef<any>(null);
-    useEffect(() => {
-        const s = details?.nearestStop;
-        if (!s || typeof s.lat !== 'number' || typeof s.lng !== 'number') return;
-        if (!mapEl.current) return;
-        if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; }
-        const m = L.map(mapEl.current).setView([s.lat, s.lng], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(m);
-        L.marker([s.lat, s.lng]).addTo(m).bindPopup(s.name || 'نقطة توقف');
-        mapInst.current = m;
-        return () => { if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; } };
-    }, [details?.nearestStop?.lat, details?.nearestStop?.lng]);
 
     return (
         <div className="mt-6 space-y-6">
