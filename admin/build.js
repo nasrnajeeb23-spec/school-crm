@@ -157,18 +157,19 @@ const runPostBuild = () => {
       fs.mkdirSync(rootAssets, { recursive: true });
     }
 
+    const copyRecursive = (src, dest) => {
+      const entries = fs.readdirSync(src, { withFileTypes: true });
+      if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+      for (const entry of entries) {
+        const s = path.join(src, entry.name);
+        const d = path.join(dest, entry.name);
+        if (entry.isDirectory()) copyRecursive(s, d);
+        else fs.copyFileSync(s, d);
+      }
+    };
+
     // Copy all assets from admin/dist/assets to root/dist/assets
     if (fs.existsSync(adminAssets)) {
-      const copyRecursive = (src, dest) => {
-        const entries = fs.readdirSync(src, { withFileTypes: true });
-        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-        for (const entry of entries) {
-          const s = path.join(src, entry.name);
-          const d = path.join(dest, entry.name);
-          if (entry.isDirectory()) copyRecursive(s, d);
-          else fs.copyFileSync(s, d);
-        }
-      };
       copyRecursive(adminAssets, rootAssets);
       console.log('Root dist assets synchronized successfully.');
     } else {
@@ -185,17 +186,6 @@ const runPostBuild = () => {
     fs.writeFileSync(path.join(__dirname, 'dist/favicon.svg'), faviconSvg, 'utf8');
     fs.writeFileSync(path.join(rootDist, 'favicon.svg'), faviconSvg, 'utf8');
 
-    const copyRecursive = (src, dest) => {
-      const entries = fs.readdirSync(src, { withFileTypes: true });
-      if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-      for (const entry of entries) {
-        const s = path.join(src, entry.name);
-        const d = path.join(dest, entry.name);
-        if (entry.isDirectory()) copyRecursive(s, d);
-        else fs.copyFileSync(s, d);
-      }
-    };
-
     const parentWebDist = path.join(__dirname, '../mobile-parent/web-dist');
     const teacherWebDist = path.join(__dirname, '../mobile-teacher/web-dist');
 
@@ -207,6 +197,8 @@ const runPostBuild = () => {
       const expoSrc = path.join(parentWebDist, '_expo');
       const expoDestAdmin = path.join(__dirname, 'dist/_expo');
       if (fs.existsSync(expoSrc)) copyRecursive(expoSrc, expoDestAdmin);
+      const parentAssetsSrc = path.join(parentWebDist, 'assets');
+      if (fs.existsSync(parentAssetsSrc)) copyRecursive(parentAssetsSrc, rootAssets);
       const rootAppsParent = path.join(rootDist, 'apps/parent');
       if (!fs.existsSync(rootAppsParent)) fs.mkdirSync(rootAppsParent, { recursive: true });
       if (fs.existsSync(parentIndexSrc)) fs.copyFileSync(parentIndexSrc, path.join(rootAppsParent, 'index.html'));
@@ -225,6 +217,8 @@ const runPostBuild = () => {
       const expoSrcT = path.join(teacherWebDist, '_expo');
       const expoDestAdminT = path.join(__dirname, 'dist/_expo');
       if (fs.existsSync(expoSrcT)) copyRecursive(expoSrcT, expoDestAdminT);
+      const teacherAssetsSrc = path.join(teacherWebDist, 'assets');
+      if (fs.existsSync(teacherAssetsSrc)) copyRecursive(teacherAssetsSrc, rootAssets);
       const rootAppsTeacher = path.join(rootDist, 'apps/teacher');
       if (!fs.existsSync(rootAppsTeacher)) fs.mkdirSync(rootAppsTeacher, { recursive: true });
       if (fs.existsSync(teacherIndexSrc)) fs.copyFileSync(teacherIndexSrc, path.join(rootAppsTeacher, 'index.html'));
