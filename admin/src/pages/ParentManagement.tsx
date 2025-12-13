@@ -36,6 +36,16 @@ const ParentManagement: React.FC<ParentManagementProps> = ({ schoolId }) => {
       .finally(() => setLoading(false));
   }, [parentId, schoolId, addToast]);
 
+  useEffect(() => {
+    try {
+      if (parentId) {
+        const k = `parent_invite_link_${parentId}`;
+        const stored = typeof window !== 'undefined' ? localStorage.getItem(k) : '';
+        if (stored) setInviteLink(stored);
+      }
+    } catch {}
+  }, [parentId]);
+
   const handleGenerateLink = async () => {
     if (!parent) return;
     try {
@@ -43,6 +53,7 @@ const ParentManagement: React.FC<ParentManagementProps> = ({ schoolId }) => {
       const res = await api.inviteParent(String(parent.id), 'manual');
       if (res.activationLink) {
         setInviteLink(res.activationLink);
+        try { if (parentId) localStorage.setItem(`parent_invite_link_${parentId}`, res.activationLink); } catch {}
         addToast('تم إنشاء رابط الدعوة بنجاح.', 'success');
       } else {
         addToast('لم يتم استلام رابط دعوة من الخادم.', 'error');
