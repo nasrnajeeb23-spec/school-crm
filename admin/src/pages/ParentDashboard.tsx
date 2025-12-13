@@ -15,14 +15,6 @@ const ParentDashboard: React.FC = () => {
     const [newRequest, setNewRequest] = useState<{ type: RequestType; details: string }>({ type: RequestType.Leave, details: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    useEffect(() => {
-        if (!user?.parentId) { setLoading(false); return; }
-        api.getParentDashboardData(user.parentId, selectedStudentId || undefined).then(setData).finally(() => setLoading(false));
-    }, [user?.parentId, selectedStudentId]);
-
-    if (loading) return <div className="text-center p-8">جاري تحميل البيانات...</div>;
-    if (!data) return <div className="text-center p-8">لا توجد بيانات لعرضها.</div>;
-
     const children = useMemo(() => {
         if (!data) return [] as { student: Student; grades?: any[]; attendance?: any[]; invoices?: any[] }[];
         if (Array.isArray(data.children)) return data.children as { student: Student; grades?: any[]; attendance?: any[]; invoices?: any[] }[];
@@ -39,6 +31,14 @@ const ParentDashboard: React.FC = () => {
         const first = children[0];
         return { student: first.student, grades: first.grades || (data?.grades || []), attendance: first.attendance || (data?.attendance || []), invoices: first.invoices || (data?.invoices || []) };
     }, [children, selectedStudentId, data]);
+
+    useEffect(() => {
+        if (!user?.parentId) { setLoading(false); return; }
+        api.getParentDashboardData(user.parentId, selectedStudentId || undefined).then(setData).finally(() => setLoading(false));
+    }, [user?.parentId, selectedStudentId]);
+
+    if (loading) return <div className="text-center p-8">جاري تحميل البيانات...</div>;
+    if (!data) return <div className="text-center p-8">لا توجد بيانات لعرضها.</div>;
 
     const latestGrade = current.grades.length > 0 ? current.grades[0] : null;
     const unpaidInvoices = current.invoices.filter((inv: Invoice) => inv.status !== InvoiceStatus.Paid);

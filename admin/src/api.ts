@@ -855,11 +855,23 @@ export const getParentTransportationDetails = async (parentId: string): Promise<
 };
 
 export const getParentActionItems = async (): Promise<ActionItem[]> => {
-    return await apiCall('/parent/action-items', { method: 'GET' });
+    try {
+        const raw = await apiCall('/parent/action-items', { method: 'GET' });
+        return Array.isArray(raw) ? raw as ActionItem[] : [];
+    } catch (e) {
+        console.error('getParentActionItems failed:', e);
+        return [];
+    }
 };
 
 export const getTeacherActionItems = async (): Promise<ActionItem[]> => {
-    return await apiCall('/teacher/action-items', { method: 'GET' });
+    try {
+        const raw = await apiCall('/teacher/action-items', { method: 'GET' });
+        return Array.isArray(raw) ? raw as ActionItem[] : [];
+    } catch (e) {
+        console.error('getTeacherActionItems failed:', e);
+        return [];
+    }
 };
 
 export const getStudentDetails = async (schoolId: number, studentId: string): Promise<{ grades: StudentGrades[], attendance: AttendanceRecord[], invoices: Invoice[], notes: StudentNote[], documents: StudentDocument[] }> => {

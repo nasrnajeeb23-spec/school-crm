@@ -80,10 +80,30 @@ router.get('/action-items', verifyToken, requireRole('PARENT'), async (req, res)
   try {
     const parentId = req.user.parentId || (req.user.role === 'PARENT' ? req.user.id : null);
     if (!parentId) return res.json([]);
-    const rows = await Notification.findAll({ where: { parentId }, order: [['date','DESC']] });
+    let rows = [];
+    try {
+      rows = await Notification.findAll({ where: { parentId }, order: [['date','DESC']] });
+    } catch (inner) {
+      console.error('Notification query failed for parent action-items:', inner && inner.message ? inner.message : inner);
+      return res.json([]);
+    }
     const typeMap = { 'Warning': 'warning', 'Info': 'info', 'Approval': 'approval' };
-    res.json(rows.map(r => ({ id: String(r.id), type: typeMap[r.type] || 'info', title: r.title, description: r.description, date: r.date.toISOString().split('T')[0], isRead: !!r.isRead })));
-  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+    const items = rows.map(r => {
+      const d = r.date instanceof Date ? r.date : new Date(r.date || Date.now());
+      return {
+        id: String(r.id),
+        type: typeMap[r.type] || 'info',
+        title: r.title,
+        description: r.description,
+        date: d.toISOString().split('T')[0],
+        isRead: !!r.isRead
+      };
+    });
+    res.json(items);
+  } catch (e) {
+    console.error(e.message);
+    res.json([]);
+  }
 });
 
 router.get('/:parentId/student-schedule', verifyToken, requireRole('PARENT'), async (req, res) => {
