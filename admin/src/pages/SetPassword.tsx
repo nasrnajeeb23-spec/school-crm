@@ -36,9 +36,24 @@ const SetPassword: React.FC = () => {
     if (!match) { addToast('كلمتا المرور غير متطابقتين.', 'warning'); return; }
     try {
       setSubmitting(true);
-      await apiCall('/auth/invite/set-password', { method: 'POST', body: JSON.stringify({ token, newPassword: pwd }) });
-      addToast('تم تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.', 'success');
-      setTimeout(() => { window.location.href = '/login'; }, 500);
+      const resp: any = await apiCall('/auth/invite/set-password', { method: 'POST', body: JSON.stringify({ token, newPassword: pwd }) });
+      try {
+        const t = resp?.token || '';
+        const u = resp?.user || null;
+        if (t) localStorage.setItem('auth_token', t);
+        if (u && u.schoolId) localStorage.setItem('current_school_id', String(u.schoolId));
+        const roleRaw = String(u?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
+        let target = '/login';
+        if (roleRaw === 'PARENT') target = '/parent';
+        else if (roleRaw === 'TEACHER') target = '/teacher';
+        else if (roleRaw === 'SCHOOLADMIN' || roleRaw === 'SCHOOL_ADMIN' || roleRaw === 'STAFF') target = '/school';
+        else if (roleRaw === 'SUPERADMIN' || roleRaw === 'SUPER_ADMIN') target = '/superadmin';
+        addToast('تم تعيين كلمة المرور وتم تسجيل الدخول بنجاح.', 'success');
+        setTimeout(() => { window.location.href = target; }, 500);
+      } catch {
+        addToast('تم تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.', 'success');
+        setTimeout(() => { window.location.href = '/login'; }, 500);
+      }
     } catch (error: any) {
       addToast('فشل تعيين كلمة المرور. تحقق من صلاحية الرابط وحاول مجددًا.', 'error');
     } finally {

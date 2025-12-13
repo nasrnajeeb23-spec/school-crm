@@ -61,6 +61,25 @@ router.post('/login', validate([
       } catch {}
     }
 
+    // التحقق من مطابقة المدرسة المختارة في واجهة الدخول مع مدرسة المستخدم
+    try {
+      const requestedSchoolId = Number(req.body?.schoolId || 0);
+      const isSuperAdmin = String(user.role || '').toUpperCase() === 'SUPER_ADMIN';
+      if (requestedSchoolId && !isSuperAdmin) {
+        const userSchoolId = Number(user.schoolId || 0);
+        if (!userSchoolId || userSchoolId !== requestedSchoolId) {
+          return res.status(403).json({ msg: 'Access denied for this school' });
+        }
+        const isParent = String(user.role || '').toUpperCase() === 'PARENT';
+        if (isParent) {
+          const parent = await Parent.findOne({ where: { id: user.parentId, schoolId: userSchoolId } });
+          if (!parent) {
+            return res.status(403).json({ msg: 'ولي الأمر غير موجود في هذه المدرسة.' });
+          }
+        }
+      }
+    } catch {}
+
     user.lastLogin = new Date();
     user.lastLoginAt = new Date();
     await user.save();
@@ -235,7 +254,24 @@ router.post('/invite/set-password', validate([
     user.lastPasswordChangeAt = new Date();
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
-    return res.json({ msg: 'Password set successfully' });
+    const accessPayload = {
+      id: user.id,
+      role: user.role,
+      schoolId: user.schoolId || null,
+      teacherId: user.teacherId || null,
+      parentId: user.parentId || null,
+      name: user.name,
+      email: user.email,
+      username: user.username,
+      permissions: user.permissions || [],
+      tokenVersion: user.tokenVersion || 0
+    };
+    const accessToken = jwt.sign(accessPayload, JWT_SECRET, { expiresIn: '12h' });
+    const refreshSecret = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
+    const userJson = user.toJSON();
+    delete userJson.password;
+    return res.json({ token: accessToken, refreshToken, user: userJson });
   } catch (e) {
     console.error(e.message);
     res.status(500).json({ msg: 'Server Error' });

@@ -28,6 +28,9 @@ const ParentManagement: React.FC<ParentManagementProps> = ({ schoolId }) => {
       .then(list => list.find(p => String(p.id) === String(parentId)) || null)
       .then((p) => {
         setParent(p);
+        if (p && !p.studentId) {
+          addToast('ولي الأمر غير مرتبط بطلاب.', 'error');
+        }
       })
       .catch(err => {
         console.error('Failed to fetch parent details:', err);

@@ -141,10 +141,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
     } else {
       const ok = await login(email, password, selectedSchool ? Number(selectedSchool) : undefined);
       if (ok) {
-        let target = '/school';
+        let target = '/';
         try {
+          const me = await api.getCurrentUser();
+          const roleRaw = String(me?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
+          if (roleRaw === 'PARENT') target = '/parent';
+          else if (roleRaw === 'TEACHER') target = '/teacher';
+          else if (roleRaw === 'SCHOOLADMIN' || roleRaw === 'SCHOOL_ADMIN' || roleRaw === 'STAFF') target = '/school';
+          else if (roleRaw === 'SUPERADMIN' || roleRaw === 'SUPER_ADMIN') target = '/superadmin';
           const last = localStorage.getItem('last_route') || '';
-          if (last && last.startsWith('/school')) target = last;
+          if (last && last.startsWith(target)) target = last;
         } catch {}
         navigate(target, { replace: true });
       }
