@@ -55,17 +55,14 @@ class CronService {
         });
 
         for (const admin of admins) {
-          // In-app notification
           await Notification.create({
-            id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-            userId: admin.id,
             title: isTrial ? 'انتهت الفترة التجريبية' : 'انتهى اشتراك المدرسة',
-            message: isTrial 
+            description: isTrial 
               ? 'انتهت فترتك التجريبية. يرجى ترقية الاشتراك للاستمرار في استخدام كافة المميزات.'
               : 'انتهى اشتراك المدرسة. يرجى تجديد الاشتراك لتجنب توقف الخدمات.',
-            type: 'system',
+            type: 'Financial',
             isRead: false,
-            createdAt: new Date()
+            date: new Date()
           });
 
           // Email notification (if email service configured)

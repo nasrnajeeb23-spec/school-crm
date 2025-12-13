@@ -375,7 +375,7 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
 ]), async (req, res) => {
   try {
     const tid = Number(req.body.teacherId);
-    if (!tid) return res.status(400).json({ msg: 'Invalid teacherId' });
+    if (!Number.isFinite(tid) || tid <= 0) return res.status(400).json({ msg: 'Invalid teacherId' });
     const teacher = await Teacher.findByPk(tid);
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
     if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(teacher.schoolId || 0)) {

@@ -1042,6 +1042,9 @@ router.delete('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL
       if (user) await user.destroy();
     } catch {}
     const school = await School.findByPk(schoolId);
+    await TeacherAttendance.destroy({ where: { teacherId: teacher.id } });
+    await SalarySlip.destroy({ where: { personType: 'teacher', personId: String(teacher.id) } });
+    await Schedule.update({ teacherId: null }, { where: { teacherId: teacher.id } });
     await teacher.destroy();
     try { if (school) await school.decrement('teacherCount'); } catch {}
     return res.json({ msg: 'Teacher removed' });
