@@ -49,6 +49,11 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
       .then(list => list.find(t => String(t.id) === String(teacherId)))
       .then(async (teacherData) => {
         if (teacherData) setTeacher(teacherData);
+        try {
+          const key = `teacher_invite_link_${String(teacherId)}`;
+          const saved = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+          if (saved) setInviteLink(saved);
+        } catch {}
         const allClasses = await api.getClasses(schoolId);
         const classes = allClasses.filter(c => String(c.homeroomTeacherName) === String(teacherData?.name));
         setTeacherDetails({ classes } as { classes: Class[] });
@@ -125,6 +130,10 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
       const res = await api.inviteTeacher(String(teacher.id), 'manual');
       if (res.activationLink) {
         setInviteLink(res.activationLink);
+        try {
+          const key = `teacher_invite_link_${String(teacherId)}`;
+          if (typeof window !== 'undefined') localStorage.setItem(key, res.activationLink);
+        } catch {}
         try {
           const list = await api.getSchoolTeachers(schoolId);
           const updated = list.find(t => String(t.id) === String(teacherId));

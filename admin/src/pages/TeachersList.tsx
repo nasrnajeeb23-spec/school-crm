@@ -119,7 +119,18 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
       setDeletingId(teacherId);
       await api.deleteSchoolTeacher(schoolId, teacherId);
       setTeachers(prev => prev.filter(t => String(t.id) !== String(teacherId)));
-      addToast('تم حذف المعلم بنجاح.', 'success');
+      try {
+        const list = await api.getSchoolTeachers(schoolId);
+        const exists = Array.isArray(list) && list.some(t => String(t.id) === String(teacherId));
+        setTeachers(list);
+        if (exists) {
+          addToast('تم الإبلاغ بالحذف لكن لم يتم الحذف فعليًا بسبب اعتماديات. الرجاء المحاولة لاحقًا.', 'warning');
+        } else {
+          addToast('تم حذف المعلم بنجاح.', 'success');
+        }
+      } catch {
+        addToast('تم حذف المعلم. تم تحديث القائمة لاحقًا.', 'success');
+      }
     } catch (e) {
       console.error('Failed to delete teacher:', e);
       addToast('فشل حذف المعلم.', 'error');

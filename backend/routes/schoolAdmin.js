@@ -1051,17 +1051,15 @@ router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SC
     const teacherId = Number(req.params.teacherId);
     const teacher = await Teacher.findOne({ where: { id: teacherId, schoolId } });
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
-    try { await Class.update({ homeroomTeacherId: null, homeroomTeacherName: 'غير محدد' }, { where: { homeroomTeacherId: teacher.id, schoolId } }); } catch {}
-    try {
-      const user = await User.findOne({ where: { teacherId: teacher.id } });
-      if (user) await user.destroy();
-    } catch {}
+    await Class.update({ homeroomTeacherId: null, homeroomTeacherName: 'غير محدد' }, { where: { homeroomTeacherId: teacher.id, schoolId } });
+    const user = await User.findOne({ where: { teacherId: teacher.id } });
+    if (user) await user.destroy();
     const school = await School.findByPk(schoolId);
-    try { await TeacherAttendance.destroy({ where: { teacherId: teacher.id } }); } catch {}
-    try { await SalarySlip.destroy({ where: { personType: 'teacher', personId: String(teacher.id) } }); } catch {}
-    try { await Schedule.update({ teacherId: null }, { where: { teacherId: teacher.id } }); } catch {}
-    try { await teacher.destroy(); } catch {}
-    try { if (school) await school.decrement('teacherCount'); } catch {}
+    await TeacherAttendance.destroy({ where: { teacherId: teacher.id } });
+    await SalarySlip.destroy({ where: { personType: 'teacher', personId: String(teacher.id) } });
+    await Schedule.update({ teacherId: null }, { where: { teacherId: teacher.id } });
+    await teacher.destroy();
+    if (school) await school.decrement('teacherCount');
     return res.json({ msg: 'Teacher removed' });
   } catch (err) {
     console.error(err.message);

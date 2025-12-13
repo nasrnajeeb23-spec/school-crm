@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 import TableSkeleton from '../../components/TableSkeleton';
 import BrandableCard from '../../components/BrandableCard';
 import { useReactToPrint } from 'react-to-print';
+import { Link } from 'react-router-dom';
 
 interface FinancePayrollProps {
     schoolId: number;
@@ -49,15 +50,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
     const [receiptDate, setReceiptDate] = useState<string>('');
     const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
-    // Attendance State
-    const [attendanceUserId, setAttendanceUserId] = useState<string>('');
-    const [attendanceDate, setAttendanceDate] = useState<string>('');
-    const [attendanceCheckIn, setAttendanceCheckIn] = useState<string>('');
-    const [attendanceCheckOut, setAttendanceCheckOut] = useState<string>('');
-    const [attendanceHoursWorked, setAttendanceHoursWorked] = useState<string>('');
-    const [attendanceStatus, setAttendanceStatus] = useState<'Present' | 'Absent' | 'Late'>('Present');
-    const [attendanceLateMinutes, setAttendanceLateMinutes] = useState<string>('');
-    const [attendanceOvertimeMinutes, setAttendanceOvertimeMinutes] = useState<string>('');
+    // Attendance moved to Staff Attendance page
 
     const { addToast } = useToast();
     const [lastErrorToastAt, setLastErrorToastAt] = useState<number>(0);
@@ -911,23 +904,12 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
               </div>
             )}
             <BrandableCard schoolSettings={schoolSettings}>
-                <div className="flex items-center justify-between mb-4"><h4 className="font-semibold">تسجيل حضور الموظفين</h4></div>
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                    <select value={attendanceUserId} onChange={e => setAttendanceUserId(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
-                        <option value="">اختر الموظف...</option>
-                        {staff.map(u => (<option key={u.id} value={String(u.id)}>{u.name}</option>))}
-                    </select>
-                    <input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                    <input type="time" placeholder="دخول" value={attendanceCheckIn} onChange={e => setAttendanceCheckIn(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                    <input type="time" placeholder="خروج" value={attendanceCheckOut} onChange={e => setAttendanceCheckOut(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                    <input type="number" step="0.01" placeholder="ساعات العمل" value={attendanceHoursWorked} onChange={e => setAttendanceHoursWorked(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                    <select value={attendanceStatus} onChange={e => setAttendanceStatus(e.target.value as any)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"><option value="Present">حاضر</option><option value="Absent">غائب</option><option value="Late">متأخر</option></select>
-                    <input type="number" placeholder="دقائق تأخير" value={attendanceLateMinutes} onChange={e => setAttendanceLateMinutes(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                    <input type="number" placeholder="دقائق إضافية" value={attendanceOvertimeMinutes} onChange={e => setAttendanceOvertimeMinutes(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                    <button onClick={async () => {
-                      if (!attendanceUserId || !attendanceDate) { addToast('اختر الموظف والتاريخ.', 'error'); return; }
-                      try { await api.createStaffAttendance(schoolId, { userId: attendanceUserId, date: attendanceDate, checkIn: attendanceCheckIn || undefined, checkOut: attendanceCheckOut || undefined, hoursWorked: attendanceHoursWorked ? Number(attendanceHoursWorked) : undefined, status: attendanceStatus, lateMinutes: attendanceLateMinutes ? Number(attendanceLateMinutes) : undefined, overtimeMinutes: attendanceOvertimeMinutes ? Number(attendanceOvertimeMinutes) : undefined }); addToast('تم تسجيل الحضور.', 'success'); setAttendanceCheckIn(''); setAttendanceCheckOut(''); setAttendanceHoursWorked(''); setAttendanceLateMinutes(''); setAttendanceOvertimeMinutes(''); } catch { addToast('فشل تسجيل الحضور.', 'error'); }
-                    }} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">تسجيل</button>
+                <div className="flex items-center justify-between mb-4"><h4 className="font-semibold">الحضور والغياب للموظفين</h4></div>
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+                    تم نقل تسجيل تفاصيل دوام الموظفين إلى صفحة الحضور والغياب الخاصة بالموظفين لتوحيد التسجيل مع المعلمين.
+                    <div className="mt-3 flex justify-end">
+                        <Link to="/school/staff/attendance" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">فتح صفحة حضور الموظفين</Link>
+                    </div>
                 </div>
             </BrandableCard>
         </div>
