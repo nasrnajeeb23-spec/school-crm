@@ -5,7 +5,12 @@ const { verifyToken, requireRole } = require('../middleware/auth')
 router.get('/config', verifyToken, async (req, res) => {
   try {
     const { PricingConfig, SchoolSettings } = require('../models')
-    const row = await PricingConfig.findOne({ where: { id: 'default' } })
+    let row;
+    try {
+        row = await PricingConfig.findOne({ where: { id: 'default' } });
+    } catch {
+        row = null; // Handle if table missing or error
+    }
     const cfg = row ? {
       pricePerStudent: row.pricePerStudent,
       pricePerTeacher: row.pricePerTeacher,
@@ -39,7 +44,10 @@ router.get('/config', verifyToken, async (req, res) => {
 router.get('/public/config', async (req, res) => {
   try {
     const { PricingConfig, SchoolSettings } = require('../models')
-    const row = await PricingConfig.findOne({ where: { id: 'default' } }).catch(() => null)
+    let row;
+    try {
+        row = await PricingConfig.findOne({ where: { id: 'default' } }).catch(() => null)
+    } catch { row = null; }
     const cfg = row ? {
       pricePerStudent: row.pricePerStudent,
       pricePerTeacher: row.pricePerTeacher,

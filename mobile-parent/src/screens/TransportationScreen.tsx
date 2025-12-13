@@ -12,6 +12,23 @@ const TransportationScreen: React.FC<TransportationScreenProps> = ({ user }) => 
     const [details, setDetails] = useState<{ route: Route; operator: BusOperator | undefined } | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const animX = useRef(new Animated.Value(0)).current;
+    const animY = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        const path = [
+            { x: 0, y: 0 },
+            { x: 60, y: -10 },
+            { x: 120, y: 0 },
+            { x: 180, y: 15 },
+            { x: 240, y: 0 },
+        ];
+        const seq = path.map((p, i) => Animated.timing(animX, { toValue: p.x, duration: 800, easing: Easing.linear, useNativeDriver: true }));
+        const seqY = path.map((p, i) => Animated.timing(animY, { toValue: p.y, duration: 800, easing: Easing.linear, useNativeDriver: true }));
+        Animated.loop(Animated.sequence(seq)).start();
+        Animated.loop(Animated.sequence(seqY)).start();
+    }, [animX, animY]);
+
     useEffect(() => {
         if (!user.parentId) { setLoading(false); return; }
         api.getParentTransportationDetails(user.parentId)
@@ -35,22 +52,6 @@ const TransportationScreen: React.FC<TransportationScreenProps> = ({ user }) => 
     }
 
     const { route, operator } = details;
-
-    const animX = useRef(new Animated.Value(0)).current;
-    const animY = useRef(new Animated.Value(0)).current;
-    useEffect(() => {
-        const path = [
-            { x: 0, y: 0 },
-            { x: 60, y: -10 },
-            { x: 120, y: 0 },
-            { x: 180, y: 15 },
-            { x: 240, y: 0 },
-        ];
-        const seq = path.map((p, i) => Animated.timing(animX, { toValue: p.x, duration: 800, easing: Easing.linear, useNativeDriver: true }));
-        const seqY = path.map((p, i) => Animated.timing(animY, { toValue: p.y, duration: 800, easing: Easing.linear, useNativeDriver: true }));
-        Animated.loop(Animated.sequence(seq)).start();
-        Animated.loop(Animated.sequence(seqY)).start();
-    }, [animX, animY]);
 
     return (
         <ScrollView style={styles.container}>

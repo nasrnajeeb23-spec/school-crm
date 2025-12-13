@@ -19,11 +19,15 @@ router.get('/:parentId/dashboard', verifyToken, requireRole('PARENT'), async (re
         const targetStudents = studentIdFilter ? parent.Students.filter(s => String(s.id) === studentIdFilter) : parent.Students;
         const children = [];
         for (const student of targetStudents) {
-            const [grades, attendance, invoices] = await Promise.all([
-                Grade.findAll({ where: { studentId: student.id }, limit: 5, order: [['createdAt','DESC']] }),
-                Attendance.findAll({ where: { studentId: student.id }, limit: 30, order: [['date','DESC']] }),
-                Invoice.findAll({ where: { studentId: student.id }, order: [['dueDate','DESC']] })
-            ]);
+            let grades = [], attendance = [], invoices = [];
+            try {
+                [grades, attendance, invoices] = await Promise.all([
+                    Grade.findAll({ where: { studentId: student.id }, limit: 5, order: [['createdAt','DESC']] }),
+                    Attendance.findAll({ where: { studentId: student.id }, limit: 30, order: [['date','DESC']] }),
+                    Invoice.findAll({ where: { studentId: student.id }, order: [['dueDate','DESC']] })
+                ]);
+            } catch (innerErr) { console.error('Error fetching details for student ' + student.id, innerErr); }
+
             children.push({
                 student: student.toJSON(),
                 grades: grades.map(g => ({ ...g.toJSON(), studentId: g.studentId, studentName: student.name, classId: g.classId, grades: { homework: g.homework, quiz: g.quiz, midterm: g.midterm, final: g.final } })),
@@ -31,7 +35,11 @@ router.get('/:parentId/dashboard', verifyToken, requireRole('PARENT'), async (re
                 invoices: invoices.map(inv => ({ id: inv.id.toString(), studentId: inv.studentId, studentName: student.name, status: invoiceStatusMap[inv.status] || inv.status, issueDate: inv.createdAt.toISOString().split('T')[0], dueDate: inv.dueDate.toISOString().split('T')[0], items: [{ description: 'رسوم دراسية', amount: parseFloat(inv.amount) }], totalAmount: parseFloat(inv.amount) }))
             });
         }
-        const actionItems = await Notification.findAll({ where: { parentId, isRead: false }, order: [['date','DESC']] });
+        let actionItems = [];
+        try {
+            actionItems = await Notification.findAll({ where: { parentId, isRead: false }, order: [['date','DESC']] });
+        } catch {}
+        
         if (studentIdFilter || children.length === 1) {
             const single = children[0];
             return res.json({
@@ -70,7 +78,9 @@ router.post('/:parentId/requests', verifyToken, requireRole('PARENT'), async (re
 
 router.get('/action-items', verifyToken, requireRole('PARENT'), async (req, res) => {
   try {
-    const rows = await Notification.findAll({ where: { parentId: req.user.parentId }, order: [['date','DESC']] });
+    const parentId = req.user.parentId || (req.user.role === 'PARENT' ? req.user.id : null);
+    if (!parentId) return res.json([]);
+    const rows = await Notification.findAll({ where: { parentId }, order: [['date','DESC']] });
     const typeMap = { 'Warning': 'warning', 'Info': 'info', 'Approval': 'approval' };
     res.json(rows.map(r => ({ id: String(r.id), type: typeMap[r.type] || 'info', title: r.title, description: r.description, date: r.date.toISOString().split('T')[0], isRead: !!r.isRead })));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
