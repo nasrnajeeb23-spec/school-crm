@@ -137,6 +137,11 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   }, [effectiveSchoolId]);
 
   useEffect(() => {
+    if (!effectiveSchoolId) return;
+    api.getSchoolSettings(effectiveSchoolId).then(setSettings).catch(() => {});
+  }, [effectiveSchoolId, location.pathname]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) setIsNotificationsOpen(false);
     };

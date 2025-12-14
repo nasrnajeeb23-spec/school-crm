@@ -58,6 +58,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   useEffect(() => {
+    const isInviteFlow = (() => {
+      if (typeof window === 'undefined') return false;
+      const p = window.location?.pathname || '';
+      if (p !== '/set-password') return false;
+      const q = new URLSearchParams(window.location.search);
+      return !!q.get('token');
+    })();
+    if (isInviteFlow) { setHydrating(false); return; }
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (!token) { setHydrating(false); return; }
     
