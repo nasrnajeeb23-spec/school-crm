@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import * as api from '../api';
+import { formatCurrency } from '../currency-config';
 
 interface ReceiptProps {
   payment: {
@@ -13,6 +14,7 @@ interface ReceiptProps {
     logoUrl?: string;
     notes?: string;
     reference?: string;
+    currencyCode?: string;
   };
   onClose: () => void;
 }
@@ -69,7 +71,7 @@ const PaymentReceiptModal: React.FC<ReceiptProps> = ({ payment, onClose }) => {
               </div>
               <div>
                 <span className="font-bold text-gray-700 block text-xs uppercase">Date</span>
-                <span>{new Date(payment.date).toLocaleDateString('en-GB')}</span>
+                <span>{new Date(payment.date).toLocaleDateString('ar-EG')}</span>
               </div>
             </div>
           </div>
@@ -78,7 +80,7 @@ const PaymentReceiptModal: React.FC<ReceiptProps> = ({ payment, onClose }) => {
           <div className="flex justify-center mb-8">
             <div className="border-2 border-gray-800 px-8 py-4 rounded-lg bg-gray-50 flex items-center gap-4">
               <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Amount Received</span>
-              <span className="text-3xl font-bold text-gray-900">${payment.amount.toFixed(2)}</span>
+              <span className="text-3xl font-bold text-gray-900">{formatCurrency(payment.amount, payment.currencyCode || 'SAR')}</span>
             </div>
           </div>
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import * as api from '../api';
 import PaymentReceiptModal from './PaymentReceiptModal';
+import { formatCurrency } from '../currency-config';
 
 interface Props {
   schoolId: number;
@@ -13,6 +14,9 @@ const StudentStatementModal: React.FC<Props> = ({ schoolId, studentId, studentNa
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [receiptToPrint, setReceiptToPrint] = useState<any | null>(null);
+  const [currencyCode, setCurrencyCode] = useState<string>('SAR');
+  const [schoolName, setSchoolName] = useState<string>('المدرسة');
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const fetchStatement = async () => {
@@ -28,6 +32,14 @@ const StudentStatementModal: React.FC<Props> = ({ schoolId, studentId, studentNa
     fetchStatement();
   }, [schoolId, studentId]);
 
+  useEffect(() => {
+    api.getSchoolSettings(schoolId).then(s => {
+      setCurrencyCode(String(s.defaultCurrency || 'SAR').toUpperCase());
+      setSchoolName(s.schoolName || 'المدرسة');
+      setLogoUrl(s.schoolLogoUrl as string);
+    }).catch(() => {});
+  }, [schoolId]);
+
   const openReceipt = (t: any) => {
       setReceiptToPrint({
           id: t.id,
@@ -35,7 +47,9 @@ const StudentStatementModal: React.FC<Props> = ({ schoolId, studentId, studentNa
           date: t.date,
           method: t.method || 'Cash',
           studentName: studentName,
-          schoolName: 'المدرسة', // This should ideally come from settings, but we can pass it later
+          schoolName,
+          logoUrl,
+          currencyCode,
           notes: t.notes,
           reference: t.reference
       });
@@ -73,9 +87,9 @@ const StudentStatementModal: React.FC<Props> = ({ schoolId, studentId, studentNa
                   <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3 whitespace-nowrap" dir="ltr">{t.date}</td>
                     <td className="px-4 py-3">{t.description}</td>
-                    <td className="px-4 py-3 font-medium text-red-600">{t.debit > 0 ? `$${t.debit.toFixed(2)}` : '-'}</td>
-                    <td className="px-4 py-3 font-medium text-green-600">{t.credit > 0 ? `$${t.credit.toFixed(2)}` : '-'}</td>
-                    <td className="px-4 py-3 font-bold text-gray-800 dark:text-white" dir="ltr">${t.balance.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-medium text-red-600">{t.debit > 0 ? formatCurrency(t.debit, currencyCode) : '-'}</td>
+                    <td className="px-4 py-3 font-medium text-green-600">{t.credit > 0 ? formatCurrency(t.credit, currencyCode) : '-'}</td>
+                    <td className="px-4 py-3 font-bold text-gray-800 dark:text-white" dir="ltr">{formatCurrency(t.balance, currencyCode)}</td>
                     <td className="px-4 py-3">
                         {t.type === 'PAYMENT' && (
                             <button onClick={() => openReceipt(t)} className="text-teal-600 hover:text-teal-800 text-xs flex items-center gap-1" title="طباعة سند قبض">
@@ -90,10 +104,13 @@ const StudentStatementModal: React.FC<Props> = ({ schoolId, studentId, studentNa
             </table>
           )}
         </div>
+        <div className="mt-4 text-center text-xs text-gray-400">
+          تم إصدار هذا الكشف إلكترونياً عبر نظام SchoolSaaS CRM
+        </div>
 
         <div className="mt-6 pt-4 border-t dark:border-gray-700 flex justify-end">
           <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
             طباعة الكشف
           </button>
         </div>

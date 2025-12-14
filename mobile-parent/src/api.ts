@@ -1,26 +1,25 @@
 import { 
     User, School, Student, StudentGrades, ScheduleEntry, Invoice, ParentRequest, 
-    RequestType, RequestStatus, Assignment, Submission, AttendanceStatus, Conversation, Message
+    RequestType, RequestStatus, Assignment, Submission, AttendanceStatus, Conversation, Message,
+    BusOperator, Route
 } from './types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
+export const API_BASE_URL = (process.env as any)?.REACT_APP_API_URL || (process.env as any)?.EXPO_PUBLIC_API_BASE_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 const authHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const token = (typeof localStorage !== 'undefined') ? localStorage.getItem('auth_token') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 // دالة مساعدة للاتصال بالـ API
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...authHeaders(),
-                ...options.headers,
-            },
-        });
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+            ...(options.headers as any || {}),
+        };
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -44,17 +43,13 @@ export const login = async (email: string, password: string, schoolId: number): 
     const token = response?.token;
     const user = response?.user || {};
     
-    if (typeof window !== 'undefined' && token) {
-        localStorage.setItem('auth_token', token);
-    }
+    if (typeof localStorage !== 'undefined' && token) { localStorage.setItem('auth_token', token); }
     
     return user;
 };
 
 export const logout = () => {
-    if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
-    }
+    if (typeof localStorage !== 'undefined') { localStorage.removeItem('auth_token'); }
 };
 
 export const getParentDashboardData = async (parentId: string, studentId?: string): Promise<any> => {
@@ -166,6 +161,17 @@ export const getParentInvoices = async (parentId: string): Promise<Invoice[]> =>
     return [];
 };
 
+export const getSchoolSettings = async (schoolId: number): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/settings`);
+};
+
+export const getAssetUrl = (path: string): string => {
+    if (!path) return '';
+    const base = API_BASE_URL.replace(/\/api\/?$/, '');
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith('/')) return `${base}${path}`;
+    return `${base}/${path}`;
+};
 export const getParentRequests = async (parentId: string): Promise<ParentRequest[]> => {
     const rows: any[] = await apiCall(`/parent/${parentId}/requests`);
     const statusMap: Record<string, RequestStatus> = {
@@ -265,6 +271,24 @@ export const createConversation = async (conversation: {
 
 export const getStudentTransportation = async (studentId: string): Promise<any> => {
     return await apiCall(`/students/${studentId}/transportation`);
+};
+
+export const getParentTransportationDetails = async (parentId: string): Promise<{ route: Route; operator: BusOperator | undefined } | null> => {
+    try {
+        const resp = await apiCall(`/parent/${parentId}/transportation`);
+        if (resp && resp.route) {
+            return resp;
+        }
+    } catch {}
+    try {
+        const dash = await getParentDashboardData(parentId);
+        const sid = dash?.student?.id || (Array.isArray(dash?.children) ? dash.children[0]?.student?.id : null);
+        if (sid) {
+            const data = await getStudentTransportation(String(sid));
+            return data || null;
+        }
+    } catch {}
+    return null;
 };
 
 // ==================== Settings ====================

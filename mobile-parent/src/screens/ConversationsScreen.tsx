@@ -12,12 +12,17 @@ const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.getConversations()
-            .then((data: any) => {
-                 setConversations(data);
-            })
-            .catch((err: any) => console.error("Failed to fetch conversations", err))
-            .finally(() => setLoading(false));
+        (async () => {
+            try {
+                const me = await api.getCurrentUser();
+                const data = await api.getConversations(me.id);
+                setConversations(data);
+            } catch (err) {
+                console.error("Failed to fetch conversations", err);
+            } finally {
+                setLoading(false);
+            }
+        })();
     }, []);
 
     const renderItem = ({ item }: { item: Conversation }) => (
@@ -37,7 +42,7 @@ const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
                 <View style={styles.itemFooter}>
                     <Text style={styles.lastMessage} numberOfLines={1}>{item.lastMessage || 'لا توجد رسائل بعد'}</Text>
-                    {item.unreadCount > 0 && (
+                    {(item.unreadCount || 0) > 0 && (
                         <View style={styles.unreadBadge}>
                             <Text style={styles.unreadText}>{item.unreadCount}</Text>
                         </View>

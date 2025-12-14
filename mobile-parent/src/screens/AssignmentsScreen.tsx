@@ -57,7 +57,7 @@ const AssignmentsScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.cardContent}>
                     <Text style={styles.cardText}>{item.className || 'المادة'}</Text>
                     {item.dueDate && (
-                        <Text style={[styles.cardText, isDueSoon && styles.dueDateSoon]}>
+                        <Text style={[styles.cardText, isDueSoon ? styles.dueDateSoon : undefined]}>
                             تاريخ التسليم: {new Date(item.dueDate).toLocaleDateString('ar-SA')}
                         </Text>
                     )}

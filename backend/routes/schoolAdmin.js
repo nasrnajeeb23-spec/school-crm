@@ -965,7 +965,7 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         }
         try {
           const EmailService = require('../services/EmailService');
-          const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+          const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', targetRole: 'Teacher', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
           const base = process.env.FRONTEND_URL || 'http://localhost:3000';
           const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
           linkToReturn = activationLink;
@@ -1661,7 +1661,7 @@ router.post('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         user = await User.create({ email: parent.email, username: parent.email, password: hashed, name: parent.name, role: 'Parent', schoolId: parent.schoolId, parentId: parent.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
     }
 
-    const inviteToken = jwt.sign({ id: user.id, type: 'invite', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Parent', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
 
@@ -3541,7 +3541,7 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
     delete userJson.password;
     try {
       const EmailService = require('../services/EmailService');
-      const inviteToken = jwt.sign({ id: user.id, type: 'invite', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+      const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Staff', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
       const base = process.env.FRONTEND_URL || 'http://localhost:3000';
       const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
       userJson.activationLink = activationLink; // Add link to response

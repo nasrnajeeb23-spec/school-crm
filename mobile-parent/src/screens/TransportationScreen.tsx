@@ -32,7 +32,7 @@ const TransportationScreen: React.FC<TransportationScreenProps> = ({ user }) => 
     useEffect(() => {
         if (!user.parentId) { setLoading(false); return; }
         api.getParentTransportationDetails(user.parentId)
-            .then(data => {
+            .then((data: any) => {
                 if (data && data.route && data.operator) {
                     setDetails(data);
                 } else {

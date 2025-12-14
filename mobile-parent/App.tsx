@@ -3,12 +3,13 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
+import { LinkingOptions } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
 import { User } from './src/types';
 
 const prefix = Linking.createURL('/');
 
-const linking = {
+const linking: LinkingOptions<any> = {
   prefixes: [prefix],
   config: {
     screens: {

@@ -4,6 +4,9 @@ import * as api from '../api';
 import StatsCard from '../components/StatsCard';
 import { RevenueIcon, TotalDebtIcon, CheckIcon, PrintIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
+import InvoicePrintModal from '../components/InvoicePrintModal';
+import { SchoolSettings } from '../types';
+import * as api from '../api';
 
 const statusColorMap: { [key in InvoiceStatus]: string } = {
   [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -15,6 +18,8 @@ const ParentFinance: React.FC = () => {
     const { currentUser: user } = useAppContext();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState(true);
+    const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
+    const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
 
     useEffect(() => {
         if (!user?.parentId) {
@@ -29,6 +34,12 @@ const ParentFinance: React.FC = () => {
             .catch(err => console.error("Failed to fetch finance data:", err))
             .finally(() => setLoading(false));
     }, [user?.parentId]);
+
+    useEffect(() => {
+        const sid = user?.schoolId;
+        if (!sid) return;
+        api.getSchoolSettings(sid).then(setSchoolSettings).catch(() => {});
+    }, [user?.schoolId]);
 
     const financeSummary = useMemo(() => {
         const totalAmount = invoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
@@ -107,7 +118,7 @@ const ParentFinance: React.FC = () => {
                                                 دفع الآن
                                             </button>
                                         )}
-                                        <button className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline mr-4">
+                                        <button onClick={() => setInvoiceToPrint(invoice)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline mr-4">
                                             <PrintIcon className="inline h-4 w-4 ml-1" />
                                             طباعة
                                         </button>
@@ -118,6 +129,7 @@ const ParentFinance: React.FC = () => {
                     </table>
                 </div>
             </div>
+            {invoiceToPrint && <InvoicePrintModal invoice={invoiceToPrint} schoolSettings={schoolSettings} onClose={() => setInvoiceToPrint(null)} />}
         </div>
     );
 };

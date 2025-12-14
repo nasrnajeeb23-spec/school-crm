@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Invoice, PaymentData } from '../types';
+import { formatCurrency } from '../currency-config';
 
 interface RecordPaymentModalProps {
   invoice: Invoice;
   onClose: () => void;
   onSave: (invoiceId: string, paymentData: PaymentData) => Promise<void>;
+  currencyCode?: string;
 }
 
-const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ invoice, onClose, onSave }) => {
+const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ invoice, onClose, onSave, currencyCode = 'SAR' }) => {
   const [paymentData, setPaymentData] = useState<PaymentData>({
     amount: invoice.remainingAmount ?? invoice.totalAmount,
     paymentDate: new Date().toISOString().split('T')[0],
@@ -43,7 +45,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ invoice, onClos
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
             فاتورة الطالب: <span className="font-semibold">{invoice.studentName}</span>
             {' | '}
-            المبلغ المتبقي: <span className="font-bold text-red-600">${(invoice.remainingAmount ?? invoice.totalAmount).toFixed(2)}</span>
+            المبلغ المتبقي: <span className="font-bold text-red-600">{formatCurrency((invoice.remainingAmount ?? invoice.totalAmount), currencyCode)}</span>
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

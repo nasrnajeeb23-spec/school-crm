@@ -61,6 +61,10 @@ export interface Invoice {
     issueDate: string;
     dueDate: string;
     totalAmount: number;
+    paidAmount?: number;
+    remainingAmount?: number;
+    studentId?: string;
+    items?: { description?: string; amount?: number }[];
 }
 
 export interface Grade {

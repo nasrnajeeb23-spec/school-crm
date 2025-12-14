@@ -27,8 +27,10 @@ const SetPassword: React.FC = () => {
   }, []);
   useEffect(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      const tParam = params.get('token') || '';
       const hasAuth = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
-      if (hasAuth) {
+      if (hasAuth && !tParam) {
         getCurrentUser().then(u => {
           const roleRaw = String(u?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
           let target = '/login';

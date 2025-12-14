@@ -5,6 +5,7 @@ import { Student, StudentGrades, SchoolSettings, Teacher } from '../types';
 import BrandableCard from '../components/BrandableCard';
 import { useAppContext } from '../contexts/AppContext';
 import { DownloadIcon } from '../components/icons';
+import { formatCurrency } from '../currency-config';
 
 const COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4'];
 
@@ -112,7 +113,41 @@ const Reports: React.FC<ReportsProps> = ({ schoolSettings }) => {
     const exportTeacherPayrollPDF = () => {
         const w = window.open('', '_blank');
         if (!w) return;
-        const html = `<!doctype html><html><head><meta charset="utf-8"><title>تقارير الرواتب</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:right}th{background:#f3f4f6}</style></head><body><h3>تأثير الحضور على رواتب المعلمين (${month})</h3><table><thead><tr><th>المعلم</th><th>الشهر</th><th>الأساسي</th><th>البدلات</th><th>الخصومات</th><th>الصافي</th><th>خصم الغياب</th><th>خصم التأخير</th><th>علاوة الإضافي</th></tr></thead><tbody>${teacherPayrollImpact.map(r => `<tr><td>${r.teacherName}</td><td>${r.month}</td><td>${r.baseAmount.toFixed(2)}</td><td>${r.allowancesTotal.toFixed(2)}</td><td>${r.deductionsTotal.toFixed(2)}</td><td>${r.netAmount.toFixed(2)}</td><td>${r.absenceDeduction.toFixed(2)}</td><td>${r.lateDeduction.toFixed(2)}</td><td>${r.overtimeAllowance.toFixed(2)}</td></tr>`).join('')}</tbody></table></body></html>`;
+        const cur = (schoolSettings?.defaultCurrency || 'SAR') as string;
+        const logo = schoolSettings?.schoolLogoUrl ? api.getAssetUrl(schoolSettings?.schoolLogoUrl as string) : '';
+        const head = `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:16px">
+            <div style="text-align:right">
+              <div style="font-size:20px;font-weight:bold">${schoolSettings?.schoolName || 'المدرسة'}</div>
+              <div style="color:#6b7280;font-size:12px">تقرير الرواتب</div>
+            </div>
+            ${logo ? `<img src="${logo}" alt="Logo" style="height:60px;width:60px;object-fit:contain" onerror="this.style.display='none'"/>` : ''}
+            <div style="text-align:left;font-family:monospace">
+              <div style="font-size:12px;color:#6b7280">Month</div>
+              <div>${month}</div>
+            </div>
+          </div>`;
+        const rows = teacherPayrollImpact.map(r => `<tr>
+          <td>${r.teacherName}</td>
+          <td>${r.month}</td>
+          <td>${formatCurrency(r.baseAmount, cur)}</td>
+          <td>${formatCurrency(r.allowancesTotal, cur)}</td>
+          <td>${formatCurrency(r.deductionsTotal, cur)}</td>
+          <td>${formatCurrency(r.netAmount, cur)}</td>
+          <td>${formatCurrency(r.absenceDeduction, cur)}</td>
+          <td>${formatCurrency(r.lateDeduction, cur)}</td>
+          <td>${formatCurrency(r.overtimeAllowance, cur)}</td>
+        </tr>`).join('');
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>تقارير الرواتب</title>
+        <style>
+        body{font-family:Tajawal,Arial,sans-serif;padding:20px;direction:rtl}
+        table{width:100%;border-collapse:collapse}
+        th,td{border:1px solid #ddd;padding:8px;text-align:right}
+        th{background:#f3f4f6}
+        </style></head><body>${head}<table><thead><tr>
+        <th>المعلم</th><th>الشهر</th><th>الأساسي</th><th>البدلات</th><th>الخصومات</th><th>الصافي</th><th>خصم الغياب</th><th>خصم التأخير</th><th>علاوة الإضافي</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+        <div style="margin-top:12px;color:#9ca3af;font-size:10px;text-align:center">تم توليد التقرير إلكترونياً عبر SchoolSaaS CRM</div>
+        </body></html>`;
         w.document.open();
         w.document.write(html);
         w.document.close();

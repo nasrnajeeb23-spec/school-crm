@@ -4,6 +4,7 @@ import { School, PricingConfig, SubscriptionState } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { EditIcon, PlusIcon, TrashIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
+import { getCurrencySymbol, formatCurrency } from '../currency-config';
 
 interface ModulesPageProps {
     school: School;
@@ -142,6 +143,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     const { addToast } = useToast();
     const { currentUser } = useAppContext();
     const canManageModules = ['SUPER_ADMIN','SUPER_ADMIN_FINANCIAL','SUPER_ADMIN_TECHNICAL','SUPER_ADMIN_SUPERVISOR'].includes(String(currentUser?.role || '').toUpperCase());
+    const symbolForCurrency = (cur: string) => getCurrencySymbol(cur);
 
     const fetchData = () => {
         setLoading(true);
@@ -262,24 +264,24 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
 
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white">الباقات والاشتراكات</h3>
-                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">الخطة الحالية: {planName} — السعر: ${planPrice.toFixed(2)}</div>
+                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">الخطة الحالية: {planName} — السعر: {formatCurrency(planPrice, String(planPacksOverage.currency || pricingConfig?.currency || 'USD'))}</div>
                     <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">وضع الفوترة: {billing.mode === 'overage' ? 'السماح بالزيادة' : 'حماية صارمة'}</div>
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400">الباقة الأساسية</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.planAmount.toFixed(2)}</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(planPacksOverage.planAmount, planPacksOverage.currency)}</p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400">توسعات السعة</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.packsAmount.toFixed(2)}</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(planPacksOverage.packsAmount, planPacksOverage.currency)}</p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400">رسوم زيادة</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.overageTotal.toFixed(2)}</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(planPacksOverage.overageTotal, planPacksOverage.currency)}</p>
                         </div>
                         <div className="border-r pr-4 dark:border-gray-700">
                             <p className="text-sm text-gray-500 dark:text-gray-400">الإجمالي الشهري</p>
-                            <p className="text-3xl font-bold text-teal-600 dark:text-teal-400">{planPacksOverage.currency === 'USD' ? '$' : ''}{planPacksOverage.total.toFixed(2)}</p>
+                            <p className="text-3xl font-bold text-teal-600 dark:text-teal-400">{formatCurrency(planPacksOverage.total, planPacksOverage.currency)}</p>
                         </div>
                     </div>
                 </div>
@@ -313,7 +315,7 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
                             {packs.map((p: any, idx: number) => (
                                 <div key={idx} className="border dark:border-gray-700 rounded-lg p-4 text-sm flex justify-between">
                                     <span className="text-gray-700 dark:text-gray-300">{p.type}</span>
-                                    <span className="font-bold text-gray-900 dark:text-white">+{p.qty} {p.price ? `($${Number(p.price).toFixed(2)})` : ''}</span>
+                                    <span className="font-bold text-gray-900 dark:text-white">+{p.qty} {p.price ? `(${formatCurrency(Number(p.price) || 0, String(planPacksOverage.currency || pricingConfig?.currency || 'USD'))})` : ''}</span>
                                 </div>
                             ))}
                         </div>

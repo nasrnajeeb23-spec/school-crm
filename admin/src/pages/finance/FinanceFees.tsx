@@ -6,17 +6,20 @@ import { FileIcon, PlusIcon } from '../../components/icons';
 import AddInvoiceModal from '../../components/AddInvoiceModal';
 import RecordPaymentModal from '../../components/RecordPaymentModal';
 import StudentStatementModal from '../../components/StudentStatementModal';
+import InvoicePrintModal from '../../components/InvoicePrintModal';
 import { useToast } from '../../contexts/ToastContext';
 import TableSkeleton from '../../components/TableSkeleton';
 import EmptyState from '../../components/EmptyState';
 import BrandableCard from '../../components/BrandableCard';
 import ResourceUsageWidget from '../../components/ResourceUsageWidget';
+import { getCurrencySymbol, formatCurrency } from '../../currency-config';
 
 const invoiceStatusColorMap: { [key in InvoiceStatus]: string } = {
   [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
   [InvoiceStatus.Unpaid]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
   [InvoiceStatus.Overdue]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 };
+const symbolForCurrency = (cur: string) => getCurrencySymbol(cur);
 
 interface FinanceFeesProps {
     schoolId: number;
@@ -38,6 +41,7 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
     
     // Invoice State
     const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
+    const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
     const [statementStudent, setStatementStudent] = useState<{id: string, name: string} | null>(null);
     const [isAddInvoiceModalOpen, setIsAddInvoiceModalOpen] = useState(false);
     const [invoiceSearchTerm, setInvoiceSearchTerm] = useState('');
@@ -243,7 +247,31 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                             <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th className="px-6 py-3">اسم الطالب</th><th className="px-6 py-3">تاريخ الاستحقاق</th><th className="px-6 py-3">المبلغ</th><th className="px-6 py-3">المدفوع</th><th className="px-6 py-3">المتبقي</th><th className="px-6 py-3">الحالة</th><th className="px-6 py-3">إجراءات</th></tr></thead>
                                 <tbody>
-                                    {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4 text-green-600">${(invoice.paidAmount || 0).toFixed(2)}</td><td className="px-6 py-4 text-red-600">${((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))).toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>{invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}</div></td></tr>))}
+                                    {filteredInvoices.map((invoice) => {
+                                      const cur = (schoolSettings?.defaultCurrency || 'SAR') as string;
+                                      const sym = symbolForCurrency(cur);
+                                      const remaining = (invoice.remainingAmount !== undefined && invoice.remainingAmount !== null)
+                                        ? invoice.remainingAmount
+                                        : (invoice.totalAmount - (invoice.paidAmount || 0));
+                                      return (
+                                        <tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td>
+                                          <td className="px-6 py-4">{invoice.dueDate}</td>
+                                          <td className="px-6 py-4 font-semibold">{formatCurrency(invoice.totalAmount, cur)}</td>
+                                          <td className="px-6 py-4 text-green-600">{formatCurrency((invoice.paidAmount || 0), cur)}</td>
+                                          <td className="px-6 py-4 text-red-600">{formatCurrency(remaining, cur)}</td>
+                                          <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td>
+                                          <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex gap-2">
+                                              {invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}
+                                              <button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>
+                                              <button onClick={() => setInvoiceToPrint(invoice)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">طباعة فاتورة</button>
+                                              {invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
                                 </tbody>
                             </table>
                         ) : (
@@ -251,6 +279,7 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                         )}
                     </div>
                 </BrandableCard>
+                {invoiceToPrint && <InvoicePrintModal invoice={invoiceToPrint} schoolSettings={schoolSettings} onClose={() => setInvoiceToPrint(null)} />}
                 <BrandableCard schoolSettings={schoolSettings}>
                     <div className="p-1">
                         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">استخدام الاتصالات</h3>
@@ -273,14 +302,14 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</span><span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.email.count} رسالة</span></div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {commUsage.email.amount.toFixed(2)} {commUsage.currency}</div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {formatCurrency(commUsage.email.amount, commUsage.currency)}</div>
                                 </div>
                                 <div>
                                     <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium text-gray-700 dark:text-gray-300">الرسائل النصية</span><span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.sms.count} رسالة</span></div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {commUsage.sms.amount.toFixed(2)} {commUsage.currency}</div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">التكلفة: {formatCurrency(commUsage.sms.amount, commUsage.currency)}</div>
                                 </div>
                                 <div>
-                                    <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium text-gray-700 dark:text-gray-300">المجموع</span><span className="text-xs font-bold text-gray-900 dark:text-white">{commUsage.total.toFixed(2)} {commUsage.currency}</span></div>
+                                    <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium text-gray-700 dark:text-gray-300">المجموع</span><span className="text-xs font-bold text-gray-900 dark:text-white">{formatCurrency(commUsage.total, commUsage.currency)}</span></div>
                                     <div className="text-sm text-gray-600 dark:text-gray-300">الفوترة حسب مزود المنصة فقط</div>
                                 </div>
                             </div>
@@ -297,9 +326,9 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                                         {commUsage.breakdown.map((b) => (
                                             <tr key={b.period} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
                                                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{b.period}</td>
-                                                <td className="px-6 py-4">{b.email.count} / {b.email.amount.toFixed(2)} {commUsage.currency}</td>
-                                                <td className="px-6 py-4">{b.sms.count} / {b.sms.amount.toFixed(2)} {commUsage.currency}</td>
-                                                <td className="px-6 py-4 font-semibold">{b.total.toFixed(2)} {commUsage.currency}</td>
+                                                <td className="px-6 py-4">{b.email.count} / {formatCurrency(b.email.amount, commUsage.currency)}</td>
+                                                <td className="px-6 py-4">{b.sms.count} / {formatCurrency(b.sms.amount, commUsage.currency)}</td>
+                                                <td className="px-6 py-4 font-semibold">{formatCurrency(b.total, commUsage.currency)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -380,9 +409,9 @@ const FinanceFees: React.FC<FinanceFeesProps> = ({ schoolId, schoolSettings }) =
                 </BrandableCard>
             )}
 
-            {invoiceToPay && <RecordPaymentModal invoice={invoiceToPay} onClose={() => setInvoiceToPay(null)} onSave={handleRecordPayment} />}
+            {invoiceToPay && <RecordPaymentModal invoice={invoiceToPay} onClose={() => setInvoiceToPay(null)} onSave={handleRecordPayment} currencyCode={(schoolSettings?.defaultCurrency || 'SAR') as string} />}
             {statementStudent && <StudentStatementModal schoolId={schoolId} studentId={statementStudent.id} studentName={statementStudent.name} onClose={() => setStatementStudent(null)} />}
-            {isAddInvoiceModalOpen && <AddInvoiceModal schoolId={schoolId} onClose={() => setIsAddInvoiceModalOpen(false)} onSave={handleAddInvoice} />}
+            {isAddInvoiceModalOpen && <AddInvoiceModal schoolId={schoolId} onClose={() => setIsAddInvoiceModalOpen(false)} onSave={handleAddInvoice} currencyCode={(schoolSettings?.defaultCurrency || 'SAR') as string} />}
         </div>
     );
 };

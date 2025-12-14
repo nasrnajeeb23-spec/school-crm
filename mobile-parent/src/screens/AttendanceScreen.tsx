@@ -99,11 +99,16 @@ const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ user }) => {
                         {['س', 'ج', 'خ', 'ر', 'ث', 'ن', 'ح'].map(d => <Text key={d} style={styles.weekDay}>{d}</Text>)}
                     </View>
                     <View style={styles.calendarGrid}>
-                        {calendarData.map((day, index) => (
-                            <View key={index} style={[styles.dayCell, day?.status && { backgroundColor: statusInfo[day.status].bg }]}>
-                                {day && <Text style={[styles.dayText, day?.status && { color: statusInfo[day.status].text, fontWeight: 'bold' }]}>{day.day}</Text>}
-                            </View>
-                        ))}
+                        {calendarData.map((day, index) => {
+                            const s = day?.status as keyof typeof statusInfo | undefined;
+                            const bgStyle = s ? { backgroundColor: statusInfo[s].bg } : undefined;
+                            const textStyle = s ? { color: statusInfo[s].text, fontWeight: 'bold' as const } : undefined;
+                            return (
+                                <View key={index} style={[styles.dayCell, bgStyle]}>
+                                    {day && <Text style={[styles.dayText, textStyle]}>{day.day}</Text>}
+                                </View>
+                            );
+                        })}
                     </View>
                      <View style={styles.legendContainer}>
                         {Object.entries(statusInfo).map(([status, info]) => (

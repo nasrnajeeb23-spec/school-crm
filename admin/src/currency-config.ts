@@ -1,25 +1,15 @@
-// ملف إعدادات العملة اليمنية
-export const CURRENCY_CONFIG = {
-    code: 'YER',
-    name: 'ريال يمني',
-    symbol: 'ر.ي',
-    decimalPlaces: 0,
-    exchangeRate: 1, // مقابل الدولار (يمكن تحديثه لاحقاً)
+export const getCurrencySymbol = (code?: string): string => {
+    const c = String(code || '').trim().toUpperCase();
+    if (c === 'USD') return '$';
+    if (c === 'SAR') return 'ر.س';
+    if (c === 'EGP') return 'ج.م';
+    if (c === 'YER') return 'ر.ي';
+    return c || '$';
 };
 
-// دالة تحويل الأسعار من دولار إلى ريال يمني
-export const convertToYER = (dollars: number): number => {
-    return Math.round(dollars * 2500); // 1 دولار = 2500 ريال يمني تقريباً
-};
-
-// دالة تنسيق المبلغ بالريال اليمني
-export const formatYER = (amount: number): string => {
-    return `${amount.toLocaleString('ar-YE')} ر.ي`;
-};
-
-// تصدير للاستخدام في المكونات
-export default {
-    CURRENCY_CONFIG,
-    convertToYER,
-    formatYER,
+export const formatCurrency = (amount: number, code?: string): string => {
+    const sym = getCurrencySymbol(code);
+    const decimals = (String(code || '').toUpperCase() === 'YER') ? 0 : 2;
+    const n = Number(amount || 0);
+    return `${sym}${n.toFixed(decimals)}`;
 };

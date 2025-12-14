@@ -16,6 +16,8 @@ import { useToast } from '../contexts/ToastContext';
 import TableSkeleton from '../components/TableSkeleton';
 import EmptyState from '../components/EmptyState';
 import BrandableCard from '../components/BrandableCard';
+import InvoicePrintModal from '../components/InvoicePrintModal';
+import ExpenseVoucherModal from '../components/ExpenseVoucherModal';
 
 const invoiceStatusColorMap: { [key in InvoiceStatus]: string } = {
   [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -35,6 +37,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
     const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
+    const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
     const [statementStudent, setStatementStudent] = useState<{id: string, name: string} | null>(null);
     const [isAddInvoiceModalOpen, setIsAddInvoiceModalOpen] = useState(false);
     const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
@@ -143,6 +146,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
     }, [invoiceSearchTerm, invoiceStatusFilter, invoices]);
 
     const renderInvoicesTab = () => (
+        <>
         <BrandableCard schoolSettings={schoolSettings}>
             <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
                 <div className="flex items-center gap-4">
@@ -161,7 +165,24 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                     <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">اسم الطالب</th><th scope="col" className="px-6 py-3">تاريخ الاستحقاق</th><th scope="col" className="px-6 py-3">المبلغ</th><th scope="col" className="px-6 py-3">المدفوع</th><th scope="col" className="px-6 py-3">المتبقي</th><th scope="col" className="px-6 py-3">الحالة</th><th scope="col" className="px-6 py-3">إجراءات</th></tr></thead>
                         <tbody>
-                            {filteredInvoices.map((invoice) => (<tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td><td className="px-6 py-4">{invoice.dueDate}</td><td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td><td className="px-6 py-4 text-green-600">${(invoice.paidAmount || 0).toFixed(2)}</td><td className="px-6 py-4 text-red-600">${((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))).toFixed(2)}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td><td className="px-6 py-4 whitespace-nowrap"><div className="flex gap-2">{invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}<button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>{invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}<button className="font-medium text-teal-600 dark:text-teal-500 hover:underline">عرض</button></div></td></tr>))}
+                            {filteredInvoices.map((invoice) => (
+                              <tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td>
+                                <td className="px-6 py-4">{invoice.dueDate}</td>
+                                <td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td>
+                                <td className="px-6 py-4 text-green-600">${(invoice.paidAmount || 0).toFixed(2)}</td>
+                                <td className="px-6 py-4 text-red-600">${((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))).toFixed(2)}</td>
+                                <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex gap-2">
+                                    {invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}
+                                    <button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>
+                                    <button onClick={() => setInvoiceToPrint(invoice)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">طباعة فاتورة</button>
+                                    {invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                     </table>
                 ) : (
@@ -169,9 +190,12 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                 )}
             </div>
         </BrandableCard>
+        {invoiceToPrint && <InvoicePrintModal invoice={invoiceToPrint} schoolSettings={schoolSettings} onClose={() => setInvoiceToPrint(null)} />}
+        </>
     );
     
     const renderExpensesTab = () => (
+        <>
         <BrandableCard schoolSettings={schoolSettings}>
             <div className="flex justify-end items-center mb-4"><button onClick={() => setIsAddExpenseModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إضافة مصروف</button></div>
              <div className="overflow-x-auto">
@@ -179,7 +203,17 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                     <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">التاريخ</th><th scope="col" className="px-6 py-3">الوصف</th><th scope="col" className="px-6 py-3">الفئة</th><th scope="col" className="px-6 py-3">المبلغ</th></tr></thead>
                         <tbody>
-                            {expenses.map((expense) => (<tr key={expense.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4">{expense.date}</td><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{expense.description}</td><td className="px-6 py-4">{expense.category}</td><td className="px-6 py-4 font-semibold text-red-500">-${expense.amount.toFixed(2)}</td></tr>))}
+                            {expenses.map((expense) => (
+                              <tr key={expense.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <td className="px-6 py-4">{expense.date}</td>
+                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{expense.description}</td>
+                                <td className="px-6 py-4">{expense.category}</td>
+                                <td className="px-6 py-4 font-semibold text-red-500 flex items-center gap-3">
+                                  -${expense.amount.toFixed(2)}
+                                  <button onClick={() => setVoucherToPrint(expense)} className="text-teal-600 hover:text-teal-800 text-xs" title="طباعة سند صرف">سند صرف</button>
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                     </table>
                 ) : (
@@ -187,6 +221,8 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                 )}
             </div>
         </BrandableCard>
+        {voucherToPrint && <ExpenseVoucherModal expense={voucherToPrint} schoolSettings={schoolSettings} onClose={() => setVoucherToPrint(null)} />}
+        </>
     );
 
     const renderReportsTab = () => (

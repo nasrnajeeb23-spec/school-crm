@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Student, NewInvoiceData, InvoiceItem } from '../types';
 import * as api from '../api';
 import { PlusIcon, TrashIcon } from './icons';
+import { formatCurrency } from '../currency-config';
 
 interface AddInvoiceModalProps {
   schoolId: number;
   onClose: () => void;
   onSave: (invoiceData: NewInvoiceData) => Promise<void>;
+  currencyCode?: string;
 }
 
-const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ schoolId, onClose, onSave }) => {
+const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ schoolId, onClose, onSave, currencyCode = 'SAR' }) => {
   const [studentId, setStudentId] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [items, setItems] = useState<InvoiceItem[]>([{ description: '', amount: 0 }]);
@@ -114,7 +116,7 @@ const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ schoolId, onClose, on
             
             <div className="text-left pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-gray-500 dark:text-gray-400">المجموع الكلي: </span>
-                <span className="text-2xl font-bold text-gray-800 dark:text-white">${totalAmount.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-gray-800 dark:text-white">{formatCurrency(totalAmount, currencyCode)}</span>
             </div>
           </div>
           <div className="flex justify-end gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">

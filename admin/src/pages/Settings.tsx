@@ -16,17 +16,64 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
   const [importState, setImportState] = useState<{students:any[];classes:any[];subjects:any[];classSubjectTeachers:any[];grades:any[];attendance:any[];schedule:any[];fees:any[];logs:string[]}>({students:[],classes:[],subjects:[],classSubjectTeachers:[],grades:[],attendance:[],schedule:[],fees:[],logs:[]});
   const [importPreview, setImportPreview] = useState<{students:{valid:number;invalid:number;errors:string[]};classes:{valid:number;invalid:number;errors:string[]};subjects:{valid:number;invalid:number;errors:string[]};classSubjectTeachers:{valid:number;invalid:number;errors:string[]};grades:{valid:number;invalid:number;errors:string[]};attendance:{valid:number;invalid:number;errors:string[]};schedule:{valid:number;invalid:number;errors:string[]};fees:{valid:number;invalid:number;errors:string[]}}>({students:{valid:0,invalid:0,errors:[]},classes:{valid:0,invalid:0,errors:[]},subjects:{valid:0,invalid:0,errors:[]},classSubjectTeachers:{valid:0,invalid:0,errors:[]},grades:{valid:0,invalid:0,errors:[]},attendance:{valid:0,invalid:0,errors:[]},schedule:{valid:0,invalid:0,errors:[]},fees:{valid:0,invalid:0,errors:[]}});
   const [importProcessing, setImportProcessing] = useState(false);
+  const [newCurrency, setNewCurrency] = useState('');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [hasDraft, setHasDraft] = useState<boolean>(() => {
+    try {
+      const k = `school_settings_draft_${schoolId}`;
+      return typeof window !== 'undefined' ? !!localStorage.getItem(k) : false;
+    } catch { return false; }
+  });
+  const [draftEnabled, setDraftEnabled] = useState<boolean>(() => {
+    try {
+      const k = `school_settings_draft_enabled_${schoolId}`;
+      const v = typeof window !== 'undefined' ? localStorage.getItem(k) : null;
+      return v ? v === '1' : true;
+    } catch { return true; }
+  });
 
   useEffect(() => {
     setLoading(true);
     api.getSchoolSettings(schoolId).then(data => {
-      setSettings(data);
+      if (draftEnabled) {
+        let merged = data;
+        try {
+          const k = `school_settings_draft_${schoolId}`;
+          const s = typeof window !== 'undefined' ? localStorage.getItem(k) : null;
+          if (s) {
+            const d = JSON.parse(s);
+            merged = { ...data, ...d };
+          }
+        } catch {}
+        setSettings(merged);
+      } else {
+        setSettings(data);
+      }
     }).catch(err => {
         console.error("Failed to load settings:", err);
     }).finally(() => {
         setLoading(false);
     });
   }, [schoolId]);
+
+  useEffect(() => {
+    try {
+      if (settings && draftEnabled) {
+        const k = `school_settings_draft_${schoolId}`;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(k, JSON.stringify(settings));
+          setHasDraft(true);
+        }
+      }
+    } catch {}
+  }, [schoolId, settings, draftEnabled]);
+
+  useEffect(() => {
+    try {
+      const k = `school_settings_draft_enabled_${schoolId}`;
+      if (typeof window !== 'undefined') localStorage.setItem(k, draftEnabled ? '1' : '0');
+    } catch {}
+  }, [schoolId, draftEnabled]);
 
   const [exportSelecting, setExportSelecting] = useState<{students:boolean;classes:boolean;subjects:boolean;classSubjectTeachers:boolean;grades:boolean;attendance:boolean;schedule:boolean;fees:boolean;teachers:boolean;parents:boolean}>({students:true,classes:true,subjects:true,classSubjectTeachers:true,grades:true,attendance:false,schedule:false,fees:true,teachers:true,parents:true});
   const [exportFilters, setExportFilters] = useState<{className:string;date:string;subjectName:string}>({className:'',date:'',subjectName:''});
@@ -84,18 +131,44 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     try {
       const file = e.target.files?.[0];
       if (!file) return;
+      setLogoUploading(true);
       const url = await api.uploadSchoolLogo(schoolId, file);
       // Add timestamp to prevent caching issues
       const timestampedUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
-      setSettings(prev => prev ? { ...prev, schoolLogoUrl: timestampedUrl } : null);
+      setSettings(prev => prev ? { ...prev, schoolLogoUrl: timestampedUrl } : prev);
+      try { e.target.value = ''; } catch {}
       addToast('تم رفع شعار المدرسة بنجاح.', 'success');
     } catch (err) {
       console.error('Failed to upload logo:', err);
       const m = String((err as any)?.message || '');
       addToast(m ? `فشل رفع شعار المدرسة: ${m}` : 'فشل رفع شعار المدرسة.', 'error');
+    } finally { setLogoUploading(false); }
+  };
+
+  const restoreDraft = () => {
+    try {
+      const k = `school_settings_draft_${schoolId}`;
+      const s = typeof window !== 'undefined' ? localStorage.getItem(k) : null;
+      if (!s) { addToast('لا توجد مسودة محفوظة.', 'warning'); return; }
+      const d = JSON.parse(s);
+      setSettings(prev => prev ? { ...prev, ...d } : d);
+      addToast('تم استعادة المسودة.', 'success');
+    } catch {
+      addToast('تعذر استعادة المسودة.', 'error');
     }
   };
 
+  const clearDraft = () => {
+    try {
+      const k = `school_settings_draft_${schoolId}`;
+      if (typeof window !== 'undefined') localStorage.removeItem(k);
+      setHasDraft(false);
+      addToast('تم حذف المسودة.', 'success');
+    } catch {
+      addToast('تعذر حذف المسودة.', 'error');
+    }
+  };
+ 
   
   const handleStageToggle = (stage: string) => {
     setSettings(prev => {
@@ -186,6 +259,11 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     setSaving(true);
     try {
         await api.updateSchoolSettings(schoolId, settings);
+        try {
+          const k = `school_settings_draft_${schoolId}`;
+          if (typeof window !== 'undefined') localStorage.removeItem(k);
+        } catch {}
+        setHasDraft(false);
         addToast('تم حفظ الإعدادات بنجاح!', 'success');
     } catch(err) {
         console.error("Failed to save settings:", err);
@@ -1183,9 +1261,123 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
                     <label htmlFor="schoolAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300">عنوان المدرسة</label>
                     <input type="text" name="schoolAddress" id="schoolAddress" value={settings.schoolAddress} onChange={handleInputChange} className={inputStyle} />
                 </div>
+                <div className="md:col-span-2">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">إعدادات العملة</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">العملة الافتراضية</label>
+                      <select
+                        value={(settings.defaultCurrency || 'SAR').toUpperCase()}
+                        onChange={(e) => {
+                          const cur = e.target.value.toUpperCase();
+                          setSettings(prev => {
+                            if (!prev) return prev;
+                            const list = Array.isArray(prev.allowedCurrencies) ? prev.allowedCurrencies : ['SAR','USD','YER','EGP'];
+                            const nextList = list.includes(cur) ? list : [...list, cur];
+                            return { ...prev, defaultCurrency: cur, allowedCurrencies: nextList };
+                          });
+                        }}
+                        className={inputStyle}
+                      >
+                        {(Array.isArray(settings.allowedCurrencies) && settings.allowedCurrencies.length > 0 ? settings.allowedCurrencies : ['SAR','USD','YER','EGP']).map(c => (
+                          <option key={c} value={c.toUpperCase()}>{c.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">إضافة عملة مسموحة</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="مثال: SAR, USD, YER, EGP"
+                          value={newCurrency}
+                          onChange={(e) => setNewCurrency(e.target.value.toUpperCase())}
+                          className={inputStyle}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = newCurrency.trim().toUpperCase();
+                            if (!cur) return;
+                            setSettings(prev => {
+                              if (!prev) return prev;
+                              const list = Array.isArray(prev.allowedCurrencies) ? prev.allowedCurrencies.map(x=>x.toUpperCase()) : [];
+                              if (list.includes(cur)) return { ...prev };
+                              const next = [...list, cur];
+                              return { ...prev, allowedCurrencies: next };
+                            });
+                            setNewCurrency('');
+                          }}
+                          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                        >
+                          إضافة
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">العملات المسموحة</label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(Array.isArray(settings.allowedCurrencies) && settings.allowedCurrencies.length > 0 ? settings.allowedCurrencies : ['SAR','USD','YER','EGP']).map(c => {
+                          const isDefault = String(settings.defaultCurrency || 'SAR').toUpperCase() === String(c || '').toUpperCase();
+                          return (
+                            <span key={c} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-sm">
+                              <span>{String(c || '').toUpperCase()}</span>
+                              <button
+                                type="button"
+                                disabled={isDefault}
+                                onClick={() => {
+                                  setSettings(prev => {
+                                    if (!prev) return prev;
+                                    const list = Array.isArray(prev.allowedCurrencies) ? prev.allowedCurrencies.map(x=>x.toUpperCase()) : [];
+                                    const code = String(c || '').toUpperCase();
+                                    const next = list.filter(x => x !== code);
+                                    const nextDefault = String(prev.defaultCurrency || 'SAR').toUpperCase();
+                                    if (code === nextDefault) {
+                                      return { ...prev };
+                                    }
+                                    return { ...prev, allowedCurrencies: next };
+                                  });
+                                }}
+                                className={`text-red-600 hover:underline ${isDefault ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                حذف
+                              </button>
+                              {isDefault && <span className="text-xs text-teal-600">(افتراضية)</span>}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">إدارة المسودة</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">حفظ المسودة تلقائياً</label>
+                      <label className="inline-flex items-center gap-2 mt-2">
+                        <input type="checkbox" checked={draftEnabled} onChange={(e)=>setDraftEnabled(e.target.checked)} />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{draftEnabled ? 'مفعّل' : 'معطّل'}</span>
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={restoreDraft} disabled={!hasDraft} className={`px-4 py-2 rounded-lg ${hasDraft ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+                        استعادة المسودة
+                      </button>
+                      <button type="button" onClick={clearDraft} disabled={!hasDraft} className={`px-4 py-2 rounded-lg ${hasDraft ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+                        حذف المسودة
+                      </button>
+                    </div>
+                    <div>
+                      <div className={`px-3 py-2 rounded ${hasDraft ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-200' : 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200'}`}>
+                        {hasDraft ? 'يوجد مسودة محفوظة' : 'لا توجد مسودة محفوظة'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div>
                     <label htmlFor="schoolLogo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">شعار المدرسة</label>
-                    <input type="file" id="schoolLogo" accept="image/*" onChange={handleLogoChange} className="mt-1 block w-full" />
+                    <input type="file" id="schoolLogo" accept="image/*" onChange={handleLogoChange} className="mt-1 block w-full" disabled={logoUploading} />
                     {settings.schoolLogoUrl && (
                         <img 
                             src={api.getAssetUrl(settings.schoolLogoUrl as string)} 

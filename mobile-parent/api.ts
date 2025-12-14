@@ -1,12 +1,12 @@
-import { User, School, ParentRequest } from './types';
+import { User, School, ParentRequest } from './src/types';
+import * as SecureStore from 'expo-secure-store';
 
-export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
+export const API_BASE_URL = ((process.env as any).EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 let memoryToken: string | null = null;
 
 async function getToken() {
   try {
-    const SecureStore = (await import('expo-secure-store')).default;
     const t = await SecureStore.getItemAsync('auth_token');
     return t || memoryToken;
   } catch {
@@ -17,12 +17,11 @@ async function getToken() {
 async function setToken(token: string) {
   memoryToken = token;
   try {
-    const SecureStore = (await import('expo-secure-store')).default;
     await SecureStore.setItemAsync('auth_token', token);
   } catch {}
 }
 
-const authHeaders = async () => {
+const authHeaders = async (): Promise<Record<string, string>> => {
   const token = await getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
@@ -41,7 +40,7 @@ export const login = async (email: string, password: string, _schoolId: number):
 
 export const logout = async () => {
   memoryToken = null;
-  try { const SecureStore = (await import('expo-secure-store')).default; await SecureStore.deleteItemAsync('auth_token'); } catch {}
+  try { await SecureStore.deleteItemAsync('auth_token'); } catch {}
 };
 
 export const getSchools = async (): Promise<School[]> => {
@@ -132,7 +131,7 @@ export const sendMessage = async (conversationId: string, payload: { content: st
   const headers = await authHeaders();
   const res = await fetch(`${API_BASE_URL}/messaging/send`, {
     method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
+    headers: { ...(headers as any), 'Content-Type': 'application/json' } as any,
     body: JSON.stringify({ conversationId, text: payload.content }),
   });
   if (!res.ok) throw new Error('Failed to send message');

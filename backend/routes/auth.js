@@ -245,6 +245,9 @@ router.post('/invite/set-password', validate([
     if (String(payload.type || '') !== 'invite') return res.status(401).json({ msg: 'Invalid token type' });
     const user = await User.findByPk(Number(payload.id));
     if (!user) return res.status(404).json({ msg: 'User not found' });
+    const tr = String(payload.targetRole || '').toUpperCase();
+    const ur = String(user.role || '').toUpperCase();
+    if (tr && tr !== ur) return res.status(403).json({ msg: 'Invalid role for invite token' });
     const ptv = Number(payload.tokenVersion || 0);
     const utv = Number(user.tokenVersion || 0);
     if (ptv !== utv) return res.status(401).json({ msg: 'Token revoked' });
@@ -341,7 +344,7 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     parent.status = 'Invited';
     await parent.save();
 
-    const inviteToken = jwt.sign({ id: user.id, type: 'invite', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Parent', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
     if (channel === 'email') {
@@ -404,7 +407,7 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
       tUser.lastPasswordChangeAt = new Date();
       await tUser.save();
     }
-    const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', targetRole: 'Teacher', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
     // Record invite metadata
@@ -462,7 +465,7 @@ router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADM
     staff.lastPasswordChangeAt = new Date();
     await staff.save();
 
-    const inviteToken = jwt.sign({ id: staff.id, type: 'invite', tokenVersion: staff.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const inviteToken = jwt.sign({ id: staff.id, type: 'invite', targetRole: 'Staff', tokenVersion: staff.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
     if (channel === 'email') {

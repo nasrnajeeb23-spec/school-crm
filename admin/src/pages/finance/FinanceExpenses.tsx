@@ -7,6 +7,8 @@ import { useToast } from '../../contexts/ToastContext';
 import TableSkeleton from '../../components/TableSkeleton';
 import EmptyState from '../../components/EmptyState';
 import BrandableCard from '../../components/BrandableCard';
+import { formatCurrency } from '../../currency-config';
+import ExpenseVoucherModal from '../../components/ExpenseVoucherModal';
 
 interface FinanceExpensesProps {
     schoolId: number;
@@ -17,7 +19,9 @@ const FinanceExpenses: React.FC<FinanceExpensesProps> = ({ schoolId, schoolSetti
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
+    const [voucherToPrint, setVoucherToPrint] = useState<Expense | null>(null);
     const { addToast } = useToast();
+    const symbolForCurrency = (cur: string) => getCurrencySymbol(cur);
 
     useEffect(() => {
         fetchData();
@@ -71,7 +75,10 @@ const FinanceExpenses: React.FC<FinanceExpensesProps> = ({ schoolId, schoolSetti
                                         <td className="px-6 py-4">{expense.date}</td>
                                         <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{expense.description}</td>
                                         <td className="px-6 py-4">{expense.category}</td>
-                                        <td className="px-6 py-4 font-semibold text-red-500">-${expense.amount.toFixed(2)}</td>
+                                        <td className="px-6 py-4 font-semibold text-red-500 flex items-center gap-3">
+                                            -{formatCurrency(expense.amount, (schoolSettings?.defaultCurrency || 'SAR') as string)}
+                                            <button onClick={() => setVoucherToPrint(expense)} className="text-teal-600 hover:text-teal-800 text-xs" title="طباعة سند صرف">سند صرف</button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -82,6 +89,7 @@ const FinanceExpenses: React.FC<FinanceExpensesProps> = ({ schoolId, schoolSetti
                 </div>
             </BrandableCard>
             {isAddExpenseModalOpen && <AddExpenseModal onClose={() => setIsAddExpenseModalOpen(false)} onSave={handleAddExpense} />}
+            {voucherToPrint && <ExpenseVoucherModal expense={voucherToPrint} schoolSettings={schoolSettings} onClose={() => setVoucherToPrint(null)} />}
         </div>
     );
 };
