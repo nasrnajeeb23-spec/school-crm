@@ -17,12 +17,19 @@ const SetPassword: React.FC = () => {
   const [pwd, setPwd] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [targetRole, setTargetRole] = useState<string>('');
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const t = params.get('token') || '';
       setToken(t);
+      if (t) {
+        try {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('last_route');
+        } catch {}
+      }
     } catch {}
   }, []);
   useEffect(() => {
@@ -60,6 +67,8 @@ const SetPassword: React.FC = () => {
           addToast('انتهت صلاحية الرابط. يرجى تسجيل الدخول.', 'warning');
           setTimeout(() => { window.location.href = '/login'; }, 800);
         }
+        const tr = String(payload?.targetRole || '').toUpperCase().replace(/[^A-Z_]/g, '');
+        if (tr) setTargetRole(tr);
       }
     } catch {}
   }, [token, addToast]);
@@ -82,19 +91,26 @@ const SetPassword: React.FC = () => {
         if (u && u.schoolId) localStorage.setItem('current_school_id', String(u.schoolId));
         const roleRaw = String(u?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
         let target = '/login';
-        if (roleRaw === 'PARENT') target = '/parent';
-        else if (roleRaw === 'TEACHER') target = '/teacher';
-        else if (roleRaw === 'SCHOOLADMIN' || roleRaw === 'SCHOOL_ADMIN' || roleRaw === 'STAFF') target = '/school';
-        else if (roleRaw === 'SUPERADMIN' || roleRaw === 'SUPER_ADMIN') target = '/superadmin';
+        const desired = targetRole || roleRaw;
+        if (desired === 'PARENT') target = '/parent';
+        else if (desired === 'TEACHER') target = '/teacher';
+        else if (desired === 'SCHOOLADMIN' || desired === 'SCHOOL_ADMIN' || desired === 'STAFF') target = '/school';
+        else if (desired === 'SUPERADMIN' || desired === 'SUPER_ADMIN' || desired.startsWith('SUPER_ADMIN_')) target = '/superadmin';
+        try { localStorage.removeItem('last_route'); } catch {}
+        try {
+          const me = await getCurrentUser();
+          const meRole = String(me?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
+          if (meRole === 'TEACHER') target = '/teacher';
+        } catch {}
         addToast('تم تعيين كلمة المرور وتم تسجيل الدخول بنجاح.', 'success');
-        setTimeout(() => { window.location.href = target; }, 500);
+        setTimeout(() => { window.location.replace(target); }, 400);
       } catch {
         addToast('تم تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.', 'success');
-        setTimeout(() => { window.location.href = '/login'; }, 500);
+        setTimeout(() => { window.location.replace('/login'); }, 500);
       }
     } catch (error: any) {
       addToast('الرابط منتهي أو غير صالح. يرجى تسجيل الدخول بكلمتك الجديدة.', 'error');
-      setTimeout(() => { window.location.href = '/login'; }, 800);
+      setTimeout(() => { window.location.replace('/login'); }, 800);
     } finally {
       setSubmitting(false);
     }
