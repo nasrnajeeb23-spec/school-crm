@@ -421,7 +421,7 @@ export const submitPayrollReceipt = async (schoolId: number, slipId: string, dat
     if (data.receiptDate) form.append('receiptDate', data.receiptDate);
     if (data.receivedBy) form.append('receivedBy', data.receivedBy);
     if (data.attachment) form.append('attachment', data.attachment);
-    const res = await fetch(`${API_BASE_URL}/school/${schoolId}/payroll/salary-slips/${slipId}/receipt`, { method: 'POST', headers: buildHeaders(false), body: form });
+    const res = await fetch(`${API_BASE_URL}/school/${schoolId}/payroll/salary-slips/${slipId}/receipt`, { method: 'POST', headers: authHeaders(), body: form });
     if (!res.ok) throw new Error('Failed to upload receipt');
     return await res.json();
 };
