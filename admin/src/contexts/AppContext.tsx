@@ -61,7 +61,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const isInviteFlow = (() => {
       if (typeof window === 'undefined') return false;
       const p = window.location?.pathname || '';
-      if (p !== '/set-password') return false;
+      if (!/^\/set-password\/?$/.test(p)) return false;
       const q = new URLSearchParams(window.location.search);
       return !!q.get('token');
     })();

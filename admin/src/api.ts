@@ -74,7 +74,16 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
           const isSilentCheck = endpoint === '/auth/me';
           const hadToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
           const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
-          if (!isAuthFlow && (isSilentCheck || (hadToken && onProtectedRoute))) {
+          const onInviteFlow = (() => {
+            try {
+              if (typeof window === 'undefined') return false;
+              const p = window.location?.pathname || '';
+              if (!/^\/set-password\/?$/i.test(p)) return false;
+              const q = new URLSearchParams(window.location.search);
+              return q.has('token');
+            } catch { return false; }
+          })();
+          if (!isAuthFlow && !onInviteFlow && (isSilentCheck || (hadToken && onProtectedRoute))) {
             try {
               if (typeof window !== 'undefined') {
                 localStorage.removeItem('auth_token');
