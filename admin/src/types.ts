@@ -364,9 +364,9 @@ export interface BehaviorRecord {
 export interface User {
   id: string;
   email: string;
-  password; // In a real app, this would be a hash, but for mock data it's fine.
-  role: UserRole;
-  schoolId?: number; // Optional, only for SchoolAdmins, Teachers, Parents
+  password?: string; // In a real app, this would be a hash, but for mock data it's fine.
+  role: UserRole | string;
+  schoolId?: number | null; // Optional, only for SchoolAdmins, Teachers, Parents
   teacherId?: string; // Optional, only for Teachers
   parentId?: string; // Optional, only for Parents
   name: string;
@@ -379,6 +379,8 @@ export interface User {
   department?: string;
   bankAccount?: string;
   createdAt?: string;
+  avatar?: string;
+  permissions?: string[];
 }
 
 export interface NewStaffData {
@@ -882,14 +884,3 @@ export interface FeeSetup {
   discounts: DiscountRule[];
 }
 
-export interface User {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    schoolId: number | null;
-    avatar?: string;
-    passwordMustChange?: boolean;
-    tokenVersion?: number;
-    permissions?: string[];
-}
