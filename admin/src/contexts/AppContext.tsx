@@ -123,7 +123,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (result === "TRIAL_EXPIRED") {
           addToast('لقد انتهت الفترة التجريبية لحسابك. يرجى الاشتراك للمتابعة.', 'warning');
           return false;
-      } else if (result) {
+      } else if (result && typeof result === 'object') {
         setCurrentUser(result);
         if (result.schoolId) {
           try { localStorage.setItem('current_school_id', String(result.schoolId)); } catch {}
