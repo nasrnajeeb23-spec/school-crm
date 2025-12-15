@@ -682,11 +682,6 @@ async function syncDatabase() {
   await Parent.sync(opts);
   try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch { }
   await Student.sync(opts);
-<<<<<<< HEAD
-  try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch { }
-=======
-  try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch {}
->>>>>>> ece149f56543dfb75f7e5dc4f44427030a85925f
   await Teacher.sync(isProd ? { force: false } : { alter: true });
   await Class.sync(isProd ? { force: false } : { alter: true });
   await FeeSetup.sync(isProd ? { force: false } : { alter: true });
