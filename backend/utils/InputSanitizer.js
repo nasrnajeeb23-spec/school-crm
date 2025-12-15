@@ -1,4 +1,7 @@
-const DOMPurify = require('isomorphic-dompurify');
+const DOMPurify = require('dompurify');
+const { JSDOM } = require('jsdom');
+const window = new JSDOM('').window;
+const domPurify = DOMPurify(window);
 const validator = require('validator');
 
 /**
@@ -21,7 +24,7 @@ class InputSanitizer {
     sanitizeName(input) {
         if (!input) return '';
         // Remove HTML tags and scripts
-        let sanitized = DOMPurify.sanitize(String(input).trim(), {
+        let sanitized = domPurify.sanitize(String(input).trim(), {
             ALLOWED_TAGS: [],
             ALLOWED_ATTR: []
         });
@@ -45,7 +48,7 @@ class InputSanitizer {
      */
     sanitizeText(input, maxLength = 1000) {
         if (!input) return '';
-        let sanitized = DOMPurify.sanitize(String(input).trim(), {
+        let sanitized = domPurify.sanitize(String(input).trim(), {
             ALLOWED_TAGS: [],
             ALLOWED_ATTR: []
         });
@@ -57,7 +60,7 @@ class InputSanitizer {
      */
     sanitizeHTML(input) {
         if (!input) return '';
-        return DOMPurify.sanitize(String(input), {
+        return domPurify.sanitize(String(input), {
             ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'p', 'br', 'ul', 'ol', 'li', 'a'],
             ALLOWED_ATTR: ['href', 'target'],
             ALLOW_DATA_ATTR: false
@@ -196,7 +199,7 @@ class InputSanitizer {
      */
     stripHTML(input) {
         if (!input) return '';
-        return DOMPurify.sanitize(String(input), {
+        return domPurify.sanitize(String(input), {
             ALLOWED_TAGS: [],
             ALLOWED_ATTR: [],
             KEEP_CONTENT: true

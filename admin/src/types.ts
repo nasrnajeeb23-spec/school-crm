@@ -881,3 +881,15 @@ export interface FeeSetup {
   paymentPlanDetails?: any;
   discounts: DiscountRule[];
 }
+
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    schoolId: number | null;
+    avatar?: string;
+    passwordMustChange?: boolean;
+    tokenVersion?: number;
+    permissions?: string[];
+}
