@@ -9,6 +9,10 @@ import { PlusIcon, UsersIcon } from '../components/icons';
 import { useToast } from '../contexts/ToastContext';
 import TableSkeleton from '../components/TableSkeleton';
 import EmptyState from '../components/EmptyState';
+import Pagination from '../components/Pagination';
+import ResponsiveTable from '../components/ResponsiveTable';
+import SearchBar from '../components/SearchBar';
+import { useSortableTable } from '../hooks/useSortableTable';
 
 const statusColorMap: { [key in TeacherStatus]: string } = {
   [TeacherStatus.Active]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -27,6 +31,18 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
   const { addToast } = useToast();
   const location = useLocation();
 
+  const [sendingId, setSendingId] = useState<string | number | null>(null);
+  const [channelByTeacher, setChannelByTeacher] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
+  const [showManualShare, setShowManualShare] = useState(false);
+  const [manualLink, setManualLink] = useState('');
+  const [cooldownByTeacher, setCooldownByTeacher] = useState<Record<string, number>>({});
+  const [sharing, setSharing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+
+  // Pagination and Sort state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   useEffect(() => {
     setLoading(true);
     api.getSchoolTeachers(schoolId).then(data => {
@@ -35,49 +51,37 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
       console.error("Failed to fetch teachers:", err);
       addToast("فشل تحميل قائمة المعلمين.", 'error');
     }).finally(() => {
-        setLoading(false);
+      setLoading(false);
     });
   }, [schoolId, addToast]);
 
   const handleAddTeacher = async (teacherData: NewTeacherData) => {
     try {
-        const newTeacher: any = await api.addSchoolTeacher(schoolId, teacherData);
-        setTeachers(prevTeachers => [newTeacher, ...prevTeachers]);
-        setIsModalOpen(false);
-        if (newTeacher.activationLink) {
-            setManualLink(newTeacher.activationLink);
-            setShowManualShare(true);
-            addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح. تم إنشاء رابط التفعيل.`, 'success');
-        } else {
-            addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح.`, 'success');
-        }
+      const newTeacher: any = await api.addSchoolTeacher(schoolId, teacherData);
+      setTeachers(prevTeachers => [newTeacher, ...prevTeachers]);
+      setIsModalOpen(false);
+      if (newTeacher.activationLink) {
+        setManualLink(newTeacher.activationLink);
+        setShowManualShare(true);
+        addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح. تم إنشاء رابط التفعيل.`, 'success');
+      } else {
+        addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح.`, 'success');
+      }
     } catch (error: any) {
-        const msg = String(error?.message || '');
-        if (msg.includes('LIMIT_EXCEEDED') || msg.includes('تم بلوغ حد الموارد')) {
-          addToast('تم بلوغ حد المعلمين. يرجى الترقية أو زيادة الحد.', 'warning');
-          try { window.location.assign('/superadmin/subscriptions'); } catch {}
-          return;
-        }
-        if (msg.includes('409') || msg.includes('DUPLICATE') || msg.includes('موجود مسبقًا') || msg.includes('البريد الإلكتروني مستخدم')) {
-          addToast('لا يمكن إضافة معلم مكرر. تحقق من البريد أو الهاتف أو الاسم والمادة.', 'warning');
-          return;
-        }
-        console.error("Failed to add teacher:", error);
-        addToast("فشل إضافة المعلم. الرجاء المحاولة مرة أخرى.", 'error');
+      const msg = String(error?.message || '');
+      if (msg.includes('LIMIT_EXCEEDED') || msg.includes('تم بلوغ حد الموارد')) {
+        addToast('تم بلوغ حد المعلمين. يرجى الترقية أو زيادة الحد.', 'warning');
+        try { window.location.assign('/superadmin/subscriptions'); } catch { }
+        return;
+      }
+      if (msg.includes('409') || msg.includes('DUPLICATE') || msg.includes('موجود مسبقًا') || msg.includes('البريد الإلكتروني مستخدم')) {
+        addToast('لا يمكن إضافة معلم مكرر. تحقق من البريد أو الهاتف أو الاسم والمادة.', 'warning');
+        return;
+      }
+      console.error("Failed to add teacher:", error);
+      addToast("فشل إضافة المعلم. الرجاء المحاولة مرة أخرى.", 'error');
     }
   };
-
-  const filteredTeachers = teachers.filter(teacher =>
-    teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const [sendingId, setSendingId] = useState<string | number | null>(null);
-  const [channelByTeacher, setChannelByTeacher] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
-  const [showManualShare, setShowManualShare] = useState(false);
-  const [manualLink, setManualLink] = useState('');
-  const [cooldownByTeacher, setCooldownByTeacher] = useState<Record<string, number>>({});
-  const [sharing, setSharing] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
   const handleInviteTeacher = async (teacherId: string | number) => {
     try {
@@ -88,7 +92,7 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
       try {
         const list = await api.getSchoolTeachers(schoolId);
         setTeachers(list);
-      } catch {}
+      } catch { }
       if (channel === 'manual') {
         if (res.activationLink) {
           setManualLink(res.activationLink);
@@ -139,130 +143,210 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
     }
   };
 
+  // Filter and Sort
+  const filteredTeachers = teachers.filter(teacher =>
+    teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const { sortedData: sortedTeachers, handleSort, getSortIcon } = useSortableTable(filteredTeachers, 'name');
+
+  // Pagination Logic
+  const totalPages = Math.ceil(sortedTeachers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTeachers = sortedTeachers.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleItemsPerPageChange = (items: number) => {
+    setItemsPerPage(items);
+    setCurrentPage(1);
+  };
+
+  const renderRow = (teacher: Teacher) => (
+    <>
+      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{teacher.name}</td>
+      <td className="px-6 py-4">{teacher.subject}</td>
+      <td className="px-6 py-4" dir="ltr">{teacher.phone}</td>
+      <td className="px-6 py-4">
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
+          {teacher.status}
+        </span>
+      </td>
+      <td className="px-6 py-4">{teacher.joinDate}</td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="flex items-center gap-3">
+          <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
+            عرض التفاصيل
+          </Link>
+          {(() => {
+            const lastInviteAt = (teacher as any).lastInviteAt ? new Date(String((teacher as any).lastInviteAt)) : null;
+            let ago = 'لا يوجد';
+            let valid = false;
+            if (lastInviteAt && !isNaN(lastInviteAt.getTime())) {
+              const diff = Math.max(0, Date.now() - lastInviteAt.getTime());
+              const mins = Math.floor(diff / 60000);
+              const hours = Math.floor(diff / 3600000);
+              const days = Math.floor(diff / 86400000);
+              ago = days > 0 ? `${days} يوم` : hours > 0 ? `${hours} ساعة` : `${mins} دقيقة`;
+              valid = lastInviteAt.getTime() + 72 * 3600 * 1000 > Date.now();
+            }
+            return (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                آخر دعوة: {ago} • حالة الرابط: {ago === 'لا يوجد' ? 'لا يوجد' : (valid ? 'صالح' : 'منتهي')}
+              </span>
+            );
+          })()}
+          <select
+            value={channelByTeacher[String(teacher.id)] || 'manual'}
+            onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
+          >
+            <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
+            <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
+            <option value="manual">مشاركة يدوية (مجاني)</option>
+          </select>
+          {(() => {
+            const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
+            const disabled = sendingId === teacher.id || cool;
+            const label = sendingId === teacher.id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : 'دعوة';
+            return (
+              <button
+                onClick={() => handleInviteTeacher(teacher.id)}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
+              >
+                {label}
+              </button>
+            );
+          })()}
+          <button
+            onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+            disabled={deletingId === teacher.id}
+            aria-disabled={deletingId === teacher.id}
+            className={`font-medium ${deletingId === teacher.id ? 'text-red-400 dark:text-red-400' : 'text-red-600 dark:text-red-500'} hover:underline`}
+          >
+            {deletingId === teacher.id ? 'جارٍ الحذف...' : 'حذف'}
+          </button>
+        </div>
+      </td>
+    </>
+  );
+
+  const renderCard = (teacher: Teacher) => (
+    <div key={teacher.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-white">{teacher.name}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{teacher.subject}</p>
+        </div>
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
+          {teacher.status}
+        </span>
+      </div>
+      <div className="space-y-2 text-sm mb-4">
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">رقم الاتصال:</span>
+          <span className="text-gray-900 dark:text-white" dir="ltr">{teacher.phone}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">تاريخ الانضمام:</span>
+          <span className="text-gray-900 dark:text-white">{teacher.joinDate}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <select
+          value={channelByTeacher[String(teacher.id)] || 'manual'}
+          onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
+          className="w-full px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm"
+        >
+          <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
+          <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
+          <option value="manual">مشاركة يدوية (مجاني)</option>
+        </select>
+        <div className="flex gap-2">
+          <Link to={`${location.pathname}/${teacher.id}`} className="flex-1 text-center py-2 px-4 bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors">
+            التفاصيل
+          </Link>
+          {(() => {
+            const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
+            const disabled = sendingId === teacher.id || cool;
+            const label = sendingId === teacher.id ? 'جاري...' : cool ? 'انتظر' : 'دعوة';
+            return (
+              <button
+                onClick={() => handleInviteTeacher(teacher.id)}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={`flex-1 py-2 px-4 rounded-lg text-white transition-colors ${disabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+              >
+                {label}
+              </button>
+            );
+          })()}
+          <button
+            onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+            disabled={deletingId === teacher.id}
+            aria-disabled={deletingId === teacher.id}
+            className={`px-4 py-2 rounded-lg text-white transition-colors ${deletingId === teacher.id ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+          >
+            {deletingId === teacher.id ? 'حذف...' : 'حذف'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="ابحث عن معلم..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full md:w-80 pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
-          <button 
+          <SearchBar
+            onSearch={setSearchTerm}
+            placeholder="ابحث عن معلم..."
+            className="w-full md:w-80"
+          />
+          <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
           >
-            <PlusIcon className="h-5 w-5 ml-2" />
+            <PlusIcon className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" />
             إضافة معلم جديد
           </button>
         </div>
-        <div className="overflow-x-auto">
-          {loading ? (
-            <TableSkeleton />
-          ) : filteredTeachers.length === 0 ? (
-            <EmptyState
-                icon={UsersIcon}
-                title="لا يوجد معلمون"
-                message={searchTerm ? `لم يتم العثور على معلمين يطابقون بحثك "${searchTerm}".` : "ابدأ بإضافة المعلمين إلى مدرستك."}
-                actionText="إضافة معلم جديد"
-                onAction={() => setIsModalOpen(true)}
+
+        {loading ? (
+          <TableSkeleton />
+        ) : filteredTeachers.length === 0 ? (
+          <EmptyState
+            icon={UsersIcon}
+            title="لا يوجد معلمون"
+            message={searchTerm ? `لم يتم العثور على معلمين يطابقون بحثك "${searchTerm}".` : "ابدأ بإضافة المعلمين إلى مدرستك."}
+            actionText="إضافة معلم جديد"
+            onAction={() => setIsModalOpen(true)}
+          />
+        ) : (
+          <>
+            <ResponsiveTable
+              headers={['اسم المعلم', 'المادة', 'رقم الاتصال', 'الحالة', 'تاريخ الانضمام', 'إجراءات']}
+              data={paginatedTeachers}
+              renderRow={renderRow}
+              renderCard={renderCard}
+              keyExtractor={(t) => String(t.id)}
             />
-          ) : (
-            <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                <tr>
-                  <th scope="col" className="px-6 py-3">اسم المعلم</th>
-                  <th scope="col" className="px-6 py-3">المادة</th>
-                  <th scope="col" className="px-6 py-3">رقم الاتصال</th>
-                  <th scope="col" className="px-6 py-3">الحالة</th>
-                  <th scope="col" className="px-6 py-3">تاريخ الانضمام</th>
-                  <th scope="col" className="px-6 py-3">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTeachers.map((teacher) => (
-                  <tr key={teacher.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{teacher.name}</td>
-                    <td className="px-6 py-4">{teacher.subject}</td>
-                    <td className="px-6 py-4" dir="ltr">{teacher.phone}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
-                        {teacher.status}
-                      </span>
-                    </td>
-                  <td className="px-6 py-4">{teacher.joinDate}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
-                        عرض التفاصيل
-                      </Link>
-                      {(() => {
-                        const lastInviteAt = (teacher as any).lastInviteAt ? new Date(String((teacher as any).lastInviteAt)) : null;
-                        let ago = 'لا يوجد';
-                        let valid = false;
-                        if (lastInviteAt && !isNaN(lastInviteAt.getTime())) {
-                          const diff = Math.max(0, Date.now() - lastInviteAt.getTime());
-                          const mins = Math.floor(diff / 60000);
-                          const hours = Math.floor(diff / 3600000);
-                          const days = Math.floor(diff / 86400000);
-                          ago = days > 0 ? `${days} يوم` : hours > 0 ? `${hours} ساعة` : `${mins} دقيقة`;
-                          valid = lastInviteAt.getTime() + 72 * 3600 * 1000 > Date.now();
-                        }
-                        return (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            آخر دعوة: {ago} • حالة الرابط: {ago === 'لا يوجد' ? 'لا يوجد' : (valid ? 'صالح' : 'منتهي')}
-                          </span>
-                        );
-                      })()}
-                      <select
-                        value={channelByTeacher[String(teacher.id)] || 'manual'}
-                        onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
-                        className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
-                      >
-                          <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
-                          <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
-                          <option value="manual">مشاركة يدوية (مجاني)</option>
-                        </select>
-                        {(() => {
-                          const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
-                          const disabled = sendingId === teacher.id || cool;
-                          const label = sendingId === teacher.id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : 'دعوة';
-                          return (
-                            <button
-                              onClick={() => handleInviteTeacher(teacher.id)}
-                              disabled={disabled}
-                              aria-disabled={disabled}
-                              className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })()}
-                        <button
-                          onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
-                          disabled={deletingId === teacher.id}
-                          aria-disabled={deletingId === teacher.id}
-                          className={`font-medium ${deletingId === teacher.id ? 'text-red-400 dark:text-red-400' : 'text-red-600 dark:text-red-500'} hover:underline`}
-                        >
-                          {deletingId === teacher.id ? 'جارٍ الحذف...' : 'حذف'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              totalItems={sortedTeachers.length}
+            />
+          </>
+        )}
       </div>
       {isModalOpen && (
         <TeacherFormModal

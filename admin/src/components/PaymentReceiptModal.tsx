@@ -23,7 +23,7 @@ const PaymentReceiptModal: React.FC<ReceiptProps> = ({ payment, onClose }) => {
   const componentRef = useRef<HTMLDivElement>(null);
   
   const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
+    contentRef: componentRef,
   });
 
   return (

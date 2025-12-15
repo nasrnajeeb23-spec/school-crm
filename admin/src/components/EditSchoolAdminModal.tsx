@@ -51,7 +51,7 @@ const EditSchoolAdminModal: React.FC<EditSchoolAdminModalProps> = ({ admin, onCl
         delete dataToSend.password;
     }
 
-    await onSave(admin.id, dataToSend);
+    await onSave(Number(admin.id), dataToSend);
     setIsSaving(false);
   };
 

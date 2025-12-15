@@ -12,7 +12,7 @@ interface Props {
 
 const InvoicePrintModal: React.FC<Props> = ({ invoice, schoolSettings, onClose }) => {
   const componentRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({ content: () => componentRef.current });
+  const handlePrint = useReactToPrint({ contentRef: componentRef });
   const cur = String(schoolSettings?.defaultCurrency || 'SAR');
   const logoUrl = schoolSettings?.schoolLogoUrl ? api.getAssetUrl(String(schoolSettings.schoolLogoUrl)) : '';
   const schoolName = schoolSettings?.schoolName || 'المدرسة';
@@ -127,4 +127,3 @@ const InvoicePrintModal: React.FC<Props> = ({ invoice, schoolSettings, onClose }
 };
 
 export default InvoicePrintModal;
-

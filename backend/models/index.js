@@ -43,6 +43,7 @@ const SubscriptionModule = require('./SubscriptionModule');
 const CommunicationUsage = require('./CommunicationUsage');
 const ContactMessage = require('./ContactMessage');
 const InvitationLog = require('./InvitationLog');
+const AdRequest = require('./AdRequest');
 
 
 // Define associations
@@ -144,6 +145,11 @@ Attendance.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
 Class.hasMany(Attendance, { foreignKey: 'classId', onDelete: 'CASCADE', hooks: true });
 Attendance.belongsTo(Class, { foreignKey: 'classId', onDelete: 'CASCADE' });
 
+// School <-> Attendance
+School.hasMany(Attendance, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Attendance.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+
 // Student <-> Note (One-to-Many)
 Student.hasMany(StudentNote, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
 StudentNote.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
@@ -241,6 +247,7 @@ const db = {
   CommunicationUsage,
   ContactMessage,
   InvitationLog,
+  AdRequest,
 };
 
 module.exports = db;

@@ -38,15 +38,11 @@ export const initSentry = () => {
 
                 // Filter out certain errors
                 if (event.exception) {
-                    const error = hint.originalException;
-
-                    // Ignore network errors
-                    if (error && error.message && error.message.includes('Network')) {
+                    const error = hint.originalException as any;
+                    if (error && error.message && String(error.message).includes('Network')) {
                         return null;
                     }
-
-                    // Ignore cancelled requests
-                    if (error && error.message && error.message.includes('cancel')) {
+                    if (error && error.message && String(error.message).includes('cancel')) {
                         return null;
                     }
                 }

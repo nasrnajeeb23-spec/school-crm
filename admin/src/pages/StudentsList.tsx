@@ -146,48 +146,42 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
     setCurrentPage(1);
   };
 
-  // ResponsiveTable columns
-  const columns = [
-    { key: 'name', label: 'اسم الطالب', sortable: true },
-    { key: 'grade', label: 'الصف', sortable: true },
-    { key: 'parentName', label: 'اسم ولي الأمر', sortable: true },
-    { key: 'status', label: 'الحالة', sortable: true },
-    { key: 'registrationDate', label: 'تاريخ التسجيل', sortable: true },
-    { key: 'actions', label: 'إجراءات', sortable: false }
-  ];
-
-  const renderRow = (student: Student) => ({
-    name: student.name,
-    grade: getDisplayGrade(student),
-    parentName: student.parentName,
-    status: (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[student.status]}`}>
-        {student.status}
-      </span>
-    ),
-    registrationDate: student.registrationDate,
-    actions: (
-      <div className="flex gap-2">
-        <Link
-          to={`${location.pathname}/${student.id}`}
-          className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
-          عرض التفاصيل
-        </Link>
-        <button
-          onClick={() => {
-            setGenForStudentId(student.id);
-            setGenDueDate('');
-            setGenIncludeBooks(true);
-            setGenIncludeUniform(true);
-            setGenIncludeActivities(true);
-            setGenDiscounts([]);
-          }}
-          className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">
-          توليد فاتورة
-        </button>
-      </div>
-    )
-  });
+  const renderRow = (student: Student) => (
+    <>
+      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{student.name}</td>
+      <td className="px-6 py-4">{getDisplayGrade(student)}</td>
+      <td className="px-6 py-4">{student.parentName}</td>
+      <td className="px-6 py-4">
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[student.status]}`}>
+          {student.status}
+        </span>
+      </td>
+      <td className="px-6 py-4">{student.registrationDate}</td>
+      <td className="px-6 py-4">
+        <div className="flex gap-2">
+          <Link
+            to={`${location.pathname}/${student.id}`}
+            className="font-medium text-teal-600 dark:text-teal-500 hover:underline"
+          >
+            عرض التفاصيل
+          </Link>
+          <button
+            onClick={() => {
+              setGenForStudentId(student.id);
+              setGenDueDate('');
+              setGenIncludeBooks(true);
+              setGenIncludeUniform(true);
+              setGenIncludeActivities(true);
+              setGenDiscounts([]);
+            }}
+            className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline"
+          >
+            توليد فاتورة
+          </button>
+        </div>
+      </td>
+    </>
+  );
 
   const renderCard = (student: Student) => (
     <div key={student.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
@@ -238,8 +232,7 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
         <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
           <div className="flex items-center gap-4 flex-1">
             <SearchBar
-              value={searchTerm}
-              onChange={setSearchTerm}
+              onSearch={setSearchTerm}
               placeholder="ابحث عن طالب..."
               className="w-full md:w-64"
             />
@@ -280,12 +273,11 @@ const StudentsList: React.FC<StudentsListProps> = ({ schoolId }) => {
         ) : (
           <>
             <ResponsiveTable
-              columns={columns}
+              headers={['اسم الطالب', 'الصف', 'اسم ولي الأمر', 'الحالة', 'تاريخ التسجيل', 'إجراءات']}
               data={paginatedStudents}
               renderRow={renderRow}
               renderCard={renderCard}
-              onSort={handleSort}
-              getSortIcon={getSortIcon}
+              keyExtractor={(s) => String(s.id)}
             />
 
             <Pagination

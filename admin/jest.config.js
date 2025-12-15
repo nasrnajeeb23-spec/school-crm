@@ -9,7 +9,9 @@ module.exports = {
     transform: {
         '^.+\\.(ts|tsx)$': ['ts-jest', {
             tsconfig: {
-                jsx: 'react',
+                jsx: 'react-jsx',
+                esModuleInterop: true,
+                allowSyntheticDefaultImports: true
             },
         }],
     },
@@ -19,7 +21,7 @@ module.exports = {
         '!src/index.tsx',
         '!src/reportWebVitals.ts',
     ],
-    coverageThresholds: {
+    coverageThreshold: {
         global: {
             branches: 70,
             functions: 70,

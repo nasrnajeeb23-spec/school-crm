@@ -4,13 +4,14 @@
  */
 
 const crypto = require('crypto');
-const { createLogger } = require('winston');
+const winston = require('winston');
+const { createLogger } = winston;
 
 const securityLogger = createLogger({
     level: 'info',
-    format: require('winston').format.json(),
+    format: winston.format.json(),
     transports: [
-        new require('winston').transports.File({
+        new winston.transports.File({
             filename: 'logs/security.log',
             maxsize: 10485760, // 10MB
             maxFiles: 30

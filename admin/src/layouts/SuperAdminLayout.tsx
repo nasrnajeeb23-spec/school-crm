@@ -6,6 +6,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import HelpWidget from '../components/HelpWidget';
 import { useAppContext } from '../contexts/AppContext';
 import ThemeToggle from '../components/ThemeToggle';
+import NotificationDropdown from '../components/NotificationDropdown';
 
 const viewTitles: { [key: string]: string } = {
   dashboard: 'لوحة التحكم الرئيسية',
@@ -51,8 +52,12 @@ const SuperAdminLayout: React.FC = () => {
       <main className="md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
           <div className="flex flex-wrap justify-between items-start gap-4">
-            <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)} />
-            <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+            <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)}>
+              <div className="flex items-center gap-2">
+                <NotificationDropdown isSuperAdmin={true} />
+                <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+              </div>
+            </Header>
           </div>
           <Breadcrumbs className="mt-4 mb-6" />
           <Outlet />

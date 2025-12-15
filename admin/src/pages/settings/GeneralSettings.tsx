@@ -101,7 +101,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({
                 {settings.schoolLogoUrl && (
                     <div className="mb-4">
                         <img
-                            src={settings.schoolLogoUrl}
+                            src={typeof settings.schoolLogoUrl === 'string' ? settings.schoolLogoUrl : ''}
                             alt="School Logo"
                             className="h-24 w-auto object-contain"
                         />

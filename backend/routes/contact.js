@@ -12,14 +12,31 @@ router.post('/', async (req, res) => {
         if (!name || !email || !message) {
             return res.status(400).json({ msg: 'Please enter all fields' });
         }
-        
+
         const newMessage = await ContactMessage.create({
             name,
             email,
             message,
             status: 'NEW'
         });
-        
+
+        // Notify Super Admins
+        try {
+            const { User, Notification } = require('../models');
+            const superAdmins = await User.findAll({ where: { role: 'SUPER_ADMIN' } });
+            for (const admin of superAdmins) {
+                await Notification.create({
+                    type: 'Info',
+                    title: 'رسالة تواصل جديدة',
+                    description: `رسالة جديدة من: ${name}`,
+                    userId: admin.id,
+                    isRead: false
+                });
+            }
+        } catch (notifyErr) {
+            console.error('Notification Error:', notifyErr);
+        }
+
         res.status(201).json(newMessage);
     } catch (err) {
         console.error(err.message);
@@ -49,13 +66,13 @@ router.put('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => 
     try {
         const { status } = req.body;
         const message = await ContactMessage.findByPk(req.params.id);
-        
+
         if (!message) {
             return res.status(404).json({ msg: 'Message not found' });
         }
-        
+
         if (status) message.status = status;
-        
+
         await message.save();
         res.json(message);
     } catch (err) {
@@ -70,11 +87,11 @@ router.put('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => 
 router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
         const message = await ContactMessage.findByPk(req.params.id);
-        
+
         if (!message) {
             return res.status(404).json({ msg: 'Message not found' });
         }
-        
+
         await message.destroy();
         res.json({ msg: 'Message removed' });
     } catch (err) {

@@ -22,18 +22,17 @@ describe('Pagination Component', () => {
     it('renders pagination correctly', () => {
         render(<Pagination {...defaultProps} />);
 
-        expect(screen.getByText('عرض')).toBeInTheDocument();
-        expect(screen.getByText('1')).toBeInTheDocument();
-        expect(screen.getByText('10')).toBeInTheDocument();
+        expect(screen.getByLabelText('عرض:')).toBeInTheDocument();
+        const info = screen.getByText(/عرض/, { selector: 'div' });
+        expect(info).toHaveTextContent('عرض 1 إلى 10 من 100 عنصر');
     });
 
     it('displays correct item range', () => {
         render(<Pagination {...defaultProps} />);
 
-        expect(screen.getByText(/عرض/)).toBeInTheDocument();
-        expect(screen.getByText(/1/)).toBeInTheDocument();
-        expect(screen.getByText(/10/)).toBeInTheDocument();
-        expect(screen.getByText(/100/)).toBeInTheDocument();
+        expect(screen.getByLabelText('عرض:')).toBeInTheDocument();
+        const info = screen.getByText(/عرض/, { selector: 'div' });
+        expect(info).toHaveTextContent('عرض 1 إلى 10 من 100 عنصر');
     });
 
     it('calls onPageChange when clicking next button', () => {

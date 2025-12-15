@@ -7,7 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 import TableSkeleton from '../../components/TableSkeleton';
 import EmptyState from '../../components/EmptyState';
 import BrandableCard from '../../components/BrandableCard';
-import { formatCurrency } from '../../currency-config';
+import { getCurrencySymbol, formatCurrency } from '../../currency-config';
 import ExpenseVoucherModal from '../../components/ExpenseVoucherModal';
 
 interface FinanceExpensesProps {

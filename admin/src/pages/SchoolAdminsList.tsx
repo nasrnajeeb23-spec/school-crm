@@ -45,7 +45,7 @@ const SchoolAdminsList: React.FC = () => {
     return matchesSearch && matchesSchool;
   });
 
-  const handleDelete = async (adminId: number) => {
+  const handleDelete = async (adminId: number | string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا المدير؟')) {
       try {
         await api.deleteUser(adminId);

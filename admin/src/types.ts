@@ -189,6 +189,7 @@ export interface Module {
     description: string;
     monthlyPrice: number;
     oneTimePrice?: number;
+    annualPrice?: number;
     isEnabled: boolean;
     isCore?: boolean;
     isSystem?: boolean;
@@ -265,6 +266,12 @@ export interface SchoolSettings {
     schoolLogoUrl?: string | File;
     contactPhone?: string;
     contactEmail?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    city?: string;
+    postalCode?: string;
+    currency?: string;
     geoLocation?: string;
     genderType?: string; // بنين/بنات/مختلط
     levelType?: string; // أساسي/ثانوي
@@ -371,6 +378,7 @@ export interface User {
   isActive?: boolean;
   department?: string;
   bankAccount?: string;
+  createdAt?: string;
 }
 
 export interface NewStaffData {
@@ -446,6 +454,7 @@ export interface Student {
     id: string;
     name: string;
     grade: string;
+    classId?: string;
     parentName: string;
     status: StudentStatus;
     registrationDate: string;
@@ -525,6 +534,7 @@ export interface Class {
   name: string;
   gradeLevel: string;
   homeroomTeacherName: string;
+  homeroomTeacherId?: string | number;
   studentCount: number;
   capacity?: number;
   subjects: string[];
@@ -597,6 +607,7 @@ export interface Conversation {
     id: string;
     roomId: string;
     type: ConversationType;
+    title?: string;
     participantName: string;
     participantAvatar: string;
     lastMessage: string;

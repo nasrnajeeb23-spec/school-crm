@@ -34,7 +34,7 @@ const SubscriptionLocked: React.FC = () => {
                 setLoading(true);
                 const [priceConf, schoolInfo, plansData, usageState, storageUsage] = await Promise.all([
                     api.getPricingConfig(),
-                    api.getSchool(String(currentUser?.schoolId)),
+                    api.getSchool(Number(currentUser?.schoolId)),
                     api.getPlans(),
                     api.getSubscriptionState(Number(currentUser?.schoolId)).catch(() => null),
                     api.getStorageUsage(Number(currentUser?.schoolId)).catch(() => 0)

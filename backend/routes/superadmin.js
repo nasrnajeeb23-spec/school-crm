@@ -794,4 +794,34 @@ router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_AD
   }
 });
 
+// @route   POST api/superadmin/self-hosted/package
+// @desc    Generate self-hosted package download link
+// @access  Public (or semi-private, handled by modal)
+router.post('/self-hosted/package', async (req, res) => {
+  try {
+    const { planId, moduleIds, schoolName, contactEmail } = req.body;
+
+    // Use the Generator Service
+    const PackageGenerator = require('../services/PackageGenerator');
+
+    // Pass info to generator (mocking schoolName if missing for demo)
+    const downloadPath = await PackageGenerator.generate({
+      schoolName: schoolName || 'My Private School',
+      contactEmail: contactEmail || 'admin@school.com',
+      modules: moduleIds,
+      domain: 'localhost' // In real world, we'd restrict to a domain
+    });
+
+    // Construct full URL
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const downloadUrl = `${protocol}://${host}${downloadPath}`; // e.g. http://localhost:5000/downloads/file.zip
+
+    res.json({ downloadUrl });
+  } catch (err) {
+    console.error('Self-Hosted Package Error:', err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;

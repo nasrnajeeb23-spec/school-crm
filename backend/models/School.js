@@ -19,6 +19,34 @@ const School = sequelize.define('School', {
       isEmail: true,
     },
   },
+  address: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  phone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  website: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  logoUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  status: {
+    type: DataTypes.ENUM('Active', 'Suspended', 'Inactive'),
+    defaultValue: 'Active',
+  },
+  city: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   studentCount: {
     type: DataTypes.INTEGER,
     defaultValue: 0,

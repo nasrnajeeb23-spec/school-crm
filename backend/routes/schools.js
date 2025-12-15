@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School } = require('../models');
+const { School, AuditLog, Notification } = require('../models');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { paginationMiddleware, buildPaginationResponse } = require('../utils/pagination');
 
@@ -118,7 +118,44 @@ router.put('/:id',
       throw new NotFoundError('المدرسة غير موجودة');
     }
 
+    const oldStatus = school.status;
     await school.update(req.body);
+
+    // Check for status change
+    if (req.body.status && req.body.status !== oldStatus) {
+      try {
+        // Create Audit Log
+        if (AuditLog) {
+          await AuditLog.create({
+            action: 'SCHOOL_STATUS_CHANGE',
+            userId: req.user.id,
+            userEmail: req.user.email,
+            ipAddress: req.ip,
+            details: JSON.stringify({
+              schoolId: school.id,
+              schoolName: school.name,
+              oldStatus,
+              newStatus: req.body.status
+            }),
+            riskLevel: req.body.status === 'Suspended' ? 'high' : 'medium'
+          });
+        }
+
+        // Create System Notification
+        if (Notification) {
+          await Notification.create({
+            type: 'Warning',
+            title: `تغيير حالة مدرسة: ${school.name}`,
+            description: `تم تغيير حالة المدرسة من ${oldStatus} إلى ${req.body.status} بواسطة ${req.user.name || req.user.email}`,
+            status: 'Sent',
+            isRead: false
+          });
+        }
+      } catch (logError) {
+        console.error('Failed to log status change:', logError);
+      }
+    }
+
     res.json(school);
   })
 );

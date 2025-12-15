@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-import { School, PricingConfig, SubscriptionState } from '../types';
+import { School, PricingConfig, SubscriptionState, Module, ModuleId } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { EditIcon, PlusIcon, TrashIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
@@ -224,25 +224,14 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
     // Also handle 'finance' vs 'finance_fees' duplication issue explicitly
     const uniqueModules = availableModules.filter(m => {
         // 1. Hide sub-finance modules if parent 'finance' exists
-        if (m.id === 'finance_fees' || m.id === 'finance_salaries' || m.id === 'finance_expenses') {
-             return !availableModules.some(p => p.id === 'finance');
+        if (m.id === ModuleId.FinanceFees || m.id === ModuleId.FinanceSalaries || m.id === ModuleId.FinanceExpenses) {
+             return !availableModules.some(p => p.id === ModuleId.Finance);
         }
         
-        // 2. Hide 'finance' module if it's acting as a duplicate of 'finance_fees' (same name/desc)
-        // OR if we want to enforce the new split structure
-        // Actually, based on migration 010, 'finance' was renamed to 'الرسوم الدراسية' (Fees)
-        // So 'finance' IS 'finance_fees' logically now.
-        // If we have BOTH 'finance' and 'finance_fees', we should probably hide one.
-        // Let's hide 'finance_fees' if 'finance' exists, as 'finance' is the legacy ID used by schools.
-        
-        if (m.id === 'finance_fees' && availableModules.some(p => p.id === 'finance')) {
-            return false;
-        }
-
-        // 3. De-duplicate by name if prices are weird (Emergency fix for user report)
+        // 2. De-duplicate by name if prices are weird (Emergency fix for user report)
         // If we have two modules named "الرسوم الدراسية", show the one with ID 'finance' and hide others
         // UNLESS the other one is totally different.
-        if (m.name === 'الرسوم الدراسية' && m.id !== 'finance' && availableModules.some(p => p.id === 'finance')) {
+        if (m.name === 'الرسوم الدراسية' && m.id !== ModuleId.Finance && availableModules.some(p => p.id === ModuleId.Finance)) {
             // This hides the $29 duplicate if the 'finance' one is present
             return false;
         }

@@ -64,6 +64,23 @@ const SchoolsList: React.FC = () => {
     navigate(`/superadmin/schools/${school.id}/manage`);
   };
 
+  const handleUpdateStatus = async (school: School, newStatus: SubscriptionStatus) => {
+    if (!window.confirm(`هل أنت متأكد من تغيير حالة المدرسة إلى "${newStatus}"؟`)) return;
+
+    try {
+      // Assuming api.updateSchool exists or we use a generic patch
+      // If api.updateSchool doesn't exist yet, we must ensure it does or use a direct fetch wrapper if needed.
+      // Based on typical patterns, let's assume api.updateSchool(id, data)
+      await api.updateSchool(school.id, { status: newStatus });
+
+      setSchools(prev => prev.map(s => s.id === school.id ? { ...s, status: newStatus } : s));
+      addToast(`تم تحديث حالة المدرسة بنجاح`, 'success');
+    } catch (error) {
+      console.error("Failed to update status", error);
+      addToast("فشل تحديث الحالة", 'error');
+    }
+  };
+
   // Pagination logic
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -95,12 +112,30 @@ const SchoolsList: React.FC = () => {
         ${school.balance.toFixed(2)}
       </td>
       <td className="px-6 py-4">
-        <button
-          onClick={() => handleManageSchool(school)}
-          className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline"
-        >
-          إدارة
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleManageSchool(school)}
+            className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline"
+          >
+            إدارة
+          </button>
+
+          {school.status === SubscriptionStatus.Active ? (
+            <button
+              onClick={() => handleUpdateStatus(school, SubscriptionStatus.Canceled)}
+              className="font-medium text-red-600 dark:text-red-500 hover:underline text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded"
+            >
+              تعليق
+            </button>
+          ) : (
+            <button
+              onClick={() => handleUpdateStatus(school, SubscriptionStatus.Active)}
+              className="font-medium text-green-600 dark:text-green-500 hover:underline text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded"
+            >
+              تفعيل
+            </button>
+          )}
+        </div>
       </td>
     </>
   );

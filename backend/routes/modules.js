@@ -8,7 +8,7 @@ const getEffectiveCatalog = async (req) => {
     const dbModules = await ModuleCatalog.findAll();
     const memoryCatalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
     const disabledSet = req.app?.locals?.disabledModules instanceof Set ? req.app.locals.disabledModules : new Set();
-    
+
     const dbMap = new Map(dbModules.map(m => [m.id, m]));
     const combined = [];
     const seenIds = new Set();
@@ -68,7 +68,7 @@ const getEffectiveCatalog = async (req) => {
             });
         }
     }
-    
+
     // Sort: Core first, then by name
     return combined.sort((a, b) => {
         if (a.isCore === b.isCore) return a.name.localeCompare(b.name);
@@ -90,7 +90,7 @@ router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
         const p = req.body || {};
         if (!p.id || !p.name) return res.status(400).json({ message: 'id and name required' });
-        
+
         const row = await ModuleCatalog.create({
             id: String(p.id),
             name: String(p.name),
@@ -102,7 +102,7 @@ router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
             isEnabled: !!p.isEnabled,
             isCore: !!p.isCore
         });
-        
+
         res.status(201).json({
             id: row.id,
             name: row.name,
@@ -133,7 +133,7 @@ router.put('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => 
             // Not in DB, check memory
             const memoryCatalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
             const mem = memoryCatalog.find(m => m.id === id);
-            
+
             if (!mem) {
                 return res.status(404).json({ message: 'Module not found' });
             }
@@ -184,7 +184,7 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
     try {
         const id = String(req.params.id || '');
         const row = await ModuleCatalog.findByPk(id);
-        
+
         if (!row) {
             const memoryCatalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
             const isBuiltIn = memoryCatalog.some(m => m.id === id);

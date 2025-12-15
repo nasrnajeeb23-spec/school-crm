@@ -63,72 +63,72 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
 
   return (
     <>
-    <aside className={`${isMobileOpen ? 'flex' : 'hidden'} md:flex fixed top-0 right-0 h-full w-64 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex-col transition-all duration-300 shadow-lg z-30`}
-    >
-      <div className="flex items-center justify-center md:justify-start md:pr-6 h-20 border-b border-gray-200 dark:border-gray-700 relative">
-        {schoolLogoUrl ? (
-            <img 
-                src={schoolLogoUrl} 
-                alt="School Logo" 
-                className="w-10 h-10 rounded-full" 
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+      <aside className={`${isMobileOpen ? 'flex' : 'hidden'} md:flex fixed top-0 right-0 h-full w-64 md:w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex-col transition-all duration-300 shadow-lg z-30`}
+      >
+        <div className="flex items-center justify-center md:justify-start md:pr-6 h-20 border-b border-gray-200 dark:border-gray-700 relative">
+          {schoolLogoUrl ? (
+            <img
+              src={schoolLogoUrl}
+              alt="School Logo"
+              className="w-10 h-10 rounded-full"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
-        ) : (
+          ) : (
             <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">S</span>
-        )}
-        <h1 className="hidden md:block ml-2 text-xl font-bold text-gray-800 dark:text-white truncate">{schoolName || 'لوحة التحكم'}</h1>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="md:hidden absolute left-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-            aria-label="إغلاق القائمة"
-          >
-            <CloseIcon className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-      <nav className="flex-grow pt-4 overflow-y-auto">
-        <ul>
-          {navItems.map(item => {
-             const isLocked = false;
-             return (
+          )}
+          <h1 className="hidden md:block ml-2 text-xl font-bold text-gray-800 dark:text-white truncate">{schoolName || 'لوحة التحكم'}</h1>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="md:hidden absolute left-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+              aria-label="إغلاق القائمة"
+            >
+              <CloseIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+        <nav className="flex-grow pt-4 overflow-y-auto">
+          <ul>
+            {navItems.map(item => {
+              const isLocked = false;
+              return (
                 <li key={item.id} className="px-2">
                   <NavLink to={item.path} className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`} end>
                     {({ isActive }) => (
                       <>
                         {isActive && <div className="absolute right-0 h-6 w-1 bg-teal-600 dark:bg-teal-400 rounded-l-full"></div>}
                         <item.icon className="h-6 w-6" />
-                        <span className="hidden md:block mr-4 flex items-center gap-2">
+                        <span className="mr-4 flex items-center gap-2">
                           <span>{item.label}</span>
                         </span>
                       </>
                     )}
                   </NavLink>
                 </li>
-            );
-          })}
-        </ul>
-      </nav>
-      
-      <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-        <NavLink
-          to={`${basePath}/profile`}
-          className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : 'text-gray-600 dark:text-gray-300 ' + inactiveLinkClasses}`}
-        >
-          <ProfileIcon className="h-6 w-6" />
-          <span className="hidden md:block mr-4">ملفي الشخصي</span>
-        </NavLink>
-        {!isSuperAdminView && (
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+          <NavLink
+            to={`${basePath}/profile`}
+            className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : 'text-gray-600 dark:text-gray-300 ' + inactiveLinkClasses}`}
+          >
+            <ProfileIcon className="h-6 w-6" />
+            <span className="hidden md:block mr-4">ملفي الشخصي</span>
+          </NavLink>
+          {!isSuperAdminView && (
             <a href="#" onClick={(e) => { e.preventDefault(); logout(); }} className={`${baseLinkClasses} text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50`}>
-            <LogoutIcon className="h-6 w-6" />
-            <span className="hidden md:block mr-4">تسجيل الخروج</span>
+              <LogoutIcon className="h-6 w-6" />
+              <span className="hidden md:block mr-4">تسجيل الخروج</span>
             </a>
-        )}
-      </div>
-    </aside>
-    {isMobileOpen && (
-      <div className="fixed inset-0 bg-black/40 md:hidden z-20" onClick={onClose} />
-    )}
+          )}
+        </div>
+      </aside>
+      {isMobileOpen && (
+        <div className="fixed inset-0 bg-black/40 md:hidden z-20" onClick={onClose} />
+      )}
     </>
   );
 };

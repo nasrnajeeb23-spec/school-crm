@@ -3,7 +3,7 @@
 
 import {
     User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ParentAccountStatus, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
-    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState
+    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState, NewParentData, SalaryComponent
 } from './types';
 
 
@@ -263,6 +263,10 @@ export const getSchoolSubscriptionDetails = async (schoolId: number): Promise<Su
 
 export const getSchoolBillingSummary = async (schoolId: number): Promise<{ totalInvoices: number; paidCount: number; unpaidCount: number; overdueCount: number; totalAmount: number; outstandingAmount: number; }> => {
     return await apiCall(`/schools/${schoolId}/billing/summary`, { method: 'GET' });
+};
+
+export const getSchoolDashboardComplete = async (schoolId: number): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/dashboard/complete`, { method: 'GET' });
 };
 
 // ==================== Student APIs ====================
@@ -622,7 +626,7 @@ export const getMessages = async (conversationId: string): Promise<Message[]> =>
     return unwrap<Message[]>(data, 'messages', []);
 };
 
-export const sendMessage = async (messageData: Partial<Message>): Promise<Message> => {
+export const sendMessage = async (messageData: { conversationId: string; text: string } | Partial<Message>): Promise<Message> => {
     return await apiCall('/messaging/send', {
         method: 'POST',
         body: JSON.stringify(messageData),
@@ -1457,6 +1461,9 @@ export const sendInvoiceReminder = async (schoolId: number, invoiceId: string): 
 export const getStudentStatement = async (schoolId: number, studentId: string): Promise<any[]> => {
     return await apiCall(`/school/${schoolId}/students/${studentId}/statement`, { method: 'GET' });
 };
+
+
+
 
 
 

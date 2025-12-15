@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-import { NewClassData, Teacher } from '../types';
-import { useAppContext } from '../contexts/AppContext';
+import { NewClassData, Teacher, SchoolSettings } from '../types';
 
 interface AddClassModalProps {
   schoolId: number;
@@ -9,9 +8,11 @@ interface AddClassModalProps {
   onSave: (data: NewClassData) => Promise<void>;
   defaultStage?: string;
   defaultGrade?: string;
+  teachers?: Teacher[];
+  schoolSettings?: SchoolSettings | null;
 }
 
-const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave, defaultStage, defaultGrade }) => {
+const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave, defaultStage, defaultGrade, teachers: propTeachers, schoolSettings }) => {
   const [formData, setFormData] = useState({
     stage: defaultStage || '',
     gradeLevel: defaultGrade || '',
@@ -20,10 +21,11 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
     homeroomTeacherId: '',
     subjects: ''
   });
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [loadingTeachers, setLoadingTeachers] = useState(true);
+  const [internalTeachers, setInternalTeachers] = useState<Teacher[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(!propTeachers);
   const [isSaving, setIsSaving] = useState(false);
-  const { schoolSettings } = useAppContext();
+
+  const teachers = propTeachers || internalTeachers;
 
   const stageGradeMap: Record<string, string[]> = {
     'رياض أطفال': ['رياض أطفال'],
@@ -40,14 +42,18 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
   }, [defaultStage, defaultGrade]);
 
   useEffect(() => {
-    api.getSchoolTeachers(schoolId).then(data => {
-      setTeachers(data);
-      if (data.length > 0) {
-        setFormData(prev => ({ ...prev, homeroomTeacherId: data[0].id }));
-      }
-      setLoadingTeachers(false);
-    });
-  }, [schoolId]);
+    if (!propTeachers) {
+        api.getSchoolTeachers(schoolId).then(data => {
+        setInternalTeachers(data);
+        if (data.length > 0) {
+            setFormData(prev => ({ ...prev, homeroomTeacherId: data[0].id }));
+        }
+        setLoadingTeachers(false);
+        });
+    } else if (propTeachers.length > 0 && !formData.homeroomTeacherId) {
+        setFormData(prev => ({ ...prev, homeroomTeacherId: propTeachers[0].id }));
+    }
+  }, [schoolId, propTeachers]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

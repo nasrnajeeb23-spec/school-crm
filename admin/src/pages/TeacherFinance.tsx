@@ -56,6 +56,7 @@ const TeacherFinance: React.FC = () => {
     }, [user?.teacherId]);
 
     const latestSlip = slips.length > 0 ? slips[0] : null;
+    const fmt = (amount: number) => formatCurrency(amount, currencyCode);
 
     if (loading) {
         return <div className="text-center p-8">جاري تحميل البيانات المالية...</div>;

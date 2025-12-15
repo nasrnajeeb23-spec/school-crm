@@ -190,4 +190,67 @@ const User = sequelize.define('User', {
   ]
 });
 
+// Encryption helpers
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default_secret_key_must_be_32_bytes_len'; // Fallback for dev
+const IV_LENGTH = 16;
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+
+function encrypt(text) {
+  if (!text) return null;
+  // Ensure key is 32 bytes
+  const keyMap = crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv('aes-256-cbc', keyMap, iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function decrypt(text) {
+  if (!text) return null;
+  try {
+    const textParts = text.split(':');
+    const iv = Buffer.from(textParts.shift(), 'hex');
+    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    const keyMap = crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest();
+    const decipher = crypto.createDecipheriv('aes-256-cbc', keyMap, iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+  } catch (e) {
+    // Return original if decryption fails (backward compatibility)
+    return text;
+  }
+}
+
+// Hooks
+User.beforeCreate(async (user) => {
+  if (user.password) {
+    user.password = await bcrypt.hash(user.password, 10);
+  }
+  if (user.mfaSecret) {
+    user.mfaSecret = encrypt(user.mfaSecret);
+  }
+});
+
+User.beforeUpdate(async (user) => {
+  if (user.changed('password')) {
+    user.password = await bcrypt.hash(user.password, 10);
+  }
+  if (user.changed('mfaSecret')) {
+    user.mfaSecret = encrypt(user.mfaSecret);
+  }
+});
+
+// Instance method to check password
+User.prototype.validPassword = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
+
+// Instance method to get clear MFA secret
+User.prototype.getMfaSecret = function () {
+  return decrypt(this.mfaSecret);
+};
+
 module.exports = User;

@@ -52,7 +52,7 @@ const StudentDistributionChart: React.FC<StudentDistributionChartProps> = ({ dat
             <ResponsiveContainer>
                 <PieChart>
                 <Pie
-                    data={data}
+                    data={data as any[]}
                     cx="50%"
                     cy="50%"
                     labelLine={false}

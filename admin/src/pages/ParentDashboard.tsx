@@ -25,7 +25,7 @@ const ParentDashboard: React.FC = () => {
     const [sortBy, setSortBy] = useState<'id'|'issueDate'|'dueDate'|'total'|'remaining'>('dueDate');
     const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc');
     const bulkPrintRef = useRef<HTMLDivElement>(null);
-    const handleBulkPrint = useReactToPrint({ content: () => bulkPrintRef.current });
+    const handleBulkPrint = useReactToPrint({ contentRef: bulkPrintRef });
 
     const children = useMemo(() => {
         if (!data) return [] as { student: Student; grades?: any[]; attendance?: any[]; invoices?: any[] }[];

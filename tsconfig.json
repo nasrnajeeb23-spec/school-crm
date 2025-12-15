@@ -15,6 +15,7 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "useUnknownInCatchVariables": false,
     "paths": {
       "@/*": [
         "./*"
@@ -24,13 +25,19 @@
     "noEmit": true
   },
   "include": [
-    "admin/src/**/*"
+    "admin/src/**/*",
+    "admin/vite-env.d.ts"
   ],
   "exclude": [
     "node_modules",
     "backend",
     "admin/node_modules",
     "dist",
-    "build"
+    "build",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "admin/src/setupTests.ts",
+    "admin/src/test-imports.tsx"
   ]
 }

@@ -28,7 +28,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
     const [editForm, setEditForm] = useState<SalaryStructurePayload | null>(null);
     const [detailSlip, setDetailSlip] = useState<any | null>(null);
     const slipPrintRef = useRef<HTMLDivElement>(null);
-    const handleSlipPrint = useReactToPrint({ content: () => slipPrintRef.current, documentTitle: detailSlip ? `SL-${schoolId}-${detailSlip.month}-${detailSlip.personType}-${detailSlip.personId}` : 'SalarySlip' });
+    const handleSlipPrint = useReactToPrint({ contentRef: slipPrintRef, documentTitle: detailSlip ? `SL-${schoolId}-${detailSlip.month}-${detailSlip.personType}-${detailSlip.personId}` : 'SalarySlip' });
     const [slipsStatusFilter, setSlipsStatusFilter] = useState<'all' | 'Draft' | 'Approved' | 'Paid'>('all');
     const [slipsSearch, setSlipsSearch] = useState<string>('');
     const [editSlipBase, setEditSlipBase] = useState<string>('');

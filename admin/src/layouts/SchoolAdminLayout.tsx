@@ -57,6 +57,7 @@ const viewTitles: { [key: string]: string } = {
 
 const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView = false }) => {
   const { currentUser, theme, toggleTheme, logout } = useAppContext();
+
   const { schoolId: urlSchoolId } = useParams<{ schoolId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,14 +70,64 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   const notificationRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTrial, setIsTrial] = useState<boolean>(false);
+  const [currentPermissions, setCurrentPermissions] = useState<Permission[]>([]);
 
   const storedId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('current_school_id') || '0') : 0;
   const effectiveSchoolId = isSuperAdminView ? parseInt(urlSchoolId || '0') : (currentUser?.schoolId || storedId);
-  const userRolePermissions = Object.values(Permission);
+
+  // Helper to derive permissions from active modules
+  const getPermissionsFromModules = (activeModules: string[]): Permission[] => {
+    const perms = new Set<Permission>();
+    const mods = new Set(activeModules.map(m => m.toLowerCase()));
+
+    // Core Permissions (Always active if basic modules present)
+    if (mods.has('student_management') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_STUDENTS);
+      perms.add(Permission.MANAGE_CLASSES);
+      perms.add(Permission.VIEW_DASHBOARD);
+    }
+    if (mods.has('academic_management') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_SCHEDULE);
+      perms.add(Permission.MANAGE_CALENDAR);
+      perms.add(Permission.MANAGE_GRADES);
+    }
+    if (mods.has('teacher_portal') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_TEACHERS);
+      perms.add(Permission.MANAGE_ATTENDANCE); // Teachers attendance
+    }
+    if (mods.has('parent_portal') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_PARENTS);
+    }
+
+    // Add-ons
+    if (mods.has('finance') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_FINANCE);
+    }
+    if (mods.has('hr_payroll') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_STAFF);
+      // HR often implies Payroll which uses Finance permission in sidebar
+      perms.add(Permission.MANAGE_FINANCE);
+    }
+    if (mods.has('transportation') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_TRANSPORTATION);
+    }
+    if (mods.has('advanced_reports') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_REPORTS);
+    }
+    if (mods.has('messaging') || mods.has('all_modules')) {
+      perms.add(Permission.MANAGE_MESSAGING);
+    }
+
+    // Always allow settings for Admin
+    perms.add(Permission.MANAGE_SETTINGS);
+    perms.add(Permission.MANAGE_MODULES);
+
+    return Array.from(perms);
+  };
 
   const hasPermission = (permission: Permission) => {
     if (isSuperAdminView) return true;
-    return userRolePermissions.includes(permission);
+    return currentPermissions.includes(permission);
   };
 
   useEffect(() => {
@@ -124,24 +175,31 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
             notifications: { email: true, sms: false, push: true },
           } as any);
         }
+
+        let calculatedPermissions = Object.values(Permission); // Default fallback
+
         if (subStateRes && subStateRes.status === 'fulfilled') {
           const ss = subStateRes.value;
           const status = String(ss?.subscription?.status || '').toUpperCase();
           const expired = !!ss?.subscription?.trialExpired;
           setIsTrial(status === 'TRIAL' && !expired);
+
+          // CRITICAL: Update permissions based on active modules
+          if (ss.modules && Array.isArray(ss.modules.active)) {
+            calculatedPermissions = getPermissionsFromModules(ss.modules.active);
+          }
         } else {
           setIsTrial(false);
         }
+        setCurrentPermissions(calculatedPermissions);
+
       }).catch(err => {
         console.error('School data load error:', err);
       }).finally(() => setLoading(false));
     }
   }, [effectiveSchoolId]);
 
-  useEffect(() => {
-    if (!effectiveSchoolId) return;
-    api.getSchoolSettings(effectiveSchoolId).then(setSettings).catch(() => { });
-  }, [effectiveSchoolId, location.pathname]);
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -187,7 +245,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   return (
     <>
       <SchoolSidebar
-        permissions={userRolePermissions}
+        permissions={isSuperAdminView ? Object.values(Permission) : currentPermissions}
         isTrial={isTrial}
         schoolName={settings?.schoolName || school.name}
         schoolLogoUrl={api.getAssetUrl(settings?.schoolLogoUrl as string)}
@@ -233,7 +291,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
               <Route path="parents/:parentId" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><ParentManagement schoolId={school.id} /></ProtectedPage>} />
               <Route path="staff" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffManagement schoolId={school.id} /></ProtectedPage>} />
               <Route path="staff/attendance" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffAttendance schoolId={school.id} /></ProtectedPage>} />
-              <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} /></ProtectedPage>} />
+              <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
               <Route path="transportation" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><Transportation schoolId={school.id} /></ProtectedPage>} />
               <Route path="attendance" element={<ProtectedPage permission={Permission.MANAGE_ATTENDANCE}><Attendance schoolId={school.id} /></ProtectedPage>} />
               <Route path="schedule" element={<ProtectedPage permission={Permission.MANAGE_SCHEDULE}><Schedule schoolId={school.id} /></ProtectedPage>} />

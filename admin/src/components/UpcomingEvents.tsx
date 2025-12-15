@@ -6,6 +6,7 @@ import { EventIcon } from './icons';
 interface UpcomingEventsProps {
     navigateTo: (view: string) => void;
     schoolId: number;
+    initialEvents?: SchoolEvent[];
 }
 
 const eventTypeColors: { [key in SchoolEventType]: string } = {
@@ -15,19 +16,23 @@ const eventTypeColors: { [key in SchoolEventType]: string } = {
     [SchoolEventType.Holiday]: 'bg-purple-500',
 };
 
-const UpcomingEvents: React.FC<UpcomingEventsProps> = ({ navigateTo, schoolId }) => {
+const UpcomingEvents: React.FC<UpcomingEventsProps> = ({ navigateTo, schoolId, initialEvents }) => {
     const [events, setEvents] = useState<SchoolEvent[]>([]);
-    
+
     useEffect(() => {
-        // FIX: Corrected function call to getSchoolEvents and passed the school id.
+        if (initialEvents) {
+            setEvents(initialEvents);
+            return;
+        }
+
         api.getSchoolEvents(schoolId).then(allEvents => {
             const upcoming = allEvents
                 .filter(event => new Date(event.date) >= new Date())
                 .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                 .slice(0, 4);
             setEvents(upcoming);
-        });
-    }, [schoolId]);
+        }).catch(err => console.error("Failed to fetch events", err));
+    }, [schoolId, initialEvents]);
 
     return (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
@@ -51,7 +56,7 @@ const UpcomingEvents: React.FC<UpcomingEventsProps> = ({ navigateTo, schoolId })
                             <p className="font-semibold text-gray-800 dark:text-white">{event.title}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">{event.time}</p>
                         </div>
-                         <div className={`flex-shrink-0 w-3 h-3 rounded-full ${eventTypeColors[event.eventType]}`} title={event.eventType}></div>
+                        <div className={`flex-shrink-0 w-3 h-3 rounded-full ${eventTypeColors[event.eventType]}`} title={event.eventType}></div>
                     </div>
                 )) : <p className="text-sm text-center text-gray-500 dark:text-gray-400 py-4">لا توجد أحداث قادمة.</p>}
             </div>

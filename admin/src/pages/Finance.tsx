@@ -167,9 +167,8 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
 
                         {activeTab === 'expenses' && (
                             <FinanceExpenses
-                                expenses={expenses}
+                                schoolId={schoolId}
                                 schoolSettings={schoolSettings}
-                                onAddExpense={() => setIsAddExpenseModalOpen(true)}
                             />
                         )}
 
@@ -181,9 +180,6 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                             <FinanceFees
                                 schoolId={schoolId}
                                 schoolSettings={schoolSettings}
-                                onInvoicesGenerated={(newInvoices) => {
-                                    setInvoices(prev => [...newInvoices, ...prev]);
-                                }}
                             />
                         )}
 

@@ -8,7 +8,7 @@ const { validate } = require('../middleware/validate');
 // --- Operators ---
 router.get('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), async (req, res) => {
   try {
-    const ops = await BusOperator.findAll({ where: { schoolId: req.params.schoolId }, order: [['status','ASC']] });
+    const ops = await BusOperator.findAll({ where: { schoolId: req.params.schoolId }, order: [['status', 'ASC']] });
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
     res.json(ops.map(o => ({ ...o.toJSON(), status: statusMap[o.status] || o.status })));
   } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
@@ -43,7 +43,7 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
 // --- Routes ---
 router.get('/:schoolId/routes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), async (req, res) => {
   try {
-    const routes = await Route.findAll({ where: { schoolId: req.params.schoolId }, order: [['name','ASC']] });
+    const routes = await Route.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']] });
     const payload = [];
     for (const r of routes) {
       const rs = await RouteStudent.findAll({ where: { routeId: r.id } });
@@ -114,8 +114,8 @@ router.get('/parent/:parentId', verifyToken, requireRole('PARENT'), requireModul
       const R = 6371;
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
     if (typeof loc.lat === 'number' && typeof loc.lng === 'number') {
@@ -128,6 +128,47 @@ router.get('/parent/:parentId', verifyToken, requireRole('PARENT'), requireModul
     }
     res.json({ route: { ...route.toJSON(), studentIds: [] }, operator: operator ? { ...operator.toJSON(), status: statusMap[operator.status] } : null, nearestStop });
   } catch (e) { res.status(500).send('Server Error'); }
+});
+
+// Public Bus Operator Application
+router.post('/operator/application', validate([
+  { name: 'name', required: true, type: 'string' },
+  { name: 'phone', required: true, type: 'string' },
+  { name: 'licenseNumber', required: true, type: 'string' },
+  { name: 'busPlateNumber', required: true, type: 'string' },
+  { name: 'busCapacity', required: true },
+  { name: 'busModel', required: true, type: 'string' },
+  { name: 'schoolId', required: true },
+]), async (req, res) => {
+  try {
+    const { schoolId, ...data } = req.body;
+    const op = await BusOperator.create({
+      id: `op_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      ...data,
+      schoolId: parseInt(schoolId),
+      status: 'Pending'
+    });
+
+    // Notify School Admin
+    try {
+      const { User, Notification } = require('../models');
+      const schoolAdmins = await User.findAll({ where: { schoolId: schoolId, role: 'SCHOOL_ADMIN' } });
+      for (const admin of schoolAdmins) {
+        await Notification.create({
+          type: 'Info', // Changed from DriverApplication to match DB Enum
+          title: 'طلب انضمام سائق جديد',
+          description: `تقدم ${data.name} بطلب للانضمام كأسطول نقل.`,
+          userId: admin.id,
+          isRead: false
+        });
+      }
+    } catch (err) { console.error('Failed to notify admins', err); }
+
+    res.status(201).json({ success: true, message: 'Application submitted successfully' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ msg: 'Server Error', error: e.message });
+  }
 });
 
 module.exports = router;
@@ -202,8 +243,8 @@ router.post('/:schoolId/auto-assign', verifyToken, requireRole('SCHOOL_ADMIN', '
       const R = 6371;
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
 
@@ -325,8 +366,8 @@ router.post('/:schoolId/auto-assign/preview', verifyToken, requireRole('SCHOOL_A
       const R = 6371;
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
 

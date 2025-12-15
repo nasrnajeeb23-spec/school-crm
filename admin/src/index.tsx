@@ -4,6 +4,7 @@ import { BrowserRouter, HashRouter } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import { AppProvider } from './contexts/AppContext';
 import App from './App';
+import './index.css';
 
 if (typeof window !== 'undefined') {
   try {
@@ -41,7 +42,7 @@ if (typeof window !== 'undefined') {
 const container = document.getElementById('root');
 if (container) {
   const isRenderHost = typeof window !== 'undefined' && /\.onrender\.com$/i.test(window.location.hostname || '');
-  const useHash = ((process.env.REACT_APP_HASH_ROUTER === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
+  const useHash = ((import.meta.env.VITE_HASH_ROUTER === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
   const root = ReactDOM.createRoot(container);
   root.render(
     <React.StrictMode>

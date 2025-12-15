@@ -39,12 +39,7 @@ const Modal: React.FC<ModalProps> = ({
     };
 
     return (
-        <div
-            className="fixed inset-0 z-50 overflow-y-auto"
-            aria-labelledby="modal-title"
-            role="dialog"
-            aria-modal="true"
-        >
+        <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                 {/* Overlay */}
                 <div
@@ -59,7 +54,12 @@ const Modal: React.FC<ModalProps> = ({
                 </span>
 
                 {/* Modal panel */}
-                <div className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full ${sizeClasses[size]} ${className}`}>
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="modal-title"
+                    className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full ${sizeClasses[size]} ${className}`}
+                >
                     {/* Header */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white" id="modal-title">

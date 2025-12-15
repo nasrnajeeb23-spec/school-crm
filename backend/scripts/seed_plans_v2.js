@@ -6,7 +6,12 @@ const plans = [
         name: 'الخطة الأساسية', // Starter
         price: 50,
         pricePeriod: 'monthly',
-        features: ['all_modules', 'basic_support'],
+        features: [
+            'all_modules',
+            'جميع وحدات النظام (الطلاب، المالية، الموارد البشرية، النقل)',
+            'تطبيقات الجوال (معلم، ولي أمر)',
+            'دعم فني عبر البريد الإلكتروني'
+        ],
         limits: {
             students: 100,
             staff: 10,
@@ -19,7 +24,13 @@ const plans = [
         name: 'الخطة المتقدمة', // Growth
         price: 150,
         pricePeriod: 'monthly',
-        features: ['all_modules', 'priority_support', 'advanced_reports'],
+        features: [
+            'all_modules',
+            'جميع وحدات النظام (الطلاب، المالية، الموارد البشرية، النقل)',
+            'تطبيقات الجوال (معلم، ولي أمر)',
+            'تقارير متقدمة وتحليلات ذكية',
+            'دعم فني أولوية (شات/بريد)'
+        ],
         limits: {
             students: 500,
             staff: 50,
@@ -32,7 +43,14 @@ const plans = [
         name: 'الخطة المؤسسية', // Enterprise
         price: 300,
         pricePeriod: 'monthly',
-        features: ['all_modules', 'dedicated_account_manager', 'api_access'],
+        features: [
+            'all_modules',
+            'جميع وحدات النظام (الطلاب، المالية، الموارد البشرية، النقل)',
+            'تطبيقات الجوال (معلم، ولي أمر)',
+            'تقارير متقدمة وتحليلات ذكية',
+            'مدير حساب خاص',
+            'API Access'
+        ],
         limits: {
             students: 2000,
             staff: 200,

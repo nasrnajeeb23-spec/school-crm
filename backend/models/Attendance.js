@@ -15,8 +15,18 @@ const Attendance = sequelize.define('Attendance', {
     type: DataTypes.ENUM('Present', 'Absent', 'Late', 'Excused'),
     allowNull: false,
   },
-  // Foreign keys are added via association
-  // studentId, classId
+  schoolId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  studentId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  classId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
 }, {
   indexes: [
     { fields: ['date'] },

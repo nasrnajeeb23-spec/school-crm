@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAppContext } from '../contexts/AppContext'
-import { getSubscriptionState, SubscriptionState } from '../api'
+import { getSubscriptionState } from '../api'
+import { SubscriptionState } from '../types'
 
 export default function TrialBanner() {
   const { currentUser } = useAppContext()

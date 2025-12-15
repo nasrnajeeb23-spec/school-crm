@@ -25,7 +25,7 @@ const GuidedTour: React.FC<GuidedTourProps> = ({ tourKey, steps, autoStart = fal
     const handleJoyrideCallback = (data: CallBackProps) => {
         const { status } = data;
 
-        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+        if (([STATUS.FINISHED, STATUS.SKIPPED] as string[]).includes(status)) {
             // Mark tour as completed
             const completedTours = JSON.parse(localStorage.getItem('completedTours') || '[]');
             if (!completedTours.includes(tourKey)) {
