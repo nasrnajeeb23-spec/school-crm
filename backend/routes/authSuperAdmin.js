@@ -9,8 +9,8 @@ const speakeasy = require('speakeasy');
 const router = express.Router();
 
 // Super Admin IP whitelist (should be in environment variables in production)
-const SUPER_ADMIN_WHITELIST = process.env.SUPER_ADMIN_IP_WHITELIST ? 
-  process.env.SUPER_ADMIN_IP_WHITELIST.split(',') : 
+const SUPER_ADMIN_WHITELIST = process.env.SUPER_ADMIN_IP_WHITELIST ?
+  process.env.SUPER_ADMIN_IP_WHITELIST.split(',') :
   ['127.0.0.1', '::1', '192.168.1.1', '10.0.0.1'];
 
 // Rate limiting for SuperAdmin login attempts
@@ -21,18 +21,18 @@ try {
     const redis = require('redis');
     const useTls = String(process.env.REDIS_URL || '').startsWith('rediss://');
     redisClient = redis.createClient({ url: process.env.REDIS_URL, socket: useTls ? { tls: true } : {} });
-    redisClient.on('error', () => {});
+    redisClient.on('error', () => { });
     // Connect lazily; failures will fall back to in-memory
     redisClient.connect().catch(() => { redisClient = null; });
   }
-} catch {}
+} catch { }
 const DEFAULT_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 async function getSecurityPolicies(app) {
   const defaults = {
     enforceMfaForAdmins: true,
-    passwordMinLength: 0,
+    passwordMinLength: 12,
     lockoutThreshold: DEFAULT_MAX_ATTEMPTS,
     allowedIpRanges: [],
     sessionMaxAgeHours: 24,
@@ -46,17 +46,17 @@ async function getSecurityPolicies(app) {
         return { ...defaults, ...cfg };
       }
     }
-  } catch {}
+  } catch { }
   const localCfg = (app && app.locals && app.locals.securityPolicies) || {};
   return { ...defaults, ...localCfg };
 }
 
 // Helper function to get client IP
 const getClientIP = (req) => {
-  return req.headers['x-forwarded-for'] || 
-         req.connection.remoteAddress || 
-         req.socket.remoteAddress ||
-         (req.connection.socket ? req.connection.socket.remoteAddress : null);
+  return req.headers['x-forwarded-for'] ||
+    req.connection.remoteAddress ||
+    req.socket.remoteAddress ||
+    (req.connection.socket ? req.connection.socket.remoteAddress : null);
 };
 
 // Helper function to check if IP is whitelisted
@@ -68,14 +68,14 @@ const isWhitelistedIP = (ip) => {
 const performSecurityCheck = (ip, userAgent) => {
   const isWhitelisted = isWhitelistedIP(ip);
   const isSuspiciousUserAgent = userAgent && (
-    userAgent.includes('bot') || 
+    userAgent.includes('bot') ||
     userAgent.includes('crawler') ||
     userAgent.includes('curl') ||
     userAgent.includes('wget')
   );
   const isUnknownDevice = userAgent && !(
-    userAgent.includes('Chrome') || 
-    userAgent.includes('Firefox') || 
+    userAgent.includes('Chrome') ||
+    userAgent.includes('Firefox') ||
     userAgent.includes('Safari') ||
     userAgent.includes('Edge')
   );
@@ -121,7 +121,7 @@ const logSuperAdminAction = async (action, details, req) => {
   try {
     const ip = getClientIP(req);
     const userAgent = req.headers['user-agent'];
-    
+
     await AuditLog.create({
       action: `superadmin.${action}`,
       userId: details.userId || null,
@@ -149,7 +149,7 @@ const checkRateLimit = async (identifier, maxAttempts = DEFAULT_MAX_ATTEMPTS, lo
       }
       const attempts = parseInt(await redisClient.get(`sa:login:${identifier}:count`) || '0');
       return { allowed: true, attempts };
-    } catch {}
+    } catch { }
   }
   const now = Date.now();
   const attempts = loginAttempts.get(identifier);
@@ -178,7 +178,7 @@ const incrementRateLimit = async (identifier, maxAttempts = DEFAULT_MAX_ATTEMPTS
         await redisClient.setEx(lockKey, seconds, '1');
       }
       return attempts;
-    } catch {}
+    } catch { }
   }
   const now = Date.now();
   const attempts = loginAttempts.get(identifier) || { count: 0, lastAttempt: now };
@@ -194,7 +194,7 @@ const clearRateLimit = async (identifier) => {
       await redisClient.del(`sa:login:${identifier}:count`);
       await redisClient.del(`sa:login:${identifier}:lock`);
       await redisClient.del(`sa:login:${identifier}:last`);
-    } catch {}
+    } catch { }
   }
   loginAttempts.delete(identifier);
 };
@@ -212,10 +212,10 @@ router.post('/login', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         message: 'Invalid input data',
-        errors: errors.array() 
+        errors: errors.array()
       });
     }
 
@@ -225,7 +225,7 @@ router.post('/login', [
 
     // Security check
     const securityCheck = performSecurityCheck(clientIP, clientUserAgent);
-    
+
     if (!securityCheck.allowed) {
       await logSuperAdminAction('login.blocked', {
         email,
@@ -234,7 +234,7 @@ router.post('/login', [
         ipAddress: clientIP,
         userAgent: clientUserAgent
       }, req);
-      
+
       return res.status(403).json({
         success: false,
         message: `Access denied: ${securityCheck.reason}`,
@@ -263,7 +263,7 @@ router.post('/login', [
         remainingTime: rateLimit.remainingTime,
         ipAddress: clientIP
       }, req);
-      
+
       return res.status(429).json({
         success: false,
         message: 'Account temporarily locked due to multiple failed attempts',
@@ -272,8 +272,8 @@ router.post('/login', [
     }
 
     // Find SuperAdmin user
-    const user = await User.findOne({ 
-      where: { 
+    const user = await User.findOne({
+      where: {
         email: email,
         role: 'SuperAdmin'
       }
@@ -281,27 +281,27 @@ router.post('/login', [
 
     if (!user) {
       await incrementRateLimit(email);
-      
+
       await logSuperAdminAction('login.failed', {
         email,
         reason: 'Invalid credentials',
         attempts: rateLimit.attempts + 1,
         ipAddress: clientIP
       }, req);
-      
+
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    
+
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       const attempts = await incrementRateLimit(email, maxAttempts, lockoutMs);
-      
+
       await logSuperAdminAction('login.failed', {
         userId: user.id,
         userEmail: user.email,
@@ -309,7 +309,7 @@ router.post('/login', [
         attempts: attempts,
         ipAddress: clientIP
       }, req);
-      
+
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -319,8 +319,8 @@ router.post('/login', [
 
     // Check if MFA is required
     const requiresMfa = ((String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification || (policies.enforceMfaForAdmins === true));
-    const tempToken = requiresMfa ? 
-      jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) : 
+    const tempToken = requiresMfa ?
+      jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) :
       undefined;
 
     // Clear rate limit on successful login
@@ -361,13 +361,13 @@ router.post('/login', [
 
   } catch (error) {
     console.error('SuperAdmin login error:', error);
-    
+
     await logSuperAdminAction('login.error', {
       email: req.body.email,
       error: error.message,
       ipAddress: getClientIP(req)
     }, req);
-    
+
     res.status(500).json({
       success: false,
       message: 'Internal server error during login'
@@ -387,10 +387,10 @@ router.post('/verify-mfa', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         message: 'Invalid input data',
-        errors: errors.array() 
+        errors: errors.array()
       });
     }
 
@@ -407,7 +407,7 @@ router.post('/verify-mfa', [
         reason: 'Invalid or expired token',
         ipAddress: clientIP
       }, req);
-      
+
       return res.status(401).json({
         success: false,
         message: 'Invalid or expired session'
@@ -451,7 +451,7 @@ router.post('/verify-mfa', [
         reason: 'Invalid MFA code',
         ipAddress: clientIP
       }, req);
-      
+
       return res.status(401).json({
         success: false,
         message: 'Invalid MFA code'
@@ -460,14 +460,14 @@ router.post('/verify-mfa', [
 
     // Generate session token
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email, 
+      {
+        id: user.id,
+        email: user.email,
         role: user.role,
         type: 'superadmin',
         tokenVersion: user.tokenVersion || 0
-      }, 
-      JWT_SECRET, 
+      },
+      JWT_SECRET,
       { expiresIn: '24h' }
     );
 
@@ -514,13 +514,13 @@ router.post('/verify-mfa', [
 
   } catch (error) {
     console.error('MFA verification error:', error);
-    
+
     await logSuperAdminAction('mfa_verify.error', {
       tempToken: req.body.tempToken,
       error: error.message,
       ipAddress: getClientIP(req)
     }, req);
-    
+
     res.status(500).json({
       success: false,
       message: 'Internal server error during MFA verification'
@@ -535,9 +535,9 @@ router.get('/superadmin/security-status', (req, res) => {
   try {
     const clientIP = getClientIP(req);
     const userAgent = req.headers['user-agent'];
-    
+
     const securityCheck = performSecurityCheck(clientIP, userAgent);
-    
+
     res.json({
       allowed: securityCheck.allowed,
       riskLevel: securityCheck.riskLevel,
@@ -547,7 +547,7 @@ router.get('/superadmin/security-status', (req, res) => {
       ipAddress: clientIP,
       isWhitelisted: isWhitelistedIP(clientIP)
     });
-    
+
   } catch (error) {
     console.error('Security status check error:', error);
     res.status(500).json({
@@ -570,7 +570,7 @@ router.post('/superadmin/logout', verifyToken, async (req, res) => {
     }
 
     const sessionId = req.headers['x-session-id'];
-    
+
     await logSuperAdminAction('logout', {
       userId: req.user.id,
       userEmail: req.user.email,
@@ -582,7 +582,7 @@ router.post('/superadmin/logout', verifyToken, async (req, res) => {
       success: true,
       message: 'SuperAdmin logged out successfully'
     });
-    
+
   } catch (error) {
     console.error('SuperAdmin logout error:', error);
     res.status(500).json({
@@ -603,7 +603,29 @@ router.post('/change-password', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
     const policies = await getSecurityPolicies(req.app);
-    
+
+    // التحقق من قوة كلمة المرور الجديدة
+    const minLength = Number(policies.passwordMinLength || 12);
+    if (newPassword.length < minLength) {
+      return res.status(400).json({
+        success: false,
+        message: `كلمة المرور يجب أن تكون ${minLength} حرفاً على الأقل`
+      });
+    }
+
+    // التحقق من التعقيد
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumbers = /[0-9]/.test(newPassword);
+    const hasSpecialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChars) {
+      return res.status(400).json({
+        success: false,
+        message: 'كلمة المرور يجب أن تحتوي على أحرف كبيرة وصغيرة وأرقام ورموز خاصة'
+      });
+    }
+
     const valid = await bcrypt.compare(oldPassword, user.password);
     if (!valid) {
       return res.status(401).json({ success: false, message: 'Invalid current password' });
@@ -625,7 +647,7 @@ router.post('/request-reset', async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     const token = jwt.sign({ userId: user.id, type: 'reset' }, JWT_SECRET, { expiresIn: '10m' });
     if (req.app.locals.redisClient) {
-      await req.app.locals.redisClient.setEx(`sa:reset:${user.id}`, 600, token).catch(() => {});
+      await req.app.locals.redisClient.setEx(`sa:reset:${user.id}`, 600, token).catch(() => { });
     }
     res.json({ success: true, resetToken: token });
   } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
@@ -641,7 +663,7 @@ router.post('/reset', async (req, res) => {
     const user = await User.findByPk(decoded.userId);
     if (!user || user.role !== 'SuperAdmin') return res.status(404).json({ success: false, message: 'User not found' });
     const policies = await getSecurityPolicies(req.app);
-    
+
     const hashed = await bcrypt.hash(newPassword, 10);
     await user.update({ password: hashed });
     await AuditLog.create({ action: 'superadmin.password.reset', userId: user.id, userEmail: user.email, ipAddress: req.headers['x-forwarded-for'] || req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({}), timestamp: new Date(), riskLevel: 'medium' });

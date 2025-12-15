@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import Breadcrumbs from '../components/Breadcrumbs';
+import HelpWidget from '../components/HelpWidget';
 import { useAppContext } from '../contexts/AppContext';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -49,12 +51,14 @@ const SuperAdminLayout: React.FC = () => {
       <main className="md:pr-64 transition-all duration-300">
         <div className="p-4 sm:p-6 md:p-8">
           <div className="flex flex-wrap justify-between items-start gap-4">
-             <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)} />
-             <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+            <Header title={getTitle()} onMenuToggle={() => setIsSidebarOpen(true)} />
+            <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
           </div>
+          <Breadcrumbs className="mt-4 mb-6" />
           <Outlet />
         </div>
       </main>
+      <HelpWidget />
     </>
   );
 };

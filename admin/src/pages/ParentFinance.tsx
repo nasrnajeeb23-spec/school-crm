@@ -1,17 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Invoice, InvoiceStatus } from '../types';
+import { Invoice, InvoiceStatus, SchoolSettings } from '../types';
 import * as api from '../api';
 import StatsCard from '../components/StatsCard';
 import { RevenueIcon, TotalDebtIcon, CheckIcon, PrintIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
 import InvoicePrintModal from '../components/InvoicePrintModal';
-import { SchoolSettings } from '../types';
-import * as api from '../api';
 
 const statusColorMap: { [key in InvoiceStatus]: string } = {
-  [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  [InvoiceStatus.Unpaid]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  [InvoiceStatus.Overdue]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+    [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+    [InvoiceStatus.Unpaid]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+    [InvoiceStatus.Overdue]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 };
 
 const ParentFinance: React.FC = () => {
@@ -38,7 +36,7 @@ const ParentFinance: React.FC = () => {
     useEffect(() => {
         const sid = user?.schoolId;
         if (!sid) return;
-        api.getSchoolSettings(sid).then(setSchoolSettings).catch(() => {});
+        api.getSchoolSettings(sid).then(setSchoolSettings).catch(() => { });
     }, [user?.schoolId]);
 
     const financeSummary = useMemo(() => {
@@ -66,23 +64,23 @@ const ParentFinance: React.FC = () => {
     return (
         <div className="mt-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatsCard 
-                    icon={RevenueIcon} 
-                    title="إجمالي الرسوم" 
-                    value={`$${financeSummary.totalAmount.toLocaleString()}`} 
-                    description="مجموع كل الفواتير" 
+                <StatsCard
+                    icon={RevenueIcon}
+                    title="إجمالي الرسوم"
+                    value={`${schoolSettings?.defaultCurrency || 'USD'} ${financeSummary.totalAmount.toLocaleString()}`}
+                    description="مجموع كل الفواتير"
                 />
-                <StatsCard 
-                    icon={CheckIcon} 
-                    title="المبلغ المدفوع" 
-                    value={`$${financeSummary.paidAmount.toLocaleString()}`} 
-                    description="مجموع المبالغ المدفوعة" 
+                <StatsCard
+                    icon={CheckIcon}
+                    title="المبلغ المدفوع"
+                    value={`${schoolSettings?.defaultCurrency || 'USD'} ${financeSummary.paidAmount.toLocaleString()}`}
+                    description="مجموع المبالغ المدفوعة"
                 />
-                <StatsCard 
-                    icon={TotalDebtIcon} 
-                    title="المبلغ المتبقي" 
-                    value={`$${financeSummary.outstandingAmount.toLocaleString()}`} 
-                    description="الرسوم المستحقة وغير المدفوعة" 
+                <StatsCard
+                    icon={TotalDebtIcon}
+                    title="المبلغ المتبقي"
+                    value={`${schoolSettings?.defaultCurrency || 'USD'} ${financeSummary.outstandingAmount.toLocaleString()}`}
+                    description="الرسوم المستحقة وغير المدفوعة"
                 />
             </div>
 
@@ -106,7 +104,7 @@ const ParentFinance: React.FC = () => {
                                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.id}</td>
                                     <td className="px-6 py-4">{invoice.issueDate}</td>
                                     <td className="px-6 py-4">{invoice.dueDate}</td>
-                                    <td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td>
+                                    <td className="px-6 py-4 font-semibold">{schoolSettings?.defaultCurrency || 'USD'} {invoice.totalAmount.toFixed(2)}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[invoice.status]}`}>
                                             {invoice.status}

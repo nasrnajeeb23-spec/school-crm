@@ -42,6 +42,7 @@ const Submission = require('./Submission');
 const SubscriptionModule = require('./SubscriptionModule');
 const CommunicationUsage = require('./CommunicationUsage');
 const ContactMessage = require('./ContactMessage');
+const InvitationLog = require('./InvitationLog');
 
 
 // Define associations
@@ -239,6 +240,7 @@ const db = {
   SubscriptionModule,
   CommunicationUsage,
   ContactMessage,
+  InvitationLog,
 };
 
 module.exports = db;

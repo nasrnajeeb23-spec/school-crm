@@ -1,7 +1,7 @@
 // API Configuration for Production - Real Backend Connection
 // هذا الملف يتصل بالـ Backend الحقيقي على Render
 
-import { 
+import {
     User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ParentAccountStatus, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
     PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState
 } from './types';
@@ -10,17 +10,17 @@ import {
 // 🔗 ضبط عنوان الـ API للإنتاج/التطوير بشكل مرن
 // الأولوية: متغير بيئة مُحقن أثناء البناء -> Vite import.meta.env (إن وجد) -> localStorage(api_base) -> الافتراضي
 const API_BASE_URL = (
-  (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) ||
-  (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
-  (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
-  'http://localhost:5000/api'
+    (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) ||
+    (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
+    (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
+    'http://localhost:5000/api'
 );
 
 const API_ALT_BASE_URL = (() => {
-  const base = API_BASE_URL || '';
-  const hasApi = /\/api\/?$/.test(base);
-  if (hasApi) return base.replace(/\/api\/?$/, '');
-  return base.replace(/\/$/, '') + '/api';
+    const base = API_BASE_URL || '';
+    const hasApi = /\/api\/?$/.test(base);
+    if (hasApi) return base.replace(/\/api\/?$/, '');
+    return base.replace(/\/$/, '') + '/api';
 })();
 
 export const getApiBase = (): string => API_BASE_URL;
@@ -44,105 +44,105 @@ const authHeaders = () => {
 
 // دالة مساعدة للاتصال بالـ API
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...authHeaders(),
-    ...options.headers,
-  };
-  const attemptFetch = async (base: string) => {
-    return await fetch(`${base}${endpoint}`, {
-      ...options,
-      headers,
-      cache: 'no-store' as RequestCache,
-    });
-  };
-  let lastError: any = null;
-  const maxRetries = 2;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await attemptFetch(API_BASE_URL);
-      if (!response.ok) {
-        let bodyText = '';
-        let bodyJson: any = null;
-        try { bodyJson = await response.json(); } catch {
-          try { bodyText = await response.text(); } catch {}
-        }
-        const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
-        const statusText = response.statusText ? ` ${response.statusText}` : '';
-        if (response.status === 401) {
-          const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
-          const isSilentCheck = endpoint === '/auth/me';
-          const hadToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
-          const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
-          const onInviteFlow = (() => {
-            try {
-              if (typeof window === 'undefined') return false;
-              const p = window.location?.pathname || '';
-              if (!/^\/set-password\/?$/i.test(p)) return false;
-              const q = new URLSearchParams(window.location.search);
-              return q.has('token');
-            } catch { return false; }
-          })();
-          if (!isAuthFlow && !onInviteFlow && (isSilentCheck || (hadToken && onProtectedRoute))) {
-            try {
-              if (typeof window !== 'undefined') {
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('current_school_id');
-                const toast = (window as any).__addToast;
-                if (typeof toast === 'function') {
-                  toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
+    const headers = {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+        ...options.headers,
+    };
+    const attemptFetch = async (base: string) => {
+        return await fetch(`${base}${endpoint}`, {
+            ...options,
+            headers,
+            cache: 'no-store' as RequestCache,
+        });
+    };
+    let lastError: any = null;
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await attemptFetch(API_BASE_URL);
+            if (!response.ok) {
+                let bodyText = '';
+                let bodyJson: any = null;
+                try { bodyJson = await response.json(); } catch {
+                    try { bodyText = await response.text(); } catch { }
                 }
-                setTimeout(() => { window.location.href = '/login'; }, 0);
-              }
-            } catch {}
-          }
-          throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
+                const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
+                const statusText = response.statusText ? ` ${response.statusText}` : '';
+                if (response.status === 401) {
+                    const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
+                    const isSilentCheck = endpoint === '/auth/me';
+                    const hadToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
+                    const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
+                    const onInviteFlow = (() => {
+                        try {
+                            if (typeof window === 'undefined') return false;
+                            const p = window.location?.pathname || '';
+                            if (!/^\/set-password\/?$/i.test(p)) return false;
+                            const q = new URLSearchParams(window.location.search);
+                            return q.has('token');
+                        } catch { return false; }
+                    })();
+                    if (!isAuthFlow && !onInviteFlow && (isSilentCheck || (hadToken && onProtectedRoute))) {
+                        try {
+                            if (typeof window !== 'undefined') {
+                                localStorage.removeItem('auth_token');
+                                localStorage.removeItem('current_school_id');
+                                const toast = (window as any).__addToast;
+                                if (typeof toast === 'function') {
+                                    toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
+                                }
+                                setTimeout(() => { window.location.href = '/login'; }, 0);
+                            }
+                        } catch { }
+                    }
+                    throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
+                }
+                if (response.status === 404 || /Not\s*Found/i.test(msg)) {
+                    const alt = await attemptFetch(API_ALT_BASE_URL);
+                    if (!alt.ok) {
+                        let altText = '';
+                        let altJson: any = null;
+                        try { altJson = await alt.json(); } catch { try { altText = await alt.text(); } catch { } }
+                        const altMsg = altJson?.msg || altJson?.error || altText || '';
+                        const altStatusText = alt.statusText ? ` ${alt.statusText}` : '';
+                        throw new Error(`HTTP ${alt.status}${altStatusText}${altMsg ? `: ${altMsg}` : ''}`);
+                    }
+                    return await alt.json();
+                }
+                throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
+            }
+            return await response.json();
+        } catch (error) {
+            lastError = error;
+            const isNetworkError = (error instanceof TypeError) || /Failed to fetch|NetworkError|net::ERR_/i.test(String((error as any)?.message || ''));
+            if (attempt < maxRetries && isNetworkError) {
+                const delayMs = 500 * (attempt + 1);
+                await new Promise(res => setTimeout(res, delayMs));
+                continue;
+            }
+            console.error(`API Error on ${endpoint}:`, error);
+            throw error;
         }
-        if (response.status === 404 || /Not\s*Found/i.test(msg)) {
-          const alt = await attemptFetch(API_ALT_BASE_URL);
-          if (!alt.ok) {
-            let altText = '';
-            let altJson: any = null;
-            try { altJson = await alt.json(); } catch { try { altText = await alt.text(); } catch {} }
-            const altMsg = altJson?.msg || altJson?.error || altText || '';
-            const altStatusText = alt.statusText ? ` ${alt.statusText}` : '';
-            throw new Error(`HTTP ${alt.status}${altStatusText}${altMsg ? `: ${altMsg}` : ''}`);
-          }
-          return await alt.json();
-        }
-        throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
-      }
-      return await response.json();
-    } catch (error) {
-      lastError = error;
-      const isNetworkError = (error instanceof TypeError) || /Failed to fetch|NetworkError|net::ERR_/i.test(String((error as any)?.message || ''));
-      if (attempt < maxRetries && isNetworkError) {
-        const delayMs = 500 * (attempt + 1);
-        await new Promise(res => setTimeout(res, delayMs));
-        continue;
-      }
-      console.error(`API Error on ${endpoint}:`, error);
-      throw error;
     }
-  }
-  throw lastError;
+    throw lastError;
 };
 
 // مساعد لاستخراج البيانات القياسية من استجابات الاستجابة الموحدة
 const unwrap = <T = any>(payload: any, key?: string, fallback: T = ([] as unknown as T)): T => {
-  try {
-    if (payload && typeof payload === 'object' && 'success' in payload) {
-      const data = (payload as any).data;
-      if (key) {
-        const v = data ? data[key] : undefined;
-        return (v !== undefined ? v : fallback) as T;
-      }
-      return (data !== undefined ? data : fallback) as T;
+    try {
+        if (payload && typeof payload === 'object' && 'success' in payload) {
+            const data = (payload as any).data;
+            if (key) {
+                const v = data ? data[key] : undefined;
+                return (v !== undefined ? v : fallback) as T;
+            }
+            return (data !== undefined ? data : fallback) as T;
+        }
+        return (payload !== undefined ? payload : fallback) as T;
+    } catch {
+        return fallback;
     }
-    return (payload !== undefined ? payload : fallback) as T;
-  } catch {
-    return fallback;
-  }
 };
 
 // ==================== Authentication APIs ====================
@@ -158,11 +158,11 @@ export const login = async (emailOrUsername: string, password: string, schoolId?
     if (typeof window !== 'undefined' && token) {
         localStorage.setItem('auth_token', token);
     }
-  const mapRole = (r: string) => {
-      const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-      const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
-      return m[key] || key;
-  };
+    const mapRole = (r: string) => {
+        const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+        const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
+        return m[key] || key;
+    };
     return { ...user, role: mapRole(user.role) } as User;
 };
 
@@ -172,14 +172,14 @@ export const logout = async (): Promise<void> => {
 
 export const getCurrentUser = async (): Promise<User> => {
     const user = await apiCall('/auth/me', { method: 'GET' });
-  if (user && user.role) {
-      const mapRole = (r: string) => {
-          const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-          const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
-          return m[key] || key;
-      };
-      user.role = mapRole(user.role);
-  }
+    if (user && user.role) {
+        const mapRole = (r: string) => {
+            const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+            const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
+            return m[key] || key;
+        };
+        user.role = mapRole(user.role);
+    }
     return user;
 };
 
@@ -189,49 +189,49 @@ export const getCurrentUser = async (): Promise<User> => {
 export const superAdminLogin = async (email: string, password: string): Promise<any> => {
     const payload = { email, password, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown', timestamp: Date.now() };
     try {
-      return await apiCall('/auth/superadmin/login', { method: 'POST', body: JSON.stringify(payload) });
+        return await apiCall('/auth/superadmin/login', { method: 'POST', body: JSON.stringify(payload) });
     } catch {
-      try {
-        const overrideEmail = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_email') || 'super@admin.com') : 'super@admin.com');
-        const overridePassword = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_password') || '') : '');
-        const emailOk = String(email).toLowerCase() === String(overrideEmail).toLowerCase();
-        const passOk = !!overridePassword && password === overridePassword;
-        if (emailOk && passOk) {
-          return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
-        }
-      } catch {}
-      // Hardcoded super admin fallback REMOVED for security
-      // if (String(email).toLowerCase() === 'super@admin.com' && password === 'password') {
-      //   return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
-      // }
-      throw new Error('Login failed');
+        try {
+            const overrideEmail = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_email') || 'super@admin.com') : 'super@admin.com');
+            const overridePassword = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_password') || '') : '');
+            const emailOk = String(email).toLowerCase() === String(overrideEmail).toLowerCase();
+            const passOk = !!overridePassword && password === overridePassword;
+            if (emailOk && passOk) {
+                return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
+            }
+        } catch { }
+        // Hardcoded super admin fallback REMOVED for security
+        // if (String(email).toLowerCase() === 'super@admin.com' && password === 'password') {
+        //   return { success: true, requiresMfa: false, user: { email, role: 'SuperAdmin' } };
+        // }
+        throw new Error('Login failed');
     }
 };
 
 export const verifySuperAdminMfa = async (tempToken: string, mfaCode: string): Promise<any> => {
-  const payload = { tempToken, mfaCode, timestamp: Date.now() };
-  return await apiCall('/auth/superadmin/verify-mfa', { method: 'POST', body: JSON.stringify(payload) });
+    const payload = { tempToken, mfaCode, timestamp: Date.now() };
+    return await apiCall('/auth/superadmin/verify-mfa', { method: 'POST', body: JSON.stringify(payload) });
 };
 
 export const requestSuperAdminReset = async (email: string): Promise<{ resetToken: string }> => {
-  return await apiCall('/auth/superadmin/request-reset', { method: 'POST', body: JSON.stringify({ email }) });
+    return await apiCall('/auth/superadmin/request-reset', { method: 'POST', body: JSON.stringify({ email }) });
 };
 
 export const resetSuperAdminPassword = async (token: string, newPassword: string): Promise<{ success: boolean }> => {
-  return await apiCall('/auth/superadmin/reset', { method: 'POST', body: JSON.stringify({ token, newPassword }) });
+    return await apiCall('/auth/superadmin/reset', { method: 'POST', body: JSON.stringify({ token, newPassword }) });
 };
 
 // ==================== School APIs ====================
 
 export const getSchools = async (): Promise<School[]> => {
     try {
-      return await apiCall('/schools', { method: 'GET' });
+        return await apiCall('/schools', { method: 'GET' });
     } catch {
-      try {
-        return await apiCall('/public/schools', { method: 'GET' });
-      } catch {
-        return [] as School[];
-      }
+        try {
+            return await apiCall('/public/schools', { method: 'GET' });
+        } catch {
+            return [] as School[];
+        }
     }
 };
 
@@ -451,18 +451,18 @@ export const getInvoices = async (schoolId: number): Promise<Invoice[]> => {
 
 export const getSchoolInvoices = async (schoolId: number): Promise<Invoice[]> => {
     try {
-      const data = await getInvoices(schoolId);
-      return Array.isArray(data) ? data : [];
+        const data = await getInvoices(schoolId);
+        return Array.isArray(data) ? data : [];
     } catch (e: any) {
-      const msg = String(e?.message || '');
-      if (/HTTP\s*403/i.test(msg)) {
-        const toast = (typeof window !== 'undefined' ? (window as any).__addToast : null);
-        if (typeof toast === 'function') {
-          toast('المالية غير متاحة: يرجى تفعيل الاشتراك أو تمديد التجربة.', 'warning');
+        const msg = String(e?.message || '');
+        if (/HTTP\s*403/i.test(msg)) {
+            const toast = (typeof window !== 'undefined' ? (window as any).__addToast : null);
+            if (typeof toast === 'function') {
+                toast('المالية غير متاحة: يرجى تفعيل الاشتراك أو تمديد التجربة.', 'warning');
+            }
+            return [] as Invoice[];
         }
-        return [] as Invoice[];
-      }
-      throw e;
+        throw e;
     }
 };
 
@@ -506,8 +506,8 @@ export const getFeeSetups = async (schoolId: number): Promise<FeeSetup[]> => {
 
 
 export const getSubscriptionState = async (schoolId: number): Promise<SubscriptionState> => {
-  const data = await apiCall(`/school/${schoolId}/subscription-state`, { method: 'GET' });
-  return unwrap<SubscriptionState>(data);
+    const data = await apiCall(`/school/${schoolId}/subscription-state`, { method: 'GET' });
+    return unwrap<SubscriptionState>(data);
 };
 
 export const createFeeSetup = async (schoolId: number, payload: Partial<FeeSetup>): Promise<FeeSetup> => {
@@ -560,11 +560,11 @@ export const updateSubscription = async (id: string, data: { planId?: number; st
 
 export const getPlans = async (): Promise<Plan[]> => {
     try { return await apiCall('/plans', { method: 'GET' }); } catch {
-      return [
-        { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: ['الوظائف الأساسية'], limits: { students: 200, teachers: 15 }, recommended: false } as any,
-        { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: ['كل ميزات الأساسية', 'إدارة مالية متقدمة'], limits: { students: 1000, teachers: 50 }, recommended: true } as any,
-        { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: ['كل ميزات المميزة', 'تقارير مخصصة'], limits: { students: 'غير محدود', teachers: 'غير محدود' }, recommended: false } as any
-      ];
+        return [
+            { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: ['الوظائف الأساسية'], limits: { students: 200, teachers: 15 }, recommended: false } as any,
+            { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: ['كل ميزات الأساسية', 'إدارة مالية متقدمة'], limits: { students: 1000, teachers: 50 }, recommended: true } as any,
+            { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: ['كل ميزات المميزة', 'تقارير مخصصة'], limits: { students: 'غير محدود', teachers: 'غير محدود' }, recommended: false } as any
+        ];
     }
 };
 
@@ -790,9 +790,9 @@ export const upsertSchoolParent = async (schoolId: number, data: NewParentData):
     return await apiCall(`/school/${schoolId}/parents`, { method: 'POST', body: JSON.stringify(data) });
 };
 
-export const inviteParent = async (parentId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string }> => {
+export const inviteParent = async (parentId: string, channel: 'email' | 'sms' | 'manual' = 'manual'): Promise<{ activationLink?: string; inviteSent?: boolean; channel?: string }> => {
     const res: any = await apiCall('/auth/parent/invite', { method: 'POST', body: JSON.stringify({ parentId, channel }) });
-    return { activationLink: res?.activationLink };
+    return { activationLink: res?.activationLink, inviteSent: res?.inviteSent, channel: res?.channel };
 };
 
 export const updateParentActiveStatus = async (schoolId: number, parentId: string, isActive: boolean): Promise<{ parentId: string; isActive: boolean; status: ParentAccountStatus }> => {
@@ -865,7 +865,7 @@ export const saveClassSchedule = async (classId: string, entries: { day: 'Sunday
     });
     if (!response.ok) {
         let data: any = null;
-        try { data = await response.json(); } catch {}
+        try { data = await response.json(); } catch { }
         const error: any = new Error(`HTTP error! status: ${response.status}`);
         error.status = response.status;
         error.data = data;
@@ -927,7 +927,7 @@ export const getTeacherSalarySlips = async (teacherId: string): Promise<TeacherS
             const year = Number(yStr || new Date().getFullYear());
             const monthName = (() => {
                 const m = Number(mStr || 1);
-                const arMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+                const arMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
                 return arMonths[(m - 1 + 12) % 12];
             })();
             const gross = Number(r.baseAmount || 0) + Number(r.allowancesTotal || 0);
@@ -1073,9 +1073,9 @@ export const getUsersByRole = async (role: string): Promise<any[]> => {
     const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
     const map: Record<string, string> = { SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT' };
     const roleParam = map[key] || key;
-    const allowed = ['SCHOOL_ADMIN','TEACHER','PARENT'];
+    const allowed = ['SCHOOL_ADMIN', 'TEACHER', 'PARENT'];
     if (!allowed.includes(roleParam)) {
-      return [] as any[];
+        return [] as any[];
     }
     const q = schoolId ? `?role=${encodeURIComponent(roleParam)}&schoolId=${schoolId}` : `?role=${encodeURIComponent(roleParam)}`;
     try {
@@ -1122,7 +1122,7 @@ export const getAvailableModules = async (): Promise<Module[]> => {
 
 // Removed duplicated functions (getSchoolModules, updateSchoolModules, submitPaymentProof)
 
- 
+
 
 export const generateSelfHostedPackage = async (payload: { planId?: string | number; moduleIds?: ModuleId[] } = {}): Promise<string> => {
     const body = { planId: payload.planId ?? null, moduleIds: Array.isArray(payload.moduleIds) ? payload.moduleIds : [] } as any;
@@ -1166,8 +1166,8 @@ export const downloadBackupZip = async (schoolId: number, payload: { types: stri
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) });
     if (!res.ok) {
         let txt = '';
-        try { txt = await res.text(); } catch {}
-        throw new Error(`HTTP ${res.status}${res.statusText ? ' '+res.statusText : ''}${txt ? `: ${txt}` : ''}`);
+        try { txt = await res.text(); } catch { }
+        throw new Error(`HTTP ${res.status}${res.statusText ? ' ' + res.statusText : ''}${txt ? `: ${txt}` : ''}`);
     }
     return await res.blob();
 };
@@ -1181,8 +1181,8 @@ export const downloadStoredBackup = async (schoolId: number, file: string): Prom
     const res = await fetch(url, { method: 'GET', headers: { ...authHeaders() } });
     if (!res.ok) {
         let txt = '';
-        try { txt = await res.text(); } catch {}
-        throw new Error(`HTTP ${res.status}${res.statusText ? ' '+res.statusText : ''}${txt ? `: ${txt}` : ''}`);
+        try { txt = await res.text(); } catch { }
+        throw new Error(`HTTP ${res.status}${res.statusText ? ' ' + res.statusText : ''}${txt ? `: ${txt}` : ''}`);
     }
     return await res.blob();
 };
@@ -1260,10 +1260,10 @@ export const getPricingConfig = async (): Promise<PricingConfig> => {
         const msg = String(err?.message || '');
         try {
             return await apiCall('/pricing/public/config', { method: 'GET' });
-        } catch {}
+        } catch { }
         try {
             return await apiCall('/public/pricing/config', { method: 'GET' });
-        } catch {}
+        } catch { }
         return {
             pricePerStudent: 1.5,
             pricePerTeacher: 2.0,
@@ -1295,9 +1295,9 @@ export const getSchoolCommunicationsUsage = async (
     if (params?.channel) qs.push(`channel=${encodeURIComponent(params.channel)}`);
     const suffix = qs.length ? `?${qs.join('&')}` : '';
     try {
-      return await apiCall(`/school/${schoolId}/communications/usage${suffix}`, { method: 'GET' });
+        return await apiCall(`/school/${schoolId}/communications/usage${suffix}`, { method: 'GET' });
     } catch {
-      return { email: { count: 0, amount: 0 }, sms: { count: 0, amount: 0 }, total: 0, currency: 'USD', breakdown: [] };
+        return { email: { count: 0, amount: 0 }, sms: { count: 0, amount: 0 }, total: 0, currency: 'USD', breakdown: [] };
     }
 };
 
@@ -1379,9 +1379,9 @@ export const createAssignment = async (data: NewAssignmentData): Promise<Assignm
 };
 
 export const gradeSubmission = async (submissionId: string, grade: number, feedback?: string): Promise<Submission> => {
-    return await apiCall(`/submissions/${submissionId}/grade`, { 
-        method: 'PUT', 
-        body: JSON.stringify({ grade, feedback }) 
+    return await apiCall(`/submissions/${submissionId}/grade`, {
+        method: 'PUT',
+        body: JSON.stringify({ grade, feedback })
     });
 };
 

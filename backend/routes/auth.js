@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, School, Plan, Subscription, SchoolSettings, Parent, Teacher } = require('../models');
+const { User, School, Plan, Subscription, SchoolSettings, Parent, Teacher, InvitationLog } = require('../models');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -8,8 +8,24 @@ const bcrypt = require('bcryptjs');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
+const rateLimit = require('express-rate-limit');
+const InvitationAuditLogger = require('../utils/InvitationAuditLogger');
+const emailValidator = require('../utils/EmailValidator');
+const inputSanitizer = require('../utils/InputSanitizer');
 
-function isStrongPassword(pwd){
+// Initialize Audit Logger
+const auditLogger = new InvitationAuditLogger(InvitationLog);
+
+// Rate limiter for invite endpoints
+const inviteLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3, // 3 requests per minute
+  message: 'Too many invite requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+function isStrongPassword(pwd) {
   const lengthOk = typeof pwd === 'string' && pwd.length >= 10;
   const upper = /[A-Z]/.test(pwd);
   const lower = /[a-z]/.test(pwd);
@@ -48,7 +64,7 @@ router.post('/login', validate([
       return res.status(401).json({ msg: 'Invalid credentials' });
     }
 
-    try { /* تم إزالة قيود الوحدات: الوصول يعتمد على حالة الاشتراك فقط */ } catch {}
+    try { /* تم إزالة قيود الوحدات: الوصول يعتمد على حالة الاشتراك فقط */ } catch { }
 
     // منع الدخول إذا كانت المدرسة موقوفة
     if (user.role !== 'SUPER_ADMIN' && user.schoolId) {
@@ -58,7 +74,7 @@ router.post('/login', validate([
         if (st === 'SUSPENDED') {
           return res.status(403).json({ msg: 'تم إيقاف المدرسة مؤقتًا. الرجاء التواصل مع الإدارة.' });
         }
-      } catch {}
+      } catch { }
     }
 
     // التحقق من مطابقة المدرسة المختارة في واجهة الدخول مع مدرسة المستخدم
@@ -78,7 +94,7 @@ router.post('/login', validate([
           }
         }
       }
-    } catch {}
+    } catch { }
 
     user.lastLogin = new Date();
     user.lastLoginAt = new Date();
@@ -118,10 +134,10 @@ router.post('/trial-signup', validate([
   try {
     const { schoolName, adminName, adminEmail, adminPassword } = req.body;
     if (!isStrongPassword(adminPassword)) {
-        return res.status(400).json({ 
-            msg: 'كلمة المرور ضعيفة. يجب أن تكون 10 خانات على الأقل وتحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص.',
-            code: 'WEAK_PASSWORD' 
-        });
+      return res.status(400).json({
+        msg: 'كلمة المرور ضعيفة. يجب أن تكون 10 خانات على الأقل وتحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص.',
+        code: 'WEAK_PASSWORD'
+      });
     }
 
     const exists = await User.findOne({ where: { email: adminEmail } });
@@ -144,7 +160,7 @@ router.post('/trial-signup', validate([
         const pid = String(inputPlanId);
         plan = await Plan.findOne({ where: { id: pid } });
       }
-    } catch {}
+    } catch { }
     if (!plan) {
       plan = await Plan.findOne({ where: { recommended: true } });
     }
@@ -156,7 +172,7 @@ router.post('/trial-signup', validate([
     await Subscription.create({ schoolId: school.id, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
 
     const hashed = await bcrypt.hash(adminPassword, 10);
-    const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_ATTENDANCE','MANAGE_GRADES','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES'] });
+    const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES'] });
 
     const payload = { id: user.id, role: user.role, schoolId: user.schoolId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -310,7 +326,7 @@ router.post('/mfa/verify', verifyToken, validate([{ name: 'token', required: tru
   }
 });
 
-router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+router.post('/parent/invite', inviteLimiter, verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
   { name: 'parentId', required: true, type: 'string' },
   { name: 'channel', required: false, type: 'string' }
 ]), async (req, res) => {
@@ -318,11 +334,45 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     const pid = Number(req.body.parentId);
     if (!pid) return res.status(400).json({ msg: 'Invalid parentId' });
     const parent = await Parent.findByPk(pid);
-    if (!parent) return res.status(404).json({ msg: 'Parent not found' });
+    if (!parent) {
+      await auditLogger.logInviteFailed(req, {
+        targetType: 'Parent',
+        targetId: pid,
+        channel: req.body.channel,
+        errorMessage: 'Parent not found',
+        metadata: { parentId: pid }
+      });
+      return res.status(404).json({ msg: 'Parent not found' });
+    }
     if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(parent.schoolId || 0)) {
+      await auditLogger.logInviteFailed(req, {
+        targetType: 'Parent',
+        targetId: pid,
+        channel: req.body.channel,
+        errorMessage: 'Access denied - different school',
+        metadata: { parentId: pid, parentSchoolId: parent.schoolId }
+      });
       return res.status(403).json({ msg: 'Access denied' });
     }
     const channel = String(req.body.channel || 'email').toLowerCase();
+
+    // Validate email if channel is email
+    if (channel === 'email' && parent.email) {
+      const emailValidation = await emailValidator.quickValidate(parent.email);
+      if (!emailValidation.valid) {
+        await auditLogger.logInviteFailed(req, {
+          targetType: 'Parent',
+          targetId: pid,
+          channel: 'email',
+          errorMessage: `Invalid email: ${emailValidation.errors.join(', ')}`,
+          metadata: { email: parent.email, errors: emailValidation.errors }
+        });
+        return res.status(400).json({
+          msg: 'Invalid email address',
+          errors: emailValidation.errors
+        });
+      }
+    }
     let user = await User.findOne({ where: { parentId: parent.id } });
     if (!user) {
       const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
@@ -347,6 +397,14 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Parent', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+
+    // Record invite metadata
+    try {
+      user.lastInviteAt = new Date();
+      user.lastInviteChannel = channel;
+      await user.save();
+    } catch { }
+
     if (channel === 'email') {
       try {
         const EmailService = require('../services/EmailService');
@@ -372,7 +430,7 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
   }
 });
 
-router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+router.post('/teacher/invite', inviteLimiter, verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
   { name: 'teacherId', required: true, type: 'string' },
   { name: 'channel', required: false, type: 'string' }
 ]), async (req, res) => {
@@ -411,7 +469,7 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
     // Record invite metadata
-    try { tUser.lastInviteAt = new Date(); tUser.lastInviteChannel = channel; await tUser.save(); } catch {}
+    try { tUser.lastInviteAt = new Date(); tUser.lastInviteChannel = channel; await tUser.save(); } catch { }
     if (channel === 'email' && isValidEmail) {
       try {
         const EmailService = require('../services/EmailService');
@@ -437,7 +495,7 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
   }
 });
 
-router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+router.post('/staff/invite', inviteLimiter, verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
   { name: 'userId', required: true, type: 'string' },
   { name: 'channel', required: false, type: 'string' }
 ]), async (req, res) => {
@@ -468,6 +526,14 @@ router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADM
     const inviteToken = jwt.sign({ id: staff.id, type: 'invite', targetRole: 'Staff', tokenVersion: staff.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+
+    // Record invite metadata
+    try {
+      staff.lastInviteAt = new Date();
+      staff.lastInviteChannel = channel;
+      await staff.save();
+    } catch { }
+
     if (channel === 'email') {
       try {
         const EmailService = require('../services/EmailService');
