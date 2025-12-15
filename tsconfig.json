@@ -25,5 +25,15 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "admin/src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "backend",
+    "admin/node_modules",
+    "dist",
+    "build"
+  ]
 }
