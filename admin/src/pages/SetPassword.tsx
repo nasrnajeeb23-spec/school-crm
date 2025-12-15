@@ -24,12 +24,6 @@ const SetPassword: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const t = params.get('token') || '';
       setToken(t);
-      if (t) {
-        try {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('last_route');
-        } catch {}
-      }
     } catch {}
   }, []);
   useEffect(() => {
