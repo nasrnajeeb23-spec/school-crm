@@ -83,7 +83,7 @@ const ParentTransportation = React.lazy(() => import('./pages/ParentTransportati
 
 
 // Helper to determine the home route based on user role
-const getHomeRouteForUser = (role: UserRole) => {
+const getHomeRouteForUser = (role: string) => {
   switch (role) {
     case UserRole.SuperAdmin:
     case UserRole.SuperAdminFinancial:
@@ -91,7 +91,7 @@ const getHomeRouteForUser = (role: UserRole) => {
     case UserRole.SuperAdminSupervisor:
       return '/superadmin';
     case UserRole.SchoolAdmin: return '/school';
-    case UserRole.Staff: return '/staff';
+    case UserRole.Staff: return '/school'; // Staff usually shares school admin layout or has similar
     case UserRole.Teacher: return '/teacher';
     case UserRole.Parent: return '/parent';
     default: return '/';
