@@ -147,12 +147,13 @@ const unwrap = <T = any>(payload: any, key?: string, fallback: T = ([] as unknow
 
 // ==================== Authentication APIs ====================
 
-export const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<User> => {
+export const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<User | string> => {
     const field = emailOrUsername.includes('@') ? { email: emailOrUsername } : { username: emailOrUsername };
     const response: any = await apiCall('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ ...field, password, schoolId }),
     });
+    if (response?.status === 'TRIAL_EXPIRED' || response?.message === 'TRIAL_EXPIRED') return "TRIAL_EXPIRED";
     const token = response?.token;
     const user = response?.user || {};
     if (typeof window !== 'undefined' && token) {
