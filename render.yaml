@@ -7,7 +7,7 @@ staticSites:
       - key: REACT_APP_HASH_ROUTER
         value: "false"
       - key: REACT_APP_API_URL
-        value: https://school-crschool-crm-backendm.onrender.com/api
+        value: https://<BACKEND_HOST>/api
       - key: REACT_APP_ENVIRONMENT
         value: production
       - key: NODE_ENV
@@ -31,23 +31,23 @@ services:
       - key: PORT
         value: 5000
       - key: CORS_ORIGIN
-        value: https://school-crm-admin.onrender.com
+        value: https://<FRONTEND_HOST>
       - key: FRONTEND_URL
-        value: https://school-crm-admin.onrender.com
+        value: https://<FRONTEND_HOST>
       - key: DATABASE_URL
-        value: postgresql://school_crm_bl6y_user:3mNy0YljbqwqXRblGAUUaq44tz9tclAt@dpg-d4gctlndiees739pt050-a/school_crm_bl6y
+        value: postgresql://<USER>:<PASSWORD>@<HOST>:<PORT>/<DB>
       - key: DB_DIALECT
         value: postgres
       - key: LICENSE_KEY
-        value: eyJtb2R1bGVzIjpbImZpbmFuY2UiLCJ0cmFuc3BvcnRhdGlvbiIsImFkdmFuY2VkX3JlcG9ydHMiXSwiZXhwaXJlc0F0IjoiMjAyNi0wMS0wMVQwMDowMDowMFoifQ.14BRfL9ZLhC2Lp1BV8lWUdplTdgxUsQ4OmfckcsDcNM
+        value: <LICENSE_KEY>
       - key: LICENSE_SECRET
-        value: a350dba030272cfc979e4a0adbdbe2a6001466f886eb7f0924f099c062c17bca
+        value: <LICENSE_SECRET>
       - key: JWT_SECRET
-        value: f846f66cf2dc8cb5026a70a67ab0e10fc6050d0cd40078f97febadea581c018a
+        value: <JWT_SECRET>
       - key: JWT_REFRESH_SECRET
-        value: 8a34e0bf7fbdfe4932aed5423b8b6454d5460973e8fa5732312c6f16fec0145382de52726f2c890858d9e05c20d1834167de5b073587644acb2c9bcfc3d40675
+        value: <JWT_REFRESH_SECRET>
       - key: SESSION_SECRET
-        value: ea03441c39faeae8277a9ad7aa28bd76
+        value: <SESSION_SECRET>
       - key: LOG_LEVEL
         value: info
       - key: MAX_FILE_SIZE
@@ -57,4 +57,4 @@ services:
       - key: RATE_LIMIT_WINDOW
         value: "15"
       - key: REDIS_URL
-        value: rediss://default:AXbBAAIncDJjODU4YzFkY2RkNTA0YTRkYmNlOWNjZDRhYjBkMjhlNnAyMzA0MDE@rational-hippo-30401.upstash.io:6379
+        value: <REDIS_URL>

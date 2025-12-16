@@ -1,5 +1,6 @@
 export enum SubscriptionStatus {
   Active = 'نشط',
+  Inactive = 'غير نشط',
   Trial = 'فترة تجريبية',
   Canceled = 'ملغي',
   PastDue = 'متأخر الدفع',
@@ -418,22 +419,25 @@ export interface Plan {
 export interface School {
   id: number;
   name: string;
-  plan: PlanName;
+  plan?: PlanName | string | null;
   status: SubscriptionStatus;
   students: number;
   teachers: number;
   balance: number; // in USD
   joinDate: string;
+  logoUrl?: string | null;
 }
 
 export interface Subscription {
   id: string;
   schoolId: number;
   schoolName: string;
-  plan: PlanName;
+  plan?: PlanName | string | null;
+  planName?: string | null;
   status: SubscriptionStatus;
   startDate: string;
   renewalDate: string;
+  endDate?: string | null;
   amount: number;
   trialEndDate?: string;
   customLimits?: UsageLimit;
@@ -883,4 +887,3 @@ export interface FeeSetup {
   paymentPlanDetails?: any;
   discounts: DiscountRule[];
 }
-

@@ -39,11 +39,13 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
     };
 
     const filteredParents = useMemo(() => {
-        return parents.filter(parent =>
-            parent.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            parent.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            parent.phoneNumber.includes(searchQuery)
-        );
+        const q = searchQuery.toLowerCase();
+        return parents.filter(parent => {
+            const name = String((parent as any)?.fullName || parent.name || '').toLowerCase();
+            const email = String(parent.email || '').toLowerCase();
+            const phone = String((parent as any)?.phoneNumber || parent.phone || '');
+            return name.includes(q) || email.includes(q) || phone.includes(searchQuery);
+        });
     }, [parents, searchQuery]);
 
     const { sortedData, requestSort, sortConfig } = useSortableTable(filteredParents);
@@ -58,12 +60,12 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
     const columns = [
         {
             header: 'اسم ولي الأمر',
-            accessor: 'fullName' as keyof Parent,
+            accessor: 'name' as keyof Parent,
             sortable: true,
             render: (parent: Parent) => (
                 <div>
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {parent.fullName}
+                        {(parent as any)?.fullName || parent.name}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                         {parent.email}
@@ -73,34 +75,33 @@ const ParentsList: React.FC<ParentsListProps> = ({ schoolId }) => {
         },
         {
             header: 'رقم الهاتف',
-            accessor: 'phoneNumber' as keyof Parent,
+            accessor: 'phone' as keyof Parent,
             sortable: true,
             render: (parent: Parent) => (
                 <span className="text-sm text-gray-900 dark:text-white dir-ltr">
-                    {parent.phoneNumber}
+                    {(parent as any)?.phoneNumber || parent.phone}
                 </span>
             )
         },
         {
             header: 'الحالة',
-            accessor: 'accountStatus' as keyof Parent,
+            accessor: 'status' as keyof Parent,
             sortable: true,
             render: (parent: Parent) => (
-                <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${parent.accountStatus === ParentAccountStatus.Active
+                <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${parent.status === ParentAccountStatus.Active
                         ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                         : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                     }`}>
-                    {parent.accountStatus === ParentAccountStatus.Active ? 'نشط' : 'غير نشط'}
+                    {parent.status === ParentAccountStatus.Active ? 'نشط' : 'غير نشط'}
                 </span>
             )
         },
         {
             header: 'عدد الطلاب',
-            accessor: 'studentsCount' as keyof Parent,
-            sortable: true,
+            accessor: 'studentId' as keyof Parent,
             render: (parent: Parent) => (
                 <span className="text-sm text-gray-900 dark:text-white text-center block">
-                    {parent.studentsCount || 0}
+                    {parent.studentId ? 1 : 0}
                 </span>
             )
         },

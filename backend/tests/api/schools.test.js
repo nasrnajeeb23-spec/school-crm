@@ -1,12 +1,27 @@
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const app = require('../../app');
 const { sequelize, School: _School } = require('../../models');
+
+let school1Id;
+let school2Id;
+
+function signToken(payload) {
+    return jwt.sign(payload, process.env.JWT_SECRET, { algorithm: 'HS256' });
+}
 
 describe('Schools API', () => {
     beforeAll(async () => {
         await sequelize.query('PRAGMA foreign_keys = OFF;');
         await sequelize.sync({ force: true });
         await sequelize.query('PRAGMA foreign_keys = ON;');
+
+        const s1 = await _School.create({ name: 'School 1', email: 's1@test.local', plan: 'PREMIUM' });
+        const s2 = await _School.create({ name: 'School 2', email: 's2@test.local', plan: 'PREMIUM' });
+        school1Id = s1.id;
+        school2Id = s2.id;
     });
 
     afterAll(async () => {
@@ -91,8 +106,8 @@ describe('Schools API', () => {
         it('should enforce rate limiting', async () => {
             const requests = [];
 
-            // Send 101 requests (exceeds limit of 100)
-            for (let i = 0; i < 101; i++) {
+            // Send 301 requests (exceeds limit of 300/minute for rateLimiters.api)
+            for (let i = 0; i < 301; i++) {
                 requests.push(
                     request(app)
                         .post('/api/schools')
@@ -105,6 +120,62 @@ describe('Schools API', () => {
             const rateLimited = responses.filter(r => r.status === 429);
 
             expect(rateLimited.length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('RBAC and school isolation', () => {
+        it('should deny access to school admin routes for teacher role', async () => {
+            const token = signToken({
+                id: 10,
+                email: 'teacher@test.local',
+                role: 'TEACHER',
+                tokenVersion: 0,
+                schoolId: school1Id,
+                permissions: []
+            });
+
+            const response = await request(app)
+                .get(`/api/school/${school1Id}/students`)
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(response.status).toBe(403);
+        });
+
+        it('should deny access when schoolId param does not match user schoolId', async () => {
+            const token = signToken({
+                id: 11,
+                email: 'admin@test.local',
+                role: 'SCHOOL_ADMIN',
+                tokenVersion: 0,
+                schoolId: school2Id,
+                permissions: []
+            });
+
+            const response = await request(app)
+                .get(`/api/school/${school1Id}/students`)
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(response.status).toBe(403);
+        });
+
+        it('should allow school admin to access own school data', async () => {
+            const token = signToken({
+                id: 12,
+                email: 'admin2@test.local',
+                role: 'SCHOOL_ADMIN',
+                tokenVersion: 0,
+                schoolId: school1Id,
+                permissions: []
+            });
+
+            const response = await request(app)
+                .get(`/api/school/${school1Id}/students`)
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveProperty('success', true);
+            expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('students');
         });
     });
 });

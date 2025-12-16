@@ -136,46 +136,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return true;
       }
     } catch {}
-    try {
-      const overrideEmail = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_email') || 'super@admin.com') : 'super@admin.com');
-      const overridePassword = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_password') || '') : '');
-      const emailOk = String(emailOrUsername).toLowerCase() === String(overrideEmail).toLowerCase();
-      const passOk = !!overridePassword && password === overridePassword;
-      if (emailOk && passOk) {
-        const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: overrideEmail, role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
+    const isProd = (() => {
+      try {
+        const v = (typeof import.meta !== 'undefined' && (import.meta as any).env) ? (import.meta as any).env : {};
+        const mode = String(v?.MODE || '').toLowerCase();
+        const appEnv = String((process as any)?.env?.REACT_APP_ENVIRONMENT || '').toLowerCase();
+        const nodeEnv = String((process as any)?.env?.NODE_ENV || '').toLowerCase();
+        return mode === 'production' || appEnv === 'production' || nodeEnv === 'production';
+      } catch {
+        return true;
+      }
+    })();
+
+    if (!isProd) {
+      try {
+        const overrideEmail = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_email') || 'super@admin.com') : 'super@admin.com');
+        const overridePassword = (typeof window !== 'undefined' ? (localStorage.getItem('superadmin_override_password') || '') : '');
+        const emailOk = String(emailOrUsername).toLowerCase() === String(overrideEmail).toLowerCase();
+        const passOk = !!overridePassword && password === overridePassword;
+        if (emailOk && passOk) {
+          const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: overrideEmail, role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
+          setCurrentUser(offlineUser);
+          try { localStorage.setItem('auth_token', 'OFFLINE_DEMO'); } catch {}
+          addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
+          return true;
+        }
+      } catch {}
+      if (String(emailOrUsername).toLowerCase() === 'super@admin.com' && password === 'password') {
+        const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: 'super@admin.com', role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
         setCurrentUser(offlineUser);
         try { localStorage.setItem('auth_token', 'OFFLINE_DEMO'); } catch {}
         addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
         return true;
       }
-    } catch {}
-    if (String(emailOrUsername).toLowerCase() === 'super@admin.com' && password === 'password') {
-      const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: 'super@admin.com', role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
-      setCurrentUser(offlineUser);
-      try { localStorage.setItem('auth_token', 'OFFLINE_DEMO'); } catch {}
-      addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
-      return true;
     }
     addToast('البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
     return false;
   };
   
   const trialSignup = async (data: NewTrialRequestData): Promise<boolean> => {
-    console.log('Starting trial signup with data:', data);
     const newUser = await api.submitTrialRequest(data);
-    console.log('Trial signup response:', newUser);
     if (newUser) {
-        console.log('Setting current user with school ID:', newUser.schoolId);
         setCurrentUser(newUser);
         if (newUser.schoolId) {
           try { 
             localStorage.setItem('current_school_id', String(newUser.schoolId)); 
-            console.log('School ID stored in localStorage:', newUser.schoolId);
           } catch (error) {
-            console.error('Error storing school ID:', error);
+            void error;
           }
         } else {
-          console.warn('No school ID found in new user data:', newUser);
+          void newUser;
         }
         addToast(`أهلاً بك ${newUser.name}! تم إنشاء حسابك التجريبي بنجاح.`, 'success');
         return true;

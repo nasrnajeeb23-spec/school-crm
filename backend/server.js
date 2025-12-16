@@ -280,16 +280,18 @@ app.use(helmet({
   }
 }));
 
-const rateLimitWindow = parseInt(process.env.RATE_LIMIT_WINDOW) || 15;
-const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300;
-app.use(rateLimit({
-  windowMs: rateLimitWindow * 60 * 1000,
-  max: rateLimitMax,
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-    retryAfter: rateLimitWindow * 60
-  }
-}));
+if (!isTestEnv) {
+  const rateLimitWindow = parseInt(process.env.RATE_LIMIT_WINDOW) || 15;
+  const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300;
+  app.use(rateLimit({
+    windowMs: rateLimitWindow * 60 * 1000,
+    max: rateLimitMax,
+    message: {
+      error: 'Too many requests from this IP, please try again later.',
+      retryAfter: rateLimitWindow * 60
+    }
+  }));
+}
 
 // Basic HTTP request logging
 app.use((req, res, next) => {
@@ -306,7 +308,9 @@ app.use((req, res, next) => {
 
 // Security Middleware
 app.use(requestIdMiddleware);
-app.use(suspiciousActivityMiddleware);
+if (!isTestEnv) {
+  app.use(suspiciousActivityMiddleware);
+}
 
 // Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -385,10 +389,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(languageMiddleware);
 
-// Global Rate Limiter
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window per IP
+const globalLimiter = isTestEnv ? (req, res, next) => next() : rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -404,15 +407,13 @@ const globalLimiter = rateLimit({
     });
   },
   skip: (req) => {
-    // Skip rate limiting for health checks
     return req.path === '/health' || req.path === '/api/health';
   }
 });
 
-// Strict Rate Limiter for Authentication Endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+const authLimiter = isTestEnv ? (req, res, next) => next() : rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
   skipSuccessfulRequests: true,
   message: 'Too many login attempts, please try again later.',
   handler: (req, res) => {
@@ -576,74 +577,66 @@ app.use('/public/schools', schoolsRoutes); // Fix for /public/schools 500/404
 app.use('/api/public/schools', schoolsRoutes); // Fix for /api/public/schools 404
 app.use('/public', schoolsRoutes);
 
-// Database Schema Fixer (Auto-run on start to ensure columns exist)
-(async () => {
-  try {
-    const { sequelize } = require('./models');
-    const queryInterface = sequelize.getQueryInterface();
-
-    // Check and add customLimits to Subscriptions
+if (!isTestEnv) {
+  (async () => {
     try {
-      const tableDesc = await queryInterface.describeTable('Subscriptions');
-      if (!tableDesc.customLimits) {
-        console.log('Adding customLimits to Subscriptions...');
-        await queryInterface.addColumn('Subscriptions', 'customLimits', {
-          type: require('sequelize').DataTypes.JSON,
-          allowNull: true
-        });
-      }
-    } catch (e) { console.error('Schema Fix Subscriptions:', e.message); }
+      const { sequelize } = require('./models');
+      const queryInterface = sequelize.getQueryInterface();
 
-    // Check and add priceSnapshot to SubscriptionModules
-    try {
-      // SubscriptionModules might not exist yet, let sequelize sync handle creation if model exists, 
-      // but if table exists and column missing:
-      const tableDesc = await queryInterface.describeTable('SubscriptionModules');
-      if (!tableDesc.priceSnapshot) {
-        console.log('Adding priceSnapshot to SubscriptionModules...');
-        await queryInterface.addColumn('SubscriptionModules', 'priceSnapshot', {
-          type: require('sequelize').DataTypes.FLOAT,
-          allowNull: true
-        });
-      }
-    } catch (e) {
-      // Table might not exist, ignore
+      try {
+        const tableDesc = await queryInterface.describeTable('Subscriptions');
+        if (!tableDesc.customLimits) {
+          console.log('Adding customLimits to Subscriptions...');
+          await queryInterface.addColumn('Subscriptions', 'customLimits', {
+            type: require('sequelize').DataTypes.JSON,
+            allowNull: true
+          });
+        }
+      } catch (e) { console.error('Schema Fix Subscriptions:', e.message); }
+
+      try {
+        const tableDesc = await queryInterface.describeTable('SubscriptionModules');
+        if (!tableDesc.priceSnapshot) {
+          console.log('Adding priceSnapshot to SubscriptionModules...');
+          await queryInterface.addColumn('SubscriptionModules', 'priceSnapshot', {
+            type: require('sequelize').DataTypes.FLOAT,
+            allowNull: true
+          });
+        }
+      } catch (e) { }
+
+      try {
+        await sequelize.models.SubscriptionModule.sync();
+      } catch (e) { }
+
+      try {
+        const tableDesc = await queryInterface.describeTable('pricing_config');
+        if (!tableDesc.pricePerTeacher) {
+          console.log('Adding pricePerTeacher to pricing_config...');
+          await queryInterface.addColumn('pricing_config', 'pricePerTeacher', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 2.0 });
+        }
+        if (!tableDesc.pricePerGBStorage) {
+          console.log('Adding pricePerGBStorage to pricing_config...');
+          await queryInterface.addColumn('pricing_config', 'pricePerGBStorage', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.2 });
+        }
+        if (!tableDesc.pricePerInvoice) {
+          console.log('Adding pricePerInvoice to pricing_config...');
+          await queryInterface.addColumn('pricing_config', 'pricePerInvoice', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.05 });
+        }
+        if (!tableDesc.currency) {
+          console.log('Adding currency to pricing_config...');
+          await queryInterface.addColumn('pricing_config', 'currency', { type: require('sequelize').DataTypes.STRING, allowNull: false, defaultValue: 'USD' });
+        }
+        if (!tableDesc.yearlyDiscountPercent) {
+          console.log('Adding yearlyDiscountPercent to pricing_config...');
+          await queryInterface.addColumn('pricing_config', 'yearlyDiscountPercent', { type: require('sequelize').DataTypes.FLOAT, allowNull: true, defaultValue: 0 });
+        }
+      } catch (e) { try { console.warn('Schema Fix pricing_config:', e.message); } catch { } }
+    } catch (err) {
+      console.error('Schema Fixer Error:', err.message);
     }
-
-    // Ensure SubscriptionModule table exists
-    try {
-      await sequelize.models.SubscriptionModule.sync();
-    } catch (e) { }
-
-    // Ensure new pricing columns exist
-    try {
-      const tableDesc = await queryInterface.describeTable('pricing_config');
-      if (!tableDesc.pricePerTeacher) {
-        console.log('Adding pricePerTeacher to pricing_config...');
-        await queryInterface.addColumn('pricing_config', 'pricePerTeacher', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 2.0 });
-      }
-      if (!tableDesc.pricePerGBStorage) {
-        console.log('Adding pricePerGBStorage to pricing_config...');
-        await queryInterface.addColumn('pricing_config', 'pricePerGBStorage', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.2 });
-      }
-      if (!tableDesc.pricePerInvoice) {
-        console.log('Adding pricePerInvoice to pricing_config...');
-        await queryInterface.addColumn('pricing_config', 'pricePerInvoice', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.05 });
-      }
-      if (!tableDesc.currency) {
-        console.log('Adding currency to pricing_config...');
-        await queryInterface.addColumn('pricing_config', 'currency', { type: require('sequelize').DataTypes.STRING, allowNull: false, defaultValue: 'USD' });
-      }
-      if (!tableDesc.yearlyDiscountPercent) {
-        console.log('Adding yearlyDiscountPercent to pricing_config...');
-        await queryInterface.addColumn('pricing_config', 'yearlyDiscountPercent', { type: require('sequelize').DataTypes.FLOAT, allowNull: true, defaultValue: 0 });
-      }
-    } catch (e) { try { console.warn('Schema Fix pricing_config:', e.message); } catch { } }
-
-  } catch (err) {
-    console.error('Schema Fixer Error:', err.message);
-  }
-})();
+  })();
+}
 
 // Public content endpoints for landing page
 app.get('/api/content/landing', (req, res) => {

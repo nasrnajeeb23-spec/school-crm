@@ -5,6 +5,7 @@ let redisClient = null;
 let isConnected = false;
 const memoryStore = new Map();
 const memoryExpiry = new Map();
+let didWarnDisconnected = false;
 
 // Initialize Redis client
 const initRedis = async () => {
@@ -54,7 +55,10 @@ const initRedis = async () => {
 // Get Redis client
 const getRedisClient = () => {
     if (!redisClient || !isConnected) {
-        console.warn('Redis client not initialized or not connected');
+        if (process.env.NODE_ENV !== 'test' && !didWarnDisconnected) {
+            didWarnDisconnected = true;
+            console.warn('Redis client not initialized or not connected');
+        }
         return null;
     }
     return redisClient;

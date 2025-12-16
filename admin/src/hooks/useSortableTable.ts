@@ -2,11 +2,18 @@ import { useState, useMemo } from 'react';
 
 export type SortOrder = 'asc' | 'desc';
 
+export type SortConfig<T> = {
+    key: keyof T;
+    direction: SortOrder;
+} | null;
+
 interface UseSortableTableResult<T> {
     sortedData: T[];
     sortKey: keyof T | null;
     sortOrder: SortOrder;
+    sortConfig: SortConfig<T>;
     handleSort: (key: keyof T) => void;
+    requestSort: (key: keyof T) => void;
     getSortIcon: (key: keyof T) => string;
 }
 
@@ -44,6 +51,10 @@ export function useSortableTable<T>(
         }
     };
 
+    const requestSort = (key: keyof T) => {
+        handleSort(key);
+    };
+
     const getSortIcon = (key: keyof T): string => {
         if (sortKey !== key) return '⇅'; // Both arrows (not sorted)
         return sortOrder === 'asc' ? '↑' : '↓';
@@ -75,11 +86,15 @@ export function useSortableTable<T>(
         });
     }, [data, sortKey, sortOrder]);
 
+    const sortConfig: SortConfig<T> = sortKey ? { key: sortKey, direction: sortOrder } : null;
+
     return {
         sortedData,
         sortKey,
         sortOrder,
+        sortConfig,
         handleSort,
+        requestSort,
         getSortIcon
     };
 }

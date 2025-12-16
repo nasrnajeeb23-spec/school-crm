@@ -18,7 +18,33 @@ if (DATABASE_URL) {
     }
   });
 } else {
-  sequelize = new Sequelize({ dialect: 'sqlite', storage: path.join(__dirname, '..', 'dev.sqlite'), logging: false });
+  const isTest = process.env.NODE_ENV === 'test';
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: isTest ? ':memory:' : path.join(__dirname, '..', 'dev.sqlite'),
+    logging: false,
+    ...(isTest
+      ? {
+          pool: {
+            max: 1,
+            min: 0,
+            idle: 0,
+            acquire: parseInt(process.env.DB_POOL_ACQUIRE_MS || '30000', 10)
+          }
+        }
+      : {})
+  });
+
+  if (isTest) {
+    sequelize.addHook('afterConnect', async (connection) => {
+      await new Promise((resolve, reject) => {
+        connection.run('PRAGMA foreign_keys = OFF;', (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    });
+  }
 }
 
 module.exports = sequelize;

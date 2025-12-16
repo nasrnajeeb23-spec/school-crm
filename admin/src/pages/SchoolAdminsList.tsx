@@ -37,11 +37,13 @@ const SchoolAdminsList: React.FC = () => {
     };
 
     const filteredAdmins = useMemo(() => {
-        return admins.filter(admin =>
-            (admin.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-            (admin.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-            (admin.schoolName?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-        );
+        const q = searchQuery.toLowerCase();
+        return admins.filter(admin => {
+            const name = String((admin as any)?.fullName || admin.name || '').toLowerCase();
+            const email = String(admin.email || '').toLowerCase();
+            const schoolName = String((admin as any)?.schoolName || '').toLowerCase();
+            return name.includes(q) || email.includes(q) || schoolName.includes(q);
+        });
     }, [admins, searchQuery]);
 
     const { sortedData, requestSort, sortConfig } = useSortableTable(filteredAdmins);
@@ -56,12 +58,12 @@ const SchoolAdminsList: React.FC = () => {
     const columns = [
         {
             header: 'الاسم',
-            accessor: 'fullName' as keyof User,
+            accessor: 'name' as keyof User,
             sortable: true,
             render: (user: User) => (
                 <div className="flex items-center">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {user.fullName}
+                        {(user as any)?.fullName || user.name}
                     </div>
                 </div>
             )
@@ -78,21 +80,21 @@ const SchoolAdminsList: React.FC = () => {
         },
         {
             header: 'المدرسة',
-            accessor: 'schoolName' as keyof User,
+            accessor: 'schoolId' as keyof User,
             sortable: true,
             render: (user: User) => (
                 <div className="text-sm text-gray-900 dark:text-white">
-                    {user.schoolName || '-'}
+                    {(user as any)?.schoolName || (user.schoolId ? String(user.schoolId) : '-')}
                 </div>
             )
         },
         {
             header: 'آخر دخول',
-            accessor: 'lastLogin' as keyof User,
+            accessor: 'createdAt' as keyof User,
             sortable: true,
             render: (user: User) => (
                 <div className="text-sm text-gray-500 dark:text-gray-400 dir-ltr text-right">
-                    {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('ar-SA') : '-'}
+                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString('ar-SA') : '-'}
                 </div>
             )
         },

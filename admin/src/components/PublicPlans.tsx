@@ -3,8 +3,11 @@ import { Plan } from '../types';
 import * as api from '../api';
 import { CheckIcon } from './icons';
 
-// This component is a display-only version of the plans for the public landing page.
-const PublicPlans: React.FC = () => {
+type PublicPlansProps = {
+  onSelectPlan?: (plan: Plan) => void;
+};
+
+const PublicPlans: React.FC<PublicPlansProps> = ({ onSelectPlan }) => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,6 +57,10 @@ const PublicPlans: React.FC = () => {
             </ul>
             <div className="mt-8">
               <button
+                type="button"
+                onClick={() => {
+                  if (typeof onSelectPlan === 'function') onSelectPlan(plan);
+                }}
                 className={`w-full py-3 px-6 text-base font-medium rounded-lg transition-colors ${
                   plan.recommended
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700'

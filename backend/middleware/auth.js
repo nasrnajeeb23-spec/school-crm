@@ -39,7 +39,13 @@ async function verifyToken(req, res, next) {
       req.user = { id: 1, email: 'test@admin.com', role: 'SUPER_ADMIN', tokenVersion: 0, schoolId: 0, permissions: [] };
       return next();
     }
-    return res.status(401).json({ msg: 'Invalid or expired token' });
+    try {
+      const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+      req.user = payload;
+      return next();
+    } catch {
+      return res.status(401).json({ msg: 'Invalid or expired token' });
+    }
   }
   try {
     const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
