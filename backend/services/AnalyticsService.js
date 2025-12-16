@@ -5,7 +5,7 @@ const Grade = require('../models/Grade');
 const Teacher = require('../models/Teacher');
 const Class = require('../models/Class');
 const Payment = require('../models/Payment');
-const { linearRegression, correlationCoefficient } = require('simple-statistics');
+const { linearRegression } = require('simple-statistics');
 
 class AnalyticsService {
   /**
@@ -93,8 +93,16 @@ class AnalyticsService {
       const whereClause = { schoolId };
       if (subject) whereClause.assignment = { [Op.like]: `%${subject}%` };
       
+      const dateFilter = (startDate || endDate) ? { 
+        date: { 
+          [Op.between]: [
+            startDate || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+            endDate || new Date()
+          ] 
+        } 
+      } : {};
       const grades = await Grade.findAll({
-        where: whereClause,
+        where: { ...whereClause, ...dateFilter },
         include: [
           {
             model: Student,

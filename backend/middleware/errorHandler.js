@@ -1,38 +1,42 @@
-// Error handling middleware for Express
 const errorHandler = (err, req, res, next) => {
-    // Log error for debugging
-    console.error('Error:', {
-        message: err.message,
-        stack: err.stack,
-        path: req.path,
-        method: req.method,
-        ip: req.ip,
-        timestamp: new Date().toISOString()
-    });
+    const isTest = process.env.NODE_ENV === 'test';
+    if (!isTest) {
+        try {
+            console.error('Error:', {
+                message: err.message,
+                stack: err.stack,
+                path: req?.path,
+                method: req?.method,
+                ip: req?.ip,
+                timestamp: new Date().toISOString()
+            });
+        } catch { }
+    }
 
-    // Determine status code
     const statusCode = err.statusCode || err.status || 500;
-
-    // Determine error type
     const errorType = err.name || 'ServerError';
+    const isDev = process.env.NODE_ENV === 'development';
+    const isProd = process.env.NODE_ENV === 'production';
 
-    // Create standardized error response
-    const errorResponse = {
+    const response = {
         success: false,
         error: {
             type: errorType,
-            message: err.message || 'حدث خطأ في الخادم',
-            ...(process.env.NODE_ENV === 'development' && {
-                stack: err.stack,
-                details: err.details
-            })
-        },
-        timestamp: new Date().toISOString(),
-        path: req.path
+            message: isProd ? 'حدث خطأ في الخادم' : (err.message || 'حدث خطأ في الخادم')
+        }
     };
 
-    // Send error response
-    res.status(statusCode).json(errorResponse);
+    if (err && err.details) {
+        response.error.details = err.details;
+    }
+    if (isDev) {
+        response.error.stack = err.stack;
+        if (err && err.details && !response.error.details) {
+            response.error.details = err.details;
+        }
+    }
+
+    res.status(statusCode).json(response);
 };
 
 // Validation error handler
@@ -75,18 +79,19 @@ const asyncHandler = (fn) => (req, res, next) => {
 class AppError extends Error {
     constructor(message, statusCode) {
         super(message);
+        this.name = 'AppError';
         this.statusCode = statusCode;
         this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
         this.isOperational = true;
-
         Error.captureStackTrace(this, this.constructor);
     }
 }
 
 class ValidationError extends AppError {
-    constructor(message) {
+    constructor(message, details) {
         super(message, 400);
         this.name = 'ValidationError';
+        this.details = details;
     }
 }
 

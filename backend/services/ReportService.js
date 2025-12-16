@@ -1,5 +1,5 @@
 const PDFDocument = require('pdfkit');
-const { Student, Grade, Class, School, Attendance } = require('../models');
+const { Student, Grade, Class, School } = require('../models');
 const fs = require('fs');
 const path = require('path');
 const { processArabic } = require('../utils/arabic');

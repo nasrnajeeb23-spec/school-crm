@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { Subscription, School, User, SchoolSettings, Plan, Notification } = require('../models');
+const { Subscription, School, User, Plan, Notification } = require('../models');
 const { Op } = require('sequelize');
 const EmailService = require('./EmailService');
 

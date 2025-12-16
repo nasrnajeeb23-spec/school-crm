@@ -41,6 +41,7 @@ const billingRoutes = require('./routes/billing');
 const contactRoutes = require('./routes/contact');
 const reportsRoutes = require('./routes/reports');
 const adsRoutes = require('./routes/ads');
+const accountingRoutes = require('./routes/accounting');
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
 const fse = require('fs-extra');
@@ -224,17 +225,19 @@ async function storeBackupZip(schoolId, types, filters) {
   await archive.finalize();
   return full;
 }
+const isTestEnv = process.env.NODE_ENV === 'test';
 const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: isTestEnv ? 'warn' : (process.env.LOG_LEVEL || 'info'),
   format: format.combine(format.timestamp(), format.json()),
   transports: [
-    new transports.Console(),
+    new transports.Console({ silent: isTestEnv }),
     new DailyRotate({
       filename: require('path').join(__dirname, '..', 'logs', 'app-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '10m',
       maxFiles: '30d',
+      silent: isTestEnv,
     })
   ]
 });
@@ -300,7 +303,6 @@ app.use((req, res, next) => {
   });
   next();
 });
-app.use(express.json());
 
 // Security Middleware
 app.use(requestIdMiddleware);
@@ -311,10 +313,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Serve generated downloads
 app.use('/downloads', express.static(path.join(__dirname, '..', 'admin', 'public', 'downloads')));
 // Standard API response middleware
-try { app.use(require('./middleware/response').responseFormatter); } catch { }
+app.use(require('./middleware/response').responseFormatter);
 let promClient;
 try { promClient = require('prom-client'); } catch { }
-if (promClient) {
+if (promClient && !isTestEnv) {
   promClient.collectDefaultMetrics();
   const httpRequestCounter = new promClient.Counter({ name: 'http_requests_total', help: 'Total HTTP requests', labelNames: ['method', 'route', 'status'] });
   const httpRequestDuration = new promClient.Histogram({ name: 'http_request_duration_seconds', help: 'HTTP request duration in seconds', labelNames: ['method', 'route', 'status'], buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10] });
@@ -360,7 +362,7 @@ const sessionConfig = {
   }
 };
 try {
-  if (process.env.REDIS_URL) {
+  if (process.env.REDIS_URL && process.env.NODE_ENV !== 'test') {
     let RedisStore;
     let client;
     try {
@@ -533,7 +535,9 @@ app.locals.cleanupOldBackups = async () => {
   } catch { }
 };
 
-nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch { } }, { scheduled: true });
+if (!isTestEnv) {
+  nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch { } }, { scheduled: true });
+}
 
 // API Routes
 app.use('/api/auth', authLimiter, authRoutes);
@@ -561,6 +565,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/ads', adsRoutes);
+app.use('/api/accounting', accountingRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
@@ -839,350 +844,353 @@ async function syncDatabase() {
   await ContactMessage.sync(opts);
   await AdRequest.sync(opts);
 }
-syncDatabase()
-  .then(async () => {
-    console.log('Database connected successfully.');
+if (process.env.NODE_ENV !== 'test') {
+  syncDatabase()
+    .then(async () => {
+      console.log('Database connected successfully.');
 
-    // Initialize Cron Service
-    try {
-      console.log('Cron service started successfully');
-    } catch (error) {
-      console.error('Failed to start cron service:', error.message);
-    }
+      // Initialize Cron Service
+      try {
+        console.log('Cron service started successfully');
+      } catch (error) {
+        console.error('Failed to start cron service:', error.message);
+      }
 
-    // Enhanced Error Handling Middleware
-    const { sanitizeError } = require('./middleware/securityMiddleware');
+      // Enhanced Error Handling Middleware
+      const { sanitizeError } = require('./middleware/securityMiddleware');
 
-    // 404 Handler
-    app.use((req, res, next) => {
-      logger.warn('404 Not Found', {
-        method: req.method,
-        path: req.path,
-        ip: req.ip
+      // 404 Handler
+      app.use((req, res, _next) => {
+        logger.warn('404 Not Found', {
+          method: req.method,
+          path: req.path,
+          ip: req.ip
+        });
+        res.status(404).json({
+          error: 'Resource not found',
+          path: req.path
+        });
       });
-      res.status(404).json({
-        error: 'Resource not found',
-        path: req.path
-      });
-    });
 
-    // Development Error Handler (with stack trace)
-    if (process.env.NODE_ENV === 'development') {
+      // Development Error Handler (with stack trace)
+      if (process.env.NODE_ENV === 'development') {
+        app.use((err, req, res, _next) => {
+          logger.error('Error occurred', {
+            error: err.message,
+            stack: err.stack,
+            url: req.url,
+            method: req.method,
+            ip: req.ip,
+            user: req.user?.id
+          });
+
+          res.status(err.status || 500).json({
+            error: err.message,
+            stack: err.stack,
+            details: err.details || {}
+          });
+        });
+      }
+
+      // Production Error Handler (sanitized)
       app.use((err, req, res, _next) => {
+        // Log full error details
         logger.error('Error occurred', {
           error: err.message,
           stack: err.stack,
           url: req.url,
           method: req.method,
           ip: req.ip,
-          user: req.user?.id
+          user: req.user?.id,
+          requestId: req.id
         });
 
+        // Send sanitized error to client
+        const sanitized = sanitizeError(err, process.env.NODE_ENV);
         res.status(err.status || 500).json({
-          error: err.message,
-          stack: err.stack,
-          details: err.details || {}
+          error: sanitized.message,
+          requestId: req.id // For support reference
         });
       });
-    }
 
-    // Production Error Handler (sanitized)
-    app.use((err, req, res, _next) => {
-      // Log full error details
-      logger.error('Error occurred', {
-        error: err.message,
-        stack: err.stack,
-        url: req.url,
-        method: req.method,
-        ip: req.ip,
-        user: req.user?.id,
-        requestId: req.id
-      });
-
-      // Send sanitized error to client
-      const sanitized = sanitizeError(err, process.env.NODE_ENV);
-      res.status(err.status || 500).json({
-        error: sanitized.message,
-        requestId: req.id // For support reference
-      });
-    });
-
-    module.exports = app;
-
-
-    try {
-      const { User, Plan, School, Subscription, BusOperator, Route, RouteStudent, Student, Parent } = require('./models');
-      const userCount = await User.count();
-      if (userCount === 0) {
-        await Plan.bulkCreate([
-          { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: JSON.stringify(['الوظائف الأساسية']), limits: JSON.stringify({ students: 200, teachers: 15 }), recommended: false },
-          { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: JSON.stringify(['كل ميزات الأساسية', 'إدارة مالية متقدمة']), limits: JSON.stringify({ students: 1000, teachers: 50 }), recommended: true },
-          { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: JSON.stringify(['كل ميزات المميزة', 'تقارير مخصصة']), limits: JSON.stringify({ students: 'غير محدود', teachers: 'غير محدود' }), recommended: false },
-        ]);
-        const school = await School.create({ id: 1, name: 'مدرسة النهضة الحديثة', contactEmail: 'info@nahda.com', studentCount: 0, teacherCount: 0, balance: 0 });
-        await Subscription.create({ schoolId: school.id, planId: 2, status: 'ACTIVE', renewalDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365) });
-        await User.bulkCreate([
-          { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SuperAdmin' },
-          { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SchoolAdmin', schoolId: school.id },
-        ]);
-        // Transportation seed
-        const op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
-        const rt = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
-        const parent = await Parent.create({ name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id });
-        const student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] });
-        await RouteStudent.create({ routeId: rt.id, studentId: student.id });
-        console.log('Seeded minimal dev data');
-      }
-      // Ensure demo parent/student and transportation always exist
-      const school = await School.findOne();
-      if (school) {
-        const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id } });
-        if (!parent.schoolId) { try { parent.schoolId = school.id; await parent.save(); } catch { } }
-        const [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
-        const [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
-        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
-        await RouteStudent.findOrCreate({ where: { routeId: rt.id, studentId: student.id }, defaults: { routeId: rt.id, studentId: student.id } });
-        // Ensure parent user for dashboard login
-        const { User } = require('./models');
-        await User.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: parent.name, email: 'parent@school.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'Parent', parentId: parent.id, schoolId: school.id } });
-        await User.findOrCreate({ where: { email: 'super@admin.com' }, defaults: { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SuperAdmin' } });
-        const [adminUser] = await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES'] } });
-        if (!adminUser.schoolId || !adminUser.permissions || adminUser.permissions.length === 0) { adminUser.schoolId = school.id; adminUser.schoolRole = 'مدير'; adminUser.permissions = ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES']; await adminUser.save(); }
-        // Auto-migrate any plaintext passwords to bcrypt hashes (dev safety)
-        const existingUsers = await User.findAll();
-        for (const u of existingUsers) {
-          const pwd = u.password || '';
-          if (!String(pwd).startsWith('$2a$') && !String(pwd).startsWith('$2b$')) {
-            u.password = await bcrypt.hash(pwd, 10);
-            await u.save();
-          }
+      try {
+        const { User, Plan, School, Subscription, BusOperator, Route, RouteStudent, Student, Parent } = require('./models');
+        const userCount = await User.count();
+        if (userCount === 0) {
+          await Plan.bulkCreate([
+            { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: JSON.stringify(['الوظائف الأساسية']), limits: JSON.stringify({ students: 200, teachers: 15 }), recommended: false },
+            { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: JSON.stringify(['كل ميزات الأساسية', 'إدارة مالية متقدمة']), limits: JSON.stringify({ students: 1000, teachers: 50 }), recommended: true },
+            { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: JSON.stringify(['كل ميزات المميزة', 'تقارير مخصصة']), limits: JSON.stringify({ students: 'غير محدود', teachers: 'غير محدود' }), recommended: false },
+          ]);
+          const school = await School.create({ id: 1, name: 'مدرسة النهضة الحديثة', email: 'info@nahda.com', studentCount: 0, teacherCount: 0, balance: 0 });
+          await Subscription.create({ schoolId: school.id, planId: 2, status: 'ACTIVE', renewalDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365) });
+          await User.bulkCreate([
+            { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SuperAdmin' },
+            { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SchoolAdmin', schoolId: school.id },
+          ]);
+          // Transportation seed
+          const op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
+          const rt = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
+          const parent = await Parent.create({ name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id });
+          const student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] });
+          await RouteStudent.create({ routeId: rt.id, studentId: student.id });
+          console.log('Seeded minimal dev data');
         }
-      }
-    } catch (e) {
-      console.warn('Seeding skipped or failed:', e?.message || e);
-    }
-    // Ensure critical indexes exist in production
-    try {
-      const db = require('./models');
-      const qi = db.sequelize.getQueryInterface();
-      const ensureIndex = async (model, fields, nameHint) => {
-        try {
-          const table = (model && typeof model.getTableName === 'function') ? model.getTableName() : null;
-          if (!table) return;
-          const existing = await qi.showIndex(table);
-          const exists = (existing || []).some(ix => {
-            const f = ix.fields ? ix.fields.map(x => (x.attribute || x)) : [];
-            return f.join(',') === fields.join(',');
-          });
-          if (!exists) {
-            const name = `idx_${String(table).replace(/[^a-z0-9_]/gi, '_')}_${fields.join('_')}`.toLowerCase();
-            await qi.addIndex(table, fields, { name });
-            try { console.log('Added index', name, 'on', table); } catch { }
-          }
-        } catch (e) { try { console.warn('Index ensure failed', nameHint || fields.join(','), e?.message || e); } catch { } }
-      };
-      await ensureIndex(db.FeeSetup, ['schoolId'], 'fee_school');
-      await ensureIndex(db.FeeSetup, ['schoolId', 'stage'], 'fee_school_stage');
-      await ensureIndex(db.StaffAttendance, ['schoolId'], 'staff_school');
-      await ensureIndex(db.StaffAttendance, ['schoolId', 'date'], 'staff_school_date');
-      await ensureIndex(db.StaffAttendance, ['userId', 'date'], 'staff_user_date');
-      await ensureIndex(db.TeacherAttendance, ['schoolId'], 'teach_school');
-      await ensureIndex(db.TeacherAttendance, ['schoolId', 'date'], 'teach_school_date');
-      await ensureIndex(db.TeacherAttendance, ['teacherId', 'date'], 'teach_teacher_date');
-      await ensureIndex(db.SalarySlip, ['schoolId'], 'slip_school');
-      await ensureIndex(db.SalarySlip, ['schoolId', 'month'], 'slip_school_month');
-      await ensureIndex(db.SalarySlip, ['personType', 'personId', 'month'], 'slip_person_month');
-      await ensureIndex(db.Conversation, ['schoolId'], 'conv_school');
-      await ensureIndex(db.Conversation, ['teacherId'], 'conv_teacher');
-      await ensureIndex(db.Conversation, ['parentId'], 'conv_parent');
-      await ensureIndex(db.Message, ['senderId'], 'msg_sender');
-      await ensureIndex(db.Message, ['senderRole'], 'msg_role');
-    } catch (e) { try { console.warn('Index bootstrap failed', e?.message || e); } catch { } }
-    try {
-      console.log('Module sync disabled: activeModules no longer used');
-    } catch (e) {
-      console.warn('Module sync disabled with error:', e?.message || e);
-    }
-    io.on('connection', (socket) => {
-      try {
-        const token = socket.handshake?.auth?.token;
-        if (token) {
-          const payload = jwt.verify(token, JWT_SECRET);
-          socket.user = payload;
-        }
-      } catch { }
-      socket.on('join_room', async (roomId) => {
-        try {
-          if (!roomId) return;
-          const { Conversation } = require('./models');
-          const conv = await Conversation.findOne({ where: { roomId } });
-          if (!conv) return;
-          const u = socket.user || {};
-          const isAllowed = (u.role === 'PARENT' && conv.parentId === u.parentId) ||
-            (u.role === 'TEACHER' && conv.teacherId === u.teacherId) ||
-            (u.role === 'SCHOOL_ADMIN' && conv.schoolId === u.schoolId) ||
-            (u.role === 'SUPER_ADMIN');
-          if (!isAllowed) return;
-          socket.join(roomId);
-        } catch { }
-      });
-      socket.on('send_message', async (payload) => {
-        try {
-          const { conversationId, roomId, text, senderId, senderRole } = payload || {};
-          if (!conversationId || !roomId || !text || !senderId || !senderRole) return;
-          const { Message } = require('./models');
-          const sid = socket.user?.id || senderId;
-          const srole = socket.user?.role || senderRole;
-          const msg = await Message.create({ id: `msg_${Date.now()}`, conversationId, text, senderId: sid, senderRole: srole });
-          io.to(roomId).emit('new_message', { id: msg.id, conversationId, text, senderId, senderRole, timestamp: msg.createdAt });
-        } catch { }
-      });
-    });
-    
-    async function acquireBackupLock(schoolId) {
-      try {
-        const { SchoolSettings } = require('./models');
-        const s = await SchoolSettings.findOne({ where: { schoolId } });
-        if (!s) return false;
-        const now = Date.now();
-        const lock = s.backupLock || {};
-        const until = lock.until ? new Date(lock.until).getTime() : 0;
-        if (until && until > now) return false;
-        const token = Math.random().toString(36).slice(2);
-        s.backupLock = { token, until: new Date(now + 2 * 60 * 1000).toISOString() };
-        await s.save();
-        return token;
-      } catch { return false; }
-    }
-    async function releaseBackupLock(schoolId, token) {
-      try {
-        const { SchoolSettings } = require('./models');
-        const s = await SchoolSettings.findOne({ where: { schoolId } });
-        if (!s) return;
-        const lock = s.backupLock || {};
-        if (lock.token && lock.token !== token) return;
-        s.backupLock = null;
-        await s.save();
-      } catch { }
-    }
-    const lastRun = new Map();
-    nodeCron.schedule('*/5 * * * *', async () => {
-      try {
-        const { SchoolSettings, School } = require('./models');
-        const schools = await School.findAll();
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        for (const sch of schools) {
-          const s = await SchoolSettings.findOne({ where: { schoolId: Number(sch.id) } });
-          const cfg = s?.backupConfig || {};
-          const types = Array.isArray(cfg.types) ? cfg.types : ['students', 'classes', 'subjects', 'classSubjectTeachers', 'grades', 'attendance', 'schedule', 'fees', 'teachers', 'parents'];
-          const retainDays = Number(cfg.retainDays || 30);
-          if (cfg.enabledDaily) {
-            const t = String(cfg.dailyTime || '02:00');
-            if (t === `${hh}:${mm}`) {
-              const key = `daily_${sch.id}_${t}_${now.toISOString().slice(0, 10)}`;
-              if (!lastRun.has(key)) {
-                const token = await acquireBackupLock(Number(sch.id));
-                if (token) {
-                  const full = await storeBackupZip(Number(sch.id), types, {});
-                  try {
-                    const { AuditLog } = require('./models');
-                    const stat = fs.statSync(full);
-                    await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
-                  } catch { }
-                  await releaseBackupLock(Number(sch.id), token);
-                }
-                lastRun.set(key, true);
-              }
+        // Ensure demo parent/student and transportation always exist
+        const school = await School.findOne();
+        if (school) {
+          const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id } });
+          if (!parent.schoolId) { try { parent.schoolId = school.id; await parent.save(); } catch { } }
+          const [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
+          const [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
+          const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
+          await RouteStudent.findOrCreate({ where: { routeId: rt.id, studentId: student.id }, defaults: { routeId: rt.id, studentId: student.id } });
+          // Ensure parent user for dashboard login
+          const { User } = require('./models');
+          await User.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: parent.name, email: 'parent@school.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'Parent', parentId: parent.id, schoolId: school.id } });
+          await User.findOrCreate({ where: { email: 'super@admin.com' }, defaults: { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SuperAdmin' } });
+          const [adminUser] = await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash(process.env.DEFAULT_PASSWORD || 'ChangeMe123!@#', 10), role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES'] } });
+          if (!adminUser.schoolId || !adminUser.permissions || adminUser.permissions.length === 0) { adminUser.schoolId = school.id; adminUser.schoolRole = 'مدير'; adminUser.permissions = ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES']; await adminUser.save(); }
+          // Auto-migrate any plaintext passwords to bcrypt hashes (dev safety)
+          const existingUsers = await User.findAll();
+          for (const u of existingUsers) {
+            const pwd = u.password || '';
+            if (!String(pwd).startsWith('$2a$') && !String(pwd).startsWith('$2b$')) {
+              u.password = await bcrypt.hash(pwd, 10);
+              await u.save();
             }
           }
-          if (cfg.enabledMonthly) {
-            const day = Number(cfg.monthlyDay || 1);
-            const t = String(cfg.monthlyTime || '03:00');
-            const dNow = now.getDate();
-            if (dNow === day && t === `${hh}:${mm}`) {
-              const key = `monthly_${sch.id}_${t}_${now.getFullYear()}_${now.getMonth() + 1}`;
-              if (!lastRun.has(key)) {
-                const token = await acquireBackupLock(Number(sch.id));
-                if (token) {
-                  const full = await storeBackupZip(Number(sch.id), types, {});
-                  try {
-                    const { AuditLog } = require('./models');
-                    const stat = fs.statSync(full);
-                    await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
-                  } catch { }
-                  await releaseBackupLock(Number(sch.id), token);
-                }
-                lastRun.set(key, true);
-              }
-            }
-          }
+        }
+      } catch (e) {
+        console.warn('Seeding skipped or failed:', e?.message || e);
+      }
+      // Ensure critical indexes exist in production
+      try {
+        const db = require('./models');
+        const qi = db.sequelize.getQueryInterface();
+        const ensureIndex = async (model, fields, nameHint) => {
           try {
-            const dir = path.join(__dirname, '..', 'uploads', 'backups', String(sch.id));
-            await fse.ensureDir(dir);
-            const files = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
-            for (const f of files) {
-              const full = path.join(dir, f);
-              const stat = fs.statSync(full);
-              const ageDays = Math.floor((now.getTime() - (stat.mtime || stat.birthtime).getTime()) / (1000 * 60 * 60 * 24));
-              if (retainDays > 0 && ageDays > retainDays) {
-                try { fs.unlinkSync(full); } catch { }
+            const table = (model && typeof model.getTableName === 'function') ? model.getTableName() : null;
+            if (!table) return;
+            const existing = await qi.showIndex(table);
+            const exists = (existing || []).some(ix => {
+              const f = ix.fields ? ix.fields.map(x => (x.attribute || x)) : [];
+              return f.join(',') === fields.join(',');
+            });
+            if (!exists) {
+              const name = `idx_${String(table).replace(/[^a-z0-9_]/gi, '_')}_${fields.join('_')}`.toLowerCase();
+              await qi.addIndex(table, fields, { name });
+              try { console.log('Added index', name, 'on', table); } catch { }
+            }
+          } catch (e) { try { console.warn('Index ensure failed', nameHint || fields.join(','), e?.message || e); } catch { } }
+        };
+        await ensureIndex(db.FeeSetup, ['schoolId'], 'fee_school');
+        await ensureIndex(db.FeeSetup, ['schoolId', 'stage'], 'fee_school_stage');
+        await ensureIndex(db.StaffAttendance, ['schoolId'], 'staff_school');
+        await ensureIndex(db.StaffAttendance, ['schoolId', 'date'], 'staff_school_date');
+        await ensureIndex(db.StaffAttendance, ['userId', 'date'], 'staff_user_date');
+        await ensureIndex(db.TeacherAttendance, ['schoolId'], 'teach_school');
+        await ensureIndex(db.TeacherAttendance, ['schoolId', 'date'], 'teach_school_date');
+        await ensureIndex(db.TeacherAttendance, ['teacherId', 'date'], 'teach_teacher_date');
+        await ensureIndex(db.SalarySlip, ['schoolId'], 'slip_school');
+        await ensureIndex(db.SalarySlip, ['schoolId', 'month'], 'slip_school_month');
+        await ensureIndex(db.SalarySlip, ['personType', 'personId', 'month'], 'slip_person_month');
+        await ensureIndex(db.Conversation, ['schoolId'], 'conv_school');
+        await ensureIndex(db.Conversation, ['teacherId'], 'conv_teacher');
+        await ensureIndex(db.Conversation, ['parentId'], 'conv_parent');
+        await ensureIndex(db.Message, ['senderId'], 'msg_sender');
+        await ensureIndex(db.Message, ['senderRole'], 'msg_role');
+      } catch (e) { try { console.warn('Index bootstrap failed', e?.message || e); } catch { } }
+      try {
+        console.log('Module sync disabled: activeModules no longer used');
+      } catch (e) {
+        console.warn('Module sync disabled with error:', e?.message || e);
+      }
+      io.on('connection', (socket) => {
+        try {
+          const token = socket.handshake?.auth?.token;
+          if (token) {
+            const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+            socket.user = payload;
+          }
+        } catch { }
+        socket.on('join_room', async (roomId) => {
+          try {
+            if (!roomId) return;
+            const { Conversation } = require('./models');
+            const conv = await Conversation.findOne({ where: { roomId } });
+            if (!conv) return;
+            const u = socket.user || {};
+            const isAllowed = (u.role === 'PARENT' && conv.parentId === u.parentId) ||
+              (u.role === 'TEACHER' && conv.teacherId === u.teacherId) ||
+              (u.role === 'SCHOOL_ADMIN' && conv.schoolId === u.schoolId) ||
+              (u.role === 'SUPER_ADMIN');
+            if (!isAllowed) return;
+            socket.join(roomId);
+          } catch { }
+        });
+        socket.on('send_message', async (payload) => {
+          try {
+            const { conversationId, roomId, text, senderId, senderRole } = payload || {};
+            if (!conversationId || !roomId || !text || !senderId || !senderRole) return;
+            const { Message } = require('./models');
+            const sid = socket.user?.id || senderId;
+            const srole = socket.user?.role || senderRole;
+            const msg = await Message.create({ id: `msg_${Date.now()}`, conversationId, text, senderId: sid, senderRole: srole });
+            io.to(roomId).emit('new_message', { id: msg.id, conversationId, text, senderId, senderRole, timestamp: msg.createdAt });
+          } catch { }
+        });
+      });
+
+      async function acquireBackupLock(schoolId) {
+        try {
+          const { SchoolSettings } = require('./models');
+          const s = await SchoolSettings.findOne({ where: { schoolId } });
+          if (!s) return false;
+          const now = Date.now();
+          const lock = s.backupLock || {};
+          const until = lock.until ? new Date(lock.until).getTime() : 0;
+          if (until && until > now) return false;
+          const token = Math.random().toString(36).slice(2);
+          s.backupLock = { token, until: new Date(now + 2 * 60 * 1000).toISOString() };
+          await s.save();
+          return token;
+        } catch { return false; }
+      }
+      async function releaseBackupLock(schoolId, token) {
+        try {
+          const { SchoolSettings } = require('./models');
+          const s = await SchoolSettings.findOne({ where: { schoolId } });
+          if (!s) return;
+          const lock = s.backupLock || {};
+          if (lock.token && lock.token !== token) return;
+          s.backupLock = null;
+          await s.save();
+        } catch { }
+      }
+      const lastRun = new Map();
+      nodeCron.schedule('*/5 * * * *', async () => {
+        try {
+          const { SchoolSettings, School } = require('./models');
+          const schools = await School.findAll();
+          const now = new Date();
+          const hh = String(now.getHours()).padStart(2, '0');
+          const mm = String(now.getMinutes()).padStart(2, '0');
+          for (const sch of schools) {
+            const s = await SchoolSettings.findOne({ where: { schoolId: Number(sch.id) } });
+            const cfg = s?.backupConfig || {};
+            const types = Array.isArray(cfg.types) ? cfg.types : ['students', 'classes', 'subjects', 'classSubjectTeachers', 'grades', 'attendance', 'schedule', 'fees', 'teachers', 'parents'];
+            const retainDays = Number(cfg.retainDays || 30);
+            if (cfg.enabledDaily) {
+              const t = String(cfg.dailyTime || '02:00');
+              if (t === `${hh}:${mm}`) {
+                const key = `daily_${sch.id}_${t}_${now.toISOString().slice(0, 10)}`;
+                if (!lastRun.has(key)) {
+                  const token = await acquireBackupLock(Number(sch.id));
+                  if (token) {
+                    const full = await storeBackupZip(Number(sch.id), types, {});
+                    try {
+                      const { AuditLog } = require('./models');
+                      const stat = fs.statSync(full);
+                      await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
+                    } catch { }
+                    await releaseBackupLock(Number(sch.id), token);
+                  }
+                  lastRun.set(key, true);
+                }
               }
             }
-          } catch { }
-        }
-      } catch { }
-    });
-    // License Verification for Self-Hosted Mode
-    const checkLicense = () => {
-      const licensePath = path.join(__dirname, 'license.json');
-      if (fs.existsSync(licensePath)) {
-        try {
-          const { verifyLicenseKey } = require('./utils/license');
-          const licenseData = JSON.parse(fs.readFileSync(licensePath, 'utf8'));
-          const result = verifyLicenseKey(licenseData.key);
+            if (cfg.enabledMonthly) {
+              const day = Number(cfg.monthlyDay || 1);
+              const t = String(cfg.monthlyTime || '03:00');
+              const dNow = now.getDate();
+              if (dNow === day && t === `${hh}:${mm}`) {
+                const key = `monthly_${sch.id}_${t}_${now.getFullYear()}_${now.getMonth() + 1}`;
+                if (!lastRun.has(key)) {
+                  const token = await acquireBackupLock(Number(sch.id));
+                  if (token) {
+                    const full = await storeBackupZip(Number(sch.id), types, {});
+                    try {
+                      const { AuditLog } = require('./models');
+                      const stat = fs.statSync(full);
+                      await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
+                    } catch { }
+                    await releaseBackupLock(Number(sch.id), token);
+                  }
+                  lastRun.set(key, true);
+                }
+              }
+            }
+            try {
+              const dir = path.join(__dirname, '..', 'uploads', 'backups', String(sch.id));
+              await fse.ensureDir(dir);
+              const files = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
+              for (const f of files) {
+                const full = path.join(dir, f);
+                const stat = fs.statSync(full);
+                const ageDays = Math.floor((now.getTime() - (stat.mtime || stat.birthtime).getTime()) / (1000 * 60 * 60 * 24));
+                if (retainDays > 0 && ageDays > retainDays) {
+                  try { fs.unlinkSync(full); } catch { }
+                }
+              }
+            } catch { }
+          }
+        } catch { }
+      });
+      // License Verification for Self-Hosted Mode
+      const checkLicense = () => {
+        const licensePath = path.join(__dirname, 'license.json');
+        if (fs.existsSync(licensePath)) {
+          try {
+            const { verifyLicenseKey } = require('./utils/license');
+            const licenseData = JSON.parse(fs.readFileSync(licensePath, 'utf8'));
+            const result = verifyLicenseKey(licenseData.key);
 
-          if (!result.valid) {
-            console.error('################################################');
-            console.error('# FATAL: INVALID LICENSE KEY DETECTED        #');
-            console.error(`# Reason: ${result.reason || 'Unknown'}                  #`);
-            console.error('################################################');
+            if (!result.valid) {
+              console.error('################################################');
+              console.error('# FATAL: INVALID LICENSE KEY DETECTED        #');
+              console.error(`# Reason: ${result.reason || 'Unknown'}                  #`);
+              console.error('################################################');
+              process.exit(1);
+            }
+
+            console.log('################################################');
+            console.log(`# LICENSE VERIFIED: ${licenseData.owner}       #`);
+            console.log(`# Modules: ${licenseData.modules.join(', ')}    #`);
+            console.log('################################################');
+
+            // Enforce Modules Globally
+            app.locals.licenseModules = new Set(licenseData.modules.map(m => String(m).toUpperCase()));
+
+          } catch (err) {
+            console.error('License Check Error:', err);
             process.exit(1);
           }
-
-          console.log('################################################');
-          console.log(`# LICENSE VERIFIED: ${licenseData.owner}       #`);
-          console.log(`# Modules: ${licenseData.modules.join(', ')}    #`);
-          console.log('################################################');
-
-          // Enforce Modules Globally
-          app.locals.licenseModules = new Set(licenseData.modules.map(m => String(m).toUpperCase()));
-
-        } catch (err) {
-          console.error('License Check Error:', err);
-          process.exit(1);
         }
+      };
+
+      if (process.env.NODE_ENV !== 'test') {
+        server.listen(PORT, async () => {
+          // Run License Check
+          checkLicense();
+
+          console.log(`Server running on port ${PORT}`);
+          console.log('Server startup complete');
+          console.log('Server listening on 0.0.0.0');
+          console.log('Test this: curl http://127.0.0.1:' + PORT + '/api/auth/login');
+          console.log('PID:', process.pid);
+        });
+        // Keep process alive
+        process.on('SIGINT', () => {
+          console.log('Shutting down gracefully...');
+          server.close(() => process.exit(0));
+        });
       }
-    };
-
-    server.listen(PORT, async () => {
-      // Run License Check
-      checkLicense();
-
-      console.log(`Server running on port ${PORT}`);
-      console.log('Server startup complete');
-      console.log('Server listening on 0.0.0.0');
-      console.log('Test this: curl http://127.0.0.1:' + PORT + '/api/auth/login');
-      console.log('PID:', process.pid);
+    })
+    .catch(err => {
+      console.error('Failed to connect to database:', err);
     });
-    // Keep process alive
-    process.on('SIGINT', () => {
-      console.log('Shutting down gracefully...');
-      server.close(() => process.exit(0));
-    });
-  })
-  .catch(err => {
-    console.error('Unable to connect to the database:', err);
-  });
+}
 if (Sentry && Sentry.Handlers && typeof Sentry.Handlers.errorHandler === 'function') { app.use(Sentry.Handlers.errorHandler()); }
+
+module.exports = app;

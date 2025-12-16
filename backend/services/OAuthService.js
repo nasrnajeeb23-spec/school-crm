@@ -2,7 +2,6 @@ const { google } = require('googleapis');
 const msal = require('@azure/msal-node');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
-const crypto = require('crypto');
 
 class OAuthService {
   constructor() {
@@ -25,7 +24,7 @@ class OAuthService {
         },
         system: {
           loggerOptions: {
-            loggerCallback(loglevel, message, containsPii) {
+            loggerCallback(loglevel, message, _containsPii) {
               console.log(message);
             },
             piiLoggingEnabled: false,

@@ -12,12 +12,18 @@ const School = sequelize.define('School', {
     allowNull: false,
     unique: true,
   },
-  contactEmail: {
+  email: {
     type: DataTypes.STRING,
     allowNull: false,
+    field: 'contactEmail',
     validate: {
       isEmail: true,
     },
+  },
+  plan: {
+    type: DataTypes.ENUM('BASIC', 'STANDARD', 'PREMIUM', 'ENTERPRISE'),
+    allowNull: false,
+    defaultValue: 'BASIC',
   },
   address: {
     type: DataTypes.STRING,

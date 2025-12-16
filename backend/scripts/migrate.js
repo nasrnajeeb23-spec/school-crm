@@ -42,15 +42,37 @@ async function runMigrations() {
     if (await hasMigration(name)) continue;
     const mod = require(path.join(dir, f));
     const queryInterface = sequelize.getQueryInterface();
+
+    // Add describeTable method if missing
+    if (!queryInterface.describeTable) {
+      queryInterface.describeTable = async (tableName) => {
+        const [results] = await sequelize.query(`
+          SELECT column_name, data_type, is_nullable
+          FROM information_schema.columns
+          WHERE table_name = '${tableName}'
+        `);
+        const desc = {};
+        results.forEach(row => {
+          desc[row.column_name] = {
+            type: row.data_type,
+            allowNull: row.is_nullable === 'YES'
+          };
+        });
+        return desc;
+      };
+    }
+
     const models = { User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig };
     if (typeof mod.up === 'function') {
+      console.log(`Running migration: ${name}`);
       await mod.up({ sequelize, queryInterface, models });
+      console.log(`✓ Completed: ${name}`);
     }
     await recordMigration(name);
   }
 }
 
-(async function main(){
+(async function main() {
   await ensureMigrationsTable();
   await runBaseline();
   await runMigrations();

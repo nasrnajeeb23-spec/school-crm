@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Conversation, Message } = require('../models');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, requireSameSchoolParam } = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
 const fse = require('fs-extra');
@@ -162,10 +162,10 @@ router.post('/send', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TE
   }
 });
 
-router.get('/attachments/:schoolId/:filename', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), async (req, res) => {
+router.get('/attachments/:schoolId/:filename', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
-    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== schoolId) return res.status(403).json({ msg: 'Access denied' });
+    // requireSameSchoolParam handles the check
     const filename = path.basename(req.params.filename);
     const filePath = path.join(__dirname, '..', 'storage', 'chat', String(schoolId), filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });

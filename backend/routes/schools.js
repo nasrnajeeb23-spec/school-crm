@@ -44,6 +44,33 @@ try {
   };
 }
 
+// Allow handling a public listing only when mounted under a public base URL
+const onlyPublicBase = (req, res, next) => {
+  const base = String(req.baseUrl || '');
+  if (base.includes('/public')) return next();
+  return next('route');
+};
+
+// @route   GET /api/public/schools  (mounted base) -> '/'
+// @desc    Public list of schools with pagination
+// @access  Public
+router.get('/',
+  onlyPublicBase,
+  rateLimiters.api,
+  paginationMiddleware,
+  cacheMiddlewares.schools,
+  asyncHandler(async (req, res) => {
+    const { page, limit, offset } = req.pagination;
+    const { count, rows } = await School.findAndCountAll({
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']],
+      attributes: ['id', 'name', 'plan', 'status', 'createdAt']
+    });
+    res.json(buildPaginationResponse(rows, count, page, limit));
+  })
+);
+
 // @route   GET /api/schools
 // @desc    Get all schools with pagination
 // @access  Private (SuperAdmin)

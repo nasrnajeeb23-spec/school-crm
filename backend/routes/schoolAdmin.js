@@ -1389,7 +1389,9 @@ router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 
   try {
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!req.user.schoolId || Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rows = await Schedule.findAll({ where: { classId: cls.id }, include: [{ model: Teacher, attributes: ['name'] }], order: [['day', 'ASC'], ['timeSlot', 'ASC']] });
     const list = rows.map(r => ({ id: String(r.id), classId: String(cls.id), day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' }));
     res.json(list);
@@ -1402,7 +1404,9 @@ router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN',
     if (!Array.isArray(entries)) return res.status(400).json({ msg: 'entries must be an array' });
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!req.user.schoolId || Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    }
     const validDays = new Set(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']);
     const normalized = [];
     const teacherIds = new Set();
@@ -1522,7 +1526,9 @@ router.get('/class/:classId/students', verifyToken, requireRole('SCHOOL_ADMIN', 
   try {
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!req.user.schoolId || Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    }
     const students = await Student.findAll({ where: { schoolId: cls.schoolId, classId: cls.id }, order: [['name', 'ASC']] });
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
     res.json(students.map(s => ({ ...s.toJSON(), status: statusMap[s.status] || s.status })));
@@ -1535,7 +1541,9 @@ router.get('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN'
     if (!date) return res.status(400).json({ msg: 'date is required' });
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!req.user.schoolId || Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rows = await Attendance.findAll({ where: { classId: cls.id, date }, order: [['studentId', 'ASC']] });
     const statusMap = { 'Present': 'حاضر', 'Absent': 'غائب', 'Late': 'متأخر', 'Excused': 'بعذر' };
     res.json(rows.map(r => ({ studentId: r.studentId, date: r.date, status: statusMap[r.status] || r.status })));
@@ -1548,7 +1556,9 @@ router.post('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN
     if (!date || !Array.isArray(records)) return res.status(400).json({ msg: 'date and records are required' });
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!req.user.schoolId || Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rev = { 'حاضر': 'Present', 'غائب': 'Absent', 'متأخر': 'Late', 'بعذر': 'Excused' };
     const ids = Array.from(new Set(records.map(r => String(r.studentId))));
     const students = await Student.findAll({ where: { id: { [Op.in]: ids }, schoolId: cls.schoolId } });
@@ -1575,7 +1585,9 @@ router.get('/class/:classId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'S
     if (!subject) return res.status(400).json({ msg: 'subject is required' });
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!req.user.schoolId || Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rows = await Grade.findAll({ where: { classId: cls.id, subject }, order: [['studentId', 'ASC']] });
     res.json(rows.map(r => ({ classId: String(cls.id), subject: r.subject, studentId: r.studentId, studentName: '', grades: { homework: r.homework, quiz: r.quiz, midterm: r.midterm, final: r.final } })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
@@ -1631,16 +1643,6 @@ router.get('/:schoolId/grades/all', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
       };
     });
     res.json(result);
-  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
-});
-
-router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
-  try {
-    const cls = await Class.findByPk(req.params.classId);
-    if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
-    const rows = await Schedule.findAll({ where: { classId: cls.id }, order: [['day', 'ASC'], ['timeSlot', 'ASC']] });
-    res.json(rows.map(r => ({ id: String(r.id), classId: String(cls.id), className: cls.name, day: r.day, startTime: r.timeSlot.split(' - ')[0], endTime: r.timeSlot.split(' - ')[1] || r.timeSlot, subject: r.subject, teacher: '' })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -3419,7 +3421,7 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
 // @route   GET api/school/:schoolId/students/:studentId/behavior
 // @desc    Get behavior records for a student
 // @access  Private (SchoolAdmin, Teacher, Parent)
-router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
     const studentId = req.params.studentId;

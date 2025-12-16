@@ -20,7 +20,7 @@ const seedDatabase = async () => {
       domain: 'alnahda',
       type: 'K12',
       phone: '0112223333',
-      contactEmail: 'info@alnahda.edu.sa',
+      email: 'info@alnahda.edu.sa',
       address: 'الرياض، المملكة العربية السعودية',
       city: 'Riyadh',
       country: 'Saudi Arabia',

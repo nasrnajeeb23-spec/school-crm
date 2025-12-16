@@ -4,7 +4,7 @@ const { validationErrorHandler } = require('./errorHandler');
 // Common validation rules
 const validationRules = {
     // Email validation
-    email: () => body('email')
+    email: (field = 'email') => body(field)
         .isEmail()
         .withMessage('البريد الإلكتروني غير صحيح')
         .normalizeEmail(),
@@ -82,8 +82,8 @@ const validators = {
     // School creation
     createSchool: validate([
         validationRules.name('name'),
-        validationRules.email('contactEmail'),
-        validationRules.phone('contactPhone'),
+        validationRules.email('email'),
+        validationRules.phone('phone'),
         body('plan').isIn(['BASIC', 'STANDARD', 'PREMIUM', 'ENTERPRISE']).withMessage('الخطة غير صحيحة')
     ]),
 

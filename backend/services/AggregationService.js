@@ -1,5 +1,5 @@
 const { 
-    SchoolStats, Student, Attendance, Invoice, Expense, User, sequelize 
+    SchoolStats, Student, Attendance, Invoice, Expense 
 } = require('../models');
 const { Op } = require('sequelize');
 

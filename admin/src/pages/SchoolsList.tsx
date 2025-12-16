@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubscriptionStatus, School, NewSchoolData } from '../types';
 import * as api from '../api';
-import AddSchoolModal from '../components/AddSchoolModal';
-import Pagination from '../components/Pagination';
+import { SchoolIcon, EditIcon, CheckIcon, XIcon, MoreVerticalIcon, PlusIcon } from '../components/icons';
 import ResponsiveTable from '../components/ResponsiveTable';
-import { PlusIcon, SchoolIcon } from '../components/icons';
+import SearchBar from '../components/SearchBar';
+import Pagination from '../components/Pagination';
+import AddSchoolModal from '../components/AddSchoolModal';
 import { useToast } from '../contexts/ToastContext';
-import TableSkeleton from '../components/TableSkeleton';
+import { useSortableTable } from '../hooks/useSortableTable';
 import EmptyState from '../components/EmptyState';
 
 const statusColorMap: { [key in SubscriptionStatus]: string } = {
   [SubscriptionStatus.Active]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  [SubscriptionStatus.Inactive]: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
   [SubscriptionStatus.Trial]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
   [SubscriptionStatus.PastDue]: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
   [SubscriptionStatus.Canceled]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
@@ -21,27 +23,24 @@ const SchoolsList: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalItems, setTotalItems] = useState(0);
-
   useEffect(() => {
     fetchSchools();
-  }, [currentPage, itemsPerPage]);
+  }, []);
 
   const fetchSchools = async () => {
     setLoading(true);
     try {
       const data = await api.getSchools();
       setSchools(data);
-      setTotalItems(data.length);
     } catch (error) {
-      console.error("Failed to fetch schools:", error);
-      addToast("فشل تحميل قائمة المدارس. الرجاء المحاولة مرة أخرى.", 'error');
+      console.error('Failed to fetch schools:', error);
+      addToast('فشل تحميل قائمة المدارس', 'error');
     } finally {
       setLoading(false);
     }
@@ -51,7 +50,6 @@ const SchoolsList: React.FC = () => {
     try {
       const newSchool = await api.addSchool(data);
       setSchools(prev => [newSchool, ...prev]);
-      setTotalItems(prev => prev + 1);
       addToast(`تمت إضافة مدرسة "${newSchool.name}" بنجاح!`, 'success');
       setIsModalOpen(false);
     } catch (error) {
@@ -68,11 +66,7 @@ const SchoolsList: React.FC = () => {
     if (!window.confirm(`هل أنت متأكد من تغيير حالة المدرسة إلى "${newStatus}"؟`)) return;
 
     try {
-      // Assuming api.updateSchool exists or we use a generic patch
-      // If api.updateSchool doesn't exist yet, we must ensure it does or use a direct fetch wrapper if needed.
-      // Based on typical patterns, let's assume api.updateSchool(id, data)
       await api.updateSchool(school.id, { status: newStatus });
-
       setSchools(prev => prev.map(s => s.id === school.id ? { ...s, status: newStatus } : s));
       addToast(`تم تحديث حالة المدرسة بنجاح`, 'success');
     } catch (error) {
@@ -81,37 +75,88 @@ const SchoolsList: React.FC = () => {
     }
   };
 
-  // Pagination logic
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedSchools = schools.slice(startIndex, endIndex);
+  const filteredSchools = useMemo(() => {
+    return schools.filter(school =>
+      school.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      school.plan?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [schools, searchQuery]);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const { sortedData, requestSort, sortConfig } = useSortableTable(filteredSchools);
 
-  const handleItemsPerPageChange = (newItemsPerPage: number) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
-  };
+  const paginatedSchools = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedData.slice(start, start + itemsPerPage);
+  }, [sortedData, currentPage, itemsPerPage]);
 
-  // Render table row for desktop
-  const renderRow = (school: School) => (
-    <>
-      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{school.name}</td>
-      <td className="px-6 py-4">{school.plan}</td>
-      <td className="px-6 py-4">
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[school.status]}`}>
+  const totalPages = Math.ceil(filteredSchools.length / itemsPerPage);
+
+  const columns = [
+    {
+      header: 'المدرسة',
+      accessor: 'name' as keyof School,
+      sortable: true,
+      render: (school: School) => (
+        <div className="flex items-center">
+          <div className="flex-shrink-0 h-10 w-10 relative">
+            {school.logoUrl ? (
+              <img className="h-10 w-10 rounded-full object-cover" src={api.getAssetUrl(school.logoUrl)} alt="" />
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                <SchoolIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-300" />
+              </div>
+            )}
+            <span className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-gray-800 ${school.status === SubscriptionStatus.Active ? 'bg-green-400' : 'bg-gray-400'}`} />
+          </div>
+          <div className="mr-4">
+            <div className="text-sm font-medium text-gray-900 dark:text-white">{school.name}</div>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: 'الباقة',
+      accessor: 'plan' as keyof School,
+      sortable: true,
+      render: (school: School) => (
+        <div className="text-sm text-gray-900 dark:text-white">
+          {school.plan || 'مجانية'}
+        </div>
+      )
+    },
+    {
+      header: 'الحالة',
+      accessor: 'status' as keyof School,
+      render: (school: School) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColorMap[school.status]}`}>
           {school.status}
         </span>
-      </td>
-      <td className="px-6 py-4">{school.students}</td>
-      <td className={`px-6 py-4 font-semibold ${school.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>
-        ${school.balance.toFixed(2)}
-      </td>
-      <td className="px-6 py-4">
+      )
+    },
+    {
+      header: 'الطلاب',
+      accessor: 'students' as keyof School,
+      sortable: true,
+      render: (school: School) => (
+        <span className="text-sm text-gray-900 dark:text-white">
+          {school.students}
+        </span>
+      )
+    },
+    {
+      header: 'الرصيد',
+      accessor: 'balance' as keyof School,
+      sortable: true,
+      render: (school: School) => (
+        <span className={`text-sm font-semibold ${school.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>
+          ${school.balance.toFixed(2)}
+        </span>
+      )
+    },
+    {
+      header: 'الإجراءات',
+      accessor: 'id' as keyof School,
+      render: (school: School) => (
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleManageSchool(school)}
@@ -136,105 +181,72 @@ const SchoolsList: React.FC = () => {
             </button>
           )}
         </div>
-      </td>
-    </>
-  );
+      )
+    }
+  ];
 
-  // Render card for mobile
-  const renderCard = (school: School) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900 dark:text-white">{school.name}</h3>
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[school.status]}`}>
-          {school.status}
-        </span>
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <span className="text-gray-500 dark:text-gray-400">الخطة:</span>
-          <span className="mr-2 text-gray-900 dark:text-white">{school.plan}</span>
-        </div>
-        <div>
-          <span className="text-gray-500 dark:text-gray-400">الطلاب:</span>
-          <span className="mr-2 text-gray-900 dark:text-white">{school.students}</span>
-        </div>
-        <div>
-          <span className="text-gray-500 dark:text-gray-400">الرصيد:</span>
-          <span className={`mr-2 font-semibold ${school.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>
-            ${school.balance.toFixed(2)}
-          </span>
-        </div>
-      </div>
-      <button
-        onClick={() => handleManageSchool(school)}
-        className="w-full mt-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-      >
-        إدارة المدرسة
-      </button>
-    </div>
-  );
+    );
+  }
 
   return (
-    <>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">قائمة المدارس</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                إجمالي المدارس: {totalItems}
-              </p>
-            </div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              <PlusIcon className="h-5 w-5 ml-2" />
-              إضافة مدرسة
-            </button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">قائمة المدارس</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            إجمالي المدارس: {filteredSchools.length}
+          </p>
         </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+        >
+          <PlusIcon className="h-5 w-5 ml-2" />
+          إضافة مدرسة
+        </button>
+      </div>
 
-        {loading ? (
-          <div className="p-6">
-            <TableSkeleton />
-          </div>
-        ) : schools.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={SchoolIcon}
-              title="لا توجد مدارس بعد"
-              message="ابدأ بإضافة مدرسة جديدة لإدارة اشتراكاتها وبياناتها."
-              actionText="إضافة مدرسة جديدة"
-              onAction={() => setIsModalOpen(true)}
+      {schools.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <EmptyState
+            icon={SchoolIcon}
+            title="لا توجد مدارس بعد"
+            message="ابدأ بإضافة مدرسة جديدة لإدارة اشتراكاتها وبياناتها."
+            actionText="إضافة مدرسة جديدة"
+            onAction={() => setIsModalOpen(true)}
+          />
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <SearchBar
+              onSearch={setSearchQuery}
+              placeholder="بحث عن مدرسة..."
             />
           </div>
-        ) : (
-          <>
-            <div className="p-6">
-              <ResponsiveTable
-                headers={['اسم المدرسة', 'الخطة', 'الحالة', 'الطلاب', 'الرصيد المستحق', 'إجراءات']}
-                data={paginatedSchools}
-                renderRow={renderRow}
-                renderCard={renderCard}
-                keyExtractor={(school) => String(school.id)}
-                emptyMessage="لا توجد مدارس في هذه الصفحة"
-              />
-            </div>
 
-            {totalPages > 1 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalItems={totalItems}
-                itemsPerPage={itemsPerPage}
-                onPageChange={handlePageChange}
-                onItemsPerPageChange={handleItemsPerPageChange}
-              />
-            )}
-          </>
-        )}
-      </div>
+          <ResponsiveTable
+            columns={columns}
+            data={paginatedSchools}
+            sortConfig={sortConfig}
+            onSort={requestSort}
+          />
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
+            totalItems={filteredSchools.length}
+          />
+        </div>
+      )}
 
       {isModalOpen && (
         <AddSchoolModal
@@ -242,7 +254,7 @@ const SchoolsList: React.FC = () => {
           onSave={handleAddSchool}
         />
       )}
-    </>
+    </div>
   );
 };
 

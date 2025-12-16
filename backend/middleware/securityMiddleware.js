@@ -122,7 +122,11 @@ class SuspiciousActivityDetector {
     constructor() {
         this.attempts = new Map(); // IP -> { count, firstAttempt, lastAttempt }
         this.blockedIPs = new Set();
-        this.cleanupInterval = setInterval(() => this.cleanup(), 60 * 60 * 1000); // Cleanup every hour
+        if (process.env.NODE_ENV !== 'test') {
+            this.cleanupInterval = setInterval(() => this.cleanup(), 60 * 60 * 1000);
+        } else {
+            this.cleanupInterval = null;
+        }
     }
 
     track(ip, action) {

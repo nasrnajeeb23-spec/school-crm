@@ -320,7 +320,7 @@ router.post('/login', [
     // Check if MFA is required
     const requiresMfa = ((String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification || (policies.enforceMfaForAdmins === true));
     const tempToken = requiresMfa ?
-      jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) :
+      jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m', algorithm: 'HS256' }) :
       undefined;
 
     // Clear rate limit on successful login
@@ -400,7 +400,7 @@ router.post('/verify-mfa', [
     // Verify temp token
     let decoded;
     try {
-      decoded = jwt.verify(tempToken, JWT_SECRET);
+      decoded = jwt.verify(tempToken, JWT_SECRET, { algorithms: ['HS256'] });
     } catch (error) {
       await logSuperAdminAction('mfa_verify.invalid_token', {
         tempToken,
@@ -468,7 +468,7 @@ router.post('/verify-mfa', [
         tokenVersion: user.tokenVersion || 0
       },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '24h', algorithm: 'HS256' }
     );
 
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -645,7 +645,7 @@ router.post('/request-reset', async (req, res) => {
     if (!email) return res.status(400).json({ success: false, message: 'Email required' });
     const user = await User.findOne({ where: { email, role: 'SuperAdmin' } });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const token = jwt.sign({ userId: user.id, type: 'reset' }, JWT_SECRET, { expiresIn: '10m' });
+    const token = jwt.sign({ userId: user.id, type: 'reset' }, JWT_SECRET, { expiresIn: '10m', algorithm: 'HS256' });
     if (req.app.locals.redisClient) {
       await req.app.locals.redisClient.setEx(`sa:reset:${user.id}`, 600, token).catch(() => { });
     }
@@ -658,7 +658,7 @@ router.post('/reset', async (req, res) => {
     const { token, newPassword } = req.body || {};
     if (!token || !newPassword) return res.status(400).json({ success: false, message: 'Invalid input' });
     let decoded;
-    try { decoded = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ success: false, message: 'Invalid or expired token' }); }
+    try { decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); } catch { return res.status(401).json({ success: false, message: 'Invalid or expired token' }); }
     if (decoded.type !== 'reset') return res.status(401).json({ success: false, message: 'Invalid token type' });
     const user = await User.findByPk(decoded.userId);
     if (!user || user.role !== 'SuperAdmin') return res.status(404).json({ success: false, message: 'User not found' });

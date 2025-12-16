@@ -1,8 +1,18 @@
 const request = require('supertest');
 const app = require('../../app');
-const { School: _School } = require('../../models');
+const { sequelize, School: _School } = require('../../models');
 
 describe('Schools API', () => {
+    beforeAll(async () => {
+        await sequelize.query('PRAGMA foreign_keys = OFF;');
+        await sequelize.sync({ force: true });
+        await sequelize.query('PRAGMA foreign_keys = ON;');
+    });
+
+    afterAll(async () => {
+        await sequelize.close();
+    });
+
     describe('GET /api/schools', () => {
         it('should return paginated schools', async () => {
             const response = await request(app)

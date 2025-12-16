@@ -45,6 +45,12 @@ const ContactMessage = require('./ContactMessage');
 const InvitationLog = require('./InvitationLog');
 const AdRequest = require('./AdRequest');
 
+// Accounting Models
+const Account = require('./Account');
+const JournalEntry = require('./JournalEntry');
+const JournalEntryLine = require('./JournalEntryLine');
+const FiscalPeriod = require('./FiscalPeriod');
+
 
 // Define associations
 // School <-> Subscription (One-to-One)
@@ -248,7 +254,54 @@ const db = {
   ContactMessage,
   InvitationLog,
   AdRequest,
+  Account,
+  JournalEntry,
+  JournalEntryLine,
+  FiscalPeriod,
 };
+
+// Accounting Associations
+// School <-> Account (One-to-Many)
+School.hasMany(Account, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+Account.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+// Account <-> Account (Self-referencing for hierarchy)
+Account.hasMany(Account, { as: 'Children', foreignKey: 'parentId', onDelete: 'SET NULL' });
+Account.belongsTo(Account, { as: 'Parent', foreignKey: 'parentId', onDelete: 'SET NULL' });
+
+// School <-> FiscalPeriod (One-to-Many)
+School.hasMany(FiscalPeriod, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+FiscalPeriod.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+// School <-> JournalEntry (One-to-Many)
+School.hasMany(JournalEntry, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+JournalEntry.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+// FiscalPeriod <-> JournalEntry (One-to-Many)
+FiscalPeriod.hasMany(JournalEntry, { foreignKey: 'fiscalPeriodId', onDelete: 'SET NULL' });
+JournalEntry.belongsTo(FiscalPeriod, { foreignKey: 'fiscalPeriodId', onDelete: 'SET NULL' });
+
+// JournalEntry <-> JournalEntryLine (One-to-Many)
+JournalEntry.hasMany(JournalEntryLine, { foreignKey: 'journalEntryId', onDelete: 'CASCADE', hooks: true });
+JournalEntryLine.belongsTo(JournalEntry, { foreignKey: 'journalEntryId', onDelete: 'CASCADE' });
+
+// Account <-> JournalEntryLine (One-to-Many)
+Account.hasMany(JournalEntryLine, { foreignKey: 'accountId', onDelete: 'RESTRICT' });
+JournalEntryLine.belongsTo(Account, { foreignKey: 'accountId', onDelete: 'RESTRICT' });
+
+// Expense <-> Account (Many-to-One)
+Expense.belongsTo(Account, { foreignKey: 'accountId', onDelete: 'SET NULL' });
+Account.hasMany(Expense, { foreignKey: 'accountId', onDelete: 'SET NULL' });
+
+// User <-> JournalEntry (createdBy, postedBy, closedBy)
+User.hasMany(JournalEntry, { as: 'CreatedEntries', foreignKey: 'createdBy', onDelete: 'RESTRICT' });
+JournalEntry.belongsTo(User, { as: 'Creator', foreignKey: 'createdBy', onDelete: 'RESTRICT' });
+
+User.hasMany(JournalEntry, { as: 'PostedEntries', foreignKey: 'postedBy', onDelete: 'SET NULL' });
+JournalEntry.belongsTo(User, { as: 'Poster', foreignKey: 'postedBy', onDelete: 'SET NULL' });
+
+User.hasMany(FiscalPeriod, { as: 'ClosedPeriods', foreignKey: 'closedBy', onDelete: 'SET NULL' });
+FiscalPeriod.belongsTo(User, { as: 'Closer', foreignKey: 'closedBy', onDelete: 'SET NULL' });
 
 module.exports = db;
 

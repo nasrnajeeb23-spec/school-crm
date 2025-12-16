@@ -112,9 +112,9 @@ router.post('/login', validate([
       permissions: user.permissions || [],
       tokenVersion: user.tokenVersion || 0
     };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' });
     const refreshSecret = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
-    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
+    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d', algorithm: 'HS256' });
 
     const { password: _, ...userData } = user.toJSON();
     res.json({ token, refreshToken, user: userData });
@@ -143,7 +143,7 @@ router.post('/trial-signup', validate([
     const exists = await User.findOne({ where: { email: adminEmail } });
     if (exists) return res.status(400).json({ msg: 'Email already in use' });
 
-    const school = await School.create({ name: schoolName, contactEmail: adminEmail });
+    const school = await School.create({ name: schoolName, email: adminEmail });
     await SchoolSettings.create({
       schoolId: school.id,
       schoolName,
@@ -175,9 +175,9 @@ router.post('/trial-signup', validate([
     const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD', 'MANAGE_STUDENTS', 'MANAGE_TEACHERS', 'MANAGE_PARENTS', 'MANAGE_CLASSES', 'MANAGE_FINANCE', 'MANAGE_TRANSPORTATION', 'MANAGE_ATTENDANCE', 'MANAGE_GRADES', 'MANAGE_REPORTS', 'MANAGE_SETTINGS', 'MANAGE_MODULES'] });
 
     const payload = { id: user.id, role: user.role, schoolId: user.schoolId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' });
     const refreshSecret = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
-    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
+    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d', algorithm: 'HS256' });
 
     const data = user.toJSON();
     delete data.password;
@@ -238,11 +238,11 @@ router.post('/refresh', async (req, res) => {
     const refreshSecret = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
     const token = req.body?.refreshToken || req.headers['x-refresh-token'] || '';
     if (!token) return res.status(400).json({ msg: 'Missing refresh token' });
-    const payload = jwt.verify(token, refreshSecret);
+    const payload = jwt.verify(token, refreshSecret, { algorithms: ['HS256'] });
     const user = await User.findByPk(payload.id);
     if (!user) return res.status(404).json({ msg: 'User not found' });
     if (Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) return res.status(401).json({ msg: 'Token revoked' });
-    const access = jwt.sign({ id: user.id, role: user.role, schoolId: user.schoolId || null, teacherId: user.teacherId || null, parentId: user.parentId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '12h' });
+    const access = jwt.sign({ id: user.id, role: user.role, schoolId: user.schoolId || null, teacherId: user.teacherId || null, parentId: user.parentId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' });
     res.json({ token: access });
   } catch (e) {
     res.status(401).json({ msg: 'Invalid refresh token' });
@@ -257,7 +257,7 @@ router.post('/invite/set-password', validate([
   try {
     const { token, newPassword } = req.body || {};
     let payload;
-    try { payload = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ msg: 'Invalid or expired token' }); }
+    try { payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); } catch { return res.status(401).json({ msg: 'Invalid or expired token' }); }
     if (String(payload.type || '') !== 'invite') return res.status(401).json({ msg: 'Invalid token type' });
     const user = await User.findByPk(Number(payload.id));
     if (!user) return res.status(404).json({ msg: 'User not found' });
@@ -285,9 +285,9 @@ router.post('/invite/set-password', validate([
       permissions: user.permissions || [],
       tokenVersion: user.tokenVersion || 0
     };
-    const accessToken = jwt.sign(accessPayload, JWT_SECRET, { expiresIn: '12h' });
+    const accessToken = jwt.sign(accessPayload, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' });
     const refreshSecret = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
-    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
+    const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d', algorithm: 'HS256' });
     const userJson = user.toJSON();
     delete userJson.password;
     return res.json({ token: accessToken, refreshToken, user: userJson });

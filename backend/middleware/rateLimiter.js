@@ -9,7 +9,14 @@ const createRateLimiter = (options = {}) => {
         message = 'تم تجاوز الحد المسموح من الطلبات، يرجى المحاولة لاحقاً',
         skipSuccessfulRequests = false,
         skipFailedRequests = false,
-        keyGenerator = (req) => req.ip,
+        keyGenerator = (req) => {
+            // If authenticated, use user ID to handle NAT/School WiFi scenarios
+            if (req.user && req.user.id) {
+                return `user_${req.user.id}`;
+            }
+            // Fallback to IP for unauthenticated requests
+            return req.ip;
+        },
         handler = (req, res) => {
             res.status(429).json({
                 success: false,
@@ -34,7 +41,7 @@ const createRateLimiter = (options = {}) => {
     };
 
     // Use Redis store if available
-    if (process.env.REDIS_URL) {
+    if (process.env.REDIS_URL && process.env.NODE_ENV !== 'test') {
         try {
             limiterOptions.store = new RedisStore({
                 sendCommand: (...args) => require('../config/redis').sendCommand(...args)
@@ -73,7 +80,7 @@ const rateLimiters = {
     // Rate limiter for API endpoints
     api: createRateLimiter({
         windowMs: 1 * 60 * 1000, // 1 minute
-        max: 30 // 30 requests per minute
+        max: 300 // 300 requests per minute (increased for dashboard concurrency)
     }),
 
     // Rate limiter for file uploads

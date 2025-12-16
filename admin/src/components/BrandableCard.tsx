@@ -10,7 +10,7 @@ interface BrandableCardProps {
 }
 
 const BrandableCard: React.FC<BrandableCardProps> = ({ children, className, schoolSettings }) => (
-    <div className={`bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-full min-h-[16rem] ${className}`}>
         {schoolSettings && (
             <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 mb-6">
                 {schoolSettings.schoolLogoUrl && (

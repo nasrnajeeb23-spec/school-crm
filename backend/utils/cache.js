@@ -3,6 +3,8 @@ const redis = require('redis');
 // Redis client configuration
 let redisClient = null;
 let isConnected = false;
+const memoryStore = new Map();
+const memoryExpiry = new Map();
 
 // Initialize Redis client
 const initRedis = async () => {
@@ -64,7 +66,15 @@ const cache = {
     get: async (key) => {
         try {
             const client = getRedisClient();
-            if (!client) return null;
+            if (!client) {
+                const exp = memoryExpiry.get(key);
+                if (exp && Date.now() > exp) {
+                    memoryStore.delete(key);
+                    memoryExpiry.delete(key);
+                    return null;
+                }
+                return memoryStore.has(key) ? memoryStore.get(key) : null;
+            }
 
             const value = await client.get(key);
             if (!value) return null;
@@ -80,7 +90,11 @@ const cache = {
     set: async (key, value, ttl = 3600) => {
         try {
             const client = getRedisClient();
-            if (!client) return false;
+            if (!client) {
+                memoryStore.set(key, value);
+                memoryExpiry.set(key, Date.now() + (Number(ttl) * 1000));
+                return true;
+            }
 
             await client.setEx(key, ttl, JSON.stringify(value));
             return true;
@@ -94,7 +108,11 @@ const cache = {
     del: async (key) => {
         try {
             const client = getRedisClient();
-            if (!client) return false;
+            if (!client) {
+                memoryStore.delete(key);
+                memoryExpiry.delete(key);
+                return true;
+            }
 
             await client.del(key);
             return true;
@@ -108,7 +126,16 @@ const cache = {
     delPattern: async (pattern) => {
         try {
             const client = getRedisClient();
-            if (!client) return false;
+            if (!client) {
+                const regex = new RegExp('^' + String(pattern).replace(/\*/g, '.*') + '$');
+                for (const k of Array.from(memoryStore.keys())) {
+                    if (regex.test(k)) {
+                        memoryStore.delete(k);
+                        memoryExpiry.delete(k);
+                    }
+                }
+                return true;
+            }
 
             const keys = await client.keys(pattern);
             if (keys.length > 0) {
@@ -125,7 +152,15 @@ const cache = {
     exists: async (key) => {
         try {
             const client = getRedisClient();
-            if (!client) return false;
+            if (!client) {
+                const exp = memoryExpiry.get(key);
+                if (exp && Date.now() > exp) {
+                    memoryStore.delete(key);
+                    memoryExpiry.delete(key);
+                    return false;
+                }
+                return memoryStore.has(key);
+            }
 
             return await client.exists(key) === 1;
         } catch (error) {
@@ -138,7 +173,12 @@ const cache = {
     ttl: async (key) => {
         try {
             const client = getRedisClient();
-            if (!client) return -1;
+            if (!client) {
+                const exp = memoryExpiry.get(key);
+                if (!exp) return -1;
+                const rem = Math.max(0, Math.ceil((exp - Date.now()) / 1000));
+                return rem;
+            }
 
             return await client.ttl(key);
         } catch (error) {
@@ -151,7 +191,12 @@ const cache = {
     incr: async (key) => {
         try {
             const client = getRedisClient();
-            if (!client) return null;
+            if (!client) {
+                const cur = memoryStore.has(key) ? memoryStore.get(key) : 0;
+                const next = Number(cur) + 1;
+                memoryStore.set(key, next);
+                return next;
+            }
 
             return await client.incr(key);
         } catch (error) {
@@ -164,7 +209,10 @@ const cache = {
     expireAt: async (key, timestamp) => {
         try {
             const client = getRedisClient();
-            if (!client) return false;
+            if (!client) {
+                memoryExpiry.set(key, Number(timestamp) * 1000);
+                return true;
+            }
 
             await client.expireAt(key, timestamp);
             return true;
