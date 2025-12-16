@@ -109,7 +109,7 @@ router.get('/parent/:parentId', verifyToken, requireRole('PARENT'), requireModul
     let nearestStop = null;
     const stops = Array.isArray(route.stops) ? route.stops : [];
     const loc = student.homeLocation || {};
-    function haversine(lat1, lon1, lat2, lon2) {
+    const haversine = (lat1, lon1, lat2, lon2) => {
       const toRad = d => d * Math.PI / 180;
       const R = 6371;
       const dLat = toRad(lat2 - lat1);
@@ -117,7 +117,7 @@ router.get('/parent/:parentId', verifyToken, requireRole('PARENT'), requireModul
       const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
-    }
+    };
     if (typeof loc.lat === 'number' && typeof loc.lng === 'number') {
       for (let i = 0; i < stops.length; i++) {
         const st = stops[i] || {};
@@ -238,7 +238,7 @@ router.post('/:schoolId/auto-assign', verifyToken, requireRole('SCHOOL_ADMIN', '
     const assigned = [];
     const skipped = [];
 
-    function haversine(lat1, lon1, lat2, lon2) {
+    const haversine = (lat1, lon1, lat2, lon2) => {
       const toRad = d => d * Math.PI / 180;
       const R = 6371;
       const dLat = toRad(lat2 - lat1);
@@ -246,9 +246,9 @@ router.post('/:schoolId/auto-assign', verifyToken, requireRole('SCHOOL_ADMIN', '
       const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
-    }
+    };
 
-    function normalize(s) { return String(s || '').toLowerCase().trim(); }
+    const normalize = (s) => String(s || '').toLowerCase().trim();
 
     const fallbackToText = options.fallbackToText !== false;
     for (const s of students) {
@@ -361,7 +361,7 @@ router.post('/:schoolId/auto-assign/preview', verifyToken, requireRole('SCHOOL_A
     const assigned = [];
     const skipped = [];
 
-    function haversine(lat1, lon1, lat2, lon2) {
+    const haversine = (lat1, lon1, lat2, lon2) => {
       const toRad = d => d * Math.PI / 180;
       const R = 6371;
       const dLat = toRad(lat2 - lat1);
@@ -369,9 +369,9 @@ router.post('/:schoolId/auto-assign/preview', verifyToken, requireRole('SCHOOL_A
       const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
-    }
+    };
 
-    function normalize(s) { return String(s || '').toLowerCase().trim(); }
+    const normalize = (s) => String(s || '').toLowerCase().trim();
 
     const fallbackToText = options.fallbackToText !== false;
     for (const s of students) {

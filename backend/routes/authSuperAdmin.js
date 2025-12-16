@@ -156,7 +156,7 @@ const checkRateLimit = async (identifier, maxAttempts = DEFAULT_MAX_ATTEMPTS, lo
   if (attempts && attempts.count >= maxAttempts) {
     const timeDiff = now - attempts.lastAttempt;
     if (timeDiff < lockoutMs) {
-      const remainingTime = Math.ceil((LOCKOUT_DURATION - timeDiff) / 1000);
+      const remainingTime = Math.ceil((lockoutMs - timeDiff) / 1000);
       return { allowed: false, remainingTime, attempts: attempts.count };
     } else {
       loginAttempts.delete(identifier);

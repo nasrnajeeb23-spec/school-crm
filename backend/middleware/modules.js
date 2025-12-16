@@ -66,7 +66,6 @@ function requireModule(moduleId) {
         }
         return res.status(402).json({ msg: 'Subscription required' });
       }
-      next();
     } catch (e) {
       console.error(`Module check error for ${moduleId}:`, e);
       return res.status(403).json({ msg: `Module access check failed`, error: e?.message });

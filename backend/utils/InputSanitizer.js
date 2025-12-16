@@ -175,23 +175,20 @@ class InputSanitizer {
      */
     escapeSQL(input) {
         if (!input) return '';
-        return String(input).replace(/[\0\x08\x09\x1a\n\r"'\\\%]/g, (char) => {
-            switch (char) {
-                case '\0': return '\\0';
-                case '\x08': return '\\b';
-                case '\x09': return '\\t';
-                case '\x1a': return '\\z';
-                case '\n': return '\\n';
-                case '\r': return '\\r';
-                case '"':
-                case "'":
-                case '\\':
-                case '%':
-                    return '\\' + char;
-                default:
-                    return char;
-            }
-        });
+        const str = String(input);
+        let out = '';
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+            if (char === '\0') out += '\\0';
+            else if (char === '\x08') out += '\\b';
+            else if (char === '\x09') out += '\\t';
+            else if (char === '\x1a') out += '\\z';
+            else if (char === '\n') out += '\\n';
+            else if (char === '\r') out += '\\r';
+            else if (char === '"' || char === "'" || char === '\\' || char === '%') out += '\\' + char;
+            else out += char;
+        }
+        return out;
     }
 
     /**

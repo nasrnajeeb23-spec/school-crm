@@ -12,28 +12,28 @@ class ReportService {
    * @returns {Promise<Buffer>} PDF Buffer
    */
   static async generateReportCard(studentId, schoolId) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const student = await Student.findByPk(studentId, {
-          include: [{ model: Class }]
-        });
-        
-        if (!student) throw new Error('Student not found');
-        if (Number(student.schoolId) !== Number(schoolId)) throw new Error('Access denied');
+    const student = await Student.findByPk(studentId, {
+      include: [{ model: Class }]
+    });
+    
+    if (!student) throw new Error('Student not found');
+    if (Number(student.schoolId) !== Number(schoolId)) throw new Error('Access denied');
 
-        const grades = await Grade.findAll({
-          where: { studentId },
-          order: [['subject', 'ASC']]
-        });
+    const grades = await Grade.findAll({
+      where: { studentId },
+      order: [['subject', 'ASC']]
+    });
 
-        const school = await School.findByPk(schoolId);
-        const fontPath = path.join(__dirname, '../assets/fonts/arial.ttf');
-
-        const doc = new PDFDocument({ margin: 50 });
-        const buffers = [];
-        doc.on('data', buffers.push.bind(buffers));
-        doc.on('end', () => resolve(Buffer.concat(buffers)));
-        doc.on('error', reject);
+    const school = await School.findByPk(schoolId);
+    const fontPath = path.join(__dirname, '../assets/fonts/arial.ttf');
+    
+    const doc = new PDFDocument({ margin: 50 });
+    const buffers = [];
+    const resultPromise = new Promise((resolve, reject) => {
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+    });
 
         // Register Font
         if (fs.existsSync(fontPath)) {
@@ -134,12 +134,8 @@ class ReportService {
         const avgText = processArabic(`المعدل العام: ${average}%`);
         doc.text(avgText, 50, doc.y, { align: 'left' }); // Arabic reversed is tricky with numbers mixed
 
-        doc.end();
-
-      } catch (error) {
-        reject(error);
-      }
-    });
+    doc.end();
+    return await resultPromise;
   }
 }
 

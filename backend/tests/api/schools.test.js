@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../../app');
-const { School } = require('../../models');
+const { School: _School } = require('../../models');
 
 describe('Schools API', () => {
     describe('GET /api/schools', () => {

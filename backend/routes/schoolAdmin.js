@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, Expense, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord, CommunicationUsage } = require('../models');
+const { School, Student, Teacher, Class, Parent, Invoice, Expense, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord, CommunicationUsage, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission, JWT_SECRET } = require('../middleware/auth');
 const { requireWithinLimits, normalizeLimits } = require('../middleware/limits');
 const { requireModule } = require('../middleware/modules');
@@ -12,9 +12,57 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const sequelize = require('../config/db'); // ensure sequelize is available for aggregations
+const path = require('path');
+const fs = require('fs');
+const fse = require('fs-extra');
+const archiver = require('archiver');
+const { verifyFileSignature, scanFile } = require('../utils/fileSecurity');
 
 // ... existing code ...
 
+function parseFileSizeToBytes(size) {
+  try {
+    if (size == null) return 0;
+    const s = String(size).trim().toUpperCase();
+    if (/^\d+$/.test(s)) return Number(s);
+    const m = s.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)$/);
+    if (!m) return 0;
+    const val = parseFloat(m[1]);
+    const unit = m[2];
+    const factor = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3, TB: 1024 ** 4 }[unit] || 1;
+    return Math.round(val * factor);
+  } catch { return 0; }
+}
+
+function parseSlot(s) {
+  try {
+    const parts = String(s).split('-');
+    const a = (parts[0] || '').trim();
+    const b = (parts[1] || '').trim();
+    const toMin = (hm) => {
+      const t = String(hm).split(':');
+      const h = Number(t[0]);
+      const m = Number(t[1]);
+      return h * 60 + m;
+    };
+    const start = toMin(a);
+    const end = toMin(b);
+    return { start, end, ok: Number.isFinite(start) && Number.isFinite(end) && start < end };
+  } catch {
+    return { start: 0, end: 0, ok: false };
+  }
+}
+
+function resolveStage(grade, stages, map) {
+  for (const st of stages) {
+    const arr = map[st] || [];
+    if (arr.includes(String(grade))) return st;
+  }
+  if (String(grade).includes('ثانوي')) return 'ثانوي';
+  if (String(grade).includes('إعدادي')) return 'إعدادي';
+  if (String(grade).includes('الصف')) return 'ابتدائي';
+  return stages[0];
+}
 // @route   GET api/school/:schoolId/dashboard/complete
 // @desc    Get complete dashboard data in one go
 // @access  Private (SchoolAdmin)
@@ -623,7 +671,7 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
       teacherAttendanceByTeacher.set(key, arr);
     }
     const toCreate = [];
-    function computeSlip(personType, id, structId) {
+    const computeSlip = (personType, id, structId) => {
       const struct = structMap.get(structId);
       if (!struct) return null;
       let base = Number(struct.baseAmount || 0);
@@ -640,10 +688,10 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
       const allowancesArr = Array.isArray(struct.allowances) ? [...struct.allowances] : [];
       const deductionsArr = Array.isArray(struct.deductions) ? [...struct.deductions] : [];
       const rows = personType === 'staff' ? (staffAttendanceByUser.get(String(id)) || []) : (teacherAttendanceByTeacher.get(String(id)) || []);
-      const absentDays = rows.filter(r => String(r.status).toLowerCase() === 'absent').length;
+      const absenceDays = rows.filter(r => String(r.status).toLowerCase() === 'absent').length;
       const lateMinutes = rows.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
       const overtimeMinutes = rows.reduce((sum, r) => sum + Number(r.overtimeMinutes || 0), 0);
-      const absencePenalty = Number(struct.absencePenaltyPerDay || 0) * absentDays;
+      const absencePenalty = Number(struct.absencePenaltyPerDay || 0) * absenceDays;
       const latePenalty = Number(struct.latePenaltyPerMinute || 0) * lateMinutes;
       const overtimeRatePerMinute = struct.overtimeRatePerMinute != null ? Number(struct.overtimeRatePerMinute) : (Number(struct.hourlyRate || 0) / 60);
       const overtimeAllowance = overtimeRatePerMinute * overtimeMinutes;
@@ -1054,7 +1102,7 @@ router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SC
       user.isActive = !!isActive;
       await user.save();
     }
-    teacher.status = !!isActive ? 'Active' : 'OnLeave';
+    teacher.status = isActive ? 'Active' : 'OnLeave';
     await teacher.save();
 
     const statusMap = { 'Active': 'نشط', 'OnLeave': 'في إجازة' };
@@ -1356,17 +1404,6 @@ router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN',
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
     const validDays = new Set(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']);
-    function parseSlot(s) {
-      try {
-        const parts = String(s).split('-');
-        const a = (parts[0] || '').trim();
-        const b = (parts[1] || '').trim();
-        const toMin = (hm) => { const t = String(hm).split(':'); const h = Number(t[0]); const m = Number(t[1]); return h * 60 + m; };
-        const start = toMin(a);
-        const end = toMin(b);
-        return { start, end, ok: Number.isFinite(start) && Number.isFinite(end) && start < end };
-      } catch { return { start: 0, end: 0, ok: false }; }
-    }
     const normalized = [];
     const teacherIds = new Set();
     const daysSet = new Set();
@@ -1774,7 +1811,7 @@ router.put('/:schoolId/parents/:parentId/status', verifyToken, requireRole('SCHO
       user.isActive = !!isActive;
       await user.save();
     }
-    parent.status = !!isActive ? 'Active' : 'Invited';
+    parent.status = isActive ? 'Active' : 'Invited';
     await parent.save();
 
     const statusMap = { 'Active': 'نشط', 'Invited': 'مدعو' };
@@ -2176,7 +2213,7 @@ router.get('/:schoolId/students/:studentId/statement', verifyToken, requireRole(
       return { ...t, balance, date: new Date(t.date).toISOString().split('T')[0] };
     });
 
-    res.json(settings);
+    res.json({ statement });
   } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error', error: err.message }); }
 });
 
@@ -3292,16 +3329,6 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
       "إعدادي": ["أول إعدادي", "ثاني إعدادي", "ثالث إعدادي"],
       "ثانوي": ["أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"],
     };
-    function resolveStage(grade) {
-      for (const st of stages) {
-        const arr = map[st] || [];
-        if (arr.includes(String(grade))) return st;
-      }
-      if (String(grade).includes('ثانوي')) return 'ثانوي';
-      if (String(grade).includes('إعدادي')) return 'إعدادي';
-      if (String(grade).includes('الصف')) return 'ابتدائي';
-      return stages[0];
-    }
     let targetStudents = [];
     if (Array.isArray(req.body.studentIds) && req.body.studentIds.length > 0) {
       targetStudents = await Student.findAll({ where: { schoolId, id: { [Op.in]: req.body.studentIds } } });
@@ -3316,7 +3343,7 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
           if (!c) { c = await Class.findByPk(String(s.classId)); if (c) clsMap.set(String(s.classId), c); }
           if (c) g = c.gradeLevel;
         }
-        const st = resolveStage(g);
+        const st = resolveStage(g, stages, map);
         if (st === stage) targetStudents.push(s);
       }
     } else {
@@ -3333,7 +3360,7 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
         const c = await Class.findByPk(String(s.classId));
         if (c) g = c.gradeLevel;
       }
-      const st = stage || resolveStage(g);
+      const st = stage || resolveStage(g, stages, map);
       const fee = feeByStage.get(st);
       if (!fee) continue;
       const tags = Array.isArray(discountTagsByStudentId[String(s.id)]) ? discountTagsByStudentId[String(s.id)] : defaultDiscounts;
@@ -3689,3 +3716,4 @@ router.post('/:schoolId/staff-attendance/bulk', verifyToken, requireSameSchoolPa
 });
 
 module.exports = router;
+module.exports.__test__ = { parseSlot, resolveStage };

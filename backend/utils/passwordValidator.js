@@ -39,7 +39,9 @@ function validatePasswordStrength(password) {
     }
 
     // رمز خاص
-    if (requirements.requireSpecialChars && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    const specials = "!@#$%^&*()_+-=[]{};':\"\\|,.<>/?";
+    const hasSpecial = [...specials].some(ch => password.includes(ch));
+    if (requirements.requireSpecialChars && !hasSpecial) {
         errors.push('كلمة المرور يجب أن تحتوي على رمز خاص واحد على الأقل (!@#$%^&*...)');
     }
 
@@ -80,7 +82,11 @@ function calculatePasswordStrength(password) {
     if (/[a-z]/.test(password)) strength += 15;
     if (/[A-Z]/.test(password)) strength += 15;
     if (/[0-9]/.test(password)) strength += 15;
-    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) strength += 15;
+    {
+        const specials = "!@#$%^&*()_+-=[]{};':\"\\|,.<>/?";
+        const hasSpecial = [...specials].some(ch => password.includes(ch));
+        if (hasSpecial) strength += 15;
+    }
 
     return Math.min(100, strength);
 }
