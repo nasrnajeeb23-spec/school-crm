@@ -498,6 +498,7 @@ export interface Teacher {
     joinDate: string;
     department?: string;
     bankAccount?: string;
+    email?: string;
     lastInviteAt?: string;
     lastInviteChannel?: 'email' | 'sms' | 'manual' | string;
 }

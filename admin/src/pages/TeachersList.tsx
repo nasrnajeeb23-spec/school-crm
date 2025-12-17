@@ -67,9 +67,13 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
     }
   };
 
-  const filteredTeachers = teachers.filter(teacher =>
-    teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTeachers = teachers.filter(teacher => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return true;
+    const nameMatch = (teacher.name || '').toLowerCase().includes(term);
+    const emailMatch = (teacher.email || '').toLowerCase().includes(term);
+    return nameMatch || emailMatch;
+  });
 
   const [sendingId, setSendingId] = useState<string | number | null>(null);
   const [channelByTeacher, setChannelByTeacher] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
@@ -182,6 +186,7 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                 <tr>
                   <th scope="col" className="px-6 py-3">اسم المعلم</th>
                   <th scope="col" className="px-6 py-3">المادة</th>
+                  <th scope="col" className="px-6 py-3">البريد الإلكتروني</th>
                   <th scope="col" className="px-6 py-3">رقم الاتصال</th>
                   <th scope="col" className="px-6 py-3">الحالة</th>
                   <th scope="col" className="px-6 py-3">تاريخ الانضمام</th>
@@ -193,6 +198,7 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                   <tr key={teacher.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{teacher.name}</td>
                     <td className="px-6 py-4">{teacher.subject}</td>
+                    <td className="px-6 py-4" dir="ltr">{(teacher as any).email || '—'}</td>
                     <td className="px-6 py-4" dir="ltr">{teacher.phone}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
@@ -228,7 +234,7 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
                         onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
                         className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
                       >
-                          <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
+                          <option value="email" disabled={!((teacher.email && String(teacher.email).trim() !== ''))}>البريد الإلكتروني (مدفوع)</option>
                           <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
                           <option value="manual">مشاركة يدوية (مجاني)</option>
                         </select>

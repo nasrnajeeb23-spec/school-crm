@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Teacher, TeacherStatus, Class, UpdatableTeacherData, SchoolSettings, AttendanceStatus } from '../types';
+import { Teacher, TeacherStatus, Class, UpdatableTeacherData, SchoolSettings, AttendanceStatus, ScheduleEntry } from '../types';
 import * as api from '../api';
 import { BackIcon, EditIcon, PrintIcon, ClassesIcon, CalendarIcon } from '../components/icons';
 import EditTeacherModal from '../components/EditTeacherModal';
@@ -41,6 +41,8 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
   const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus | null>(null);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
   useEffect(() => {
     if (!teacherId) return;
@@ -105,6 +107,15 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
       })
       .finally(() => setAttendanceLoading(false));
   }, [teacher, schoolId, attendanceDate, addToast]);
+
+  useEffect(() => {
+    if (!teacher) return;
+    setScheduleLoading(true);
+    api.getTeacherScheduleForSchool(schoolId, teacher.id)
+      .then(rows => setSchedule(Array.isArray(rows) ? rows : []))
+      .catch(() => { addToast('فشل تحميل جدول المعلم.', 'error'); })
+      .finally(() => setScheduleLoading(false));
+  }, [teacher, schoolId, addToast]);
 
   const handleUpdateTeacher = async (data: UpdatableTeacherData) => {
     if (!teacher) return;
@@ -237,7 +248,7 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
                 <div className="flex-grow text-center md:text-right">
                     <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{teacher.name}</h2>
                     <div className="flex items-center justify-center md:justify-start gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    <span>المادة: {teacher.subject}</span><span>|</span><span dir="ltr">الهاتف: {teacher.phone}</span><span>|</span><span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>{teacher.status}</span>
+                    <span>المادة: {teacher.subject}</span><span>|</span><span dir="ltr">البريد: {teacher.email || '—'}</span><span>|</span><span dir="ltr">الهاتف: {teacher.phone}</span><span>|</span><span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>{teacher.status}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -253,6 +264,56 @@ const TeacherProfile: React.FC<TeacherProfileProps> = ({ schoolId, schoolSetting
                     </button>
                 </div>
             </div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+          <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-4">بيانات المعلم</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="text-sm text-gray-600 dark:text-gray-300">تاريخ الانضمام</div>
+              <div className="text-base font-semibold text-gray-800 dark:text-white">{teacher.joinDate || '—'}</div>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="text-sm text-gray-600 dark:text-gray-300">القسم</div>
+              <div className="text-base font-semibold text-gray-800 dark:text-white">{teacher.department || '—'}</div>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="text-sm text-gray-600 dark:text-gray-300">رقم الحساب/البنك</div>
+              <div className="text-base font-semibold text-gray-800 dark:text-white" dir="ltr">{teacher.bankAccount || '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+          <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-4 flex items-center"><CalendarIcon className="h-6 w-6 ml-2 text-teال-500" />الجدول الدراسي</h3>
+          {scheduleLoading ? (
+            <p>جاري تحميل الجدول...</p>
+          ) : schedule.length === 0 ? (
+            <p className="text-center text-gray-500 dark:text-gray-400 py-4">لا يوجد جدول مسجل لهذا المعلم.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                  <tr>
+                    <th className="px-6 py-3">اليوم</th>
+                    <th className="px-6 py-3">الوقت</th>
+                    <th className="px-6 py-3">الفصل</th>
+                    <th className="px-6 py-3">المادة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.map((e) => (
+                    <tr key={e.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                      <td className="px-6 py-4">{e.day}</td>
+                      <td className="px-6 py-4" dir="ltr">{e.timeSlot}</td>
+                      <td className="px-6 py-4">{e.className || ''}</td>
+                      <td className="px-6 py-4">{e.subject}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">

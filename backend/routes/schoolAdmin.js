@@ -440,7 +440,7 @@ router.get('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
     const teachers = await Teacher.findAll({ 
       where: { schoolId: req.params.schoolId }, 
-      include: [{ model: User, attributes: ['id','lastInviteAt','lastInviteChannel'], required: false }],
+      include: [{ model: User, attributes: ['id','email','lastInviteAt','lastInviteChannel'], required: false }],
       order: [['name', 'ASC']], 
       limit, 
       offset 
@@ -453,6 +453,7 @@ router.get('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       return { 
         ...json, 
         status: statusMap[t.status] || t.status,
+        email: u && u.email ? String(u.email) : null,
         lastInviteAt: u && u.lastInviteAt ? new Date(u.lastInviteAt).toISOString() : null,
         lastInviteChannel: u && u.lastInviteChannel ? String(u.lastInviteChannel) : null
       };
@@ -1335,6 +1336,20 @@ router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
+// Teacher schedule for School Admin
+router.get('/:schoolId/teacher/:teacherId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const { Schedule, Class, Teacher } = require('../models');
+    const schoolId = Number(req.params.schoolId);
+    const teacherId = Number(req.params.teacherId);
+    const teacher = await Teacher.findByPk(teacherId);
+    if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (Number(teacher.schoolId) !== schoolId) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Schedule.findAll({ where: { teacherId: teacher.id }, include: [{ model: Class, attributes: ['id','gradeLevel','section'] }], order: [['day','ASC'],['timeSlot','ASC']] });
+    const list = rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: r.Class ? `${r.Class.gradeLevel} (${r.Class.section || 'أ'})` : '', day: r.day, timeSlot: r.timeSlot, subject: r.subject }));
+    res.json(list);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
 router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { entries } = req.body || {};

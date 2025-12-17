@@ -850,6 +850,10 @@ export const getTeacherSchedule = async (teacherId: string | number): Promise<Sc
     return await apiCall(`/teacher/${teacherId}/schedule`, { method: 'GET' });
 };
 
+export const getTeacherScheduleForSchool = async (schoolId: number, teacherId: string | number): Promise<ScheduleEntry[]> => {
+    return await apiCall(`/school/${schoolId}/teacher/${teacherId}/schedule`, { method: 'GET' });
+};
+
 export const getSchedule = async (classId: string): Promise<ScheduleEntry[]> => {
     return await apiCall(`/school/class/${classId}/schedule`, { method: 'GET' });
 };
