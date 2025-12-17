@@ -929,8 +929,9 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
       joinDate: new Date(),
     });
 
-    // Increment teacher count in the school
-    await school.increment('teacherCount');
+    const newCountAfterCreate = await Teacher.count({ where: { schoolId: parseInt(schoolId) } });
+    school.teacherCount = newCountAfterCreate;
+    await school.save();
 
     // Map status for frontend consistency
     const statusMap = { 'Active': 'نشط', 'OnLeave': 'في إجازة' };
@@ -1059,7 +1060,11 @@ router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SC
     await SalarySlip.destroy({ where: { personType: 'teacher', personId: String(teacher.id) } });
     await Schedule.update({ teacherId: null }, { where: { teacherId: teacher.id } });
     await teacher.destroy();
-    if (school) await school.decrement('teacherCount');
+    if (school) {
+      const newCountAfterDelete = await Teacher.count({ where: { schoolId } });
+      school.teacherCount = newCountAfterDelete;
+      await school.save();
+    }
     return res.json({ msg: 'Teacher removed' });
   } catch (err) {
     console.error(err.message);

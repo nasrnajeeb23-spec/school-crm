@@ -29,6 +29,8 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
     const [loading, setLoading] = useState(true);
     const [attendancePercent, setAttendancePercent] = useState<string>('—%');
     const [commUsage, setCommUsage] = useState<{ email: { count: number; amount: number }; sms: { count: number; amount: number }; total: number; currency: string } | null>(null);
+    const [studentsCount, setStudentsCount] = useState<number>(school.students || 0);
+    const [teachersCount, setTeachersCount] = useState<number>(school.teachers || 0);
     const navigate = useNavigate();
     const { addToast } = useToast();
 
@@ -36,9 +38,10 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [studentDistributionData, classes] = await Promise.all([
+                const [studentDistributionData, classes, countsData] = await Promise.all([
                     api.getStudentDistribution(school.id),
                     api.getSchoolClasses(school.id),
+                    api.apiCall(`/school/${school.id}/stats/counts`, { method: 'GET' })
                 ]);
                 try {
                   const invoicesData = await api.getSchoolInvoices(school.id);
@@ -47,6 +50,13 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
                   setOverdueInvoices(0);
                 }
                 setDistributionData(studentDistributionData);
+                try {
+                  const sd = countsData as any;
+                  const sc = Number(sd?.students || 0);
+                  const tc = Number(sd?.teachers || 0);
+                  setStudentsCount(sc);
+                  setTeachersCount(tc);
+                } catch {}
                 const today = new Date().toISOString().split('T')[0];
                 let total = 0;
                 let present = 0;
@@ -106,14 +116,14 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
                 <StatsCard 
                     icon={StudentsIcon} 
                     title="إجمالي الطلاب" 
-                    value={school.students.toLocaleString()}
+                    value={studentsCount.toLocaleString()}
                     description="عدد الطلاب المسجلين حالياً" 
                     onClick={() => navigate('students')}
                 />
                 <StatsCard 
                     icon={UsersIcon} 
                     title="إجمالي المعلمين" 
-                    value={school.teachers.toLocaleString()}
+                    value={teachersCount.toLocaleString()}
                     description="عدد المعلمين في المدرسة"
                     onClick={() => navigate('teachers')}
                 />

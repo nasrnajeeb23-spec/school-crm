@@ -13,25 +13,24 @@ const isStrong = (pwd: string) => {
 
 const SetPassword: React.FC = () => {
   const { addToast } = useToast();
-  const [token, setToken] = useState('');
-  const [pwd, setPwd] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [targetRole, setTargetRole] = useState<string>('');
-
-  useEffect(() => {
+  const [token, setToken] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const t = params.get('token') || '';
-      setToken(t);
       if (t) {
         try {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('last_route');
         } catch {}
       }
-    } catch {}
-  }, []);
+      return t;
+    } catch { return ''; }
+  });
+  const [pwd, setPwd] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [targetRole, setTargetRole] = useState<string>('');
+
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -60,7 +59,11 @@ const SetPassword: React.FC = () => {
     try {
       const parts = token.split('.');
       if (parts.length === 3) {
-        const b64 = (s: string) => s.replace(/-/g, '+').replace(/_/g, '/');
+        const b64 = (s: string) => {
+          const x = s.replace(/-/g, '+').replace(/_/g, '/');
+          const pad = x.length % 4 === 2 ? '==' : x.length % 4 === 3 ? '=' : x.length % 4 === 1 ? '===' : '';
+          return x + pad;
+        };
         const payload = JSON.parse(atob(b64(parts[1])));
         const expMs = Number(payload?.exp || 0) * 1000;
         if (expMs && Date.now() > expMs) {
