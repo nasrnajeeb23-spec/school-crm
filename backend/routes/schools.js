@@ -231,6 +231,7 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
   try {
     const sid = Number(req.params.id);
     const { User } = require('../models');
+    const reason = String((req.query && req.query.reason) || '').slice(0, 500);
     let s = await SchoolSettings.findOne({ where: { schoolId: sid } });
     if (!s) s = await SchoolSettings.create({ schoolId: sid, schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } });
     s.operationalStatus = 'DELETED';
@@ -238,7 +239,7 @@ router.delete('/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) 
     await User.update({ isActive: false }, { where: { schoolId: sid } });
     try {
       const { AuditLog } = require('../models');
-      await AuditLog.create({ action: 'school.delete', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: sid }), timestamp: new Date(), riskLevel: 'high' });
+      await AuditLog.create({ action: 'school.delete', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: sid, reason }), timestamp: new Date(), riskLevel: 'high' });
     } catch {}
     return res.json({ deleted: true });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }

@@ -1207,8 +1207,17 @@ export const updateSchoolOperationalStatus = async (schoolId: number, status: 'A
     return await apiCall(`/schools/${schoolId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
 };
 
-export const deleteSchool = async (schoolId: number): Promise<{ deleted: boolean }> => {
-    return await apiCall(`/schools/${schoolId}`, { method: 'DELETE' });
+export const deleteSchool = async (schoolId: number, reason?: string): Promise<{ deleted: boolean }> => {
+    const qs = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+    return await apiCall(`/schools/${schoolId}${qs}`, { method: 'DELETE' });
+};
+
+export const getDeletedSchools = async (): Promise<School[]> => {
+    return await apiCall('/superadmin/schools/deleted', { method: 'GET' });
+};
+
+export const restoreSchool = async (schoolId: number): Promise<{ restored: boolean; schoolId: number }> => {
+    return await apiCall(`/superadmin/schools/${schoolId}/restore`, { method: 'PUT' });
 };
 
 export const getDashboardStats = async (): Promise<any> => {

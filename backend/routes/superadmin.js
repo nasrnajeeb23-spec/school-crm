@@ -772,4 +772,47 @@ router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_AD
     }
 });
 
+router.get('/schools/deleted', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { SchoolSettings } = require('../models');
+    const { Op } = require('sequelize');
+    const deletedSettings = await SchoolSettings.findAll({ where: { operationalStatus: 'DELETED' } });
+    const ids = deletedSettings.map(r => Number(r.schoolId));
+    if (!ids.length) return res.json([]);
+    const rows = await School.findAll({
+      where: { id: { [Op.in]: ids } },
+      include: [{ model: Subscription, include: { model: Plan } }],
+      order: [['name', 'ASC']],
+    });
+    const formatted = rows.map(school => {
+      const s = school.toJSON();
+      return {
+        id: s.id,
+        name: s.name,
+        plan: s.Subscription?.Plan?.name || 'N/A',
+        status: 'DELETED',
+        students: s.studentCount,
+        teachers: s.teacherCount,
+        balance: parseFloat(s.balance),
+        joinDate: new Date(s.createdAt).toISOString().split('T')[0],
+      };
+    });
+    res.json(formatted);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/schools/:id/restore', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const sid = Number(req.params.id);
+    const { SchoolSettings, AuditLog } = require('../models');
+    let s = await SchoolSettings.findOne({ where: { schoolId: sid } });
+    if (!s) s = await SchoolSettings.create({ schoolId: sid, schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } });
+    s.operationalStatus = 'ACTIVE';
+    await s.save();
+    try { await User.update({ isActive: true }, { where: { schoolId: sid } }); } catch {}
+    try { await AuditLog.create({ action: 'school.restore', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: sid }), timestamp: new Date(), riskLevel: 'medium' }); } catch {}
+    return res.json({ restored: true, schoolId: sid });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
 module.exports = router;

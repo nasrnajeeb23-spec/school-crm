@@ -21,20 +21,22 @@ const SchoolsList: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
   const { addToast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
-    api.getSchools().then(data => {
+    const fetcher = showDeleted ? api.getDeletedSchools : api.getSchools;
+    fetcher().then(data => {
       setSchools(data);
     }).catch(error => {
-        console.error("Failed to fetch schools:", error);
-        addToast("فشل تحميل قائمة المدارس. الرجاء المحاولة مرة أخرى.", 'error');
+      console.error("Failed to fetch schools:", error);
+      addToast("فشل تحميل قائمة المدارس. الرجاء المحاولة مرة أخرى.", 'error');
     }).finally(() => {
-        setLoading(false);
+      setLoading(false);
     });
-  }, [addToast]);
+  }, [addToast, showDeleted]);
   
   const handleAddSchool = async (data: NewSchoolData) => {
       try {
@@ -63,6 +65,12 @@ const SchoolsList: React.FC = () => {
           >
             <PlusIcon className="h-5 w-5 ml-2" />
             إضافة مدرسة
+          </button>
+          <button
+            onClick={() => setShowDeleted(v => !v)}
+            className={`ml-2 px-4 py-2 rounded-lg transition-colors ${showDeleted ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+          >
+            {showDeleted ? 'عرض النشطة' : 'عرض المحذوفة'}
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -94,16 +102,40 @@ const SchoolsList: React.FC = () => {
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{school.name}</td>
                     <td className="px-6 py-4">{school.plan}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[school.status]}`}>
-                        {school.status}
-                      </span>
+                      {showDeleted ? (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+                          محذوفة
+                        </span>
+                      ) : (
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[school.status]}`}>
+                          {school.status}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">{school.students}</td>
                     <td className={`px-6 py-4 font-semibold ${school.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>${school.balance.toFixed(2)}</td>
                     <td className="px-6 py-4">
-                      <button onClick={() => handleManageSchool(school)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">
-                        إدارة
-                      </button>
+                      {showDeleted ? (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await api.restoreSchool(school.id);
+                              setSchools(prev => prev.filter(s => s.id !== school.id));
+                              addToast('تم استرجاع المدرسة.', 'success');
+                            } catch (e) {
+                              console.error('Restore failed', e);
+                              addToast('فشل استرجاع المدرسة.', 'error');
+                            }
+                          }}
+                          className="font-medium text-green-600 dark:text-green-400 hover:underline"
+                        >
+                          استرجاع
+                        </button>
+                      ) : (
+                        <button onClick={() => handleManageSchool(school)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">
+                          إدارة
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
