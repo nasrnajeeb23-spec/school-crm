@@ -35,6 +35,7 @@ const TeacherFinance: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [expandedSlipId, setExpandedSlipId] = useState<string | null>(null);
     const [currencyCode, setCurrencyCode] = useState<string>('SAR');
+    const fmt = (amount: number) => formatCurrency(amount, currencyCode);
 
     useEffect(() => {
         if (!user?.teacherId) {

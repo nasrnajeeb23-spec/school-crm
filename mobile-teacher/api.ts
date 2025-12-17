@@ -4,7 +4,7 @@
 import { User, School, Student, Class, Assignment, Submission, AttendanceRecord, Conversation, Message } from './types';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
+export const API_BASE_URL = (((process as any).env as any)['EXPO_PUBLIC_API_BASE_URL'] as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
 
 async function getToken() {
   try {

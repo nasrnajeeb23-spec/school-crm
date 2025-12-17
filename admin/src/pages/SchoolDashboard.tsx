@@ -63,7 +63,7 @@ const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ school }) => {
                 for (const cls of classes as Class[]) {
                     const records = await api.getAttendance(cls.id, today);
                     total += records.length;
-                    present += records.filter(r => r.status === AttendanceStatus.Present || r.status === 'Present').length;
+                    present += records.filter(r => r.status === AttendanceStatus.Present || String(r.status) === 'Present').length;
                 }
                 const pct = total > 0 ? Math.round((present / total) * 100) : 0;
                 setAttendancePercent(`${pct}%`);

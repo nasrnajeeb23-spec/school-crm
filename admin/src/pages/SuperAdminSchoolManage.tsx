@@ -163,6 +163,10 @@ const SuperAdminSchoolManage: React.FC = () => {
 
   const inputStyle = 'mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700';
   const colors = ['#4f46e5','#10b981','#f59e0b','#ef4444','#6366f1','#14b8a6'];
+  const PieAny: any = Pie;
+  const PieChartAny: any = PieChart;
+  const ResponsiveContainerAny: any = ResponsiveContainer;
+  const CellAny: any = Cell;
 
   return (
     <div className="space-y-8">
@@ -242,15 +246,15 @@ const SuperAdminSchoolManage: React.FC = () => {
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">إحصائية توزيع الطلاب بحسب الصف</h3>
         {distribution.length > 0 ? (
           <div className="w-full h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={distribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
+            <ResponsiveContainerAny>
+              <PieChartAny>
+                <PieAny data={distribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
                   {distribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                    <CellAny key={`cell-${index}`} fill={colors[index % colors.length]} />
                   ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+                </PieAny>
+              </PieChartAny>
+            </ResponsiveContainerAny>
           </div>
         ) : (
           <p className="text-gray-500 dark:text-gray-400">لا توجد بيانات متاحة.</p>

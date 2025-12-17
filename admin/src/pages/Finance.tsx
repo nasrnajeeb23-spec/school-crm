@@ -1,7 +1,7 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { Invoice, InvoiceStatus, PaymentData, NewInvoiceData, Expense, NewExpenseData, ExpenseCategory, SchoolSettings, Teacher, User, FeeSetup, DiscountRule, PaymentPlanType } from '../types';
 import * as api from '../api';
 import StatsCard from '../components/StatsCard';
@@ -36,6 +36,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [voucherToPrint, setVoucherToPrint] = useState<Expense | null>(null);
     const [loading, setLoading] = useState(true);
     const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null);
     const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
