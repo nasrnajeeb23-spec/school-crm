@@ -5,7 +5,9 @@ const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const bcrypt = require('bcryptjs');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
+const { requireModule } = require('../middleware/modules');
+const { rateLimit } = require('../middleware/rateLimit');
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 
@@ -310,7 +312,7 @@ router.post('/mfa/verify', verifyToken, validate([{ name: 'token', required: tru
   }
 });
 
-router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requirePermission('MANAGE_PARENTS'), requireModule('parent_portal'), rateLimit({ name: 'invite_parent', windowMs: 60000, max: 5 }), validate([
   { name: 'parentId', required: true, type: 'string' },
   { name: 'channel', required: false, type: 'string' }
 ]), async (req, res) => {
@@ -323,6 +325,13 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
       return res.status(403).json({ msg: 'Access denied' });
     }
     const channel = String(req.body.channel || 'email').toLowerCase();
+    const emailValid = /.+@.+\..+/.test(String(parent.email || '').trim());
+    const phoneValid = /^[0-9+\-()\s]{5,}$/.test(String(parent.phone || '').trim());
+    const expHours = Number(process.env.INVITE_TOKEN_EXPIRY_HOURS || 72);
+    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const baseEnv = process.env.FRONTEND_URL || '';
+    const computedBase = (baseEnv || String(req.headers.origin || 'http://localhost:3000')).replace(/\/$/, '');
+    if (!baseEnv && isProd) return res.status(500).json({ msg: 'FRONTEND_URL not configured' });
     let user = await User.findOne({ where: { parentId: parent.id } });
     if (!user) {
       const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
@@ -344,27 +353,80 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     parent.status = 'Invited';
     await parent.save();
 
-    const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Parent', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
-    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Parent', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: `${expHours}h` });
+    const activationLink = `${computedBase}/set-password?token=${encodeURIComponent(inviteToken)}`;
     if (channel === 'email') {
+      if (!emailValid) {
+        await require('../models').AuditLog.create({
+          action: 'invite_parent_invalid_email',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ parentId: String(parent.id), channel: 'email', reason: 'invalid_email', activationLink })
+        }).catch(() => {});
+        return res.status(400).json({ invited: false, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'email', code: 'INVALID_CHANNEL', activationLink });
+      }
       try {
         const EmailService = require('../services/EmailService');
         await EmailService.sendActivationInvite(parent.email, parent.name, 'Parent', activationLink, '', parent.schoolId);
+        await require('../models').AuditLog.create({
+          action: 'invite_parent_email',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ parentId: String(parent.id), channel: 'email', inviteSent: true })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: true, channel: 'email', activationLink });
       } catch (e) {
+        await require('../models').AuditLog.create({
+          action: 'invite_parent_email_failed',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ parentId: String(parent.id), channel: 'email', inviteSent: false, error: e?.message || String(e) })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'email' });
       }
     }
     if (channel === 'sms') {
+      if (!phoneValid) {
+        await require('../models').AuditLog.create({
+          action: 'invite_parent_invalid_phone',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ parentId: String(parent.id), channel: 'sms', reason: 'invalid_phone', activationLink })
+        }).catch(() => {});
+        return res.status(400).json({ invited: false, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'sms', code: 'INVALID_CHANNEL', activationLink });
+      }
       try {
         const SmsService = require('../services/SmsService');
         const ok = await SmsService.sendActivationInvite(parent.phone, parent.name, 'Parent', activationLink, '', parent.schoolId);
+        await require('../models').AuditLog.create({
+          action: 'invite_parent_sms',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ parentId: String(parent.id), channel: 'sms', inviteSent: !!ok })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: !!ok, channel: 'sms', activationLink });
       } catch (e) {
         return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'sms' });
       }
     }
+    await require('../models').AuditLog.create({
+      action: 'invite_parent_manual',
+      userId: req.user.id,
+      userEmail: req.user.email || null,
+      ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+      userAgent: req.headers['user-agent'] || '',
+      details: JSON.stringify({ parentId: String(parent.id), channel: 'manual' })
+    }).catch(() => {});
     return res.status(201).json({ invited: true, parentId: String(parent.id), userId: String(user.id), inviteSent: false, channel: 'manual', activationLink });
   } catch (e) {
     console.error(e.message);
@@ -372,7 +434,7 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
   }
 });
 
-router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requirePermission('MANAGE_TEACHERS'), requireModule('teacher_portal'), rateLimit({ name: 'invite_teacher', windowMs: 60000, max: 5 }), validate([
   { name: 'teacherId', required: true, type: 'string' },
   { name: 'channel', required: false, type: 'string' }
 ]), async (req, res) => {
@@ -389,6 +451,12 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
     const isValidEmail = /.+@.+\..+/.test(rawIdentifier);
     const emailForUser = isValidEmail ? rawIdentifier : `teacher-${teacher.id}-school-${teacher.schoolId}@no-reply.example.com`;
     const usernameForUser = isValidEmail ? rawIdentifier : (String(teacher.username || '').trim() || `teacher_${teacher.id}`);
+    const phoneValid = /^[0-9+\-()\s]{5,}$/.test(String(teacher.phone || '').trim());
+    const expHours = Number(process.env.INVITE_TOKEN_EXPIRY_HOURS || 72);
+    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const baseEnv = process.env.FRONTEND_URL || '';
+    const computedBase = (baseEnv || String(req.headers.origin || 'http://localhost:3000')).replace(/\/$/, '');
+    if (!baseEnv && isProd) return res.status(500).json({ msg: 'FRONTEND_URL not configured' });
     let tUser = await User.findOne({ where: { teacherId: teacher.id } });
     if (!tUser) {
       const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
@@ -407,29 +475,71 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
       tUser.lastPasswordChangeAt = new Date();
       await tUser.save();
     }
-    const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', targetRole: 'Teacher', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
-    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', targetRole: 'Teacher', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: `${expHours}h` });
+    const activationLink = `${computedBase}/set-password?token=${encodeURIComponent(inviteToken)}`;
     // Record invite metadata
     try { tUser.lastInviteAt = new Date(); tUser.lastInviteChannel = channel; await tUser.save(); } catch {}
     if (channel === 'email' && isValidEmail) {
       try {
         const EmailService = require('../services/EmailService');
         await EmailService.sendActivationInvite(rawIdentifier, teacher.name, 'Teacher', activationLink, '', teacher.schoolId);
+        await require('../models').AuditLog.create({
+          action: 'invite_teacher_email',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ teacherId: String(teacher.id), channel: 'email', inviteSent: true })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: true, channel: 'email', activationLink });
       } catch (e2) {
+        await require('../models').AuditLog.create({
+          action: 'invite_teacher_email_failed',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ teacherId: String(teacher.id), channel: 'email', inviteSent: false, error: e2?.message || String(e2) })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'email' });
       }
     }
     if (channel === 'sms') {
+      if (!phoneValid) {
+        await require('../models').AuditLog.create({
+          action: 'invite_teacher_invalid_phone',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ teacherId: String(teacher.id), channel: 'sms', reason: 'invalid_phone', activationLink })
+        }).catch(() => {});
+        return res.status(400).json({ invited: false, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'sms', code: 'INVALID_CHANNEL', activationLink });
+      }
       try {
         const SmsService = require('../services/SmsService');
         const ok = await SmsService.sendActivationInvite(teacher.phone, teacher.name, 'Teacher', activationLink, '', teacher.schoolId);
+        await require('../models').AuditLog.create({
+          action: 'invite_teacher_sms',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ teacherId: String(teacher.id), channel: 'sms', inviteSent: !!ok })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: !!ok, channel: 'sms', activationLink });
       } catch (e) {
         return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'sms' });
       }
     }
+    await require('../models').AuditLog.create({
+      action: 'invite_teacher_manual',
+      userId: req.user.id,
+      userEmail: req.user.email || null,
+      ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+      userAgent: req.headers['user-agent'] || '',
+      details: JSON.stringify({ teacherId: String(teacher.id), channel: 'manual' })
+    }).catch(() => {});
     return res.status(201).json({ invited: true, teacherId: String(teacher.id), userId: String(tUser.id), inviteSent: false, channel: 'manual', activationLink });
   } catch (e) {
     console.error(e.message);
@@ -437,7 +547,65 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
   }
 });
 
-router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), validate([
+router.post('/parent/invite/revoke', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requirePermission('MANAGE_PARENTS'), requireModule('parent_portal'), validate([{ name: 'parentId', required: true, type: 'string' }]), async (req, res) => {
+  try {
+    const pid = Number(req.body.parentId);
+    if (!pid) return res.status(400).json({ msg: 'Invalid parentId' });
+    const parent = await Parent.findByPk(pid);
+    if (!parent) return res.status(404).json({ msg: 'Parent not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(parent.schoolId || 0)) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+    const user = await User.findOne({ where: { parentId: parent.id } });
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    user.tokenVersion = Number(user.tokenVersion || 0) + 1;
+    user.lastInviteAt = null;
+    await user.save();
+    await require('../models').AuditLog.create({
+      action: 'invite_parent_revoke',
+      userId: req.user.id,
+      userEmail: req.user.email || null,
+      ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+      userAgent: req.headers['user-agent'] || '',
+      details: JSON.stringify({ parentId: String(parent.id), userId: String(user.id) })
+    }).catch(() => {});
+    return res.status(200).json({ revoked: true });
+  } catch (e) {
+    console.error(e.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.post('/teacher/invite/revoke', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requirePermission('MANAGE_TEACHERS'), requireModule('teacher_portal'), validate([{ name: 'teacherId', required: true, type: 'string' }]), async (req, res) => {
+  try {
+    const tid = Number(req.body.teacherId);
+    if (!Number.isFinite(tid) || tid <= 0) return res.status(400).json({ msg: 'Invalid teacherId' });
+    const teacher = await Teacher.findByPk(tid);
+    if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(teacher.schoolId || 0)) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+    const user = await User.findOne({ where: { teacherId: teacher.id } });
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    user.tokenVersion = Number(user.tokenVersion || 0) + 1;
+    user.lastInviteAt = null;
+    await user.save();
+    await require('../models').AuditLog.create({
+      action: 'invite_teacher_revoke',
+      userId: req.user.id,
+      userEmail: req.user.email || null,
+      ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+      userAgent: req.headers['user-agent'] || '',
+      details: JSON.stringify({ teacherId: String(teacher.id), userId: String(user.id) })
+    }).catch(() => {});
+    return res.status(200).json({ revoked: true });
+  } catch (e) {
+    console.error(e.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requirePermission('MANAGE_STAFF'), rateLimit({ name: 'invite_staff', windowMs: 60000, max: 5 }), validate([
   { name: 'userId', required: true, type: 'string' },
   { name: 'channel', required: false, type: 'string' }
 ]), async (req, res) => {
@@ -453,7 +621,9 @@ router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADM
       return res.status(400).json({ msg: 'Not a staff user' });
     }
     const channel = String(req.body.channel || 'email').toLowerCase();
-    const e = String(staff.email || staff.username || '').trim().toLowerCase();
+    const emailRaw = String(staff.email || staff.username || '').trim().toLowerCase();
+    const isValidEmail = /.+@.+\..+/.test(emailRaw);
+    const phoneValid = /^[0-9+\-()\s]{5,}$/.test(String(staff.phone || '').trim());
     if (!staff.password || staff.passwordMustChange === undefined) {
       const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
       const hashed = await bcrypt.hash(placeholder, 10);
@@ -463,29 +633,91 @@ router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADM
     staff.isActive = true;
     staff.tokenVersion = Number(staff.tokenVersion || 0) + 1;
     staff.lastPasswordChangeAt = new Date();
+    staff.lastInviteAt = new Date();
+    staff.lastInviteChannel = channel;
     await staff.save();
 
-    const inviteToken = jwt.sign({ id: staff.id, type: 'invite', targetRole: 'Staff', tokenVersion: staff.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
-    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    const expHours = Number(process.env.INVITE_TOKEN_EXPIRY_HOURS || 72);
+    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const baseEnv = process.env.FRONTEND_URL || '';
+    const computedBase = (baseEnv || String(req.headers.origin || 'http://localhost:3000')).replace(/\/$/, '');
+    if (!baseEnv && isProd) return res.status(500).json({ msg: 'FRONTEND_URL not configured' });
+    const normalizedRole = String(staff.role || '').toUpperCase();
+    const targetRole = normalizedRole === 'SCHOOLADMIN' ? 'SchoolAdmin' : 'Staff';
+    const inviteToken = jwt.sign({ id: staff.id, type: 'invite', targetRole, tokenVersion: staff.tokenVersion || 0 }, JWT_SECRET, { expiresIn: `${expHours}h` });
+    const activationLink = `${computedBase}/set-password?token=${encodeURIComponent(inviteToken)}`;
     if (channel === 'email') {
+      if (!isValidEmail) {
+        await require('../models').AuditLog.create({
+          action: 'invite_staff_invalid_email',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ staffId: String(staff.id), channel: 'email', reason: 'invalid_email', activationLink })
+        }).catch(() => {});
+        return res.status(400).json({ invited: false, userId: String(staff.id), inviteSent: false, channel: 'email', code: 'INVALID_CHANNEL', activationLink });
+      }
       try {
         const EmailService = require('../services/EmailService');
-        await EmailService.sendActivationInvite(e, staff.name, 'Staff', activationLink, '', staff.schoolId);
+        await EmailService.sendActivationInvite(emailRaw, staff.name, targetRole, activationLink, '', staff.schoolId);
+        await require('../models').AuditLog.create({
+          action: 'invite_staff_email',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ staffId: String(staff.id), channel: 'email', inviteSent: true })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: true, channel: 'email', activationLink });
       } catch (e2) {
+        await require('../models').AuditLog.create({
+          action: 'invite_staff_email_failed',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ staffId: String(staff.id), channel: 'email', inviteSent: false, error: e2?.message || String(e2) })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: false, channel: 'email' });
       }
     }
     if (channel === 'sms') {
+      if (!phoneValid) {
+        await require('../models').AuditLog.create({
+          action: 'invite_staff_invalid_phone',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ staffId: String(staff.id), channel: 'sms', reason: 'invalid_phone', activationLink })
+        }).catch(() => {});
+        return res.status(400).json({ invited: false, userId: String(staff.id), inviteSent: false, channel: 'sms', code: 'INVALID_CHANNEL', activationLink });
+      }
       try {
         const SmsService = require('../services/SmsService');
-        const ok = await SmsService.sendActivationInvite(staff.phone, staff.name, 'Staff', activationLink, '', staff.schoolId);
+        const ok = await SmsService.sendActivationInvite(staff.phone, staff.name, targetRole, activationLink, '', staff.schoolId);
+        await require('../models').AuditLog.create({
+          action: 'invite_staff_sms',
+          userId: req.user.id,
+          userEmail: req.user.email || null,
+          ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ staffId: String(staff.id), channel: 'sms', inviteSent: !!ok })
+        }).catch(() => {});
         return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: !!ok, channel: 'sms', activationLink });
       } catch (e3) {
         return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: false, channel: 'sms' });
       }
     }
+    await require('../models').AuditLog.create({
+      action: 'invite_staff_manual',
+      userId: req.user.id,
+      userEmail: req.user.email || null,
+      ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').toString(),
+      userAgent: req.headers['user-agent'] || '',
+      details: JSON.stringify({ staffId: String(staff.id), channel: 'manual' })
+    }).catch(() => {});
     return res.status(201).json({ invited: true, userId: String(staff.id), inviteSent: false, channel: 'manual', activationLink });
   } catch (e) {
     console.error(e.message);
