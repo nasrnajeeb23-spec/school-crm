@@ -36,6 +36,7 @@ const createRateLimiter = (options = {}) => {
         skipFailedRequests,
         keyGenerator,
         handler,
+        passOnStoreError: true,
         standardHeaders: true,
         legacyHeaders: false
     };

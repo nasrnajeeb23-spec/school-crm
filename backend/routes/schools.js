@@ -51,6 +51,24 @@ const onlyPublicBase = (req, res, next) => {
   return next('route');
 };
 
+let _schoolTableCols = null;
+const getSchoolTableCols = async () => {
+  if (_schoolTableCols) return _schoolTableCols;
+  try {
+    const qi = School.sequelize.getQueryInterface();
+    const desc = await qi.describeTable(School.getTableName());
+    _schoolTableCols = desc && typeof desc === 'object' ? Object.keys(desc) : [];
+  } catch {
+    _schoolTableCols = [];
+  }
+  return _schoolTableCols;
+};
+
+const pickExistingCols = (cols, desired) => {
+  const set = new Set(Array.isArray(cols) ? cols : []);
+  return desired.filter(c => set.has(c));
+};
+
 // @route   GET /api/public/schools  (mounted base) -> '/'
 // @desc    Public list of schools with pagination
 // @access  Public
@@ -61,13 +79,19 @@ router.get('/',
   cacheMiddlewares.schools,
   asyncHandler(async (req, res) => {
     const { page, limit, offset } = req.pagination;
-    const { count, rows } = await School.findAndCountAll({
-      limit,
-      offset,
-      order: [['createdAt', 'DESC']],
-      attributes: ['id', 'name', 'plan', 'status', 'createdAt']
-    });
-    res.json(buildPaginationResponse(rows, count, page, limit));
+    try {
+      const cols = await getSchoolTableCols();
+      const attributes = pickExistingCols(cols, ['id', 'name', 'createdAt', 'plan', 'status']);
+      const { count, rows } = await School.findAndCountAll({
+        limit,
+        offset,
+        order: [['createdAt', 'DESC']],
+        ...(attributes.length ? { attributes } : {}),
+      });
+      return res.json(buildPaginationResponse(rows, count, page, limit));
+    } catch {
+      return res.json(buildPaginationResponse([], 0, page, limit));
+    }
   })
 );
 
@@ -83,14 +107,19 @@ router.get('/',
   asyncHandler(async (req, res) => {
     const { page, limit, offset } = req.pagination;
 
-    const { count, rows } = await School.findAndCountAll({
-      limit,
-      offset,
-      order: [['createdAt', 'DESC']],
-      attributes: ['id', 'name', 'email', 'phone', 'plan', 'status', 'createdAt', 'updatedAt']
-    });
-
-    res.json(buildPaginationResponse(rows, count, page, limit));
+    try {
+      const cols = await getSchoolTableCols();
+      const attributes = pickExistingCols(cols, ['id', 'name', 'createdAt', 'updatedAt', 'phone', 'status', 'plan', 'logoUrl', 'city', 'address', 'website', 'description', 'contactEmail', 'email']);
+      const { count, rows } = await School.findAndCountAll({
+        limit,
+        offset,
+        order: [['createdAt', 'DESC']],
+        ...(attributes.length ? { attributes } : {}),
+      });
+      return res.json(buildPaginationResponse(rows, count, page, limit));
+    } catch {
+      return res.json(buildPaginationResponse([], 0, page, limit));
+    }
   })
 );
 
