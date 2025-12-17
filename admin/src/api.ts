@@ -277,7 +277,15 @@ export const getSchools = async (): Promise<School[]> => {
 };
 
 export const getSchool = async (id: number): Promise<School> => {
-    return await apiCall(`/schools/${id}`, { method: 'GET' });
+    try {
+        return await apiCall(`/schools/${id}`, { method: 'GET' });
+    } catch (err: any) {
+        try {
+            return await apiCall(`/school/schools/${id}`, { method: 'GET' });
+        } catch {
+            throw err;
+        }
+    }
 };
 
 export const getSchoolById = async (id: number): Promise<School> => {
