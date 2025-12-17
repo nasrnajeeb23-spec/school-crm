@@ -8,11 +8,19 @@ const { requireModule, moduleMap } = require('../middleware/modules');
 // Public endpoint alias to list schools without auth
 router.get('/public', async (req, res) => {
   try {
+    const Op = require('sequelize').Op;
     const schools = await School.findAll({
-      include: { model: Subscription, include: { model: Plan } },
+      include: [{ model: Subscription, include: { model: Plan } }],
       order: [['name', 'ASC']],
     });
-    const formattedSchools = schools.map(school => {
+    const ids = schools.map(s => s.id);
+    const settingsRows = await SchoolSettings.findAll({ where: { schoolId: { [Op.in]: ids } } });
+    const byId = new Map(settingsRows.map(r => [Number(r.schoolId), r]));
+    const visible = schools.filter(s => {
+      const st = byId.get(Number(s.id));
+      return !st || String(st.operationalStatus).toUpperCase() !== 'DELETED';
+    });
+    const formattedSchools = visible.map(school => {
       const s = school.toJSON();
       return {
         id: s.id,
@@ -37,18 +45,21 @@ router.get('/public', async (req, res) => {
 // @access  Private (SuperAdmin) / Public for login screen
 router.get('/', async (req, res) => {
   try {
+    const Op = require('sequelize').Op;
     const schools = await School.findAll({
-      include: {
-        model: Subscription,
-        include: {
-          model: Plan,
-        },
-      },
-      order: [['name', 'ASC']], // Order alphabetically by name
+      include: [{ model: Subscription, include: { model: Plan } }],
+      order: [['name', 'ASC']],
+    });
+    const ids = schools.map(s => s.id);
+    const settingsRows = await SchoolSettings.findAll({ where: { schoolId: { [Op.in]: ids } } });
+    const byId = new Map(settingsRows.map(r => [Number(r.schoolId), r]));
+    const visible = schools.filter(s => {
+      const st = byId.get(Number(s.id));
+      return !st || String(st.operationalStatus).toUpperCase() !== 'DELETED';
     });
 
     // Format the response to match the frontend's expected structure
-    const formattedSchools = schools.map(school => {
+    const formattedSchools = visible.map(school => {
       const schoolJSON = school.toJSON();
       return {
         id: schoolJSON.id,
@@ -82,6 +93,12 @@ router.get('/:id', async (req, res) => {
       },
     });
     if (!school) return res.status(404).json({ msg: 'School not found' });
+    try {
+      const settings = await SchoolSettings.findOne({ where: { schoolId: Number(req.params.id) } });
+      if (settings && String(settings.operationalStatus).toUpperCase() === 'DELETED') {
+        return res.status(404).json({ msg: 'School not found' });
+      }
+    } catch {}
     const s = school.toJSON();
     return res.json({
       id: s.id,
@@ -125,7 +142,7 @@ router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     // Default settings
     const academicStart = new Date(start.getFullYear(), 8, 1); // Sep 1
     const academicEnd = new Date(start.getFullYear() + 1, 5, 20); // Jun 20 next year
-    await SchoolSettings.create({ schoolId: school.id, schoolName: school.name, schoolAddress: schoolData.address || '', academicYearStart: academicStart, academicYearEnd: academicEnd, notifications: { email: true, sms: false, push: true }, availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"] });
+    await SchoolSettings.create({ schoolId: school.id, schoolName: school.name, schoolAddress: schoolData.address || '', academicYearStart: academicStart, academicYearEnd: academicEnd, notifications: { email: true, sms: false, push: true }, availableStages: ["رياض أطفال","ابتدائي","إعدادي","ثانوي"], operationalStatus: 'ACTIVE' });
 
     // Create initial admin user
     const bcrypt = require('bcryptjs');

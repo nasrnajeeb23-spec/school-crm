@@ -149,6 +149,11 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  operationalStatus: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'ACTIVE',
+  },
   // schoolId FK is added via association
 });
 

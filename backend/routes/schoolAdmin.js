@@ -384,8 +384,9 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
       homeLocation: homeLocation || ((address || city || lat !== undefined || lng !== undefined) ? { address: address || '', city: city || '', ...(lat !== undefined ? { lat: Number(lat) } : {}), ...(lng !== undefined ? { lng: Number(lng) } : {}) } : null),
     });
 
-    // Increment student count in the school
-    await school.increment('studentCount');
+    const newCountAfterCreate = await Student.count({ where: { schoolId: parseInt(schoolId) } });
+    school.studentCount = newCountAfterCreate;
+    await school.save();
 
     // Map status for frontend consistency
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
@@ -865,6 +866,10 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
       const dupByPhone = await Teacher.findOne({ where: { schoolId: req.user.schoolId, phone: String(phone || '').trim() } });
       if (dupByPhone) {
         return res.status(409).json({ msg: 'المعلم موجود مسبقًا برقم الهاتف نفسه.', code: 'DUPLICATE' });
+      }
+      const dupByNameOnly = await Teacher.findOne({ where: { schoolId: req.user.schoolId, name: String(name || '').trim() } });
+      if (dupByNameOnly) {
+        return res.status(409).json({ msg: 'يوجد معلم بنفس الاسم داخل المدرسة.', code: 'DUPLICATE_NAME' });
       }
       const dupByNameSubject = await Teacher.findOne({ where: { schoolId: req.user.schoolId, name: String(name || '').trim(), subject: String(subject || '').trim() } });
       if (dupByNameSubject) {
@@ -2550,7 +2555,9 @@ router.post('/:schoolId/import/students', verifyToken, requireRole('SCHOOL_ADMIN
             // Update school student count
             const school = await School.findByPk(schoolId);
             if (school) {
-              await school.increment('studentCount', { by: studentsToCreate.length });
+              const newCountAfterImport = await Student.count({ where: { schoolId } });
+              school.studentCount = newCountAfterImport;
+              await school.save();
             }
         }
 
