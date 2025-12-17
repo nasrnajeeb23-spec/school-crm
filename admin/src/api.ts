@@ -225,11 +225,51 @@ export const resetSuperAdminPassword = async (token: string, newPassword: string
 // ==================== School APIs ====================
 
 export const getSchools = async (): Promise<School[]> => {
+    const toArray = <T = any>(payload: any): T[] => {
+        if (Array.isArray(payload)) return payload as T[];
+        const candidates = [
+            payload?.data,
+            payload?.rows,
+            payload?.schools,
+            payload?.items,
+            payload?.result,
+        ];
+        for (const c of candidates) {
+            if (Array.isArray(c)) return c as T[];
+        }
+        return [] as T[];
+    };
+
+    const fetchAll = async (baseEndpoint: string): Promise<School[]> => {
+        const limit = 100;
+        const out: School[] = [];
+        for (let page = 1; page <= 50; page++) {
+            const sep = baseEndpoint.includes('?') ? '&' : '?';
+            const payload: any = await apiCall(`${baseEndpoint}${sep}page=${page}&limit=${limit}`, { method: 'GET' });
+            const items = toArray<School>(payload);
+            out.push(...items);
+            const pg = payload?.pagination;
+            const hasNext = !!pg?.hasNextPage || (typeof pg?.currentPage === 'number' && typeof pg?.totalPages === 'number' && pg.currentPage < pg.totalPages);
+            if (!hasNext || items.length === 0) break;
+        }
+        return out;
+    };
+
+    const hasToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
+
+    if (!hasToken) {
+        try {
+            return await fetchAll('/public/schools');
+        } catch {
+            return [] as School[];
+        }
+    }
+
     try {
-        return await apiCall('/schools', { method: 'GET' });
+        return await fetchAll('/schools');
     } catch {
         try {
-            return await apiCall('/public/schools', { method: 'GET' });
+            return await fetchAll('/public/schools');
         } catch {
             return [] as School[];
         }
