@@ -4,6 +4,7 @@ import * as api from '../api';
 import { School, Invoice, SchoolSettings, Subscription } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import StatsCard from '../components/StatsCard';
+import { formatCurrency } from '../currency-config';
 import { BackIcon, SchoolIcon, SubscriptionIcon, BillingIcon, UsersIcon, ModuleIcon } from '../components/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -182,7 +183,7 @@ const SuperAdminSchoolManage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard icon={SubscriptionIcon} title="الخطة" value={subscription?.plan || school.plan} description={subscription?.status || school.status} />
-        <StatsCard icon={BillingIcon} title="القيمة الشهرية" value={`$${baseCost.toFixed(2)}`} description="سعر الخطة" />
+        <StatsCard icon={BillingIcon} title="القيمة الشهرية" value={formatCurrency(Number(baseCost || 0), 'USD')} description="سعر الخطة" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -202,7 +203,7 @@ const SuperAdminSchoolManage: React.FC = () => {
             <div><div className="text-gray-500">مدفوعة</div><div className="text-green-600">{billingSummary?.paidCount ?? 0}</div></div>
             <div><div className="text-gray-500">غير مدفوعة</div><div className="text-yellow-600">{billingSummary?.unpaidCount ?? 0}</div></div>
             <div><div className="text-gray-500">متأخرة</div><div className="text-red-600">{billingSummary?.overdueCount ?? 0}</div></div>
-            <div className="col-span-2"><div className="text-gray-500">رصيد مستحق</div><div className="text-gray-900 dark:text-white">${(billingSummary?.outstandingAmount ?? 0).toFixed(2)}</div></div>
+            <div className="col-span-2"><div className="text-gray-500">رصيد مستحق</div><div className="text-gray-900 dark:text-white">{formatCurrency(Number(billingSummary?.outstandingAmount ?? 0), String(settings?.defaultCurrency || 'SAR'))}</div></div>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">

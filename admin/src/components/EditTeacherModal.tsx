@@ -13,6 +13,9 @@ const EditTeacherModal: React.FC<EditTeacherModalProps> = ({ teacher, onClose, o
     subject: teacher.subject,
     phone: teacher.phone,
     status: teacher.status,
+    department: teacher.department,
+    bankAccount: teacher.bankAccount,
+    email: teacher.email || '',
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -53,6 +56,20 @@ const EditTeacherModal: React.FC<EditTeacherModalProps> = ({ teacher, onClose, o
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الهاتف</label>
               <input type="tel" name="phone" id="phone" value={formData.phone} onChange={handleChange} required className={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</label>
+            <input type="email" name="email" id="email" value={formData.email || ''} onChange={handleChange} className={`${inputStyle}`} dir="ltr" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">القسم</label>
+              <input type="text" name="department" id="department" value={formData.department || ''} onChange={handleChange} className={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="bankAccount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الحساب/البنك</label>
+              <input type="text" name="bankAccount" id="bankAccount" value={formData.bankAccount || ''} onChange={handleChange} className={inputStyle} dir="ltr" />
             </div>
           </div>
            <div>

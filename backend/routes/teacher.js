@@ -105,7 +105,7 @@ router.get('/:teacherId/salary-slips', verifyToken, requireRole('TEACHER'), asyn
   try {
     if (String(req.user.teacherId) !== String(req.params.teacherId)) return res.status(403).json({ msg: 'Access denied' });
     const { SalarySlip } = require('../models');
-    const rows = await SalarySlip.findAll({ where: { personType: 'teacher', personId: String(req.params.teacherId) }, order: [['month','DESC']] });
-    res.json(rows.map(r => ({ id: r.id, month: r.month, baseAmount: Number(r.baseAmount || 0), allowancesTotal: Number(r.allowancesTotal || 0), deductionsTotal: Number(r.deductionsTotal || 0), netAmount: Number(r.netAmount || 0), allowances: Array.isArray(r.allowances) ? r.allowances : [], deductions: Array.isArray(r.deductions) ? r.deductions : [], status: r.status })));
+  const rows = await SalarySlip.findAll({ where: { personType: 'teacher', personId: String(req.params.teacherId) }, order: [['month','DESC']] });
+    res.json(rows.map(r => ({ id: r.id, month: r.month, baseAmount: Number(r.baseAmount || 0), allowancesTotal: Number(r.allowancesTotal || 0), deductionsTotal: Number(r.deductionsTotal || 0), netAmount: Number(r.netAmount || 0), allowances: Array.isArray(r.allowances) ? r.allowances : [], deductions: Array.isArray(r.deductions) ? r.deductions : [], status: r.status, currencyCode: String(r.currencyCode || 'SAR').toUpperCase() })));
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });

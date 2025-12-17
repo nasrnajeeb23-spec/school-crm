@@ -102,6 +102,11 @@ const SalarySlip = sequelize.define('SalarySlip', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  currencyCode: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'SAR',
+  },
 }, {
   indexes: [
     { fields: ['schoolId'] },

@@ -93,10 +93,31 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     // SuperAdmin only fields
     if (isSuperAdmin) {
-        if (email !== undefined) user.email = email;
+        if (email !== undefined) {
+          const e = String(email || '').trim().toLowerCase();
+          const dupe = await User.findOne({ where: { email: e } });
+          if (dupe && Number(dupe.id) !== Number(user.id)) {
+            return res.status(409).json({ msg: 'Email already in use' });
+          }
+          user.email = e;
+          user.username = e;
+        }
         if (schoolId !== undefined) user.schoolId = schoolId;
         if (isActive !== undefined) user.isActive = isActive;
         if (role !== undefined) user.role = role;
+    } else if (isSelf && email !== undefined) {
+        const e = String(email || '').trim().toLowerCase();
+        const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+        if (!valid) return res.status(400).json({ msg: 'Invalid email format' });
+        const ok = await bcrypt.compare(currentPassword || '', user.password);
+        if (!ok) return res.status(401).json({ msg: 'Invalid current password' });
+        const dupe = await User.findOne({ where: { email: e } });
+        if (dupe && Number(dupe.id) !== Number(user.id)) {
+          return res.status(409).json({ msg: 'Email already in use' });
+        }
+        user.email = e;
+        user.username = e;
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
     }
 
     if (newPassword) {

@@ -8,6 +8,7 @@ const Expense = sequelize.define('Expense', {
   description: { type: DataTypes.STRING, allowNull: false },
   category: { type: DataTypes.STRING, allowNull: false },
   amount: { type: DataTypes.DECIMAL(10,2), allowNull: false },
+  currencyCode: { type: DataTypes.STRING, allowNull: false, defaultValue: 'SAR' },
 }, { tableName: 'expenses' });
 
 module.exports = Expense;

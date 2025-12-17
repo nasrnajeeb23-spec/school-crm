@@ -23,7 +23,7 @@ const SalaryDetailRow: React.FC<{ item: SalaryComponent }> = ({ item }) => {
         <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
             <p className="text-gray-600 dark:text-gray-400">{item.description}</p>
             <p className={`font-semibold ${isBonus ? 'text-green-500' : 'text-red-500'}`}>
-                {isBonus ? '+' : '-'} {formatCurrency(item.amount)}
+                {isBonus ? '+' : '-'} {fmt(item.amount)}
             </p>
         </div>
     );

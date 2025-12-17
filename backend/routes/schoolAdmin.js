@@ -581,6 +581,8 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
     const month = String(req.query.month || '').trim();
     if (!month || !/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ msg: 'Invalid month format' });
     const schoolId = parseInt(req.params.schoolId, 10);
+    const settingsRow = await SchoolSettings.findOne({ where: { schoolId } }).catch(() => null);
+    const currencyCode = String(settingsRow?.defaultCurrency || 'SAR').toUpperCase();
     const staff = await User.findAll({ where: { schoolId, role: 'SchoolAdmin', isActive: { [Op.not]: false } } });
     const teachers = await Teacher.findAll({ where: { schoolId } });
     const structs = await SalaryStructure.findAll({ where: { schoolId } });
@@ -649,6 +651,7 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
         lateMinutes,
         overtimeMinutes,
         status: 'Draft',
+        currencyCode
       };
     }
     for (const s of staff) {
@@ -771,32 +774,35 @@ router.put('/:schoolId/payroll/salary-slips/:id/approve', verifyToken, requireRo
         return res.status(400).json({ msg: 'Salary slip already approved' });
     }
 
-    row.status = 'Approved';
-    row.approvedBy = req.user?.id || null;
-    await row.save();
+  row.status = 'Approved';
+  row.approvedBy = req.user?.id || null;
+  await row.save();
 
-    // Auto-create Expense Record
-    try {
-        let personName = row.personId;
-        if (row.personType === 'teacher') {
-            const t = await Teacher.findByPk(row.personId);
-            if (t) personName = t.name;
-        } else if (row.personType === 'staff') {
-            const s = await User.findByPk(row.personId);
-            if (s) personName = s.name;
-        }
-
-        await Expense.create({
-            schoolId: row.schoolId,
-            date: new Date(),
-            description: `Salary Payment - ${row.month} - ${personName}`,
-            category: 'Salaries',
-            amount: row.netAmount
-        });
-    } catch (expErr) {
-        console.error('Failed to create expense for salary slip:', expErr);
-        // Don't fail the approval if expense creation fails, but log it
+  // Auto-create Expense Record
+  try {
+    let personName = row.personId;
+    if (row.personType === 'teacher') {
+      const t = await Teacher.findByPk(row.personId);
+      if (t) personName = t.name;
+    } else if (row.personType === 'staff') {
+      const s = await User.findByPk(row.personId);
+      if (s) personName = s.name;
     }
+
+    const settingsRow = await SchoolSettings.findOne({ where: { schoolId: row.schoolId } }).catch(() => null);
+    const cur = String(settingsRow?.defaultCurrency || row.currencyCode || 'SAR').toUpperCase();
+    await Expense.create({
+      schoolId: row.schoolId,
+      date: new Date(),
+      description: `Salary Payment - ${row.month} - ${personName}`,
+      category: 'Salaries',
+      amount: row.netAmount,
+      currencyCode: cur
+    });
+  } catch (expErr) {
+    console.error('Failed to create expense for salary slip:', expErr);
+    // Don't fail the approval if expense creation fails, but log it
+  }
 
     res.json(row.toJSON());
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
@@ -999,9 +1005,10 @@ router.put('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_AD
   { name: 'status', required: true, type: 'string', enum: ['نشط', 'في إجازة'] },
   { name: 'department', required: false, type: 'string' },
   { name: 'bankAccount', required: false, type: 'string' },
+  { name: 'email', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
-    const { name, subject, phone, status, department, bankAccount } = req.body;
+    const { name, subject, phone, status, department, bankAccount, email } = req.body;
     if (!name || !subject || !phone || !status) {
       return res.status(400).json({ msg: 'Missing required fields' });
     }
@@ -1014,8 +1021,51 @@ router.put('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_AD
     if (bankAccount !== undefined) teacher.bankAccount = bankAccount || null;
     teacher.status = status === 'نشط' ? 'Active' : status === 'في إجازة' ? 'OnLeave' : teacher.status;
     await teacher.save();
+
+    let updatedEmail = null;
+    try {
+      const e = String(email || '').trim().toLowerCase();
+      if (e) {
+        const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+        if (!valid) return res.status(400).json({ msg: 'Invalid email format' });
+        let tUser = await User.findOne({ where: { teacherId: teacher.id } });
+        if (tUser) {
+          if (String(tUser.email || '').toLowerCase() !== e) {
+            const dupe = await User.findOne({ where: { email: e } });
+            if (dupe && Number(dupe.id) !== Number(tUser.id)) {
+              return res.status(409).json({ msg: 'Email already in use' });
+            }
+            tUser.email = e;
+            tUser.username = e;
+            tUser.tokenVersion = Number(tUser.tokenVersion || 0) + 1;
+            await tUser.save();
+          }
+          updatedEmail = tUser.email;
+        } else {
+          const { School } = require('../models');
+          const schoolId = Number(req.params.schoolId);
+          const school = await School.findByPk(schoolId);
+          const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
+          const hashed = await bcrypt.hash(placeholder, 10);
+          const existing = await User.findOne({ where: { email: e } });
+          if (existing) return res.status(409).json({ msg: 'Email already in use' });
+          tUser = await User.create({ email: e, username: e, password: hashed, name, role: 'Teacher', schoolId, teacherId: teacher.id, passwordMustChange: true, isActive: true, tokenVersion: 0 });
+          updatedEmail = tUser.email;
+          try {
+            const EmailService = require('../services/EmailService');
+            const inviteToken = jwt.sign({ id: tUser.id, type: 'invite', targetRole: 'Teacher', tokenVersion: tUser.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+            const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+            await EmailService.sendActivationInvite(e, name, 'Teacher', activationLink, (school && school.name) || '', schoolId);
+            tUser.lastInviteAt = new Date();
+            tUser.lastInviteChannel = 'email';
+            await tUser.save();
+          } catch {}
+        }
+      }
+    } catch {}
     const statusMap = { 'Active': 'نشط', 'OnLeave': 'في إجازة' };
-    res.json({ ...teacher.toJSON(), status: statusMap[teacher.status] || teacher.status });
+    res.json({ ...teacher.toJSON(), status: statusMap[teacher.status] || teacher.status, email: updatedEmail });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
@@ -1837,7 +1887,8 @@ router.get('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
         totalAmount: parseFloat(inv.amount),
         taxAmount: parseFloat(inv.taxAmount || 0),
         paidAmount: parseFloat(inv.paidAmount || 0),
-        remainingAmount: parseFloat(inv.amount) - parseFloat(inv.paidAmount || 0)
+        remainingAmount: parseFloat(inv.amount) - parseFloat(inv.paidAmount || 0),
+        currencyCode: String(inv.currencyCode || 'SAR').toUpperCase()
     })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
@@ -1875,6 +1926,7 @@ router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
     const taxRate = Number(settings?.taxRate || 0);
     const discount = Number(req.body.discount || 0);
+    const cur = String(settings?.defaultCurrency || 'SAR').toUpperCase();
     
     const subTotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     // Calculate taxable amount after discount (if discount is applied before tax)
@@ -1890,7 +1942,8 @@ router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         taxAmount: taxAmount,
         dueDate: new Date(dueDate), 
         status: 'UNPAID',
-        items: items 
+        items: items,
+        currencyCode: cur
     });
     
     res.status(201).json({ 
@@ -1904,7 +1957,8 @@ router.post('/:schoolId/invoices', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
         subTotal,
         discount,
         taxAmount,
-        totalAmount 
+        totalAmount,
+        currencyCode: cur
     });
   } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
@@ -1924,6 +1978,8 @@ router.post('/:schoolId/invoices/:invoiceId/payments', verifyToken, requireRole(
     
     const inv = await Invoice.findByPk(req.params.invoiceId);
     if (!inv) return res.status(404).json({ msg: 'Invoice not found' });
+    const schoolSettingsRow = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
+    const cur = String(schoolSettingsRow?.defaultCurrency || inv.currencyCode || 'SAR').toUpperCase();
 
     // Create payment record
     const payment = await Payment.create({
@@ -1932,7 +1988,8 @@ router.post('/:schoolId/invoices/:invoiceId/payments', verifyToken, requireRole(
       date: paymentDate,
       method: paymentMethod || 'Cash',
       notes: notes || '',
-      recordedBy: req.user.id
+      recordedBy: req.user.id,
+      currencyCode: cur
     });
 
     // Update invoice paid amount
@@ -1962,7 +2019,7 @@ router.post('/:schoolId/invoices/:invoiceId/payments', verifyToken, requireRole(
             await NotificationService.sendFinancialAlert(
                 student.Parent.id,
                 'تم استلام دفعة مالية',
-                `تم استلام مبلغ ${amount} $ للطالب ${student.name}. رقم السند: PAY-${payment.id}`,
+                `تم استلام مبلغ ${amount} ${cur} للطالب ${student.name}. رقم السند: PAY-${payment.id}`,
                 req.params.schoolId
             );
 
@@ -1973,7 +2030,7 @@ router.post('/:schoolId/invoices/:invoiceId/payments', verifyToken, requireRole(
                     student.Parent.email,
                     student.name,
                     amount,
-                    '$', 
+                    cur, 
                     `PAY-${payment.id}`,
                     paymentDate,
                     Number(req.params.schoolId)
@@ -2017,31 +2074,34 @@ router.post('/:schoolId/invoices/:invoiceId/remind', verifyToken, requireRole('S
     
     if (inv.status === 'PAID') return res.status(400).json({ msg: 'Invoice is already paid' });
 
-    const student = inv.Student;
-    if (!student || !student.Parent) {
-        return res.status(400).json({ msg: 'Parent not found' });
-    }
+  const student = inv.Student;
+  if (!student || !student.Parent) {
+      return res.status(400).json({ msg: 'Parent not found' });
+  }
+  const settingsRow = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
+  const cur = String(settingsRow?.defaultCurrency || inv.currencyCode || 'SAR').toUpperCase();
+  const remaining = Number(inv.amount) - Number(inv.paidAmount || 0);
 
-    const NotificationService = require('../services/NotificationService');
-    await NotificationService.sendFinancialAlert(
-        student.Parent.id,
-        'تذكير بفاتورة مستحقة',
-        `نود تذكيركم بوجود فاتورة مستحقة للطالب ${student.name} بقيمة ${inv.remainingAmount || inv.amount} $. تاريخ الاستحقاق: ${inv.dueDate.toISOString().split('T')[0]}`,
-        req.params.schoolId
-    );
+  const NotificationService = require('../services/NotificationService');
+  await NotificationService.sendFinancialAlert(
+      student.Parent.id,
+      'تذكير بفاتورة مستحقة',
+      `نود تذكيركم بوجود فاتورة مستحقة للطالب ${student.name} بقيمة ${remaining} ${cur}. تاريخ الاستحقاق: ${inv.dueDate.toISOString().split('T')[0]}`,
+      req.params.schoolId
+  );
 
-    let sent = false;
-    if (student.Parent.email) {
-        const EmailService = require('../services/EmailService');
-        sent = await EmailService.sendInvoiceReminder(
-            student.Parent.email,
-            student.name,
-            `${inv.remainingAmount || inv.amount} $`,
-            inv.dueDate.toISOString().split('T')[0],
-            Number(req.params.schoolId)
-        );
-    } else {
-        // If no email, at least we sent the internal notification
+  let sent = false;
+  if (student.Parent.email) {
+      const EmailService = require('../services/EmailService');
+      sent = await EmailService.sendInvoiceReminder(
+          student.Parent.email,
+          student.name,
+          `${remaining} ${cur}`,
+          inv.dueDate.toISOString().split('T')[0],
+          Number(req.params.schoolId)
+      );
+  } else {
+      // If no email, at least we sent the internal notification
         sent = true; 
     }
 
@@ -2147,7 +2207,8 @@ router.get('/:schoolId/students/:studentId/statement', verifyToken, requireRole(
             description: `فاتورة #${inv.id}`,
             debit: parseFloat(inv.amount),
             credit: 0,
-            reference: String(inv.id)
+            reference: String(inv.id),
+            currencyCode: String(inv.currencyCode || 'SAR').toUpperCase()
         });
     });
 
@@ -2162,7 +2223,8 @@ router.get('/:schoolId/students/:studentId/statement', verifyToken, requireRole(
             reference: pay.reference,
             notes: pay.notes,
             recordedBy: pay.recordedBy,
-            method: pay.method
+            method: pay.method,
+            currencyCode: String(pay.currencyCode || 'SAR').toUpperCase()
         });
     });
 
@@ -2176,7 +2238,7 @@ router.get('/:schoolId/students/:studentId/statement', verifyToken, requireRole(
         return { ...t, balance, date: new Date(t.date).toISOString().split('T')[0] };
     });
 
-    res.json(settings);
+    res.json(statement);
   } catch (err) { console.error('Error in GET settings:', err); res.status(500).json({ msg: 'Server Error', error: err.message }); }
 });
 
@@ -2225,6 +2287,7 @@ router.get('/:schoolId/student/:studentId/details', verifyToken, requireRole('SC
                 dueDate: inv.dueDate.toISOString().split('T')[0],
                 items: [{ description: `رسوم دراسية`, amount: parseFloat(inv.amount) }],
                 totalAmount: parseFloat(inv.amount),
+                currencyCode: String(inv.currencyCode || 'SAR').toUpperCase()
             })),
             notes,
             documents,
@@ -2678,7 +2741,7 @@ router.get('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
     const { Expense } = require('../models');
     try { await Expense.sync({ alter: true }); } catch (e) { console.error('Sync Expense Error:', e); } // Auto-heal
     const rows = await Expense.findAll({ where: { schoolId: Number(req.params.schoolId) }, order: [['date','DESC']] });
-    res.json(rows.map(e => ({ id: String(e.id), date: e.date, description: e.description, category: e.category, amount: parseFloat(e.amount) })));
+    res.json(rows.map(e => ({ id: String(e.id), date: e.date, description: e.description, category: e.category, amount: parseFloat(e.amount), currencyCode: String(e.currencyCode || 'SAR').toUpperCase() })));
   } catch (err) { console.error('Get Expenses Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 
@@ -2688,8 +2751,10 @@ router.post('/:schoolId/expenses', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     try { await Expense.sync({ alter: true }); } catch (e) { console.error('Sync Expense Error:', e); } // Auto-heal
     const { date, description, category, amount } = req.body || {};
     if (!date || !description || !category || amount === undefined) return res.status(400).json({ msg: 'Invalid payload' });
-    const exp = await Expense.create({ schoolId: Number(req.params.schoolId), date, description, category, amount });
-    res.status(201).json({ id: String(exp.id), date: exp.date, description: exp.description, category: exp.category, amount: parseFloat(exp.amount) });
+    const settingsRow = await SchoolSettings.findOne({ where: { schoolId: Number(req.params.schoolId) } }).catch(() => null);
+    const cur = String(settingsRow?.defaultCurrency || 'SAR').toUpperCase();
+    const exp = await Expense.create({ schoolId: Number(req.params.schoolId), date, description, category, amount, currencyCode: cur });
+    res.status(201).json({ id: String(exp.id), date: exp.date, description: exp.description, category: exp.category, amount: parseFloat(exp.amount), currencyCode: String(exp.currencyCode || 'SAR').toUpperCase() });
   } catch (err) { console.error('Create Expense Error:', err); res.status(500).json({ msg: 'Server Error: ' + err.message }); }
 });
 

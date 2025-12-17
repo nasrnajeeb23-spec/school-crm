@@ -18,6 +18,7 @@ import EmptyState from '../components/EmptyState';
 import BrandableCard from '../components/BrandableCard';
 import InvoicePrintModal from '../components/InvoicePrintModal';
 import ExpenseVoucherModal from '../components/ExpenseVoucherModal';
+import { formatCurrency } from '../currency-config';
 
 const invoiceStatusColorMap: { [key in InvoiceStatus]: string } = {
   [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -169,9 +170,9 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                               <tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td>
                                 <td className="px-6 py-4">{invoice.dueDate}</td>
-                                <td className="px-6 py-4 font-semibold">${invoice.totalAmount.toFixed(2)}</td>
-                                <td className="px-6 py-4 text-green-600">${(invoice.paidAmount || 0).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-red-600">${((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))).toFixed(2)}</td>
+                                <td className="px-6 py-4 font-semibold">{formatCurrency(Number(invoice.totalAmount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
+                                <td className="px-6 py-4 text-green-600">{formatCurrency(Number(invoice.paidAmount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
+                                <td className="px-6 py-4 text-red-600">{formatCurrency(Number((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
                                 <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex gap-2">
@@ -209,7 +210,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{expense.description}</td>
                                 <td className="px-6 py-4">{expense.category}</td>
                                 <td className="px-6 py-4 font-semibold text-red-500 flex items-center gap-3">
-                                  -${expense.amount.toFixed(2)}
+                                  -{formatCurrency(Number(expense.amount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}
                                   <button onClick={() => setVoucherToPrint(expense)} className="text-teal-600 hover:text-teal-800 text-xs" title="طباعة سند صرف">سند صرف</button>
                                 </td>
                               </tr>
@@ -531,7 +532,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
             <div className="mt-6 space-y-6">
                 <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md"><nav className="flex gap-2" aria-label="Tabs">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}><tab.icon className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" /><span>{tab.label}</span></button>))}</nav></div>
                 {loading ? <TableSkeleton /> : (<>
-                        {activeTab === 'overview' && (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><StatsCard icon={RevenueIcon} title="إجمالي الإيرادات" value={`$${summary.totalRevenue.toLocaleString()}`} description="مجموع الفواتير المدفوعة" /><StatsCard icon={ExpenseIcon} title="إجمالي المصروفات" value={`$${summary.totalExpenses.toLocaleString()}`} description="مجموع النفقات المسجلة" /><StatsCard icon={NetProfitIcon} title="صافي الربح" value={`$${summary.netProfit.toLocaleString()}`} description="الإيرادات - المصروفات" /></div>)}
+                        {activeTab === 'overview' && (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><StatsCard icon={RevenueIcon} title="إجمالي الإيرادات" value={formatCurrency(Number(summary.totalRevenue || 0), String(schoolSettings?.defaultCurrency || 'SAR'))} description="مجموع الفواتير المدفوعة" /><StatsCard icon={ExpenseIcon} title="إجمالي المصروفات" value={formatCurrency(Number(summary.totalExpenses || 0), String(schoolSettings?.defaultCurrency || 'SAR'))} description="مجموع النفقات المسجلة" /><StatsCard icon={NetProfitIcon} title="صافي الربح" value={formatCurrency(Number(summary.netProfit || 0), String(schoolSettings?.defaultCurrency || 'SAR'))} description="الإيرادات - المصروفات" /></div>)}
                         {activeTab === 'invoices' && renderInvoicesTab()}
                         {activeTab === 'expenses' && renderExpensesTab()}
                         {activeTab === 'reports' && renderReportsTab()}

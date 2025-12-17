@@ -621,22 +621,23 @@ async function syncDatabase(){
   // Sync independent tables first
   await School.sync(opts);
   try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch {}
-  await SchoolSettings.sync(isProd ? { force: false } : { alter: true });
+  await SchoolSettings.sync(opts);
   await Plan.sync(opts);
-  await BusOperator.sync(isProd ? { force: false } : { alter: true });
+  await BusOperator.sync(opts);
   await Parent.sync(opts);
   try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch {}
+  try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch {}
   await Student.sync(opts);
-  await Teacher.sync(isProd ? { force: false } : { alter: true });
-  await Class.sync(isProd ? { force: false } : { alter: true });
-  await FeeSetup.sync(isProd ? { force: false } : { alter: true });
-  await Invoice.sync(isProd ? { force: false } : { alter: true });
-  await Payment.sync(isProd ? { force: false } : { alter: true });
+  await Teacher.sync(opts);
+  await Class.sync(opts);
+  await FeeSetup.sync(opts);
+  await Invoice.sync(opts);
+  await Payment.sync(opts);
   
   // Then sync dependent tables
   await Subscription.sync(opts);
-  await Route.sync(isProd ? { force: false } : { alter: true });
-  await User.sync(isProd ? { force: false } : { alter: true });
+  await Route.sync(opts);
+  await User.sync(opts);
   await Conversation.sync(opts);
   await Message.sync(opts);
   await Expense.sync(opts);

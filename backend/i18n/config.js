@@ -128,10 +128,12 @@ const formatDate = (date, locale = 'en') => {
 
 // Helper function for formatting currency according to locale
 const formatCurrency = (amount, locale = 'en', currency = 'USD') => {
+  const code = String(currency || 'USD').toUpperCase();
+  const decimals = /^(YER|JPY)$/.test(code) ? 0 : 2;
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 2
+    currency: code,
+    minimumFractionDigits: decimals
   }).format(amount);
 };
 

@@ -519,6 +519,7 @@ export interface UpdatableTeacherData {
     status: TeacherStatus;
     department?: string;
     bankAccount?: string;
+    email?: string;
 }
 
 export interface Class {
@@ -729,6 +730,7 @@ export interface NewAdRequestData {
 
 export interface UpdatableUserData {
     name?: string;
+    email?: string;
     phone?: string;
     currentPassword?: string;
     newPassword?: string;

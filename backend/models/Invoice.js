@@ -45,6 +45,11 @@ const Invoice = sequelize.define('Invoice', {
     allowNull: false,
     defaultValue: 0.00,
   },
+  currencyCode: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'SAR',
+  },
   // Foreign keys are added via associations
   // studentId
 }, {
