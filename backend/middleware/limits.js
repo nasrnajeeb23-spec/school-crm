@@ -10,18 +10,22 @@ function normalizeLimits(settings, plan, sub) {
   if (plan && plan.limits) {
     const l = typeof plan.limits === 'string' ? safeJson(plan.limits) : plan.limits;
     if (l && l.students !== undefined) limits.students = l.students === 'غير محدود' || l.students === 'unlimited' ? 999999 : Number(l.students);
+    if (l && l.staff !== undefined) limits.teachers = l.staff === 'غير محدود' || l.staff === 'unlimited' ? 999999 : Number(l.staff);
     if (l && l.teachers !== undefined) limits.teachers = l.teachers === 'غير محدود' || l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
     if (l && l.invoices !== undefined) limits.invoices = l.invoices === 'غير محدود' || l.invoices === 'unlimited' ? 999999 : Number(l.invoices);
     if (l && l.storageGB !== undefined) limits.storageGB = l.storageGB === 'غير محدود' || l.storageGB === 'unlimited' ? 999999 : Number(l.storageGB);
+    if (l && l.storage !== undefined) limits.storageGB = l.storage === 'غير محدود' || l.storage === 'unlimited' ? 999999 : Number(l.storage);
     source = 'plan';
   }
 
   if (sub && sub.customLimits) {
     const l = typeof sub.customLimits === 'string' ? safeJson(sub.customLimits) : sub.customLimits;
     if (l && l.students !== undefined) limits.students = l.students === 'غير محدود' || l.students === 'unlimited' ? 999999 : Number(l.students);
+    if (l && l.staff !== undefined) limits.teachers = l.staff === 'غير محدود' || l.staff === 'unlimited' ? 999999 : Number(l.staff);
     if (l && l.teachers !== undefined) limits.teachers = l.teachers === 'غير محدود' || l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
     if (l && l.invoices !== undefined) limits.invoices = l.invoices === 'غير محدود' || l.invoices === 'unlimited' ? 999999 : Number(l.invoices);
     if (l && l.storageGB !== undefined) limits.storageGB = l.storageGB === 'غير محدود' || l.storageGB === 'unlimited' ? 999999 : Number(l.storageGB);
+    if (l && l.storage !== undefined) limits.storageGB = l.storage === 'غير محدود' || l.storage === 'unlimited' ? 999999 : Number(l.storage);
     if (Array.isArray(l.packs)) packs = l.packs;
     if (l.hardCap === true) mode = 'hard_cap';
     if (l.allowOverage === true) mode = 'overage';
@@ -42,9 +46,11 @@ function normalizeLimits(settings, plan, sub) {
   if (settings && settings.customLimits) {
     const l = typeof settings.customLimits === 'string' ? safeJson(settings.customLimits) : settings.customLimits;
     if (l && l.students !== undefined) limits.students = l.students === 'غير محدود' || l.students === 'unlimited' ? 999999 : Number(l.students);
+    if (l && l.staff !== undefined) limits.teachers = l.staff === 'غير محدود' || l.staff === 'unlimited' ? 999999 : Number(l.staff);
     if (l && l.teachers !== undefined) limits.teachers = l.teachers === 'غير محدود' || l.teachers === 'unlimited' ? 999999 : Number(l.teachers);
     if (l && l.invoices !== undefined) limits.invoices = l.invoices === 'غير محدود' || l.invoices === 'unlimited' ? 999999 : Number(l.invoices);
     if (l && l.storageGB !== undefined) limits.storageGB = l.storageGB === 'غير محدود' || l.storageGB === 'unlimited' ? 999999 : Number(l.storageGB);
+    if (l && l.storage !== undefined) limits.storageGB = l.storage === 'غير محدود' || l.storage === 'unlimited' ? 999999 : Number(l.storage);
     if (l.hardCap === true) mode = 'hard_cap';
     if (l.allowOverage === true) mode = 'overage';
     source = 'school_custom';
