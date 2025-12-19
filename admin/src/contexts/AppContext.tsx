@@ -58,6 +58,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   useEffect(() => {
+    const isLoginPage = (() => {
+      if (typeof window === 'undefined') return false;
+      const p = window.location?.pathname || '';
+      return /^\/(login|superadmin\/login)\/?$/i.test(p);
+    })();
+    if (isLoginPage) { setHydrating(false); return; }
     const isInviteFlow = (() => {
       if (typeof window === 'undefined') return false;
       const p = window.location?.pathname || '';

@@ -377,7 +377,7 @@ nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBa
 
 // API Routes
 const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/auth/superadmin', authLimiter, authSuperAdminRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/schools', schoolsRoutes);
