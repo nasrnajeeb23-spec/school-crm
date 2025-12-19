@@ -156,7 +156,7 @@ const checkRateLimit = async (identifier, maxAttempts = DEFAULT_MAX_ATTEMPTS, lo
   if (attempts && attempts.count >= maxAttempts) {
     const timeDiff = now - attempts.lastAttempt;
     if (timeDiff < lockoutMs) {
-      const remainingTime = Math.ceil((LOCKOUT_DURATION - timeDiff) / 1000);
+      const remainingTime = Math.ceil((lockoutMs - timeDiff) / 1000);
       return { allowed: false, remainingTime, attempts: attempts.count };
     } else {
       loginAttempts.delete(identifier);
@@ -423,7 +423,7 @@ router.post('/verify-mfa', [
 
     // Find user
     const user = await User.findByPk(decoded.userId);
-    if (!user || user.role !== 'SuperAdmin') {
+    if (!user || String(user.role).toUpperCase() !== 'SUPERADMIN') {
       return res.status(401).json({
         success: false,
         message: 'Invalid user'
@@ -440,8 +440,21 @@ router.post('/verify-mfa', [
         window: 1
       });
     } else {
-      const validCodes = ['123456', '654321', '000000'];
-      otpValid = validCodes.includes(mfaCode);
+      if (isDev) {
+        const validCodes = ['123456', '654321', '000000'];
+        otpValid = validCodes.includes(mfaCode);
+      } else {
+        await logSuperAdminAction('mfa_verify.failed', {
+          userId: user.id,
+          userEmail: user.email,
+          reason: 'MFA not enabled',
+          ipAddress: clientIP
+        }, req);
+        return res.status(401).json({
+          success: false,
+          message: 'MFA not enabled'
+        });
+      }
     }
 
     if (!otpValid) {
@@ -562,7 +575,7 @@ router.get('/superadmin/security-status', (req, res) => {
 // @access  Private (SuperAdmin only)
 router.post('/superadmin/logout', verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== 'SuperAdmin') {
+    if (String(req.user.role).toUpperCase() !== 'SUPERADMIN') {
       return res.status(403).json({
         success: false,
         message: 'Access denied'

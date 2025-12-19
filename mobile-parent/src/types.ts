@@ -173,6 +173,7 @@ export interface Assignment {
     creationDate: string;
     status: string; // 'Active' | 'Archived'
     submissionCount: number;
+    attachments?: AttachmentMeta[];
 }
 
 export interface Submission {
@@ -185,7 +186,7 @@ export interface Submission {
     grade?: number;
     feedback?: string;
     content?: string;
-    attachmentUrl?: string;
+    attachments?: AttachmentMeta[];
 }
 
 export enum ConversationType {
@@ -214,4 +215,13 @@ export interface Conversation {
     lastMessage?: string;
     timestamp?: string;
     unreadCount?: number;
+}
+
+export interface AttachmentMeta {
+    filename: string;
+    originalName?: string;
+    mimeType?: string;
+    size?: number;
+    url?: string;
+    uploadedAt?: string;
 }

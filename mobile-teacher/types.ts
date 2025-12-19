@@ -116,6 +116,7 @@ export enum ConversationType {
 export interface Message {
     id: string;
     senderId: 'me' | 'other'; // 'me' for the current user
+    senderRole?: UserRole;
     text: string;
     timestamp: string;
 }
@@ -173,6 +174,7 @@ export interface Assignment {
     creationDate: string;
     status: AssignmentStatus;
     submissionCount: number;
+    attachments?: AttachmentMeta[];
 }
 
 export interface Submission {
@@ -184,4 +186,14 @@ export interface Submission {
     status: SubmissionStatus;
     grade?: number;
     feedback?: string;
+    attachments?: AttachmentMeta[];
+}
+
+export interface AttachmentMeta {
+    filename: string;
+    originalName?: string;
+    mimeType?: string;
+    size?: number;
+    url?: string;
+    uploadedAt?: string;
 }

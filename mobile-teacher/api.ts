@@ -1,10 +1,18 @@
 // Mobile Teacher App - Real API Connection
 // هذا الملف يتصل بالـ Backend الحقيقي
 
-import { User, School, Student, Class, Assignment, Submission, AttendanceRecord, Conversation, Message } from './types';
+import { User, School, Student, Class, Assignment, Submission, AttendanceRecord, AttendanceStatus, DailyAttendance, StudentGrades, Conversation, Message } from './types';
 import * as SecureStore from 'expo-secure-store';
 
 export const API_BASE_URL = (((process as any).env as any)['EXPO_PUBLIC_API_BASE_URL'] as string) || 'https://school-crschool-crm-backendm.onrender.com/api';
+
+export const getAssetUrl = (path: string): string => {
+  if (!path) return '';
+  const base = API_BASE_URL.replace(/\/api\/?$/, '');
+  if (/^https?:\/\//i.test(path)) return path;
+  if (path.startsWith('/')) return `${base}${path}`;
+  return `${base}/${path}`;
+};
 
 async function getToken() {
   try {
@@ -104,23 +112,23 @@ export const getCurrentUser = async (): Promise<User> => {
 // ==================== Teacher Dashboard APIs ====================
 
 export const getTeacherClasses = async (teacherId: string): Promise<Class[]> => {
-    return await apiCall(`/teachers/${teacherId}/classes`);
+    return await apiCall(`/teacher/${teacherId}/classes`);
 };
 
 export const getClassStudents = async (classId: string): Promise<Student[]> => {
-    return await apiCall(`/classes/${classId}/students`);
+    return await apiCall(`/school/class/${classId}/students`);
 };
 
 export const getTeacherSchedule = async (teacherId: string): Promise<any[]> => {
-    return await apiCall(`/teachers/${teacherId}/schedule`);
+    return await apiCall(`/teacher/${teacherId}/schedule`);
 };
 
 export const getTeacherDashboardData = async (teacherId: string): Promise<{ classes: any[]; schedule: any[]; actionItems: any[] }> => {
-    return await apiCall(`/teachers/${teacherId}/dashboard`);
+    return await apiCall(`/teacher/${teacherId}/dashboard`);
 };
 
 export const getTeacherAssignments = async (teacherId: string): Promise<Assignment[]> => {
-    return await apiCall(`/teachers/${teacherId}/assignments`);
+    return await apiCall(`/teacher/${teacherId}/assignments`);
 };
 
 // ==================== Assignments Management ====================
@@ -156,8 +164,27 @@ export const gradeSubmission = async (submissionId: string, grade: number, feedb
 
 // ==================== Attendance ====================
 
+export const getAttendance = async (classId: string, date: string): Promise<DailyAttendance> => {
+    const rows = (await apiCall(`/school/class/${classId}/attendance?date=${encodeURIComponent(date)}`)) as Array<{ studentId: string; date: string; status: AttendanceStatus }>;
+    const records: AttendanceRecord[] = Array.isArray(rows)
+        ? rows.map(r => ({ studentId: String(r.studentId), studentName: '', status: r.status }))
+        : [];
+    return { classId, date, records };
+};
+
+export const saveAttendance = async (classId: string, date: string, records: AttendanceRecord[]): Promise<void> => {
+    await apiCall(`/school/class/${classId}/attendance`, {
+        method: 'POST',
+        body: JSON.stringify({
+            date,
+            records: records.map(r => ({ studentId: r.studentId, status: r.status })),
+        }),
+    });
+};
+
 export const getClassAttendance = async (classId: string, date: string): Promise<AttendanceRecord[]> => {
-    return await apiCall(`/classes/${classId}/attendance?date=${date}`);
+    const daily = await getAttendance(classId, date);
+    return daily.records;
 };
 
 export const markAttendance = async (attendanceData: {
@@ -169,10 +196,19 @@ export const markAttendance = async (attendanceData: {
         notes?: string;
     }>;
 }): Promise<AttendanceRecord[]> => {
-    return await apiCall('/attendance', {
+    await apiCall(`/school/class/${attendanceData.classId}/attendance`, {
         method: 'POST',
-        body: JSON.stringify(attendanceData),
+        body: JSON.stringify({
+            date: attendanceData.date,
+            records: attendanceData.records.map(r => ({ studentId: r.studentId, status: r.status })),
+        }),
     });
+
+    return attendanceData.records.map(r => ({
+        studentId: r.studentId,
+        studentName: '',
+        status: r.status as AttendanceStatus,
+    }));
 };
 
 // ==================== Grades ====================
@@ -191,6 +227,28 @@ export const addGrade = async (grade: {
     return await apiCall('/grades', {
         method: 'POST',
         body: JSON.stringify(grade),
+    });
+};
+
+export const getGrades = async (classId: string, subject: string): Promise<StudentGrades[]> => {
+    return await apiCall(`/school/class/${classId}/grades?subject=${encodeURIComponent(subject)}`);
+};
+
+export const saveGrades = async (entries: StudentGrades[]): Promise<void> => {
+    const me: User = await getCurrentUser();
+    const schoolId = me.schoolId;
+    if (!schoolId) throw new Error('Missing schoolId');
+
+    await apiCall(`/school/${schoolId}/grades`, {
+        method: 'POST',
+        body: JSON.stringify({
+            entries: entries.map(e => ({
+                classId: e.classId,
+                subject: e.subject,
+                studentId: e.studentId,
+                grades: e.grades,
+            })),
+        }),
     });
 };
 
@@ -232,11 +290,11 @@ export const createConversation = async (conversation: {
 // ==================== Finance ====================
 
 export const getTeacherSalarySlips = async (teacherId: string): Promise<any[]> => {
-    return await apiCall(`/teachers/${teacherId}/salary-slips`);
+    return await apiCall(`/teacher/${teacherId}/salary-slips`);
 };
 
 export const getTeacherFinanceSummary = async (teacherId: string): Promise<any> => {
-    return await apiCall(`/teachers/${teacherId}/finance-summary`);
+    return await apiCall(`/teacher/${teacherId}/finance-summary`);
 };
 
 // ==================== Settings ====================

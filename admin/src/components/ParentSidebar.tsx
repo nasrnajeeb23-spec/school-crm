@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, ScheduleIcon, RequestIcon, LogoutIcon, ProfileIcon, BusIcon, MessagingIcon, CloseIcon } from './icons';
+import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, ScheduleIcon, RequestIcon, LogoutIcon, ProfileIcon, BusIcon, MessagingIcon, CloseIcon, AssignmentIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface ParentSidebarProps {
@@ -16,6 +16,7 @@ const ParentSidebar: React.FC<ParentSidebarProps> = ({ isMobileOpen = false, onC
     { id: 'grades', label: 'الدرجات', icon: GradesIcon, path: '/parent/grades' },
     { id: 'attendance', label: 'الحضور', icon: AttendanceIcon, path: '/parent/attendance' },
     { id: 'finance', label: 'المالية', icon: FinanceIcon, path: '/parent/finance' },
+    { id: 'assignments', label: 'الواجبات', icon: AssignmentIcon, path: '/parent/assignments' },
     { id: 'schedule', label: 'الجدول', icon: ScheduleIcon, path: '/parent/schedule' },
     { id: 'requests', label: 'الطلبات', icon: RequestIcon, path: '/parent/requests' },
     { id: 'messaging', label: 'الرسائل', icon: MessagingIcon, path: '/parent/messaging' },

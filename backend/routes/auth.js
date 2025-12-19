@@ -11,6 +11,23 @@ const { rateLimit } = require('../middleware/rateLimit');
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 
+async function verifyHCaptchaToken(token, ip) {
+  try {
+    const enabled = String(process.env.HCAPTCHA_ENABLED || '').toLowerCase() === 'true';
+    if (!enabled) return true;
+    const secret = process.env.HCAPTCHA_SECRET || '';
+    if (!secret) return false;
+    const params = new URLSearchParams();
+    params.append('secret', secret);
+    params.append('response', token || '');
+    if (ip) params.append('remoteip', String(ip));
+    const resp = await fetch('https://hcaptcha.com/siteverify', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
+    const data = await resp.json().catch(() => ({}));
+    return !!data.success;
+  } catch {
+    return false;
+  }
+}
 function isStrongPassword(pwd){
   const lengthOk = typeof pwd === 'string' && pwd.length >= 10;
   const upper = /[A-Z]/.test(pwd);
@@ -23,7 +40,7 @@ function isStrongPassword(pwd){
 // @route   POST api/auth/login
 // @desc    Authenticate user & get token (supports both email and username)
 // @access  Public
-router.post('/login', validate([
+router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), validate([
   { name: 'email', required: false, type: 'string' },
   { name: 'username', required: false, type: 'string' },
   { name: 'password', required: true, type: 'string' },
@@ -31,6 +48,13 @@ router.post('/login', validate([
   const { email, username, password } = req.body;
 
   try {
+    const client = String(req.body?.client || req.headers['x-client'] || '').toLowerCase();
+    const captchaToken = String(req.body?.hcaptchaToken || '');
+    const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString();
+    if (client === 'web') {
+      const okCaptcha = await verifyHCaptchaToken(captchaToken, ip);
+      if (!okCaptcha) return res.status(400).json({ msg: 'Captcha verification failed' });
+    }
     // Support both email and username login
     const loginField = email ? { email } : { username };
     if (!loginField.email && !loginField.username) {
@@ -103,6 +127,12 @@ router.post('/login', validate([
     const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
 
     const { password: _, ...userData } = user.toJSON();
+    try {
+      const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+      const baseCookie = { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' };
+      res.cookie('access_token', token, { ...baseCookie, maxAge: 12 * 60 * 60 * 1000 });
+      res.cookie('refresh_token', refreshToken, { ...baseCookie, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    } catch {}
     res.json({ token, refreshToken, user: userData });
   } catch (err) {
     console.error(err.message);
@@ -235,6 +265,17 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+router.post('/logout', async (req, res) => {
+  try {
+    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const baseCookie = { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' };
+    res.clearCookie('access_token', baseCookie);
+    res.clearCookie('refresh_token', baseCookie);
+    res.json({ msg: 'Logged out' });
+  } catch (e) {
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
 // Set password via invite token
 router.post('/invite/set-password', validate([
   { name: 'token', required: true, type: 'string' },

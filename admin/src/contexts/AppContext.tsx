@@ -10,7 +10,7 @@ interface AppContextType {
   hydrating: boolean;
   theme: Theme;
   toggleTheme: () => void;
-  login: (emailOrUsername: string, password: string, schoolId?: number) => Promise<boolean>;
+  login: (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string) => Promise<boolean>;
   logout: () => void;
   trialSignup: (data: NewTrialRequestData) => Promise<boolean>;
   updateProfile: (data: UpdatableUserData) => Promise<boolean>;
@@ -66,8 +66,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return !!q.get('token');
     })();
     if (isInviteFlow) { setHydrating(false); return; }
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!token) { setHydrating(false); return; }
     
     let cancelled = false;
     (async () => {
@@ -117,13 +115,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => { cancelled = true; };
   }, []);
 
-  const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<boolean> => {
+  const login = async (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string): Promise<boolean> => {
     try {
-      const result = await api.login(emailOrUsername, password, schoolId);
-      if (result === "TRIAL_EXPIRED") {
-          addToast('لقد انتهت الفترة التجريبية لحسابك. يرجى الاشتراك للمتابعة.', 'warning');
-          return false;
-      } else if (result) {
+      const result = await api.login(emailOrUsername, password, schoolId, hcaptchaToken);
+      if (result) {
         setCurrentUser(result);
         if (result.schoolId) {
           try { localStorage.setItem('current_school_id', String(result.schoolId)); } catch {}
@@ -144,7 +139,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (emailOk && passOk) {
         const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: overrideEmail, role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
         setCurrentUser(offlineUser);
-        try { localStorage.setItem('auth_token', 'OFFLINE_DEMO'); } catch {}
         addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
         return true;
       }
@@ -152,7 +146,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (String(emailOrUsername).toLowerCase() === 'super@admin.com' && password === 'password') {
       const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: 'super@admin.com', role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
       setCurrentUser(offlineUser);
-      try { localStorage.setItem('auth_token', 'OFFLINE_DEMO'); } catch {}
       addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
       return true;
     }
@@ -199,9 +192,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logout = () => {
     addToast('تم تسجيل خروجك بنجاح.', 'info');
+    try { api.logout().catch(() => {}); } catch {}
     setCurrentUser(null);
     try {
-      localStorage.removeItem('auth_token');
       localStorage.removeItem('current_school_id');
     } catch {}
   };

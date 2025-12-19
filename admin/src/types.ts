@@ -835,6 +835,7 @@ export interface Assignment {
     creationDate: string;
     status: AssignmentStatus;
     submissionCount: number;
+    attachments?: AttachmentMeta[];
 }
 
 export interface NewAssignmentData {
@@ -842,6 +843,7 @@ export interface NewAssignmentData {
     title: string;
     description: string;
     dueDate: string;
+    files?: File[];
 }
 
 export interface Submission {
@@ -853,6 +855,16 @@ export interface Submission {
   status: SubmissionStatus;
   grade?: number;
   feedback?: string;
+  attachments?: AttachmentMeta[];
+}
+
+export interface AttachmentMeta {
+  filename: string;
+  originalName?: string;
+  mimeType?: string;
+  size?: number;
+  url?: string;
+  uploadedAt?: string;
 }
 
 export type PaymentPlanType = 'Monthly' | 'Termly' | 'Installments';

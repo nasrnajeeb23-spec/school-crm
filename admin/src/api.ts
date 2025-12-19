@@ -10,7 +10,6 @@ import {
 // 🔗 ضبط عنوان الـ API للإنتاج/التطوير بشكل مرن
 // الأولوية: متغير بيئة مُحقن أثناء البناء -> Vite import.meta.env (إن وجد) -> localStorage(api_base) -> الافتراضي
 const API_BASE_URL = (
-  (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) ||
   (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
   (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
   'http://localhost:5000/api'
@@ -35,17 +34,17 @@ export const getAssetUrl = (url?: string): string => {
 };
 
 const authHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const schoolId = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
-    const base: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const base: Record<string, string> = {};
     if (schoolId) base['x-school-id'] = String(schoolId);
     return base;
 };
 
 // دالة مساعدة للاتصال بالـ API
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+  const isFormData = typeof FormData !== 'undefined' && (options as any)?.body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...authHeaders(),
     ...options.headers,
   };
@@ -53,6 +52,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     return await fetch(`${base}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include',
       cache: 'no-store' as RequestCache,
     });
   };
@@ -72,7 +72,6 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
         if (response.status === 401) {
           const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
           const isSilentCheck = endpoint === '/auth/me';
-          const hadToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
           const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
           const onInviteFlow = (() => {
             try {
@@ -83,10 +82,10 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
               return q.has('token');
             } catch { return false; }
           })();
-          if (!isAuthFlow && !onInviteFlow && (isSilentCheck || (hadToken && onProtectedRoute))) {
+          const shouldRedirect = !isAuthFlow && !onInviteFlow && (isSilentCheck || onProtectedRoute);
+          if (shouldRedirect) {
             try {
               if (typeof window !== 'undefined') {
-                localStorage.removeItem('auth_token');
                 localStorage.removeItem('current_school_id');
                 const toast = (window as any).__addToast;
                 if (typeof toast === 'function') {
@@ -147,17 +146,13 @@ const unwrap = <T = any>(payload: any, key?: string, fallback: T = ([] as unknow
 
 // ==================== Authentication APIs ====================
 
-export const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<User> => {
+export const login = async (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string): Promise<User> => {
     const field = emailOrUsername.includes('@') ? { email: emailOrUsername } : { username: emailOrUsername };
     const response: any = await apiCall('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ ...field, password, schoolId }),
+        body: JSON.stringify({ ...field, password, schoolId, client: 'web', hcaptchaToken }),
     });
-    const token = response?.token;
     const user = response?.user || {};
-    if (typeof window !== 'undefined' && token) {
-        localStorage.setItem('auth_token', token);
-    }
   const mapRole = (r: string) => {
       const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
       const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
@@ -905,6 +900,24 @@ export const getParentActionItems = async (): Promise<ActionItem[]> => {
     }
 };
 
+export const getParentAssignments = async (parentId: string, studentId?: string): Promise<any> => {
+    const qs = studentId ? `?studentId=${encodeURIComponent(String(studentId))}` : '';
+    return await apiCall(`/parent/${parentId}/assignments${qs}`, { method: 'GET' });
+};
+
+export const submitParentAssignment = async (parentId: string, assignmentId: string | number, studentId: string, content: string, files: File[]): Promise<any> => {
+    const fd = new FormData();
+    fd.append('studentId', String(studentId));
+    fd.append('content', String(content || ''));
+    for (const f of files || []) {
+        fd.append('attachments', f, (f as any).name || 'file');
+    }
+    return await apiCall(`/parent/${parentId}/assignments/${assignmentId}/submit`, { method: 'POST', body: fd });
+};
+export const createParentPaymentSession = async (invoiceId: string | number): Promise<{ paymentUrl?: string; sessionId?: string }> => {
+    return await apiCall('/payments/session', { method: 'POST', body: JSON.stringify({ invoiceId }) });
+};
+
 export const getTeacherActionItems = async (): Promise<ActionItem[]> => {
     try {
         const raw = await apiCall('/teacher/action-items', { method: 'GET' });
@@ -1388,6 +1401,18 @@ export const getSubmissionsForAssignment = async (assignmentId: string): Promise
 };
 
 export const createAssignment = async (data: NewAssignmentData): Promise<Assignment> => {
+    const hasFiles = (data as any)?.files && Array.isArray((data as any).files) && ((data as any).files as File[]).length > 0;
+    if (hasFiles) {
+        const fd = new FormData();
+        fd.append('title', String(data.title));
+        fd.append('description', String(data.description || ''));
+        fd.append('classId', String(data.classId));
+        fd.append('dueDate', String(data.dueDate || ''));
+        for (const f of ((data as any).files as File[])) {
+            fd.append('attachments', f, (f as any).name || 'file');
+        }
+        return await apiCall('/assignments', { method: 'POST', body: fd });
+    }
     return await apiCall('/assignments', { method: 'POST', body: JSON.stringify(data) });
 };
 

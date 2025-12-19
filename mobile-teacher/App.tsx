@@ -1,14 +1,15 @@
 import 'react-native-gesture-handler';
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { LinkingOptions, NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 import AppNavigator from './navigation/AppNavigator';
+import { RootStackParamList } from './navigation/AppNavigator';
 import { User } from './types';
 
 const prefix = Linking.createURL('/');
 
-const linking = {
+const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [prefix],
   config: {
     screens: {

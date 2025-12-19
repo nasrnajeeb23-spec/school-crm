@@ -29,11 +29,32 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
 })();
 
 async function verifyToken(req, res, next) {
+  const parseCookies = (cookieHeader) => {
+    const out = {};
+    if (!cookieHeader) return out;
+    const pairs = String(cookieHeader).split(';');
+    for (const p of pairs) {
+      const idx = p.indexOf('=');
+      if (idx === -1) continue;
+      const k = p.slice(0, idx).trim();
+      const v = decodeURIComponent(p.slice(idx + 1).trim());
+      out[k] = v;
+    }
+    return out;
+  };
   const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ msg: 'Missing Authorization header' });
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ msg: 'Invalid Authorization header format' });
-  const token = parts[1];
+  let token = null;
+  if (authHeader) {
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') token = parts[1];
+  }
+  if (!token) {
+    try {
+      const cookies = parseCookies(req.headers['cookie'] || '');
+      token = cookies['access_token'] || null;
+    } catch {}
+  }
+  if (!token) return res.status(401).json({ msg: 'Missing Authorization header' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = payload;

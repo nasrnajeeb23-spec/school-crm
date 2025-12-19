@@ -2,6 +2,42 @@ const express = require('express');
 const router = express.Router();
 const { Parent, Student, Grade, Attendance, Invoice, Notification, Schedule, Class, Teacher, Assignment, Submission } = require('../models');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const MAX_ATTACHMENT_SIZE = parseInt(process.env.MAX_ATTACHMENT_SIZE || `${25 * 1024 * 1024}`, 10); // 25 MB
+const allowedMimeTypes = new Set([
+  'image/png','image/jpeg','image/jpg','image/gif',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain'
+]);
+function ensureDir(p){ try { fs.mkdirSync(p, { recursive: true }); } catch {} }
+function safeName(name){ return `${Date.now()}_${Math.random().toString(36).slice(2,8)}_${path.basename(name).replace(/[^A-Za-z0-9._-]+/g,'_')}`; }
+const submissionStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    try {
+      const assignmentId = req.params.assignmentId;
+      const parentId = req.params.parentId;
+      const studentId = (req.body && req.body.studentId) || '';
+      const schoolId = Number(req.user?.schoolId || 0) || 0;
+      const dir = path.join(__dirname, '..', 'storage', 'submissions', String(schoolId || 'unknown'), String(studentId || 'unknown'));
+      ensureDir(dir);
+      cb(null, dir);
+    } catch (e) { cb(e); }
+  },
+  filename: (_req, file, cb) => cb(null, safeName(file.originalname))
+});
+const submissionUpload = multer({
+  storage: submissionStorage,
+  limits: { fileSize: MAX_ATTACHMENT_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (allowedMimeTypes.has(file.mimetype)) cb(null, true);
+    else cb(new Error('Unsupported file type'));
+  }
+});
 
 // @route   GET api/parent/:parentId/dashboard
 // @desc    Get all necessary data for the parent dashboard
@@ -147,7 +183,15 @@ router.get('/:parentId/assignments', verifyToken, requireRole('PARENT'), async (
                     description: a.description,
                     dueDate: a.dueDate,
                     teacherName: a.Teacher ? a.Teacher.name : 'Unknown',
-                    status: a.status
+                    status: a.status,
+                    attachments: Array.isArray(a.attachments) ? a.attachments.map(att => ({
+                      filename: att.filename,
+                      originalName: att.originalName,
+                      mimeType: att.mimeType,
+                      size: att.size,
+                      url: `/api/parent/${req.params.parentId}/assignments/${a.id}/attachments/${encodeURIComponent(att.filename)}`,
+                      uploadedAt: att.uploadedAt
+                    })) : []
                 }))
             });
         }
@@ -171,11 +215,21 @@ router.get('/:parentId/assignments/:assignmentId/submission', verifyToken, requi
         });
         
         if (!submission) return res.json(null);
-        return res.json(submission);
+        const mapped = submission.toJSON();
+        const atts = Array.isArray(mapped.attachments) ? mapped.attachments : [];
+        mapped.attachments = atts.map(att => ({
+          filename: att.filename,
+          originalName: att.originalName,
+          mimeType: att.mimeType,
+          size: att.size,
+          uploadedAt: att.uploadedAt,
+          url: `/api/parent/${req.params.parentId}/submissions/${mapped.id}/attachments/${encodeURIComponent(att.filename)}`
+        }));
+        return res.json(mapped);
     } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 
-router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireRole('PARENT'), async (req, res) => {
+router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireRole('PARENT'), submissionUpload.array('attachments', 10), async (req, res) => {
     try {
         if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
         const { studentId, content } = req.body;
@@ -188,10 +242,19 @@ router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireR
             }
         });
         
+        const files = Array.isArray(req.files) ? req.files : [];
+        const added = files.map(f => ({
+          filename: f.filename,
+          originalName: f.originalname,
+          mimeType: f.mimetype,
+          size: f.size,
+          uploadedAt: new Date().toISOString()
+        }));
         if (submission) {
             submission.content = content || submission.content;
             submission.status = 'Submitted';
             submission.submissionDate = new Date();
+            submission.attachments = Array.isArray(submission.attachments) ? [...submission.attachments, ...added] : added;
             await submission.save();
         } else {
             submission = await Submission.create({
@@ -199,12 +262,42 @@ router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireR
                 studentId: studentId,
                 content: content || '',
                 status: 'Submitted',
-                submissionDate: new Date()
+                submissionDate: new Date(),
+                attachments: added
             });
         }
         
         return res.json(submission);
     } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/assignments/:assignmentId/attachments/:filename', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const schoolId = Number(req.user.schoolId || 0) || 0;
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(__dirname, '..', 'storage', 'assignments', String(schoolId), filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename=${filename}`);
+    res.type(path.extname(filename));
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/submissions/:submissionId/attachments/:filename', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const submission = await Submission.findByPk(req.params.submissionId).catch(() => null);
+    if (!submission) return res.status(404).json({ msg: 'Submission not found' });
+    const parent = await Parent.findByPk(req.params.parentId, { include: { model: Student } }).catch(() => null);
+    const owns = parent && parent.Students && parent.Students.find(s => String(s.id) === String(submission.studentId));
+    if (!owns) return res.status(403).json({ msg: 'Access denied' });
+    const schoolId = Number(req.user.schoolId || 0) || 0;
+    const base = path.join(__dirname, '..', 'storage', 'submissions', String(schoolId), String(submission.studentId));
+    const filePath = path.join(base, req.params.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    return res.sendFile(filePath);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 
 router.get('/:parentId/grades', verifyToken, requireRole('PARENT'), async (req, res) => {

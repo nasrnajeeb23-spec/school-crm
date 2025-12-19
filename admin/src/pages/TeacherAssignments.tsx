@@ -88,15 +88,59 @@ const TeacherAssignments: React.FC = () => {
         <>
             <div className="mt-6 space-y-6">
                  <button onClick={() => setSelectedAssignment(null)} className="flex items-center text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors font-semibold"><BackIcon className="h-5 w-5 ml-2" /><span>العودة لقائمة الواجبات</span></button>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><h2 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedAssignment.title}</h2><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedAssignment.className} | تاريخ التسليم: {selectedAssignment.dueDate}</p><p className="mt-4 text-gray-700 dark:text-gray-300">{selectedAssignment.description}</p></div>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedAssignment.title}</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedAssignment.className} | تاريخ التسليم: {selectedAssignment.dueDate}</p>
+                    <p className="mt-4 text-gray-700 dark:text-gray-300">{selectedAssignment.description}</p>
+                    {Array.isArray(selectedAssignment.attachments) && selectedAssignment.attachments.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">مرفقات المعلم</h4>
+                        <ul className="list-disc pr-6 text-sm text-teal-700 dark:text-teal-300">
+                          {selectedAssignment.attachments.map((a, idx) => (
+                            <li key={`${a.filename}-${idx}`}>
+                              <a href={api.getAssetUrl(a.url || '')} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {a.originalName || a.filename}
+                              </a>
+                              {a.size ? ` — ${(a.size / (1024 * 1024)).toFixed(2)}MB` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                </div>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                      <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 flex items-center"><UsersIcon className="h-6 w-6 ml-2 text-teal-500" />تسليمات الطلاب</h3>
                     <div className="overflow-x-auto">
                         {loading ? <p>جاري تحميل التسليمات...</p> : (
                             <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
-                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th className="px-6 py-3">اسم الطالب</th><th className="px-6 py-3">تاريخ التسليم</th><th className="px-6 py-3">الحالة</th><th className="px-6 py-3">الدرجة</th><th className="px-6 py-3">إجراء</th></tr></thead>
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th className="px-6 py-3">اسم الطالب</th><th className="px-6 py-3">تاريخ التسليم</th><th className="px-6 py-3">الحالة</th><th className="px-6 py-3">الدرجة</th><th className="px-6 py-3">المرفقات</th><th className="px-6 py-3">إجراء</th></tr></thead>
                                 <tbody>
-                                {submissions.map(sub => (<tr key={sub.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700"><td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{sub.studentName}</td><td className="px-6 py-4">{sub.submissionDate || '-'}</td><td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[sub.status]}`}>{sub.status}</span></td><td className="px-6 py-4 font-semibold">{sub.grade !== undefined ? `${sub.grade} / 10` : '-'}</td><td className="px-6 py-4">{sub.status !== SubmissionStatus.NotSubmitted && (<button onClick={() => setSubmissionToGrade(sub)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">{sub.status === SubmissionStatus.Graded ? 'تعديل الدرجة' : 'تقييم'}</button>)}</td></tr>))}
+                                {submissions.map(sub => (
+                                  <tr key={sub.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{sub.studentName}</td>
+                                    <td className="px-6 py-4">{sub.submissionDate || '-'}</td>
+                                    <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[sub.status]}`}>{sub.status}</span></td>
+                                    <td className="px-6 py-4 font-semibold">{sub.grade !== undefined ? `${sub.grade} / 10` : '-'}</td>
+                                    <td className="px-6 py-4">
+                                      {Array.isArray(sub.attachments) && sub.attachments.length > 0 ? (
+                                        <div className="space-y-1">
+                                          {sub.attachments.map((a, idx) => (
+                                            <a key={`${sub.id}-${a.filename}-${idx}`} href={api.getAssetUrl(a.url || '')} target="_blank" rel="noopener noreferrer" className="block text-teal-600 dark:text-teal-400 hover:underline">
+                                              {a.originalName || a.filename}
+                                            </a>
+                                          ))}
+                                        </div>
+                                      ) : (<span className="text-gray-400">لا يوجد</span>)}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      {sub.status !== SubmissionStatus.NotSubmitted && (
+                                        <button onClick={() => setSubmissionToGrade(sub)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
+                                          {sub.status === SubmissionStatus.Graded ? 'تعديل الدرجة' : 'تقييم'}
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
                                 </tbody>
                             </table>
                         )}

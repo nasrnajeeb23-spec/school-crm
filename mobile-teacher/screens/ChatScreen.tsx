@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Activity
 import { StackScreenProps } from '@react-navigation/stack';
 import io, { Socket } from 'socket.io-client';
 import * as api from '../api';
-import { Message } from '../types';
+import { Message, UserRole } from '../types';
 import { MessagesStackParamList } from '../navigation/MessagesNavigator';
 import { SendIcon } from '../components/icons';
 
@@ -68,7 +68,7 @@ const ChatScreen: React.FC<Props> = ({ route }) => {
         const tempMessage: Message = {
             id: `temp_${Date.now()}`,
             senderId: 'me',
-            senderRole: 'TEACHER', // Optimistic role
+            senderRole: UserRole.Teacher,
             text: textToSend,
             timestamp: new Date().toISOString(),
         };
@@ -88,7 +88,7 @@ const ChatScreen: React.FC<Props> = ({ route }) => {
     };
 
     const renderItem = ({ item }: { item: Message }) => {
-        const isMyMessage = item.senderRole === 'TEACHER' || item.senderId === 'me';
+        const isMyMessage = item.senderRole === UserRole.Teacher || item.senderId === 'me';
 
         return (
             <View style={[

@@ -5,6 +5,7 @@ import { School } from '../types';
 import * as api from '../api';
 import { useAppContext } from '../contexts/AppContext';
 import { useToast } from '../contexts/ToastContext';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 
 interface LoginPageProps {
   mode?: 'default' | 'superadmin';
@@ -22,6 +23,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; school?: string }>({});
+  const [captchaToken, setCaptchaToken] = useState('');
+  const HCAPTCHA_SITE_KEY =
+    ((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_HCAPTCHA_SITE_KEY) ||
+     '');
   
   // Security features for SuperAdmin
   const [mfaCode, setMfaCode] = useState('');
@@ -139,7 +144,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
         handleLoginError(error.message || 'Login failed');
       }
     } else {
-      const ok = await login(email, password, selectedSchool ? Number(selectedSchool) : undefined);
+      const ok = await login(email, password, selectedSchool ? Number(selectedSchool) : undefined, captchaToken);
       if (ok) {
         let target = '/';
         try {
@@ -380,6 +385,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                   </div>
                 </div>
                 {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+                {!isSuperAdminLogin && !!HCAPTCHA_SITE_KEY && (
+                  <div className="mt-3">
+                    <HCaptcha
+                      sitekey={HCAPTCHA_SITE_KEY}
+                      onVerify={(token) => setCaptchaToken(token)}
+                      onExpire={() => setCaptchaToken('')}
+                    />
+                  </div>
+                )}
               </div>
             )}
             <div className="pt-2">
@@ -389,7 +403,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
                   isLoading ||
                   (isSuperAdminLogin && !/\S+@\S+\.\S+/.test(email)) ||
                   (isSuperAdminLogin && password.length < 10) ||
-                  (showMfa && mfaCode.length !== 6)
+                  (showMfa && mfaCode.length !== 6) ||
+                  (!isSuperAdminLogin && !showMfa && !!HCAPTCHA_SITE_KEY && !captchaToken)
                 } 
                 className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed ${
                   isSuperAdminLogin 

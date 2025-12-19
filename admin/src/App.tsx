@@ -80,6 +80,7 @@ const ParentFinance = React.lazy(() => import('./pages/ParentFinance'));
 const ParentSchedule = React.lazy(() => import('./pages/ParentSchedule'));
 const ParentRequests = React.lazy(() => import('./pages/ParentRequests'));
 const ParentTransportation = React.lazy(() => import('./pages/ParentTransportation'));
+const ParentAssignments = React.lazy(() => import('./pages/ParentAssignments'));
 
 
 // Helper to determine the home route based on user role
@@ -236,6 +237,7 @@ const App: React.FC = () => {
                 <Route path="attendance" element={<ParentAttendance />} />
                 <Route path="finance" element={<ParentFinance />} />
                 <Route path="schedule" element={<ParentSchedule />} />
+                <Route path="assignments" element={<ParentAssignments />} />
                 <Route path="requests" element={<ParentRequests />} />
                 <Route path="messaging" element={<Messaging />} />
                 <Route path="transportation" element={<ParentTransportation />} />

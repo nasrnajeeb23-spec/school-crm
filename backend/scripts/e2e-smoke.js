@@ -152,6 +152,70 @@ async function waitFor(url, { headers = {}, timeoutMs = 7000, intervalMs = 400 }
     // Parent dashboard
     const parentResp = await fetch(`${base}/parent/${parentId}/dashboard`, { headers: { Authorization: `Bearer ${parentToken}` } });
     log('parent_dashboard', parentResp.ok);
+
+    // Transportation: full operator → route → student assignment → parent view flow
+    try {
+      // 1) Submit a bus operator application (public)
+      const opReqBody = {
+        name: 'سائق اختبار ' + Date.now(),
+        phone: '055' + Math.floor(1000000 + Math.random() * 8999999),
+        licenseNumber: 'LIC' + Math.floor(Math.random() * 100000),
+        busPlateNumber: 'TEST-' + Math.floor(Math.random() * 10000),
+        busCapacity: 20,
+        busModel: 'MiniBus 2020',
+        schoolId: 1
+      };
+      resp = await fetch(`${base}/transportation/operator/application`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(opReqBody) });
+      const op = await resp.json();
+      const operatorId = op?.id || op?.data?.id || null;
+      log('operator_application', resp.ok, { operatorId });
+
+      // 2) Approve operator (creates driver account)
+      if (operatorId) {
+        resp = await fetch(`${base}/transportation/operator/${operatorId}/approve`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` } });
+        const approveData = await resp.json();
+        log('approve_operator', resp.ok, { driverAccountCreated: !!approveData?.driverAccountCreated, userId: approveData?.userId || null });
+      } else {
+        log('approve_operator', false, { reason: 'missing_operator_id' });
+      }
+
+      // 3) Create a route assigned to this operator
+      let routeId = null;
+      if (operatorId) {
+        const routeName = 'مسار تجريبي ' + Math.floor(Math.random() * 1000);
+        resp = await fetch(`${base}/transportation/1/routes`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ name: routeName, busOperatorId: operatorId }) });
+        const route = await resp.json();
+        routeId = route?.id || route?.data?.id || null;
+        log('create_transport_route', resp.ok, { routeId });
+      }
+
+      // 4) Assign seeded parent’s student to the route
+      if (routeId) {
+        const studentsResp = await fetch(`${base}/school/1/students`, { headers: { Authorization: `Bearer ${adminToken}` } });
+        const studentsJson = await studentsResp.json();
+        const studentsArr = Array.isArray(studentsJson) ? studentsJson : (studentsJson?.data?.students || studentsJson?.students || []);
+        const target = Array.isArray(studentsArr) ? ((studentsArr.find(s => String(s.parentId || '') === String(parentId)) || studentsArr.find(s => s.parentId) || studentsArr[0])) : null;
+        const sid = target ? (target.id || target.studentId) : null;
+        if (sid) {
+          resp = await fetch(`${base}/transportation/1/routes/${routeId}/students`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ studentIds: [sid] }) });
+          log('assign_students_to_route', resp.ok, { count: sid ? 1 : 0, studentId: sid });
+        } else {
+          log('assign_students_to_route', false, { reason: 'no_student_found' });
+        }
+      } else {
+        log('assign_students_to_route', false, { reason: 'missing_route_id' });
+      }
+
+      // 5) Verify parent transportation details reflect assignment
+      if (parentId) {
+        resp = await fetch(`${base}/transportation/parent/${parentId}`, { headers: { Authorization: `Bearer ${parentToken}` } });
+        const parentDetails = await resp.json();
+        const ok = !!(parentDetails && parentDetails.operator && parentDetails.route);
+        log('parent_transportation', ok, { operatorId: parentDetails?.operator?.id || null, routeId: parentDetails?.route?.id || null });
+      }
+    } catch (e) {
+      log('transportation_flow', false, { message: String(e) });
+    }
   } catch (e) {
     log('error', false, { message: String(e) });
     process.exit(1);

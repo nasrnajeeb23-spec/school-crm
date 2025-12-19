@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, FlatList } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import * as api from '../api';
-import { StudentGrades, Grade, Class } from '../types';
+import { StudentGrades, Grade, Class, User } from '../types';
 import { MyClassesStackParamList } from '../navigation/MyClassesNavigator';
 
 type Props = StackScreenProps<MyClassesStackParamList, 'Grades'>;
@@ -16,9 +16,14 @@ const TeacherGradesScreen: React.FC<Props> = ({ route }) => {
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        // We need to fetch the class info to get its subjects
-        // Assuming teacherId is 'tech_001' for mock purposes
-        api.getTeacherClasses("tech_001").then(classes => {
+        api.getCurrentUser().then((me: User) => {
+            if (!me.teacherId) {
+                setLoading(false);
+                return;
+            }
+            return api.getTeacherClasses(me.teacherId);
+        }).then(classes => {
+            if (!classes) return;
             const currentClass = classes.find(c => c.id === classId);
             if (currentClass) {
                 setClassInfo(currentClass);
@@ -30,6 +35,8 @@ const TeacherGradesScreen: React.FC<Props> = ({ route }) => {
             } else {
                  setLoading(false);
             }
+        }).catch(() => {
+            setLoading(false);
         });
     }, [classId]);
 
@@ -41,7 +48,7 @@ const TeacherGradesScreen: React.FC<Props> = ({ route }) => {
             api.getClassStudents(classId),
             api.getGrades(classId, selectedSubject)
         ]).then(([classStudents, subjectGrades]) => {
-            const gradesMap = new Map(subjectGrades.map(g => [g.studentId, g.grades]));
+            const gradesMap = new Map(subjectGrades.map((g: StudentGrades) => [g.studentId, g.grades]));
             
             const fullGradesData = classStudents.map(student => ({
                 classId: classId,

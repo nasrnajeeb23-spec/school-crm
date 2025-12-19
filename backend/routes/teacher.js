@@ -88,6 +88,37 @@ router.get('/:teacherId/schedule', verifyToken, requireRole('TEACHER'), async (r
   } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 
+// Teacher assignments
+router.get('/:teacherId/assignments', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const teacherId = Number(req.params.teacherId);
+    if (String(req.user.teacherId) !== String(teacherId)) return res.status(403).json({ msg: 'Access denied' });
+    const { Assignment } = require('../models');
+    const rows = await Assignment.findAll({ where: { teacherId }, include: [{ model: Class, attributes: ['gradeLevel','section'] }], order: [['dueDate','DESC']] });
+    res.json(rows.map(a => {
+      const j = a.toJSON();
+      const cls = a.Class;
+      return {
+        id: String(j.id),
+        title: j.title,
+        description: j.description,
+        dueDate: j.dueDate,
+        classId: String(j.classId),
+        className: cls ? `${cls.gradeLevel} (${cls.section || 'أ'})` : '',
+        status: j.status,
+        attachments: Array.isArray(j.attachments) ? j.attachments.map(att => ({
+          filename: att.filename,
+          originalName: att.originalName,
+          mimeType: att.mimeType,
+          size: att.size,
+          url: `/api/assignments/${j.id}/attachments/${encodeURIComponent(att.filename)}`,
+          uploadedAt: att.uploadedAt
+        })) : []
+      };
+    }));
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
 // Teacher action items
 router.get('/action-items', verifyToken, requireRole('TEACHER'), async (req, res) => {
   try {

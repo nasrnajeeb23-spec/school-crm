@@ -12,7 +12,7 @@ const Assignment = sequelize.define('Assignment', {
         allowNull: false
     },
     classId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING,
         allowNull: false
     },
     teacherId: {
@@ -26,6 +26,11 @@ const Assignment = sequelize.define('Assignment', {
     description: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    attachments: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: []
     },
     dueDate: {
         type: DataTypes.DATE,

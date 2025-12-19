@@ -11,7 +11,7 @@ import { useAppContext } from '../contexts/AppContext';
 
 const viewTitles: { [key: string]: string } = {
   dashboard: 'لوحة التحكم', grades: 'درجات الطالب', attendance: 'الحضور والغياب',
-  finance: 'المالية والفواتير', schedule: 'الجدول الدراسي', requests: 'الطلبات',
+  finance: 'المالية والفواتير', assignments: 'الواجبات', schedule: 'الجدول الدراسي', requests: 'الطلبات',
   messaging: 'الرسائل', transportation: 'النقل المدرسي', profile: 'ملفي الشخصي',
 };
 

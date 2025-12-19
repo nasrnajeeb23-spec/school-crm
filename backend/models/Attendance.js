@@ -7,6 +7,10 @@ const Attendance = sequelize.define('Attendance', {
     autoIncrement: true,
     primaryKey: true,
   },
+  schoolId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   date: {
     type: DataTypes.DATEONLY,
     allowNull: false,

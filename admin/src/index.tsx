@@ -8,7 +8,7 @@ import App from './App';
 if (typeof window !== 'undefined') {
   try {
     const key = 'api_base';
-    const envApi = (process.env.REACT_APP_API_URL || ((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || ''));
+    const envApi = (((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || ''));
     const host = window.location.hostname || '';
     const cur = localStorage.getItem(key) || '';
     const hasApi = (v: string) => /\/api\/?$/.test(v || '');
@@ -40,8 +40,7 @@ if (typeof window !== 'undefined') {
 
 const container = document.getElementById('root');
 if (container) {
-  const isRenderHost = typeof window !== 'undefined' && /\.onrender\.com$/i.test(window.location.hostname || '');
-  const useHash = ((process.env.REACT_APP_HASH_ROUTER === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
+  const useHash = ((((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_HASH_ROUTER) || '') === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
   const root = ReactDOM.createRoot(container);
   root.render(
     <React.StrictMode>

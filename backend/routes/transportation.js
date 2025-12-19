@@ -1,11 +1,50 @@
 const express = require('express');
 const router = express.Router();
-const { BusOperator, Route, RouteStudent, Student } = require('../models');
+const { BusOperator, Route, RouteStudent, Student, School, User } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam } = require('../middleware/auth');
 const { requireModule } = require('../middleware/modules');
 const { validate } = require('../middleware/validate');
+const bcrypt = require('bcryptjs');
 
 // --- Operators ---
+// Public application endpoint for bus operators (drivers)
+// Allows a driver to submit an application to a specific school without authentication
+router.post('/operator/application', validate([
+  { name: 'name', required: true, type: 'string' },
+  { name: 'phone', required: true, type: 'string' },
+  { name: 'licenseNumber', required: true, type: 'string' },
+  { name: 'busPlateNumber', required: true, type: 'string' },
+  { name: 'busCapacity', required: true },
+  { name: 'busModel', required: true, type: 'string' },
+  { name: 'schoolId', required: true },
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.body.schoolId);
+    if (!schoolId || Number.isNaN(schoolId)) {
+      return res.status(400).json({ msg: 'Invalid schoolId' });
+    }
+    const school = await School.findByPk(schoolId).catch(() => null);
+    if (!school) {
+      return res.status(404).json({ msg: 'School not found' });
+    }
+    const op = await BusOperator.create({
+      id: `op_${Date.now()}`,
+      name: req.body.name,
+      phone: req.body.phone,
+      licenseNumber: req.body.licenseNumber,
+      busPlateNumber: req.body.busPlateNumber,
+      busCapacity: Number(req.body.busCapacity),
+      busModel: req.body.busModel,
+      schoolId,
+      status: 'Pending',
+    });
+    const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
+    return res.status(201).json({ ...op.toJSON(), status: statusMap[op.status] });
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error', error: e?.message });
+  }
+});
+
 router.get('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), async (req, res) => {
   try {
     const ops = await BusOperator.findAll({ where: { schoolId: req.params.schoolId }, order: [['status','ASC']] });
@@ -36,7 +75,45 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
     if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     op.status = 'Approved';
     await op.save();
-    res.json({ ...op.toJSON(), status: 'معتمد' });
+    let user = null;
+    const usernameRaw = String(op.phone || '').trim() || `driver_${op.id}`;
+    const emailRaw = `driver+${String(op.id)}@drivers.local`;
+    user = await User.findOne({ where: { schoolId: op.schoolId, username: usernameRaw } });
+    if (!user) user = await User.findOne({ where: { email: emailRaw } });
+    if (!user) {
+      const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
+      const hashed = await bcrypt.hash(placeholder, 10);
+      user = await User.create({
+        name: op.name,
+        email: emailRaw,
+        username: usernameRaw,
+        password: hashed,
+        role: 'Staff',
+        schoolId: op.schoolId,
+        phone: op.phone || null,
+        schoolRole: 'Driver',
+        isActive: true,
+        passwordMustChange: true,
+        tokenVersion: 0
+      });
+    } else {
+      user.isActive = true;
+      user.schoolRole = user.schoolRole || 'Driver';
+      await user.save();
+    }
+    const payload = { ...op.toJSON(), status: 'معتمد', driverAccountCreated: true, userId: user ? String(user.id) : null };
+    res.json(payload);
+  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
+});
+
+router.put('/operator/:operatorId/reject', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
+  try {
+    const op = await BusOperator.findByPk(req.params.operatorId);
+    if (!op) return res.status(404).json({ msg: 'Operator not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+    op.status = 'Rejected';
+    await op.save();
+    res.json({ ...op.toJSON(), status: 'مرفوض' });
   } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 

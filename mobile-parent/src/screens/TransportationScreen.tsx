@@ -69,11 +69,12 @@ const TransportationScreen: React.FC<TransportationScreenProps> = ({ user }) => 
                 <View style={styles.infoRow}><ProfileIcon size={18} color="#6b7280" /><Text style={styles.infoText}>الاسم: {operator.name}</Text></View>
                 <View style={styles.infoRow}><Text style={styles.infoLabel}>الهاتف:</Text><Text style={[styles.infoText, {color: '#dc2626'}]}>{operator.phone}</Text></View>
             </View>
-             <View style={styles.card}>
+            <View style={styles.card}>
                 <Text style={styles.cardTitle}>معلومات الحافلة</Text>
                 <View style={styles.infoRow}><Text style={styles.infoLabel}>رقم اللوحة:</Text><Text style={styles.infoText}>{operator.busPlateNumber}</Text></View>
                 <View style={styles.infoRow}><Text style={styles.infoLabel}>الموديل:</Text><Text style={styles.infoText}>{operator.busModel}</Text></View>
             </View>
+            <Text style={styles.disclaimer}>تنبيه: التتبُّع تقريبي وغير لحظي وقد يتأخر تحديث الموقع.</Text>
         </ScrollView>
     );
 };
@@ -88,6 +89,7 @@ const styles = StyleSheet.create({
     infoRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 6 },
     infoLabel: { color: '#6b7280', fontSize: 14 },
     infoText: { color: '#111827', fontSize: 16, marginRight: 8, fontWeight: '600' },
+    disclaimer: { color: '#6b7280', fontSize: 12, textAlign: 'center', marginBottom: 24 }
 });
 
 export default TransportationScreen;
