@@ -19,6 +19,7 @@ const roleColors: { [key in SchoolRole]: string } = {
   [SchoolRole.AcademicCoordinator]: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
   [SchoolRole.Secretary]: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
   [SchoolRole.Supervisor]: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+  [SchoolRole.Driver]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
 };
 
 const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
@@ -287,7 +288,7 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                     <td className="px-6 py-4">{member.email}</td>
                     <td className="px-6 py-4">
                       {member.schoolRole && (
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleColors[member.schoolRole]}`}>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleColors[member.schoolRole as SchoolRole] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
                           {member.schoolRole}
                         </span>
                       )}

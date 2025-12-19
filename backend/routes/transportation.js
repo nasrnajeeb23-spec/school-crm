@@ -91,14 +91,14 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
         role: 'Staff',
         schoolId: op.schoolId,
         phone: op.phone || null,
-        schoolRole: 'Driver',
+        schoolRole: 'سائق',
         isActive: true,
         passwordMustChange: true,
         tokenVersion: 0
       });
     } else {
       user.isActive = true;
-      user.schoolRole = user.schoolRole || 'Driver';
+      user.schoolRole = user.schoolRole || 'سائق';
       await user.save();
     }
     const payload = { ...op.toJSON(), status: 'معتمد', driverAccountCreated: true, userId: user ? String(user.id) : null };

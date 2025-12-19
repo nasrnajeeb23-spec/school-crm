@@ -358,7 +358,16 @@ export const createClass = async (classData: NewClassData): Promise<Class> => {
 // ==================== Staff APIs ====================
 
 export const getSchoolStaff = async (schoolId: number): Promise<User[]> => {
-    return await apiCall(`/school/${schoolId}/staff`, { method: 'GET' });
+    const rows: any[] = await apiCall(`/school/${schoolId}/staff`, { method: 'GET' });
+    try {
+      return Array.isArray(rows) ? rows.map((u: any) => {
+        const r = String(u.schoolRole || '').trim();
+        const mapped = r === 'Driver' ? 'سائق' : r;
+        return { ...u, schoolRole: mapped };
+      }) : [];
+    } catch {
+      return Array.isArray(rows) ? rows : [];
+    }
 };
 
 export const addSchoolStaff = async (schoolId: number, staffData: NewStaffData): Promise<User> => {

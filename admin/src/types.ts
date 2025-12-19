@@ -58,6 +58,7 @@ export enum SchoolRole {
     AcademicCoordinator = 'منسق أكاديمي',
     Secretary = 'سكرتير',
     Supervisor = 'مشرف',
+    Driver = 'سائق',
 }
 
 export enum Permission {

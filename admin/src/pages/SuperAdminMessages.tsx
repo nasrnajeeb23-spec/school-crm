@@ -14,6 +14,7 @@ interface ContactMessage {
 const SuperAdminMessages: React.FC = () => {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -52,6 +53,20 @@ const SuperAdminMessages: React.FC = () => {
     }
   };
 
+  const parsePayload = (raw: string): any | null => {
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+  const isAdRequest = (payload: any): boolean => {
+    try { return payload && String(payload.type) === 'AD_REQUEST'; } catch { return false; }
+  };
+  const renderMessagePreview = (msg: ContactMessage) => {
+    const payload = parsePayload(msg.message);
+    if (isAdRequest(payload)) {
+      return String(payload.title || 'طلب إعلان');
+    }
+    return msg.message;
+  };
+
   if (loading) return <div className="p-8 text-center">جاري التحميل...</div>;
 
   return (
@@ -76,10 +91,22 @@ const SuperAdminMessages: React.FC = () => {
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {messages.map((msg) => (
+                  <>
                   <tr key={msg.id} className={msg.status === 'NEW' ? 'bg-blue-50 dark:bg-blue-900/10' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{msg.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{msg.email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate" title={msg.message}>{msg.message}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate" title={renderMessagePreview(msg)}>
+                      <div className="flex items-center gap-2">
+                        <span>{renderMessagePreview(msg)}</span>
+                        {(() => {
+                          const payload = parsePayload(msg.message);
+                          if (isAdRequest(payload)) {
+                            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">طلب إعلان</span>;
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {new Date(msg.createdAt).toLocaleDateString('ar-SA')}
                     </td>
@@ -92,7 +119,10 @@ const SuperAdminMessages: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                      <div className="flex gap-2">
+                      <div className="flex gap-3 items-center">
+                        <button onClick={() => setExpandedId(prev => prev === msg.id ? null : msg.id)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                          {expandedId === msg.id ? 'إخفاء التفاصيل' : 'تفاصيل'}
+                        </button>
                         {msg.status !== 'READ' && (
                           <button onClick={() => updateStatus(msg.id, 'READ')} className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
                             تحديد كمقروء
@@ -109,6 +139,37 @@ const SuperAdminMessages: React.FC = () => {
                       </div>
                     </td>
                   </tr>
+                  {expandedId === msg.id && (
+                    <tr>
+                      <td className="px-6 py-4 bg-gray-50 dark:bg-gray-900" colSpan={6}>
+                        {(() => {
+                          const payload = parsePayload(msg.message);
+                          if (isAdRequest(payload)) {
+                            return (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div><span className="font-semibold text-gray-800 dark:text-gray-200">نوع الرسالة:</span> <span className="ml-2 rtl:mr-2 rtl:ml-0">طلب إعلان</span></div>
+                                <div><span className="font-semibold text-gray-800 dark:text-gray-200">عنوان الإعلان:</span> <span className="ml-2 rtl:mr-2 rtl:ml-0">{payload.title || '-'}</span></div>
+                                <div><span className="font-semibold text-gray-800 dark:text-gray-200">اسم المعلن:</span> <span className="ml-2 rtl:mr-2 rtl:ml-0">{payload.advertiserName || msg.name}</span></div>
+                                <div><span className="font-semibold text-gray-800 dark:text-gray-200">بريد المعلن:</span> <span className="ml-2 rtl:mr-2 rtl:ml-0">{payload.advertiserEmail || msg.email}</span></div>
+                                <div className="md:col-span-2"><span className="font-semibold text-gray-800 dark:text-gray-200">وصف الإعلان:</span> <span className="ml-2 rtl:mr-2 rtl:ml-0">{payload.description || '-'}</span></div>
+                                {payload.link && (
+                                  <div className="md:col-span-1"><span className="font-semibold text-gray-800 dark:text-gray-200">الرابط:</span> <a href={payload.link} target="_blank" rel="noopener noreferrer" className="ml-2 rtl:mr-2 rtl:ml-0 text-blue-600 dark:text-blue-400 hover:underline">{payload.link}</a></div>
+                                )}
+                                {payload.imageUrl && (
+                                  <div className="md:col-span-1"><span className="font-semibold text-gray-800 dark:text-gray-200">الصورة:</span> <a href={payload.imageUrl} target="_blank" rel="noopener noreferrer" className="ml-2 rtl:mr-2 rtl:ml-0 text-blue-600 dark:text-blue-400 hover:underline">فتح الصورة</a></div>
+                                )}
+                                {payload.submittedAt && (
+                                  <div className="md:col-span-2"><span className="font-semibold text-gray-800 dark:text-gray-200">تاريخ الإرسال:</span> <span className="ml-2 rtl:mr-2 rtl:ml-0">{new Date(payload.submittedAt).toLocaleString('ar-SA')}</span></div>
+                                )}
+                              </div>
+                            );
+                          }
+                          return <div className="text-sm text-gray-700 dark:text-gray-300">{msg.message}</div>;
+                        })()}
+                      </td>
+                    </tr>
+                  )}
+                  </>
                 ))}
               </tbody>
             </table>
