@@ -641,11 +641,18 @@ export const getMessages = async (conversationId: string): Promise<Message[]> =>
     return unwrap<Message[]>(data, 'messages', []);
 };
 
-export const sendMessage = async (messageData: Partial<Message>): Promise<Message> => {
-    return await apiCall('/messaging/send', {
+export const sendMessage = async (messageData: { conversationId: string; text: string; attachmentUrl?: string; attachmentType?: string; attachmentName?: string }): Promise<Message> => {
+    const resp = await apiCall('/messaging/send', {
         method: 'POST',
         body: JSON.stringify(messageData),
     });
+    const raw = unwrap<any>(resp);
+    return {
+        id: String(raw?.id || `msg_${Date.now()}`),
+        senderId: 'me',
+        text: String(raw?.text || messageData.text || ''),
+        timestamp: String(raw?.timestamp || new Date().toISOString()),
+    };
 };
 
 // ==================== Landing Page APIs ====================
