@@ -41,8 +41,11 @@ const Messaging: React.FC = () => {
         const baseUrl = api.getApiBase().replace(/\/api\/?$/, '');
         socketRef.current = io(baseUrl, {
             query: { token },
-            transports: ['websocket', 'polling'],
-            withCredentials: true
+            transports: ['polling', 'websocket'],
+            withCredentials: true,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            timeout: 10000
         });
 
         socketRef.current.on('connect', () => {

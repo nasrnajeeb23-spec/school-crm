@@ -2897,7 +2897,9 @@ router.post('/:schoolId/modules/quote', verifyToken, requireRole('SCHOOL_ADMIN',
     const { PricingConfig, Student, Teacher, Invoice, Subscription, Plan, SchoolSettings } = require('../models');
     const p = req.body || {};
     const period = String(p.period || 'monthly');
-    const priceConfig = await PricingConfig.findOne({ where: { id: 'default' } });
+    let priceConfigRow = null;
+    try { priceConfigRow = await PricingConfig.findOne({ where: { id: 'default' } }); } catch {}
+    const priceConfig = priceConfigRow ? priceConfigRow : { pricePerStudent: 1.5, pricePerTeacher: 2.0, pricePerInvoice: 0.05, pricePerGBStorage: 0.2, currency: 'USD' };
     const students = await Student.count({ where: { schoolId } });
     const teachers = await Teacher.count({ where: { schoolId } });
     let invoices = 0;
@@ -2938,7 +2940,9 @@ router.post('/:schoolId/modules/quote', verifyToken, requireRole('SCHOOL_ADMIN',
       { key: 'overage_storageGB', qty: ovStorageQty, unitPrice: pricePerGBStorage, amount: mode === 'overage' ? ovStorage : 0 },
     ];
     const total = planPrice + packTotal + overageTotal;
-    return res.success({ period, items, total, currency: priceConfig?.currency || 'USD' }, 'Quote generated');
+    let currency = priceConfig?.currency || 'USD';
+    if (settings && settings.defaultCurrency) { try { currency = String(settings.defaultCurrency).trim().toUpperCase() || currency; } catch {} }
+    return res.success({ period, items, total, currency }, 'Quote generated');
   } catch (e) { console.error(e?.message || e); return res.error(500, 'SERVER_ERROR', 'Server Error'); }
 });
 
