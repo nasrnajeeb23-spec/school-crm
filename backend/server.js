@@ -412,6 +412,57 @@ app.use('/public/schools', schoolsRoutes); // Fix for /public/schools 500/404
 app.use('/api/public/schools', schoolsRoutes); // Fix for /api/public/schools 404
 app.use('/public', schoolsRoutes);
 
+// Advertising requests (alias to contact messages with structured payload)
+app.post('/api/ads/request', async (req, res) => {
+  try {
+    const { ContactMessage } = require('./models');
+    const { advertiserName, advertiserEmail, title, description, imageUrl, link } = req.body || {};
+    if (!advertiserName || !advertiserEmail || !title || !description) {
+      return res.status(400).json({ msg: 'Invalid payload' });
+    }
+    const message = JSON.stringify({
+      type: 'AD_REQUEST',
+      advertiserName: String(advertiserName),
+      advertiserEmail: String(advertiserEmail),
+      title: String(title),
+      description: String(description),
+      imageUrl: String(imageUrl || ''),
+      link: String(link || ''),
+      submittedAt: new Date().toISOString()
+    });
+    const row = await ContactMessage.create({ name: String(advertiserName), email: String(advertiserEmail), message, status: 'NEW' });
+    return res.status(201).json({ id: row.id, status: 'NEW' });
+  } catch (e) {
+    try { console.error('AD request error:', e?.message || e); } catch {}
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+// Alias without /api to support frontend fallback base
+app.post('/ads/request', async (req, res) => {
+  try {
+    const { ContactMessage } = require('./models');
+    const { advertiserName, advertiserEmail, title, description, imageUrl, link } = req.body || {};
+    if (!advertiserName || !advertiserEmail || !title || !description) {
+      return res.status(400).json({ msg: 'Invalid payload' });
+    }
+    const message = JSON.stringify({
+      type: 'AD_REQUEST',
+      advertiserName: String(advertiserName),
+      advertiserEmail: String(advertiserEmail),
+      title: String(title),
+      description: String(description),
+      imageUrl: String(imageUrl || ''),
+      link: String(link || ''),
+      submittedAt: new Date().toISOString()
+    });
+    const row = await ContactMessage.create({ name: String(advertiserName), email: String(advertiserEmail), message, status: 'NEW' });
+    return res.status(201).json({ id: row.id, status: 'NEW' });
+  } catch (e) {
+    try { console.error('AD request error (alias):', e?.message || e); } catch {}
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
 // Database Schema Fixer (Auto-run on start to ensure columns exist)
 (async () => {
   try {
@@ -481,34 +532,76 @@ app.use('/public', schoolsRoutes);
   }
 })();
 
-// Public content endpoints for landing page
 app.get('/api/content/landing', (req, res) => {
-  res.json({
-    hero: {
-      title: 'منصة SchoolSaaS لإدارة المدارس باحترافية',
-      subtitle: 'حل شامل لتبسيط إدارة الطلاب والمعلمين والمالية والتواصل في مدرسة واحدة'
-    },
-    features: {
-      title: 'أهم الميزات',
-      subtitle: 'ميزات عملية تُسهّل عمل الإدارة والمعلمين وأولياء الأمور',
-      items: [
-        { id: 'f1', title: 'إدارة الطلاب', description: 'ملفات الطلاب، الحضور، الدرجات، والأنشطة في مكان واحد' },
-        { id: 'f2', title: 'إدارة مالية', description: 'فواتير، مدفوعات، وإيرادات مع تقارير مفصلة' },
-        { id: 'f3', title: 'نظام الدرجات', description: 'إدخال الدرجات، استخراج التقارير، ومتابعة الأداء' },
-        { id: 'f4', title: 'الرسائل والتواصل', description: 'تواصل داخلي بين الإدارة والمعلمين وأولياء الأمور' },
-        { id: 'f5', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات لاتخاذ قرارات أفضل' },
-        { id: 'f6', title: 'الصلاحيات والأذونات', description: 'صلاحيات دقيقة لكل دور داخل المدرسة' }
-      ]
-    },
-    ads: {
-      title: 'عروض وخدمات إضافية',
-      slides: [
-        { id: 'ad1', title: 'باقات مرنة للمدارس', description: 'اختر الخطة التي تناسب حجم مدرستك واحتياجاتك', ctaText: 'شاهد الباقات', link: '/#pricing', imageUrl: 'https://images.unsplash.com/photo-1554931545-5b453faafe36?w=1200&q=80&auto=format&fit=crop' },
-        { id: 'ad2', title: 'تجربة مجانية', description: 'جرّب المنصة مجاناً وابدأ إدارة مدرستك اليوم', ctaText: 'ابدأ الآن', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1523580846011-df4f04b29464?w=1200&q=80&auto=format&fit=crop' },
-        { id: 'ad3', title: 'حل مستضاف ذاتياً', description: 'امتلك نسخة خاصة من النظام داخل مؤسستك', ctaText: 'اطلب عرض سعر', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80&auto=format&fit=crop' }
-      ]
-    }
-  });
+  try {
+    const catalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
+    const items = (catalog.length
+      ? catalog
+          .filter(m => m.isEnabled)
+          .map(m => ({ id: String(m.id), title: String(m.name), description: String(m.description || '') }))
+      : [
+          { id: 'student_management', title: 'إدارة الطلاب', description: 'ملفات الطلاب، الحضور، الدرجات، والأنشطة في مكان واحد' },
+          { id: 'finance_fees', title: 'إدارة مالية', description: 'فواتير، مدفوعات، وإيرادات مع تقارير مفصلة' },
+          { id: 'advanced_reports', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات لاتخاذ قرارات أفضل' },
+          { id: 'messaging', title: 'الرسائل والتواصل', description: 'تواصل داخلي بين الإدارة والمعلمين وأولياء الأمور' },
+          { id: 'transportation', title: 'النقل المدرسي', description: 'إدارة الحافلات والمسارات والطلاب المنقولين' },
+          { id: 'finance_salaries', title: 'الرواتب وشؤون الموظفين', description: 'إدارة مسيرات الرواتب وهياكل الأجور والحضور' },
+          { id: 'finance_expenses', title: 'المصروفات', description: 'تتبع المصروفات والمشتريات' },
+          { id: 'parent_portal', title: 'بوابة ولي الأمر', description: 'متابعة حضور ودرجات ورسائل الأبناء' },
+          { id: 'teacher_portal', title: 'بوابة المعلم', description: 'إدارة الجدول والحضور والدرجات عبر الويب' },
+          { id: 'teacher_app', title: 'تطبيق المعلم', description: 'إشعارات فورية وإدارة المهام من الجوال' }
+        ]);
+    res.json({
+      hero: {
+        title: 'منصة SchoolSaaS لإدارة المدارس باحترافية',
+        subtitle: 'حل شامل لتبسيط إدارة الطلاب والمعلمين والمالية والتواصل في مدرسة واحدة'
+      },
+      features: {
+        title: 'أهم الميزات',
+        subtitle: 'ميزات عملية تُسهّل عمل الإدارة والمعلمين وأولياء الأمور',
+        items
+      },
+      ads: {
+        title: 'عروض وخدمات إضافية',
+        slides: [
+          { id: 'ad1', title: 'باقات مرنة للمدارس', description: 'اختر الخطة التي تناسب حجم مدرستك واحتياجاتك', ctaText: 'شاهد الباقات', link: '/#pricing', imageUrl: 'https://images.unsplash.com/photo-1554931545-5b453faafe36?w=1200&q=80&auto=format&fit=crop' },
+          { id: 'ad2', title: 'تجربة مجانية', description: 'جرّب المنصة مجاناً وابدأ إدارة مدرستك اليوم', ctaText: 'ابدأ الآن', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1523580846011-df4f04b29464?w=1200&q=80&auto=format&fit=crop' },
+          { id: 'ad3', title: 'حل مستضاف ذاتياً', description: 'امتلك نسخة خاصة من النظام داخل مؤسستك', ctaText: 'اطلب عرض سعر', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80&auto=format&fit=crop' }
+        ]
+      }
+    });
+  } catch {
+    res.json({
+      hero: {
+        title: 'منصة SchoolSaaS لإدارة المدارس باحترافية',
+        subtitle: 'حل شامل لتبسيط إدارة الطلاب والمعلمين والمالية والتواصل في مدرسة واحدة'
+      },
+      features: {
+        title: 'أهم الميزات',
+        subtitle: 'ميزات عملية تُسهّل عمل الإدارة والمعلمين وأولياء الأمور',
+        items: [
+          { id: 'student_management', title: 'إدارة الطلاب', description: 'ملفات الطلاب، الحضور، الدرجات، والأنشطة في مكان واحد' },
+          { id: 'finance_fees', title: 'إدارة مالية', description: 'فواتير، مدفوعات، وإيرادات مع تقارير مفصلة' },
+          { id: 'advanced_reports', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات لاتخاذ قرارات أفضل' },
+          { id: 'messaging', title: 'الرسائل والتواصل', description: 'تواصل داخلي بين الإدارة والمعلمين وأولياء الأمور' },
+          { id: 'transportation', title: 'النقل المدرسي', description: 'إدارة الحافلات والمسارات والطلاب المنقولين' },
+          { id: 'finance_salaries', title: 'الرواتب وشؤون الموظفين', description: 'إدارة مسيرات الرواتب وهياكل الأجور والحضور' },
+          { id: 'finance_expenses', title: 'المصروفات', description: 'تتبع المصروفات والمشتريات' },
+          { id: 'parent_portal', title: 'بوابة ولي الأمر', description: 'متابعة حضور ودرجات ورسائل الأبناء' },
+          { id: 'teacher_portal', title: 'بوابة المعلم', description: 'إدارة الجدول والحضور والدرجات عبر الويب' },
+          { id: 'teacher_app', title: 'تطبيق المعلم', description: 'إشعارات فورية وإدارة المهام من الجوال' }
+        ]
+      },
+      ads: {
+        title: 'عروض وخدمات إضافية',
+        slides: [
+          { id: 'ad1', title: 'باقات مرنة للمدارس', description: 'اختر الخطة التي تناسب حجم مدرستك واحتياجاتك', ctaText: 'شاهد الباقات', link: '/#pricing', imageUrl: 'https://images.unsplash.com/photo-1554931545-5b453faafe36?w=1200&q=80&auto=format&fit=crop' },
+          { id: 'ad2', title: 'تجربة مجانية', description: 'جرّب المنصة مجاناً وابدأ إدارة مدرستك اليوم', ctaText: 'ابدأ الآن', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1523580846011-df4f04b29464?w=1200&q=80&auto=format&fit=crop' },
+          { id: 'ad3', title: 'حل مستضاف ذاتياً', description: 'امتلك نسخة خاصة من النظام داخل مؤسستك', ctaText: 'اطلب عرض سعر', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80&auto=format&fit=crop' }
+        ]
+      }
+    });
+  }
 });
 
 // Health check endpoint for production verification

@@ -691,9 +691,16 @@ export const getLandingPageContent = async (): Promise<LandingPageContent> => {
                 title: 'الميزات',
                 subtitle: 'أدوات متقدمة للإدارة والتعليم',
                 items: [
-                    { id: 'f1', title: 'الطلاب', description: 'إدارة الطلاب والحضور والدرجات' },
-                    { id: 'f2', title: 'المالية', description: 'فواتير ومدفوعات وتقارير مالية' },
-                    { id: 'f4', title: 'التواصل', description: 'مراسلات داخلية فعالة' }
+                    { id: 'student_management', title: 'إدارة الطلاب', description: 'ملفات الطلاب والحضور والدرجات والأنشطة' },
+                    { id: 'finance_fees', title: 'الرسوم الدراسية', description: 'فواتير ومدفوعات وتقارير مالية' },
+                    { id: 'advanced_reports', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات مخصصة' },
+                    { id: 'messaging', title: 'التواصل والرسائل', description: 'مراسلات داخلية فعالة بين جميع الأطراف' },
+                    { id: 'transportation', title: 'النقل المدرسي', description: 'الحافلات والمسارات وإدارة الطلاب المنقولين' },
+                    { id: 'finance_salaries', title: 'الرواتب وشؤون الموظفين', description: 'مسيرات الرواتب وهياكل الأجور والحضور' },
+                    { id: 'finance_expenses', title: 'المصروفات', description: 'تتبع المصروفات والمشتريات' },
+                    { id: 'parent_portal', title: 'بوابة ولي الأمر', description: 'متابعة حضور ودرجات ورسائل الأبناء' },
+                    { id: 'teacher_portal', title: 'بوابة المعلم', description: 'إدارة الجدول والحضور والدرجات عبر الويب' },
+                    { id: 'teacher_app', title: 'تطبيق المعلم', description: 'إشعارات فورية وإدارة المهام من الجوال' }
                 ]
             },
             ads: {

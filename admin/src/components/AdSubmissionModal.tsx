@@ -65,7 +65,7 @@ const AdSubmissionModal: React.FC<AdSubmissionModalProps> = ({ onClose, onSave }
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center modal-fade-in" onClick={onClose}>
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl p-6 m-4 max-h-[90vh] flex flex-col modal-content-scale-up" onClick={e => e.stopPropagation()}>
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex-shrink-0">تقديم طلب إعلاني</h2>
-        <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto pr-2 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto pr-2 space-y-4" id="ad-form">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="advertiserName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">اسمك/اسم الشركة</label>
@@ -98,14 +98,13 @@ const AdSubmissionModal: React.FC<AdSubmissionModalProps> = ({ onClose, onSave }
             <input type="url" name="link" id="link" value={formData.link} onChange={handleChange} required className={inputStyle} placeholder="https://your-product.com" />
             {errors.link && <p className="text-red-500 text-xs mt-1">{errors.link}</p>}
           </div>
+          <div className="flex justify-end gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors">إلغاء</button>
+              <button type="submit" disabled={isSaving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
+                  {isSaving ? 'جاري الإرسال...' : 'إرسال الطلب'}
+              </button>
+          </div>
         </form>
-
-        <div className="flex justify-end gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors">إلغاء</button>
-            <button type="submit" disabled={isSaving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
-                {isSaving ? 'جاري الإرسال...' : 'إرسال الطلب'}
-            </button>
-        </div>
       </div>
     </div>
   );
