@@ -56,6 +56,19 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
       cache: 'no-store' as RequestCache,
     });
   };
+  const derivedBase = (() => {
+    try {
+      if (typeof window === 'undefined') return '';
+      const host = window.location.hostname || '';
+      if (!host) return '';
+      if (host.endsWith('.onrender.com')) {
+        const sub = host.split('.onrender.com')[0];
+        const back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
+        return `https://${back}.onrender.com/api`;
+      }
+      return '';
+    } catch { return ''; }
+  })();
   let lastError: any = null;
   const maxRetries = 2;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -69,10 +82,15 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
         }
         const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
         const statusText = response.statusText ? ` ${response.statusText}` : '';
+        if (response.status === 429 && endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
+          const alt2 = await attemptFetch(derivedBase);
+          if (alt2.ok) return await alt2.json();
+        }
         if (response.status === 401) {
           const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
           const isSilentCheck = endpoint === '/auth/me';
           const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
+          const onLoginPage = typeof window !== 'undefined' ? /^\/(login|superadmin\/login)\/?$/i.test(window.location?.pathname || '') : false;
           const onInviteFlow = (() => {
             try {
               if (typeof window === 'undefined') return false;
@@ -82,13 +100,13 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
               return q.has('token');
             } catch { return false; }
           })();
-          const shouldRedirect = !isAuthFlow && !onInviteFlow && (isSilentCheck || onProtectedRoute);
+          const shouldRedirect = !isAuthFlow && !onInviteFlow && !onLoginPage && (isSilentCheck || onProtectedRoute);
           if (shouldRedirect) {
             try {
               if (typeof window !== 'undefined') {
                 localStorage.removeItem('current_school_id');
                 const toast = (window as any).__addToast;
-                if (typeof toast === 'function') {
+                if (typeof toast === 'function' && !onLoginPage) {
                   toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
                 }
                 setTimeout(() => { window.location.href = '/login'; }, 0);
@@ -115,6 +133,12 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     } catch (error) {
       lastError = error;
       const isNetworkError = (error instanceof TypeError) || /Failed to fetch|NetworkError|net::ERR_/i.test(String((error as any)?.message || ''));
+      if (endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
+        try {
+          const resp = await attemptFetch(derivedBase);
+          if (resp.ok) return await resp.json();
+        } catch {}
+      }
       if (attempt < maxRetries && isNetworkError) {
         const delayMs = 500 * (attempt + 1);
         await new Promise(res => setTimeout(res, delayMs));

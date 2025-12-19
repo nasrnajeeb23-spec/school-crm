@@ -86,6 +86,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (!cancelled) setHydrating(false);
           return;
         }
+        if (err.message && err.message.includes('429')) {
+          if (!cancelled) setHydrating(false);
+          return;
+        }
       }
 
       // Retry only on network errors or server errors
@@ -106,6 +110,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } catch (err: any) {
            // Stop on auth error
            if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
+             break;
+           }
+           if (err.message && err.message.includes('429')) {
              break;
            }
         }
