@@ -129,7 +129,7 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), val
     const { password: _, ...userData } = user.toJSON();
     try {
       const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-      const baseCookie = { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' };
+      const baseCookie = { httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax', path: '/' };
       res.cookie('access_token', token, { ...baseCookie, maxAge: 12 * 60 * 60 * 1000 });
       res.cookie('refresh_token', refreshToken, { ...baseCookie, maxAge: 7 * 24 * 60 * 60 * 1000 });
     } catch {}
@@ -268,7 +268,7 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-    const baseCookie = { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' };
+    const baseCookie = { httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax', path: '/' };
     res.clearCookie('access_token', baseCookie);
     res.clearCookie('refresh_token', baseCookie);
     res.json({ msg: 'Logged out' });
