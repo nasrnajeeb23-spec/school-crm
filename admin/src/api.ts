@@ -91,6 +91,10 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
           const isSilentCheck = endpoint === '/auth/me';
           const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
           const onLoginPage = typeof window !== 'undefined' ? /^\/(login|superadmin\/login)\/?$/i.test(window.location?.pathname || '') : false;
+          const onPublicPage = typeof window !== 'undefined' ? (() => {
+            const p = window.location?.pathname || '';
+            return /^\/$/.test(p) || /^\/(landing|apps|help|pricing)\/?$/i.test(p);
+          })() : false;
           const onInviteFlow = (() => {
             try {
               if (typeof window === 'undefined') return false;
@@ -100,13 +104,13 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
               return q.has('token');
             } catch { return false; }
           })();
-          const shouldRedirect = !isAuthFlow && !onInviteFlow && !onLoginPage && (isSilentCheck || onProtectedRoute);
+          const shouldRedirect = !isAuthFlow && !onInviteFlow && !onLoginPage && !onPublicPage && onProtectedRoute;
           if (shouldRedirect) {
             try {
               if (typeof window !== 'undefined') {
                 localStorage.removeItem('current_school_id');
                 const toast = (window as any).__addToast;
-                if (typeof toast === 'function' && !onLoginPage) {
+                if (typeof toast === 'function' && !onLoginPage && !onPublicPage) {
                   toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
                 }
                 setTimeout(() => { window.location.href = '/login'; }, 0);

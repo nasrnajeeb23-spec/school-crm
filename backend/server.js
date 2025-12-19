@@ -400,12 +400,14 @@ app.use('/api/modules', modulesRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/contact', contactRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
 // Aliases without "/api" to support frontend fallback requests
 app.use('/superadmin', superadminRoutes);
 app.use('/dashboard', analyticsRoutes);
+app.use('/contact', contactRoutes);
 app.use('/public/schools', schoolsRoutes); // Fix for /public/schools 500/404
 app.use('/api/public/schools', schoolsRoutes); // Fix for /api/public/schools 404
 app.use('/public', schoolsRoutes);
