@@ -65,13 +65,13 @@ async function verifyToken(req, res, next) {
     if (tv !== ptv) return res.status(401).json({ msg: 'Token revoked' });
     // Enforce central security policies for SuperAdmin
     const policies = (req.app && req.app.locals && req.app.locals.securityPolicies) || null;
-    const roleKey = String(u.role || '').toUpperCase().replace(/[^A-Z]/g, '');
-    const isSuper = roleKey === 'SUPERADMIN';
-    if (policies && isSuper) {
-      // Enforce MFA: require token type issued after MFA
-      if (policies.enforceMfaForAdmins && String(payload.type || '') !== 'superadmin') {
-        return res.status(401).json({ msg: 'MFA required' });
-      }
+  const roleKey = String(u.role || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const isSuper = roleKey === 'SUPERADMIN';
+  if (policies && isSuper) {
+    // Enforce MFA only if user has MFA enabled
+    if (policies.enforceMfaForAdmins && u.mfaEnabled === true && String(payload.type || '') !== 'superadmin') {
+      return res.status(401).json({ msg: 'MFA required' });
+    }
       // Enforce allowed IP ranges if configured
       const ranges = Array.isArray(policies.allowedIpRanges) ? policies.allowedIpRanges : [];
       if (ranges.length > 0) {

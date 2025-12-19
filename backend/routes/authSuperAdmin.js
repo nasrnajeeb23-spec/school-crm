@@ -318,7 +318,7 @@ router.post('/login', [
     }
 
     // Check if MFA is required
-    const requiresMfa = ((String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification || (policies.enforceMfaForAdmins === true));
+    const requiresMfa = ((String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification);
     const tempToken = requiresMfa ? 
       jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) : 
       undefined;
