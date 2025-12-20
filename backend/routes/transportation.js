@@ -193,8 +193,11 @@ router.get('/operator/:operatorId/invite-link', verifyToken, requireRole('SCHOOL
     }
 
     const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Driver', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
-    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const baseEnv = process.env.FRONTEND_URL || '';
+    const computedBase = (baseEnv || String(req.headers.origin || 'http://localhost:3000')).replace(/\/$/, '');
+    if (!baseEnv && isProd) return res.status(500).json({ msg: 'FRONTEND_URL not configured' });
+    const activationLink = `${computedBase}/set-password?token=${encodeURIComponent(inviteToken)}`;
     return res.json({ activationLink });
   } catch (e) {
     return res.status(500).json({ msg: 'Server Error', error: e?.message });

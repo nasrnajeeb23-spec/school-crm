@@ -32,8 +32,24 @@ async function getToken(){
     }
   } catch {}
   try {
-    const secret = process.env.JWT_SECRET || 'devsecret';
-    const token = jwt.sign({ id: 1, email: 'super@admin.com', role: 'SuperAdmin', type: 'superadmin', tokenVersion: 0 }, secret, { expiresIn: '1h' });
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return null;
+    const { Op } = require('sequelize');
+    const { User } = require('../models');
+    const user = await User.findOne({
+      where: {
+        role: {
+          [Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
+        }
+      },
+      order: [['id', 'ASC']]
+    }).catch(() => null);
+    if (!user) return null;
+    const token = jwt.sign(
+      { id: user.id, email: user.email || null, role: user.role, type: 'superadmin', tokenVersion: user.tokenVersion || 0 },
+      secret,
+      { expiresIn: '1h' }
+    );
     return token;
   } catch { return null; }
 }
@@ -45,7 +61,11 @@ async function getToken(){
     const p = plans[0];
     const original = { name: p.name, price: p.price, pricePeriod: p.pricePeriod, features: p.features, limits: p.limits, recommended: !!p.recommended };
     const token = await getToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    if (!token) {
+      console.log('Plans GET smoke OK (PUT skipped: no SuperAdmin token)');
+      process.exit(0);
+    }
+    const headers = { Authorization: `Bearer ${token}` };
     const res = await request('PUT', `/plans/${p.id}`, original, headers);
     if (res && res.id === String(p.id)) {
       console.log('Plans GET/PUT smoke OK');
