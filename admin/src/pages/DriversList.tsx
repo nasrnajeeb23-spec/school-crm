@@ -56,6 +56,8 @@ const DriversList: React.FC<DriversListProps> = ({ schoolId, withContainer = tru
   const [manualLink, setManualLink] = useState<string>('');
   const [creatingInviteFor, setCreatingInviteFor] = useState<string | null>(null);
   const [sharingInvite, setSharingInvite] = useState(false);
+  const [sharingInviteFor, setSharingInviteFor] = useState<string | null>(null);
+  const [inviteLinkByDriver, setInviteLinkByDriver] = useState<Record<string, string>>({});
 
   const validateForm = (form: { name: string; email: string; phone: string; licenseNumber: string; busPlateNumber: string; busCapacity: number; busModel: string }, requireEmail: boolean) => {
     if (!form.name.trim()) return 'يرجى إدخال اسم السائق.';
@@ -134,17 +136,94 @@ const DriversList: React.FC<DriversListProps> = ({ schoolId, withContainer = tru
     }
   };
 
-  const handleInvite = async (operatorId: string) => {
+  const createInviteLink = async (operatorId: string) => {
+    const res = await api.getBusOperatorInviteLink(operatorId);
+    const link = String(res?.activationLink || '');
+    if (!link) return '';
+    setInviteLinkByDriver(prev => ({ ...prev, [operatorId]: link }));
+    return link;
+  };
+
+  const ensureInviteLink = async (operatorId: string) => {
+    const cached = String(inviteLinkByDriver[operatorId] || '');
+    if (cached) return cached;
+    return await createInviteLink(operatorId);
+  };
+
+  const handleGenerateInvite = async (operatorId: string) => {
     try {
       setCreatingInviteFor(operatorId);
-      const res = await api.getBusOperatorInviteLink(operatorId);
-      if (res?.activationLink) {
-        setManualLink(res.activationLink);
-        setShowManualShare(true);
+      const link = await createInviteLink(operatorId);
+      if (link) {
         addToast('تم إنشاء رابط التفعيل.', 'success');
       } else {
         addToast('لم يتم استلام رابط تفعيل من الخادم.', 'error');
       }
+    } catch {
+      addToast('فشل إنشاء رابط التفعيل.', 'error');
+    } finally {
+      setCreatingInviteFor(null);
+    }
+  };
+
+  const handleCopyInvite = async (operatorId: string) => {
+    try {
+      const link = await ensureInviteLink(operatorId);
+      if (!link) {
+        addToast('لم يتم استلام رابط تفعيل من الخادم.', 'error');
+        return;
+      }
+      await navigator.clipboard.writeText(link);
+      addToast('تم نسخ الرابط.', 'success');
+    } catch {
+      addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error');
+    }
+  };
+
+  const handleShareInvite = async (operatorId: string) => {
+    try {
+      setSharingInviteFor(operatorId);
+      const link = await ensureInviteLink(operatorId);
+      if (!link) {
+        addToast('لم يتم استلام رابط تفعيل من الخادم.', 'error');
+        return;
+      }
+      const anyNav = navigator as any;
+      if (anyNav.share) {
+        await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: link });
+        addToast('تمت المشاركة بنجاح.', 'success');
+      } else {
+        await navigator.clipboard.writeText(link);
+        addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
+      }
+    } catch {
+      try {
+        const link = String(inviteLinkByDriver[operatorId] || '');
+        if (link) {
+          await navigator.clipboard.writeText(link);
+          addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning');
+        } else {
+          addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error');
+        }
+      } catch {
+        addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error');
+      }
+    } finally {
+      setSharingInviteFor(null);
+    }
+  };
+
+  const handleManualShareInvite = async (operatorId: string) => {
+    try {
+      setCreatingInviteFor(operatorId);
+      const link = await ensureInviteLink(operatorId);
+      if (!link) {
+        addToast('لم يتم استلام رابط تفعيل من الخادم.', 'error');
+        return;
+      }
+      setManualLink(link);
+      setShowManualShare(true);
+      addToast('تم إنشاء رابط التفعيل.', 'success');
     } catch {
       addToast('فشل إنشاء رابط التفعيل.', 'error');
     } finally {
@@ -307,14 +386,40 @@ const DriversList: React.FC<DriversListProps> = ({ schoolId, withContainer = tru
                         </>
                       )}
                       {d.status === BusOperatorStatus.Approved && (
-                        <button
-                          onClick={() => handleInvite(d.id)}
-                          disabled={creatingInviteFor === d.id}
-                          aria-disabled={creatingInviteFor === d.id}
-                          className={`text-sm px-3 py-1 ${creatingInviteFor === d.id ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
-                        >
-                          {creatingInviteFor === d.id ? 'جارٍ الإنشاء...' : 'رابط التفعيل'}
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleGenerateInvite(d.id)}
+                            disabled={creatingInviteFor === d.id}
+                            aria-disabled={creatingInviteFor === d.id}
+                            className={`text-sm px-3 py-1 ${creatingInviteFor === d.id ? 'bg-gray-400' : 'bg-red-600 hover:bg-red-700'} text-white rounded-md`}
+                          >
+                            {creatingInviteFor === d.id ? 'جارٍ الإنشاء...' : 'إنشاء رابط'}
+                          </button>
+                          <button
+                            onClick={() => handleCopyInvite(d.id)}
+                            disabled={creatingInviteFor === d.id}
+                            aria-disabled={creatingInviteFor === d.id}
+                            className={`text-sm px-3 py-1 ${creatingInviteFor === d.id ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700'} text-white rounded-md`}
+                          >
+                            نسخ الرابط
+                          </button>
+                          <button
+                            onClick={() => handleShareInvite(d.id)}
+                            disabled={creatingInviteFor === d.id || sharingInviteFor === d.id}
+                            aria-disabled={creatingInviteFor === d.id || sharingInviteFor === d.id}
+                            className={`text-sm px-3 py-1 ${(creatingInviteFor === d.id || sharingInviteFor === d.id) ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+                          >
+                            {sharingInviteFor === d.id ? 'جارٍ المشاركة...' : 'مشاركة'}
+                          </button>
+                          <button
+                            onClick={() => handleManualShareInvite(d.id)}
+                            disabled={creatingInviteFor === d.id}
+                            aria-disabled={creatingInviteFor === d.id}
+                            className={`text-sm px-3 py-1 ${creatingInviteFor === d.id ? 'bg-gray-400' : 'bg-gray-800 hover:bg-gray-900'} text-white rounded-md`}
+                          >
+                            عرض للمشاركة اليدوية
+                          </button>
+                        </>
                       )}
                       <button onClick={() => handleDelete(d.id, d.name)} className="text-sm px-3 py-1 bg-gray-800 text-white rounded-md hover:bg-gray-900">
                         حذف
