@@ -126,6 +126,13 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
           if (alt2.ok) return await alt2.json();
         }
         if (response.status === 401) {
+          if (endpoint === '/auth/me') {
+            try {
+              setAuthToken('');
+              setRefreshToken('');
+              localStorage.removeItem('current_school_id');
+            } catch {}
+          }
           const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
           const isSilentCheck = endpoint === '/auth/me';
           const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
@@ -187,7 +194,9 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
         await new Promise(res => setTimeout(res, delayMs));
         continue;
       }
-      console.error(`API Error on ${endpoint}:`, error);
+      const msg = String((error as any)?.message || '');
+      const suppress = endpoint === '/auth/me' && (/HTTP\s*401|HTTP\s*403|Missing Authorization header|Invalid or expired token/i.test(msg));
+      if (!suppress) console.error(`API Error on ${endpoint}:`, error);
       throw error;
     }
   }

@@ -137,6 +137,27 @@ app.locals.securityPolicies = {
 })();
 
 // Middleware
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin;
+    if (!origin) return next();
+    const allowAny = allowedOrigins.includes('*');
+    const allowed = allowAny || allowedOrigins.includes(origin);
+    if (allowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      const reqHeaders = req.headers['access-control-request-headers'];
+      res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, x-school-id, x-client, x-requested-with');
+    }
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    return next();
+  } catch {
+    return next();
+  }
+});
+
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -153,6 +174,17 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin;
+    if (origin && res.getHeader('Access-Control-Allow-Origin') === '*') {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+  } catch {}
+  next();
+});
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
