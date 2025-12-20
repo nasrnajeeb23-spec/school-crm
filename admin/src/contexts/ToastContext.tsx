@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -18,22 +18,23 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [idCounter, setIdCounter] = useState(0);
-  const [lastToast, setLastToast] = useState<{ message: string; type: ToastType; time: number } | null>(null);
+  const idCounterRef = useRef(0);
+  const lastToastRef = useRef<{ message: string; type: ToastType; time: number } | null>(null);
 
   const addToast = useCallback((message: string, type: ToastType) => {
     const now = Date.now();
+    const lastToast = lastToastRef.current;
     if (lastToast && lastToast.message === message && lastToast.type === type && (now - lastToast.time) < 4000) {
       return;
     }
-    setLastToast({ message, type, time: now });
+    lastToastRef.current = { message, type, time: now };
     setToasts(prevToasts => {
-      const newToast = { id: idCounter, message, type };
+      const newToast = { id: idCounterRef.current, message, type };
       const updatedToasts = [...prevToasts, newToast].slice(-5);
       return updatedToasts;
     });
-    setIdCounter(prevId => prevId + 1);
-  }, [idCounter, lastToast]);
+    idCounterRef.current += 1;
+  }, []);
 
   const removeToast = useCallback((id: number) => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));

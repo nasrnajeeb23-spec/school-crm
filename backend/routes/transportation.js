@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { BusOperator, Route, RouteStudent, Student, School, User } = require('../models');
+const { QueryTypes } = require('sequelize');
+const { sequelize, BusOperator, Route, RouteStudent, Student, School, User } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, JWT_SECRET } = require('../middleware/auth');
 const { requireModule } = require('../middleware/modules');
 const { validate } = require('../middleware/validate');
@@ -50,10 +51,38 @@ router.post('/operator/application', validate([
 
 router.get('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), async (req, res) => {
   try {
-    const ops = await BusOperator.findAll({ where: { schoolId: req.params.schoolId }, order: [['status','ASC']] });
+    const schoolId = Number.parseInt(String(req.params.schoolId), 10);
+    if (!schoolId || Number.isNaN(schoolId)) return res.status(400).json({ msg: 'Invalid schoolId' });
+
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
-    res.json(ops.map(o => ({ ...o.toJSON(), status: statusMap[o.status] || o.status })));
-  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
+    try {
+      const ops = await BusOperator.findAll({ where: { schoolId }, order: [['status', 'ASC']] });
+      return res.json(ops.map(o => ({ ...o.toJSON(), status: statusMap[o.status] || o.status })));
+    } catch (e) {
+      const tables = ['"BusOperators"', '"busoperators"'];
+      const columnSets = [
+        ['id', 'name', 'email', 'phone', 'licenseNumber', 'busPlateNumber', 'busCapacity', 'busModel', 'schoolId', 'userId', 'status'],
+        ['id', 'name', 'email', 'phone', 'licenseNumber', 'busPlateNumber', 'busCapacity', 'busModel', 'schoolId', 'status'],
+        ['id', 'name', 'phone', 'licenseNumber', 'busPlateNumber', 'busCapacity', 'busModel', 'schoolId', 'userId', 'status'],
+        ['id', 'name', 'phone', 'licenseNumber', 'busPlateNumber', 'busCapacity', 'busModel', 'schoolId', 'status'],
+      ];
+      for (const table of tables) {
+        for (const cols of columnSets) {
+          try {
+            const colSql = cols.map(c => `"${c}"`).join(', ');
+            const rows = await sequelize.query(
+              `SELECT ${colSql} FROM ${table} WHERE "schoolId" = :schoolId ORDER BY "status" ASC`,
+              { replacements: { schoolId }, type: QueryTypes.SELECT }
+            );
+            return res.json((rows || []).map((o) => ({ ...o, status: statusMap[o.status] || o.status })));
+          } catch {}
+        }
+      }
+      return res.status(500).json({ msg: e?.message || 'Server Error' });
+    }
+  } catch (e) {
+    return res.status(500).json({ msg: e?.message || 'Server Error' });
+  }
 });
 
 router.post('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), validate([

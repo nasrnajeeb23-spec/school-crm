@@ -20,6 +20,7 @@ const SetPassword: React.FC = () => {
       if (t) {
         try {
           localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
           localStorage.removeItem('last_route');
         } catch {}
       }
@@ -90,8 +91,10 @@ const SetPassword: React.FC = () => {
       const resp: any = await apiCall('/auth/invite/set-password', { method: 'POST', body: JSON.stringify({ token, newPassword: pwd }) });
       try {
         const t = resp?.token || '';
+        const rt = resp?.refreshToken || '';
         const u = resp?.user || null;
         if (t) localStorage.setItem('auth_token', t);
+        if (rt) localStorage.setItem('refresh_token', rt);
         if (u && u.schoolId) localStorage.setItem('current_school_id', String(u.schoolId));
         const roleRaw = String(u?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
         let target = '/login';

@@ -140,16 +140,19 @@ app.locals.securityPolicies = {
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes('*')) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins.includes('*')) return callback(null, origin);
+    if (allowedOrigins.includes(origin)) return callback(null, origin);
     logger.warn(`CORS blocked request from: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id', 'x-client', 'x-requested-with'],
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {

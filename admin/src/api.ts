@@ -40,12 +40,47 @@ const authHeaders = () => {
     return base;
 };
 
+const getAuthToken = (): string => {
+  try {
+    return (typeof window !== 'undefined' ? (localStorage.getItem('auth_token') || '') : '');
+  } catch {
+    return '';
+  }
+};
+
+const setAuthToken = (token?: string) => {
+  try {
+    if (typeof window === 'undefined') return;
+    if (token) localStorage.setItem('auth_token', token);
+    else localStorage.removeItem('auth_token');
+  } catch {}
+};
+
+const getRefreshToken = (): string => {
+  try {
+    return (typeof window !== 'undefined' ? (localStorage.getItem('refresh_token') || '') : '');
+  } catch {
+    return '';
+  }
+};
+
+const setRefreshToken = (token?: string) => {
+  try {
+    if (typeof window === 'undefined') return;
+    if (token) localStorage.setItem('refresh_token', token);
+    else localStorage.removeItem('refresh_token');
+  } catch {}
+};
+
 // دالة مساعدة للاتصال بالـ API
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   const isFormData = typeof FormData !== 'undefined' && (options as any)?.body instanceof FormData;
+  const storedToken = getAuthToken();
+  const authHeader = storedToken ? { Authorization: `Bearer ${storedToken}` } : {};
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...authHeaders(),
+    ...authHeader,
     ...options.headers,
   };
   const attemptFetch = async (base: string) => {
@@ -80,7 +115,11 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
         try { bodyJson = await response.json(); } catch {
           try { bodyText = await response.text(); } catch {}
         }
-        const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
+        const primaryMsg = bodyJson?.message || bodyJson?.msg || bodyText || '';
+        const detailMsg = bodyJson?.error || bodyJson?.detail || '';
+        const msg = (primaryMsg && detailMsg && /^(Server Error|خطأ في الخادم|Internal Server Error)$/i.test(String(primaryMsg).trim()))
+          ? `${primaryMsg}: ${detailMsg}`
+          : (primaryMsg || detailMsg || '');
         const statusText = response.statusText ? ` ${response.statusText}` : '';
         if (response.status === 429 && endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
           const alt2 = await attemptFetch(derivedBase);
@@ -180,6 +219,10 @@ export const login = async (emailOrUsername: string, password: string, schoolId?
         method: 'POST',
         body: JSON.stringify({ ...field, password, schoolId, client: 'web', hcaptchaToken }),
     });
+    try {
+      if (response?.token) setAuthToken(response.token);
+      if (response?.refreshToken) setRefreshToken(response.refreshToken);
+    } catch {}
     const user = response?.user || {};
   const mapRole = (r: string) => {
       const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
@@ -191,6 +234,10 @@ export const login = async (emailOrUsername: string, password: string, schoolId?
 
 export const logout = async (): Promise<void> => {
     await apiCall('/auth/logout', { method: 'POST' });
+    try {
+      setAuthToken('');
+      setRefreshToken('');
+    } catch {}
 };
 
 export const getCurrentUser = async (): Promise<User> => {
@@ -760,9 +807,10 @@ export const submitTrialRequest = async (data: NewTrialRequestData): Promise<Use
         body: JSON.stringify(data),
     });
     const token = response?.token;
-    if (typeof window !== 'undefined' && token) {
-        localStorage.setItem('auth_token', token);
-    }
+    try {
+      if (token) setAuthToken(token);
+      if (response?.refreshToken) setRefreshToken(response.refreshToken);
+    } catch {}
     return response?.user || null;
 };
 

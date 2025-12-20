@@ -209,6 +209,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentUser(null);
     try {
       localStorage.removeItem('current_school_id');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
     } catch {}
   };
 
