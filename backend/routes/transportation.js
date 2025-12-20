@@ -8,6 +8,8 @@ const { validate } = require('../middleware/validate');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const busOperatorQueryOptions = { attributes: { exclude: ['userId'] } };
+
 // --- Operators ---
 // Public application endpoint for bus operators (drivers)
 // Allows a driver to submit an application to a specific school without authentication
@@ -41,7 +43,7 @@ router.post('/operator/application', validate([
       busModel: req.body.busModel,
       schoolId,
       status: 'Pending',
-    });
+    }, { returning: false });
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
     return res.status(201).json({ ...op.toJSON(), status: statusMap[op.status] });
   } catch (e) {
@@ -56,7 +58,7 @@ router.get('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
 
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
     try {
-      const ops = await BusOperator.findAll({ where: { schoolId }, order: [['status', 'ASC']] });
+      const ops = await BusOperator.findAll({ where: { schoolId }, order: [['status', 'ASC']], ...busOperatorQueryOptions });
       return res.json(ops.map(o => ({ ...o.toJSON(), status: statusMap[o.status] || o.status })));
     } catch (e) {
       const tables = ['"BusOperators"', '"busoperators"'];
@@ -95,7 +97,10 @@ router.post('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
   { name: 'busModel', required: true, type: 'string' },
 ]), async (req, res) => {
   try {
-    const op = await BusOperator.create({ id: `op_${Date.now()}`, ...req.body, status: 'Pending', schoolId: parseInt(req.params.schoolId, 10) });
+    const op = await BusOperator.create(
+      { id: `op_${Date.now()}`, ...req.body, status: 'Pending', schoolId: parseInt(req.params.schoolId, 10) },
+      { returning: false }
+    );
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
     res.status(201).json({ ...op.toJSON(), status: statusMap[op.status] });
   } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
@@ -103,11 +108,11 @@ router.post('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
 
 router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
   try {
-    const op = await BusOperator.findByPk(req.params.operatorId);
+    const op = await BusOperator.findByPk(req.params.operatorId, busOperatorQueryOptions);
     if (!op) return res.status(404).json({ msg: 'Operator not found' });
     if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     op.status = 'Approved';
-    await op.save();
+    await op.save({ returning: false });
     let user = null;
     const providedEmail = String(op.email || '').trim();
     const usernameRaw = providedEmail || String(op.phone || '').trim() || `driver_${op.id}`;
@@ -157,7 +162,7 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
     }
     try {
       op.userId = user ? user.id : null;
-      await op.save();
+      await op.save({ returning: false });
     } catch {}
     const payload = { ...op.toJSON(), status: 'معتمد', driverAccountCreated: true, userId: user ? String(user.id) : null };
     res.json(payload);
@@ -166,7 +171,7 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
 
 router.get('/operator/:operatorId/invite-link', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
   try {
-    const op = await BusOperator.findByPk(req.params.operatorId);
+    const op = await BusOperator.findByPk(req.params.operatorId, busOperatorQueryOptions);
     if (!op) return res.status(404).json({ msg: 'Operator not found' });
     if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     if (String(op.status || '') !== 'Approved') return res.status(400).json({ msg: 'Operator not approved' });
@@ -188,7 +193,7 @@ router.get('/operator/:operatorId/invite-link', verifyToken, requireRole('SCHOOL
     if (!op.userId) {
       try {
         op.userId = user.id;
-        await op.save();
+        await op.save({ returning: false });
       } catch {}
     }
 
@@ -206,18 +211,18 @@ router.get('/operator/:operatorId/invite-link', verifyToken, requireRole('SCHOOL
 
 router.put('/operator/:operatorId/reject', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
   try {
-    const op = await BusOperator.findByPk(req.params.operatorId);
+    const op = await BusOperator.findByPk(req.params.operatorId, busOperatorQueryOptions);
     if (!op) return res.status(404).json({ msg: 'Operator not found' });
     if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     op.status = 'Rejected';
-    await op.save();
+    await op.save({ returning: false });
     res.json({ ...op.toJSON(), status: 'مرفوض' });
   } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
 router.get('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
   try {
-    const op = await BusOperator.findByPk(req.params.operatorId);
+    const op = await BusOperator.findByPk(req.params.operatorId, busOperatorQueryOptions);
     if (!op) return res.status(404).json({ msg: 'Operator not found' });
     if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
@@ -229,7 +234,7 @@ router.get('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
 
 router.put('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
   try {
-    const op = await BusOperator.findByPk(req.params.operatorId);
+    const op = await BusOperator.findByPk(req.params.operatorId, busOperatorQueryOptions);
     if (!op) return res.status(404).json({ msg: 'Operator not found' });
     if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
 
@@ -256,7 +261,7 @@ router.put('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
 
     if (!changed) return res.status(400).json({ msg: 'No changes provided' });
 
-    await op.save();
+    await op.save({ returning: false });
 
     if (op.userId) {
       try {
@@ -284,7 +289,7 @@ router.put('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
 
 router.delete('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
   try {
-    const op = await BusOperator.findByPk(req.params.operatorId);
+    const op = await BusOperator.findByPk(req.params.operatorId, busOperatorQueryOptions);
     if (!op) return res.status(404).json({ msg: 'Operator not found' });
     if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
 
@@ -369,7 +374,7 @@ router.get('/parent/:parentId', verifyToken, requireRole('PARENT'), requireModul
     if (!rs) return res.json(null);
     const route = await Route.findByPk(rs.routeId);
     if (!route) return res.json(null);
-    const operator = route.busOperatorId ? await BusOperator.findByPk(route.busOperatorId) : null;
+    const operator = route.busOperatorId ? await BusOperator.findByPk(route.busOperatorId, busOperatorQueryOptions) : null;
     const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
     let nearestStop = null;
     const stops = Array.isArray(route.stops) ? route.stops : [];
@@ -444,7 +449,7 @@ router.post('/:schoolId/auto-assign', verifyToken, requireRole('SCHOOL_ADMIN', '
     const opsById = {};
     for (const r of routes) {
       if (r.busOperatorId) {
-        const op = await BusOperator.findByPk(r.busOperatorId);
+        const op = await BusOperator.findByPk(r.busOperatorId, busOperatorQueryOptions);
         if (op && op.status === 'Approved') {
           opsById[op.id] = op;
           const cnt = await RouteStudent.count({ where: { routeId: r.id } });
@@ -568,7 +573,7 @@ router.post('/:schoolId/auto-assign/preview', verifyToken, requireRole('SCHOOL_A
     }
     for (const r of routes) {
       if (r.busOperatorId) {
-        const op = await BusOperator.findByPk(r.busOperatorId);
+        const op = await BusOperator.findByPk(r.busOperatorId, busOperatorQueryOptions);
         if (op && op.status === 'Approved') {
           const cnt = await RouteStudent.count({ where: { routeId: r.id } });
           routeMap[r.id].operator = op;

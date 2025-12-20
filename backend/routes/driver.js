@@ -4,8 +4,10 @@ const router = express.Router();
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { User, BusOperator, Route, RouteStudent, Student } = require('../models');
 
+const busOperatorQueryOptions = { attributes: { exclude: ['userId'] } };
+
 async function getDriverOperators(userId) {
-  const operators = await BusOperator.findAll({ where: { userId } }).catch(() => []);
+  const operators = await BusOperator.findAll({ where: { userId }, ...busOperatorQueryOptions }).catch(() => []);
   if (operators.length) return operators;
 
   const u = await User.findByPk(userId).catch(() => null);
@@ -24,14 +26,15 @@ async function getDriverOperators(userId) {
         ...(email ? [{ email }] : []),
         ...(phone ? [{ phone }] : []),
       ]
-    }
+    },
+    ...busOperatorQueryOptions
   }).catch(() => []);
 
   for (const op of fallback) {
     if (!op.userId) {
       try {
         op.userId = u.id;
-        await op.save();
+        await op.save({ returning: false });
       } catch {}
     }
   }
@@ -102,4 +105,3 @@ router.get('/routes/:routeId', verifyToken, requireRole('DRIVER'), async (req, r
 });
 
 module.exports = router;
-
