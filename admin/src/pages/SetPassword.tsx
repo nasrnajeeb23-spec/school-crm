@@ -42,6 +42,7 @@ const SetPassword: React.FC = () => {
           let target = '/login';
           if (roleRaw === 'PARENT') target = '/parent';
           else if (roleRaw === 'TEACHER') target = '/teacher';
+          else if (roleRaw === 'STAFF' && String((u as any)?.schoolRole || '') === 'سائق') target = '/driver';
           else if (roleRaw === 'SCHOOL_ADMIN' || roleRaw === 'STAFF') target = '/school';
           else if (roleRaw === 'SUPER_ADMIN' || roleRaw === 'SUPERADMIN' || roleRaw.startsWith('SUPER_ADMIN_')) target = '/superadmin';
           addToast('أنت مسجّل دخول بالفعل. تم توجيهك للوحة التحكم.', 'info');
@@ -97,6 +98,7 @@ const SetPassword: React.FC = () => {
         const desired = targetRole || roleRaw;
         if (desired === 'PARENT') target = '/parent';
         else if (desired === 'TEACHER') target = '/teacher';
+        else if (desired === 'STAFF' && String((u as any)?.schoolRole || '') === 'سائق') target = '/driver';
         else if (desired === 'SCHOOLADMIN' || desired === 'SCHOOL_ADMIN' || desired === 'STAFF') target = '/school';
         else if (desired === 'SUPERADMIN' || desired === 'SUPER_ADMIN' || desired.startsWith('SUPER_ADMIN_')) target = '/superadmin';
         try { localStorage.removeItem('last_route'); } catch {}

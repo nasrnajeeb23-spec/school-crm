@@ -171,6 +171,9 @@ Schedule.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
 School.hasMany(BusOperator, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 BusOperator.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
+User.hasOne(BusOperator, { foreignKey: 'userId', onDelete: 'SET NULL' });
+BusOperator.belongsTo(User, { foreignKey: 'userId', onDelete: 'SET NULL' });
+
 School.hasMany(Route, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 Route.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 BusOperator.hasMany(Route, { foreignKey: 'busOperatorId', onDelete: 'CASCADE', hooks: true });

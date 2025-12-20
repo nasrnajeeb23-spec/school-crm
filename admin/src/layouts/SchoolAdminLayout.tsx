@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import SchoolSidebar from '../components/SchoolSidebar';
 import Header from '../components/Header';
-import { School, Student, Teacher, InvoiceStatus, ActionItem, User, SchoolSettings, Permission, ActionItemType } from '../types';
+import { School, Student, Teacher, InvoiceStatus, ActionItem, User, SchoolSettings, Permission, ActionItemType, SchoolRole, UserRole } from '../types';
 
 import { BackIcon, BellIcon } from '../components/icons';
 import ThemeToggle from '../components/ThemeToggle';
@@ -70,7 +70,16 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   
   const storedId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('current_school_id') || '0') : 0;
   const effectiveSchoolId = isSuperAdminView ? parseInt(urlSchoolId || '0') : (currentUser?.schoolId || storedId);
-  const userRolePermissions = Object.values(Permission);
+  if (!isSuperAdminView && currentUser?.role === UserRole.Staff && String(currentUser?.schoolRole || '') === String(SchoolRole.Driver)) {
+    return <Navigate to="/driver" replace />;
+  }
+
+  const userRolePermissions = (() => {
+    if (isSuperAdminView) return Object.values(Permission);
+    const perms = (currentUser?.permissions || []) as Permission[];
+    if (currentUser?.role === UserRole.SchoolAdmin && perms.length === 0) return Object.values(Permission);
+    return perms;
+  })();
 
   const hasPermission = (permission: Permission) => {
     if (isSuperAdminView) return true;

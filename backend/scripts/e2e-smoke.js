@@ -52,7 +52,12 @@ async function waitFor(url, { headers = {}, timeoutMs = 7000, intervalMs = 400 }
 }
 
 (async () => {
-  const base = process.env.BASE_API || 'http://127.0.0.1:5002/api';
+  const rawBase = process.env.BASE_URL || process.env.BASE_API || 'http://127.0.0.1:5002';
+  const base = (() => {
+    const b = String(rawBase || '').trim().replace(/\/$/, '');
+    if (/\/api$/i.test(b)) return b;
+    return `${b}/api`;
+  })();
   const criticalSteps = new Set(['operator_application', 'approve_operator', 'driver_invite_link', 'create_transport_route', 'assign_students_to_route']);
   let criticalFailed = false;
   function log(step, ok, extra) {

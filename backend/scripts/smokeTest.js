@@ -71,10 +71,22 @@ async function run(){
   const classesRes = await req('GET','/api/school/1/classes', { Authorization: 'Bearer ' + newAccess });
   const classes = classesRes.ok ? JSON.parse(classesRes.body) : [];
   let classId = classes[0] ? classes[0].id : null;
-  const t1 = await req('POST','/api/school/1/teachers', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: 'معلم جدول', subject: 'الرياضيات', phone: '0501112222' }));
-  if (!t1.ok) throw new Error('create teacher failed');
-  const tData = JSON.parse(t1.body);
-  const tid = tData.id;
+  const teachersRes = await req('GET','/api/school/1/teachers', { Authorization: 'Bearer ' + newAccess });
+  const teachers = teachersRes.ok ? JSON.parse(teachersRes.body) : [];
+  let tid = teachers[0] ? teachers[0].id : null;
+  if (!tid) {
+    const rand = String(Date.now()).slice(-8);
+    const t1 = await req('POST','/api/school/1/teachers', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: `معلم جدول ${rand}`, subject: 'الرياضيات', phone: `050${rand}` }));
+    if (t1.ok) {
+      const tData = JSON.parse(t1.body);
+      tid = tData.id;
+    } else {
+      const t2 = await req('GET','/api/school/1/teachers', { Authorization: 'Bearer ' + newAccess });
+      const tList = t2.ok ? JSON.parse(t2.body) : [];
+      tid = tList[0] ? tList[0].id : null;
+      if (!tid) throw new Error('create teacher failed');
+    }
+  }
   if (!classId) {
     const crtClass = await req('POST','/api/school/1/classes', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: 'فصل اختبار', gradeLevel: 'الصف الأول', homeroomTeacherId: String(tid), capacity: 30, subjects: ['الرياضيات'] }));
     if (!crtClass.ok) throw new Error('create class failed');

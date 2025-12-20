@@ -4,6 +4,7 @@ const { School, Subscription, Plan, Student, Invoice, SchoolSettings } = require
 const { sequelize } = require('../models');
 const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
 const { requireModule, moduleMap } = require('../middleware/modules');
+const { derivePermissionsForUser } = require('../utils/permissionMatrix');
 
 // Public endpoint alias to list schools without auth
 router.get('/public', async (req, res) => {
@@ -150,7 +151,7 @@ router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     const existsUser = await require('../models').User.findOne({ where: { [require('sequelize').Op.or]: [{ email: adminData.email }, { username }] } });
     if (existsUser) return res.status(400).json({ msg: 'Admin email already exists' });
     const hash = await bcrypt.hash(String(adminData.password), 10);
-    const permissions = ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES','MANAGE_STAFF'];
+    const permissions = derivePermissionsForUser({ role: 'SchoolAdmin', schoolRole: 'مدير' });
     const admin = await require('../models').User.create({ name: adminData.name, email: adminData.email, username, password: hash, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', isActive: true, permissions, passwordMustChange: true, tokenVersion: 0 });
 
     const response = { id: school.id, name: school.name, plan: plan.name, status: 'TRIAL', students: school.studentCount, teachers: school.teacherCount, balance: parseFloat(school.balance), joinDate: school.createdAt.toISOString().split('T')[0] };

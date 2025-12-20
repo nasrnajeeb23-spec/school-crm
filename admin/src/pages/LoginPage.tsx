@@ -152,6 +152,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ mode = 'default' }) => {
           const roleRaw = String(me?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
           if (roleRaw === 'PARENT') target = '/parent';
           else if (roleRaw === 'TEACHER') target = '/teacher';
+          else if (roleRaw === 'STAFF' && String((me as any)?.schoolRole || '') === 'سائق') target = '/driver';
           else if (roleRaw === 'SCHOOLADMIN' || roleRaw === 'SCHOOL_ADMIN' || roleRaw === 'STAFF') target = '/school';
           else if (roleRaw === 'SUPERADMIN' || roleRaw === 'SUPER_ADMIN') target = '/superadmin';
           const last = localStorage.getItem('last_route') || '';

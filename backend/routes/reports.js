@@ -6,7 +6,7 @@ const ReportService = require('../services/ReportService');
 // @route   GET api/reports/:schoolId/student/:studentId/card
 // @desc    Download Student Report Card PDF
 // @access  Private (SchoolAdmin, Teacher, Parent, Student)
-router.get('/:schoolId/student/:studentId/card', verifyToken, requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/student/:studentId/card', verifyToken, requireRole('SCHOOL_ADMIN', 'TEACHER', 'PARENT', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const { schoolId, studentId } = req.params;
     

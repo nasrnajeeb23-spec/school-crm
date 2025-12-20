@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { SalaryStructure, SalarySlip } = require('../models');
 const { StaffAttendance, TeacherAttendance } = require('../models');
+const { deriveDesiredDbRole, derivePermissionsForUser } = require('../utils/permissionMatrix');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -853,7 +854,7 @@ router.get('/:schoolId/payroll/receipts/:filename', verifyToken, requireRole('SC
 // @route   POST api/school/:schoolId/teachers
 // @desc    Add a new teacher to a school
 // @access  Private (SchoolAdmin)
-router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requireSameSchoolParam('schoolId'), requireWithinLimits('teachers'), validate([
+router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'STAFF'), requirePermission('MANAGE_TEACHERS'), requireSameSchoolParam('schoolId'), requireWithinLimits('teachers'), validate([
   { name: 'name', required: true, type: 'string', minLength: 2 },
   { name: 'subject', required: true, type: 'string' },
   { name: 'phone', required: true, type: 'string' },
@@ -1662,7 +1663,7 @@ router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 
 // @route   GET api/school/:schoolId/parents
 // @desc    Get all parents for a specific school
 // @access  Private (SchoolAdmin)
-router.get('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'STAFF'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/parents', verifyToken, requireRole('SCHOOL_ADMIN', 'STAFF'), requirePermission('MANAGE_PARENTS'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const parents = await Parent.findAll({ 
         where: { schoolId: req.params.schoolId },
@@ -3463,7 +3464,7 @@ router.post('/:schoolId/fees/invoices/generate', verifyToken, requireRole('SCHOO
 // @route   GET api/school/:schoolId/students/:studentId/behavior
 // @desc    Get behavior records for a student
 // @access  Private (SchoolAdmin, Teacher, Parent)
-router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireSameSchoolParam('schoolId'), async (req, res) => {
+router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireRole('SCHOOL_ADMIN', 'TEACHER', 'PARENT', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
     const studentId = req.params.studentId;
@@ -3646,7 +3647,10 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(placeholder, salt);
 
-    user = await User.create({ name, email, username: email.split('@')[0], password: hashedPassword, role: 'Staff', schoolRole: role, schoolId, phone, department, bankAccount, isActive: true, passwordMustChange: true, tokenVersion: 0 });
+    const desiredRole = deriveDesiredDbRole({ role: 'Staff', schoolRole: role });
+    const desiredPermissions = derivePermissionsForUser({ role: desiredRole, schoolRole: role });
+
+    user = await User.create({ name, email, username: email.split('@')[0], password: hashedPassword, role: desiredRole, schoolRole: role, schoolId, phone, department, bankAccount, isActive: true, passwordMustChange: true, permissions: desiredPermissions, tokenVersion: 0 });
 
     const userJson = user.toJSON();
     delete userJson.password;
@@ -3678,6 +3682,10 @@ router.put('/:schoolId/staff/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     let user = await User.findOne({ where: { id: userId, schoolId } });
     if (!user) return res.status(404).json({ msg: 'Staff not found' });
 
+    if (role !== undefined && String(role || '') === 'سائق') {
+      return res.status(400).json({ msg: 'Drivers are managed in transportation module' });
+    }
+
     user.name = name || user.name;
     user.email = email || user.email;
     user.schoolRole = role || user.schoolRole;
@@ -3685,6 +3693,11 @@ router.put('/:schoolId/staff/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
     user.department = department || user.department;
     user.bankAccount = bankAccount || user.bankAccount;
     if (isActive !== undefined) user.isActive = isActive;
+
+    const desiredRole = deriveDesiredDbRole({ role: user.role, schoolRole: user.schoolRole });
+    const desiredPermissions = derivePermissionsForUser({ role: desiredRole, schoolRole: user.schoolRole });
+    user.role = desiredRole;
+    user.permissions = desiredPermissions;
 
     await user.save();
 

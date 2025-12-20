@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
 const { requireModule } = require('../middleware/modules');
 const { rateLimit } = require('../middleware/rateLimit');
+const { deriveDesiredDbRole, derivePermissionsForUser } = require('../utils/permissionMatrix');
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 
@@ -110,16 +111,19 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), val
     user.lastLoginAt = new Date();
     await user.save();
 
+    const effectiveRole = deriveDesiredDbRole({ role: user.role, schoolRole: user.schoolRole });
+    const effectivePermissions = derivePermissionsForUser({ role: effectiveRole, schoolRole: user.schoolRole });
+
     const payload = {
       id: user.id,
-      role: user.role,
+      role: effectiveRole,
       schoolId: user.schoolId || null,
       teacherId: user.teacherId || null,
       parentId: user.parentId || null,
       name: user.name,
       email: user.email,
       username: user.username,
-      permissions: user.permissions || [],
+      permissions: effectivePermissions,
       tokenVersion: user.tokenVersion || 0
     };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -127,6 +131,8 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), val
     const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
 
     const { password: _, ...userData } = user.toJSON();
+    userData.role = effectiveRole;
+    userData.permissions = effectivePermissions;
     try {
       const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
       const baseCookie = { httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax', path: '/' };
@@ -188,15 +194,19 @@ router.post('/trial-signup', validate([
     await Subscription.create({ schoolId: school.id, planId: plan?.id || null, status: 'TRIAL', startDate: new Date(), endDate: renewal, renewalDate: renewal });
 
     const hashed = await bcrypt.hash(adminPassword, 10);
-    const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_ATTENDANCE','MANAGE_GRADES','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES'] });
+    const user = await User.create({ name: adminName, email: adminEmail, username: adminEmail, password: hashed, role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: derivePermissionsForUser({ role: 'SchoolAdmin', schoolRole: 'مدير' }) });
 
-    const payload = { id: user.id, role: user.role, schoolId: user.schoolId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 };
+    const effectiveRole = deriveDesiredDbRole({ role: user.role, schoolRole: user.schoolRole });
+    const effectivePermissions = derivePermissionsForUser({ role: effectiveRole, schoolRole: user.schoolRole });
+    const payload = { id: user.id, role: effectiveRole, schoolId: user.schoolId || null, name: user.name, email: user.email, username: user.username, permissions: effectivePermissions, tokenVersion: user.tokenVersion || 0 };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
     const refreshSecret = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
     const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
 
     const data = user.toJSON();
     delete data.password;
+    data.role = effectiveRole;
+    data.permissions = effectivePermissions;
     return res.status(201).json({ token, refreshToken, user: data });
   } catch (err) {
     console.error(err.message);
@@ -234,6 +244,10 @@ router.get('/me', verifyToken, async (req, res) => {
     if (!user) return res.status(404).json({ msg: 'User not found' });
     const data = user.toJSON();
     delete data.password;
+    const effectiveRole = deriveDesiredDbRole({ role: data.role, schoolRole: data.schoolRole });
+    const effectivePermissions = derivePermissionsForUser({ role: effectiveRole, schoolRole: data.schoolRole });
+    data.role = effectiveRole;
+    data.permissions = effectivePermissions;
     res.json(data);
   } catch (err) {
     res.status(500).json({ msg: 'Server Error' });
@@ -258,7 +272,9 @@ router.post('/refresh', async (req, res) => {
     const user = await User.findByPk(payload.id);
     if (!user) return res.status(404).json({ msg: 'User not found' });
     if (Number(user.tokenVersion || 0) !== Number(payload.tokenVersion || 0)) return res.status(401).json({ msg: 'Token revoked' });
-    const access = jwt.sign({ id: user.id, role: user.role, schoolId: user.schoolId || null, teacherId: user.teacherId || null, parentId: user.parentId || null, name: user.name, email: user.email, username: user.username, permissions: user.permissions || [], tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '12h' });
+    const effectiveRole = deriveDesiredDbRole({ role: user.role, schoolRole: user.schoolRole });
+    const effectivePermissions = derivePermissionsForUser({ role: effectiveRole, schoolRole: user.schoolRole });
+    const access = jwt.sign({ id: user.id, role: effectiveRole, schoolId: user.schoolId || null, teacherId: user.teacherId || null, parentId: user.parentId || null, name: user.name, email: user.email, username: user.username, permissions: effectivePermissions, tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '12h' });
     res.json({ token: access });
   } catch (e) {
     res.status(401).json({ msg: 'Invalid refresh token' });
@@ -290,7 +306,10 @@ router.post('/invite/set-password', validate([
     if (!user) return res.status(404).json({ msg: 'User not found' });
     const tr = String(payload.targetRole || '').toUpperCase();
     const ur = String(user.role || '').toUpperCase();
-    if (tr && tr !== ur) return res.status(403).json({ msg: 'Invalid role for invite token' });
+    if (tr && tr !== ur) {
+      const isLegacyDriverToken = tr === 'STAFF' && ur === 'DRIVER' && String(user.schoolRole || '') === 'سائق';
+      if (!isLegacyDriverToken) return res.status(403).json({ msg: 'Invalid role for invite token' });
+    }
     const ptv = Number(payload.tokenVersion || 0);
     const utv = Number(user.tokenVersion || 0);
     if (ptv !== utv) return res.status(401).json({ msg: 'Token revoked' });
@@ -300,16 +319,18 @@ router.post('/invite/set-password', validate([
     user.lastPasswordChangeAt = new Date();
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
+    const effectiveRole = deriveDesiredDbRole({ role: user.role, schoolRole: user.schoolRole });
+    const effectivePermissions = derivePermissionsForUser({ role: effectiveRole, schoolRole: user.schoolRole });
     const accessPayload = {
       id: user.id,
-      role: user.role,
+      role: effectiveRole,
       schoolId: user.schoolId || null,
       teacherId: user.teacherId || null,
       parentId: user.parentId || null,
       name: user.name,
       email: user.email,
       username: user.username,
-      permissions: user.permissions || [],
+      permissions: effectivePermissions,
       tokenVersion: user.tokenVersion || 0
     };
     const accessToken = jwt.sign(accessPayload, JWT_SECRET, { expiresIn: '12h' });
@@ -317,6 +338,8 @@ router.post('/invite/set-password', validate([
     const refreshToken = jwt.sign({ id: user.id, tokenVersion: user.tokenVersion || 0 }, refreshSecret, { expiresIn: '7d' });
     const userJson = user.toJSON();
     delete userJson.password;
+    userJson.role = effectiveRole;
+    userJson.permissions = effectivePermissions;
     return res.json({ token: accessToken, refreshToken, user: userJson });
   } catch (e) {
     console.error(e.message);

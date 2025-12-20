@@ -41,6 +41,7 @@ const pricingRoutes = require('./routes/pricing');
 const billingRoutes = require('./routes/billing');
 const contactRoutes = require('./routes/contact');
 const reportsRoutes = require('./routes/reports');
+const driverRoutes = require('./routes/driver');
 const CronService = require('./services/CronService');
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
@@ -391,6 +392,7 @@ app.use('/api/teacher', teacherRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/license', licenseRoutes);
 app.use('/api/transportation', transportationRoutes);
+app.use('/api/driver', driverRoutes);
 app.use('/api/superadmin', packageRoutes);
 app.use('/api/messaging', messagingRoutes);
 app.use('/api/auth/enterprise', authEnterpriseRoutes);
@@ -1133,8 +1135,10 @@ syncDatabase()
         const { User } = require('./models');
         await User.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: parent.name, email: 'parent@school.com', password: await bcrypt.hash('password', 10), role: 'Parent', parentId: parent.id, schoolId: school.id } });
         await User.findOrCreate({ where: { email: 'super@admin.com' }, defaults: { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash('password', 10), role: 'SuperAdmin' } });
-        const [adminUser] = await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES'] } });
-        if (!adminUser.schoolId || !adminUser.permissions || adminUser.permissions.length === 0) { adminUser.schoolId = school.id; adminUser.schoolRole = 'مدير'; adminUser.permissions = ['VIEW_DASHBOARD','MANAGE_STUDENTS','MANAGE_TEACHERS','MANAGE_PARENTS','MANAGE_CLASSES','MANAGE_FINANCE','MANAGE_TRANSPORTATION','MANAGE_REPORTS','MANAGE_SETTINGS','MANAGE_MODULES']; await adminUser.save(); }
+        const { derivePermissionsForUser } = require('./utils/permissionMatrix');
+        const adminPermissions = derivePermissionsForUser({ role: 'SchoolAdmin', schoolRole: 'مدير' });
+        const [adminUser] = await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: adminPermissions } });
+        if (!adminUser.schoolId || !adminUser.permissions || adminUser.permissions.length === 0) { adminUser.schoolId = school.id; adminUser.schoolRole = 'مدير'; adminUser.permissions = adminPermissions; await adminUser.save(); }
         // Auto-migrate any plaintext passwords to bcrypt hashes (dev safety)
         const existingUsers = await User.findAll();
         for (const u of existingUsers) {

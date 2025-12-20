@@ -18,7 +18,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
   const { logout } = useAppContext();
   const location = useLocation();
 
-  const basePath = isSuperAdminView ? location.pathname.split('/').slice(0, 4).join('/') : '/school';
+  const basePath = isSuperAdminView ? location.pathname.split('/').slice(0, 4).join('/') : (location.pathname.startsWith('/staff') ? '/staff' : '/school');
 
   const allNavItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: DashboardIcon, requiredPermission: Permission.VIEW_DASHBOARD, path: `${basePath}/dashboard` },

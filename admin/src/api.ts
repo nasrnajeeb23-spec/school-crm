@@ -183,7 +183,7 @@ export const login = async (emailOrUsername: string, password: string, schoolId?
     const user = response?.user || {};
   const mapRole = (r: string) => {
       const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-      const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
+      const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', DRIVER: 'DRIVER', STAFF: 'STAFF' };
       return m[key] || key;
   };
     return { ...user, role: mapRole(user.role) } as User;
@@ -198,7 +198,7 @@ export const getCurrentUser = async (): Promise<User> => {
   if (user && user.role) {
       const mapRole = (r: string) => {
           const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-          const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
+          const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', DRIVER: 'DRIVER', STAFF: 'STAFF' };
           return m[key] || key;
       };
       user.role = mapRole(user.role);
@@ -939,6 +939,15 @@ export const submitParentRequest = async (parentId: string, data: any): Promise<
 
 export const getParentTransportationDetails = async (parentId: string): Promise<any> => {
     return await apiCall(`/transportation/parent/${parentId}`, { method: 'GET' });
+};
+
+export const getDriverMe = async (): Promise<any> => {
+    return await apiCall('/driver/me', { method: 'GET' });
+};
+
+export const getDriverRoutes = async (): Promise<any[]> => {
+    const raw = await apiCall('/driver/routes', { method: 'GET' });
+    return Array.isArray(raw) ? raw : [];
 };
 
 export const getParentActionItems = async (): Promise<ActionItem[]> => {

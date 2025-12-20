@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from './contexts/AppContext';
-import { User, UserRole } from './types';
+import { SchoolRole, User, UserRole } from './types';
 import ToastContainer from './components/ToastContainer';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -13,6 +13,7 @@ const SuperAdminLayout = React.lazy(() => import('./layouts/SuperAdminLayout'));
 const SchoolAdminLayout = React.lazy(() => import('./layouts/SchoolAdminLayout'));
 const TeacherLayout = React.lazy(() => import('./layouts/TeacherLayout'));
 const ParentLayout = React.lazy(() => import('./layouts/ParentLayout'));
+const DriverLayout = React.lazy(() => import('./layouts/DriverLayout'));
 
 // Super Admin Pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -81,11 +82,17 @@ const ParentSchedule = React.lazy(() => import('./pages/ParentSchedule'));
 const ParentRequests = React.lazy(() => import('./pages/ParentRequests'));
 const ParentTransportation = React.lazy(() => import('./pages/ParentTransportation'));
 const ParentAssignments = React.lazy(() => import('./pages/ParentAssignments'));
+const DriverDashboard = React.lazy(() => import('./pages/DriverDashboard'));
 
+const isDriverUser = (user: User | null) => {
+  if (!user) return false;
+  if (user.role === UserRole.Driver) return true;
+  return user.role === UserRole.Staff && String(user.schoolRole || '') === String(SchoolRole.Driver);
+};
 
-// Helper to determine the home route based on user role
-const getHomeRouteForUser = (role: UserRole) => {
-  switch (role) {
+const getHomeRouteForUser = (user: User) => {
+  if (isDriverUser(user)) return '/driver';
+  switch (user.role) {
     case UserRole.SuperAdmin:
     case UserRole.SuperAdminFinancial:
     case UserRole.SuperAdminTechnical:
@@ -109,8 +116,15 @@ const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }
         return <Navigate to="/login" replace />;
     }
 
+    if (isDriverUser(currentUser)) {
+        const path = window.location.pathname || '';
+        if (/^\/(school|staff)(\/|$)/.test(path)) {
+            return <Navigate to="/driver" replace />;
+        }
+    }
+
     if (currentUser.passwordMustChange) {
-        const profileRoute = `${getHomeRouteForUser(currentUser.role)}/profile`;
+        const profileRoute = `${getHomeRouteForUser(currentUser)}/profile`;
         if (window.location.pathname !== profileRoute) {
             return <Navigate to={profileRoute} replace />;
         }
@@ -126,9 +140,29 @@ const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }
     }
 
     if (!allowedRoles.includes(currentUser.role)) {
-        return <Navigate to={getHomeRouteForUser(currentUser.role)} replace />;
+        return <Navigate to={getHomeRouteForUser(currentUser)} replace />;
     }
 
+    return <Outlet />;
+};
+
+const ProtectedDriverRoute: React.FC = () => {
+    const { currentUser, hydrating } = useAppContext();
+    if (hydrating) {
+        return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الجلسة...</div>;
+    }
+    if (!currentUser) {
+        return <Navigate to="/login" replace />;
+    }
+    if (!isDriverUser(currentUser)) {
+        return <Navigate to={getHomeRouteForUser(currentUser)} replace />;
+    }
+    if (currentUser.passwordMustChange) {
+        const profileRoute = `${getHomeRouteForUser(currentUser)}/profile`;
+        if (window.location.pathname !== profileRoute) {
+            return <Navigate to={profileRoute} replace />;
+        }
+    }
     return <Outlet />;
 };
 
@@ -140,7 +174,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const path = location.pathname || '';
-    const protectedPath = /^\/(school|teacher|parent|superadmin)/.test(path);
+    const protectedPath = /^\/(school|staff|teacher|parent|superadmin|driver)/.test(path);
     if (currentUser && protectedPath) {
       try { localStorage.setItem('last_route', path); } catch {}
     }
@@ -210,6 +244,15 @@ const App: React.FC = () => {
             <Route path="/school/subscription-locked" element={<SubscriptionLocked />} />
             <Route path="/school/*" element={<SchoolAdminLayout />} />
             <Route path="/staff/*" element={<SchoolAdminLayout />} />
+          </Route>
+
+          {/* Driver Routes */}
+          <Route element={<ProtectedDriverRoute />}>
+            <Route path="/driver" element={<DriverLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<DriverDashboard />} />
+              <Route path="profile" element={<UserProfile />} />
+            </Route>
           </Route>
           
           {/* Teacher Routes */}

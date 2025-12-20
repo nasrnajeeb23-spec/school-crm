@@ -63,6 +63,21 @@ export enum SchoolRole {
 
 export enum Permission {
     VIEW_DASHBOARD = 'VIEW_DASHBOARD',
+    VIEW_STUDENTS = 'VIEW_STUDENTS',
+    VIEW_TEACHERS = 'VIEW_TEACHERS',
+    VIEW_PARENTS = 'VIEW_PARENTS',
+    VIEW_CLASSES = 'VIEW_CLASSES',
+    VIEW_ATTENDANCE = 'VIEW_ATTENDANCE',
+    VIEW_SCHEDULE = 'VIEW_SCHEDULE',
+    VIEW_CALENDAR = 'VIEW_CALENDAR',
+    VIEW_GRADES = 'VIEW_GRADES',
+    VIEW_MESSAGING = 'VIEW_MESSAGING',
+    VIEW_FINANCE = 'VIEW_FINANCE',
+    VIEW_REPORTS = 'VIEW_REPORTS',
+    VIEW_SETTINGS = 'VIEW_SETTINGS',
+    VIEW_STAFF = 'VIEW_STAFF',
+    VIEW_TRANSPORTATION = 'VIEW_TRANSPORTATION',
+    VIEW_MODULES = 'VIEW_MODULES',
     MANAGE_STUDENTS = 'MANAGE_STUDENTS',
     MANAGE_TEACHERS = 'MANAGE_TEACHERS',
     MANAGE_PARENTS = 'MANAGE_PARENTS',
@@ -358,13 +373,14 @@ export interface BehaviorRecord {
 export interface User {
   id: string;
   email: string;
-  password; // In a real app, this would be a hash, but for mock data it's fine.
+  password?: unknown;
   role: UserRole;
   schoolId?: number; // Optional, only for SchoolAdmins, Teachers, Parents
   teacherId?: string; // Optional, only for Teachers
   parentId?: string; // Optional, only for Parents
   name: string;
   schoolRole?: SchoolRole; // For staff members
+  permissions?: Permission[];
   phone?: string;
   username?: string;
   passwordMustChange?: boolean;
@@ -771,6 +787,7 @@ export interface BusOperator {
     busModel: string;
     status: BusOperatorStatus;
     schoolId: number;
+    userId?: number | null;
 }
 
 export interface NewBusOperatorApplication {

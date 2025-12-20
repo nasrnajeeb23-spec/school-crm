@@ -89,8 +89,8 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
       if (existingByEmail) {
         const sameSchool = Number(existingByEmail.schoolId || 0) === Number(op.schoolId || 0);
         const isDriver = String(existingByEmail.schoolRole || '') === 'سائق';
-        const isStaff = String(existingByEmail.role || '') === 'Staff';
-        if (!sameSchool || !isDriver || !isStaff) {
+        const isDriverRole = String(existingByEmail.role || '') === 'Driver' || String(existingByEmail.role || '') === 'Staff';
+        if (!sameSchool || !isDriver || !isDriverRole) {
           return res.status(409).json({ msg: 'Email already in use' });
         }
         user = existingByEmail;
@@ -108,7 +108,7 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
         email: emailRaw,
         username: usernameRaw,
         password: hashed,
-        role: 'Staff',
+        role: 'Driver',
         schoolId: op.schoolId,
         phone: op.phone || null,
         schoolRole: 'سائق',
@@ -123,8 +123,13 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
       }
       user.isActive = true;
       user.schoolRole = user.schoolRole || 'سائق';
+      if (String(user.role || '') !== 'Driver') user.role = 'Driver';
       await user.save();
     }
+    try {
+      op.userId = user ? user.id : null;
+      await op.save();
+    } catch {}
     const payload = { ...op.toJSON(), status: 'معتمد', driverAccountCreated: true, userId: user ? String(user.id) : null };
     res.json(payload);
   } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
@@ -146,9 +151,19 @@ router.get('/operator/:operatorId/invite-link', verifyToken, requireRole('SCHOOL
       null;
 
     if (!user) return res.status(404).json({ msg: 'Driver account not found' });
-    if (String(user.role || '') !== 'Staff' || String(user.schoolRole || '') !== 'سائق') return res.status(404).json({ msg: 'Driver account not found' });
+    if (String(user.schoolRole || '') !== 'سائق') return res.status(404).json({ msg: 'Driver account not found' });
+    if (String(user.role || '') !== 'Driver') {
+      user.role = 'Driver';
+      await user.save();
+    }
+    if (!op.userId) {
+      try {
+        op.userId = user.id;
+        await op.save();
+      } catch {}
+    }
 
-    const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Staff', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Driver', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const base = process.env.FRONTEND_URL || 'http://localhost:3000';
     const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
     return res.json({ activationLink });

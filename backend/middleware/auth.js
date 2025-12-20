@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { deriveDesiredDbRole, derivePermissionsForUser } = require('../utils/permissionMatrix');
 
 function ipv4(ip) {
   const m = String(ip || '').match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
@@ -63,6 +64,24 @@ async function verifyToken(req, res, next) {
     const tv = Number(u.tokenVersion || 0);
     const ptv = Number(payload.tokenVersion || 0);
     if (tv !== ptv) return res.status(401).json({ msg: 'Token revoked' });
+    const effectiveRole = deriveDesiredDbRole({ role: u.role, schoolRole: u.schoolRole });
+    const effectivePermissions = derivePermissionsForUser({ role: effectiveRole, schoolRole: u.schoolRole });
+    try {
+      req.user = {
+        ...req.user,
+        id: u.id,
+        role: effectiveRole,
+        schoolRole: u.schoolRole || null,
+        schoolId: u.schoolId || null,
+        teacherId: u.teacherId || null,
+        parentId: u.parentId || null,
+        name: u.name,
+        email: u.email,
+        username: u.username,
+        permissions: effectivePermissions,
+        tokenVersion: u.tokenVersion || 0
+      };
+    } catch {}
     // Enforce central security policies for SuperAdmin
     const policies = (req.app && req.app.locals && req.app.locals.securityPolicies) || null;
   const roleKey = String(u.role || '').toUpperCase().replace(/[^A-Z]/g, '');
@@ -109,12 +128,14 @@ function requireRole(...allowedRoles) {
         SCHOOLADMIN: 'SCHOOL_ADMIN',
         TEACHER: 'TEACHER',
         PARENT: 'PARENT',
+        DRIVER: 'DRIVER',
         STAFF: 'STAFF'
       };
       return map[key] || String(role).toUpperCase();
     };
 
-    const userRole = normalizeRole(req.user.role);
+    let userRole = normalizeRole(req.user.role);
+    if (userRole === 'STAFF' && String(req.user.schoolRole || '') === 'سائق') userRole = 'DRIVER';
     const allowedRolesUpper = allowedRoles.map(role => normalizeRole(role));
 
     if (!allowedRolesUpper.includes(userRole)) {
@@ -174,12 +195,14 @@ function requirePermission(...requiredPerms) {
         SCHOOLADMIN: 'SCHOOL_ADMIN',
         TEACHER: 'TEACHER',
         PARENT: 'PARENT',
+        DRIVER: 'DRIVER',
         STAFF: 'STAFF'
       };
       return map[key] || String(role).toUpperCase();
     };
 
-    const userRole = normalizeRole(req.user.role);
+    let userRole = normalizeRole(req.user.role);
+    if (userRole === 'STAFF' && String(req.user.schoolRole || '') === 'سائق') userRole = 'DRIVER';
     const superAdminRoles = ['SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'];
     if (superAdminRoles.includes(userRole)) return next();
 
