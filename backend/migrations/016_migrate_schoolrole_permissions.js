@@ -41,11 +41,11 @@ module.exports = {
           const b = [...desiredPermissions].slice().sort();
           const samePermissions = JSON.stringify(a) === JSON.stringify(b);
 
-          if (user.role !== desiredRole || !samePermissions) {
-            await user.update(
-              { role: desiredRole, permissions: desiredPermissions },
-              { transaction }
-            );
+          const updates = {};
+          if (!samePermissions) updates.permissions = desiredPermissions;
+          if (user.role !== desiredRole && desiredRole !== 'Driver') updates.role = desiredRole;
+          if (Object.keys(updates).length > 0) {
+            await user.update(updates, { transaction });
           }
         }
       }
@@ -57,4 +57,3 @@ module.exports = {
     }
   }
 };
-
