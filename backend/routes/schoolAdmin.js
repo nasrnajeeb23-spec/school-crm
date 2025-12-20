@@ -3601,7 +3601,18 @@ router.post('/:schoolId/teachers/attendance', verifyToken, requireSameSchoolPara
 router.get('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = parseInt(req.params.schoolId);
-    const staff = await User.findAll({ where: { schoolId, role: 'Staff' }, attributes: { exclude: ['password'] }, order: [['name', 'ASC']] });
+    const staff = await User.findAll({
+      where: {
+        schoolId,
+        role: 'Staff',
+        [Op.or]: [
+          { schoolRole: { [Op.ne]: 'سائق' } },
+          { schoolRole: null }
+        ]
+      },
+      attributes: { exclude: ['password'] },
+      order: [['name', 'ASC']]
+    });
     res.json(staff);
   } catch (err) {
     console.error(err.message);
@@ -3620,6 +3631,10 @@ router.post('/:schoolId/staff', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_
   try {
     const schoolId = parseInt(req.params.schoolId);
     const { name, email, role, phone, department, bankAccount } = req.body;
+
+    if (String(role || '') === 'سائق') {
+      return res.status(400).json({ msg: 'Drivers are managed in transportation module' });
+    }
 
     // Check if user exists
     let user = await User.findOne({ where: { email } });

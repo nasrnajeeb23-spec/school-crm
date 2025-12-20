@@ -763,6 +763,7 @@ export interface Driver {
 export interface BusOperator {
     id: string;
     name: string;
+    email?: string | null;
     phone: string;
     licenseNumber: string;
     busPlateNumber: string;
@@ -774,6 +775,7 @@ export interface BusOperator {
 
 export interface NewBusOperatorApplication {
     name: string;
+    email: string;
     phone: string;
     licenseNumber: string;
     busPlateNumber: string;

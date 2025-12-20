@@ -230,7 +230,7 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
             <div className="flex gap-3 min-w-max items-center">
               <button onClick={() => setRoleFilter('all')} className={`px-3 py-1 rounded-md text-sm ${roleFilter === 'all' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>الكل ({staff.length})</button>
-              {Object.values(SchoolRole).map(r => (
+              {Object.values(SchoolRole).filter(r => r !== SchoolRole.Driver).map(r => (
                 <button key={r} onClick={() => setRoleFilter(r as SchoolRole)} className={`px-3 py-1 rounded-md text-sm ${roleFilter === r ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>
                   {r} ({roleSummary.find(s => s.role === r)?.count || 0})
                 </button>

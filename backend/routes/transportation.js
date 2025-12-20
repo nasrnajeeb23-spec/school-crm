@@ -1,16 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const { BusOperator, Route, RouteStudent, Student, School, User } = require('../models');
-const { verifyToken, requireRole, requireSameSchoolParam } = require('../middleware/auth');
+const { verifyToken, requireRole, requireSameSchoolParam, JWT_SECRET } = require('../middleware/auth');
 const { requireModule } = require('../middleware/modules');
 const { validate } = require('../middleware/validate');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // --- Operators ---
 // Public application endpoint for bus operators (drivers)
 // Allows a driver to submit an application to a specific school without authentication
 router.post('/operator/application', validate([
   { name: 'name', required: true, type: 'string' },
+  { name: 'email', required: true, type: 'string' },
   { name: 'phone', required: true, type: 'string' },
   { name: 'licenseNumber', required: true, type: 'string' },
   { name: 'busPlateNumber', required: true, type: 'string' },
@@ -30,6 +32,7 @@ router.post('/operator/application', validate([
     const op = await BusOperator.create({
       id: `op_${Date.now()}`,
       name: req.body.name,
+      email: String(req.body.email || '').trim() || null,
       phone: req.body.phone,
       licenseNumber: req.body.licenseNumber,
       busPlateNumber: req.body.busPlateNumber,
@@ -55,6 +58,7 @@ router.get('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
 
 router.post('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), validate([
   { name: 'name', required: true, type: 'string' },
+  { name: 'email', required: true, type: 'string' },
   { name: 'phone', required: true, type: 'string' },
   { name: 'licenseNumber', required: true, type: 'string' },
   { name: 'busPlateNumber', required: true, type: 'string' },
@@ -76,10 +80,26 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
     op.status = 'Approved';
     await op.save();
     let user = null;
-    const usernameRaw = String(op.phone || '').trim() || `driver_${op.id}`;
-    const emailRaw = `driver+${String(op.id)}@drivers.local`;
-    user = await User.findOne({ where: { schoolId: op.schoolId, username: usernameRaw } });
-    if (!user) user = await User.findOne({ where: { email: emailRaw } });
+    const providedEmail = String(op.email || '').trim();
+    const usernameRaw = providedEmail || String(op.phone || '').trim() || `driver_${op.id}`;
+    const emailRaw = providedEmail || `driver+${String(op.id)}@drivers.local`;
+
+    if (providedEmail) {
+      const existingByEmail = await User.findOne({ where: { email: providedEmail } });
+      if (existingByEmail) {
+        const sameSchool = Number(existingByEmail.schoolId || 0) === Number(op.schoolId || 0);
+        const isDriver = String(existingByEmail.schoolRole || '') === 'سائق';
+        const isStaff = String(existingByEmail.role || '') === 'Staff';
+        if (!sameSchool || !isDriver || !isStaff) {
+          return res.status(409).json({ msg: 'Email already in use' });
+        }
+        user = existingByEmail;
+      }
+    }
+
+    if (!user) user = await User.findOne({ where: { schoolId: op.schoolId, username: usernameRaw } });
+    if (!user && op.phone) user = await User.findOne({ where: { schoolId: op.schoolId, phone: op.phone } });
+    if (!user && !providedEmail) user = await User.findOne({ where: { email: emailRaw } });
     if (!user) {
       const placeholder = Math.random().toString(36).slice(-12) + 'Aa!1';
       const hashed = await bcrypt.hash(placeholder, 10);
@@ -97,6 +117,10 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
         tokenVersion: 0
       });
     } else {
+      if (providedEmail && String(user.email || '') !== providedEmail) {
+        user.email = providedEmail;
+        if (!user.username) user.username = usernameRaw;
+      }
       user.isActive = true;
       user.schoolRole = user.schoolRole || 'سائق';
       await user.save();
@@ -104,6 +128,33 @@ router.put('/operator/:operatorId/approve', verifyToken, requireRole('SCHOOL_ADM
     const payload = { ...op.toJSON(), status: 'معتمد', driverAccountCreated: true, userId: user ? String(user.id) : null };
     res.json(payload);
   } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
+});
+
+router.get('/operator/:operatorId/invite-link', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
+  try {
+    const op = await BusOperator.findByPk(req.params.operatorId);
+    if (!op) return res.status(404).json({ msg: 'Operator not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+    if (String(op.status || '') !== 'Approved') return res.status(400).json({ msg: 'Operator not approved' });
+
+    const providedEmail = String(op.email || '').trim();
+    const usernameRaw = providedEmail || String(op.phone || '').trim() || `driver_${op.id}`;
+    let user =
+      (providedEmail ? await User.findOne({ where: { email: providedEmail } }).catch(() => null) : null) ||
+      (await User.findOne({ where: { schoolId: op.schoolId, username: usernameRaw } }).catch(() => null)) ||
+      (op.phone ? await User.findOne({ where: { schoolId: op.schoolId, phone: op.phone } }).catch(() => null) : null) ||
+      null;
+
+    if (!user) return res.status(404).json({ msg: 'Driver account not found' });
+    if (String(user.role || '') !== 'Staff' || String(user.schoolRole || '') !== 'سائق') return res.status(404).json({ msg: 'Driver account not found' });
+
+    const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Staff', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
+    const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const activationLink = `${base.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(inviteToken)}`;
+    return res.json({ activationLink });
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error', error: e?.message });
+  }
 });
 
 router.put('/operator/:operatorId/reject', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {

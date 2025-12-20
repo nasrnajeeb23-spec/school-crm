@@ -23,6 +23,23 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
     const [routes, setRoutes] = useState<Route[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAddRouteModalOpen, setIsAddRouteModalOpen] = useState(false);
+    const [isAddDriverOpen, setIsAddDriverOpen] = useState(false);
+    const [savingDriver, setSavingDriver] = useState(false);
+    const [driverForm, setDriverForm] = useState<{ name: string; email: string; phone: string; licenseNumber: string; busPlateNumber: string; busCapacity: number; busModel: string }>({
+        name: '',
+        email: '',
+        phone: '',
+        licenseNumber: '',
+        busPlateNumber: '',
+        busCapacity: 20,
+        busModel: '',
+    });
+    const [selectedOperator, setSelectedOperator] = useState<BusOperator | null>(null);
+    const [inviteLink, setInviteLink] = useState<string>('');
+    const [showManualShare, setShowManualShare] = useState(false);
+    const [manualLink, setManualLink] = useState<string>('');
+    const [creatingInvite, setCreatingInvite] = useState(false);
+    const [sharingInvite, setSharingInvite] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [editingConfigRoute, setEditingConfigRoute] = useState<Route | null>(null);
   const [stopsDraft, setStopsDraft] = useState<{ name: string; time?: string; lat?: number; lng?: number }[]>([]);
@@ -164,8 +181,63 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
         }
     };
 
+    const openDriverDetails = (op: BusOperator) => {
+        setSelectedOperator(op);
+        setInviteLink('');
+    };
+
+    const generateInviteLink = async () => {
+        if (!selectedOperator) return;
+        try {
+            setCreatingInvite(true);
+            const res = await api.getBusOperatorInviteLink(selectedOperator.id);
+            setInviteLink(res.activationLink);
+            addToast('تم إنشاء الرابط.', 'success');
+        } catch {
+            addToast('فشل إنشاء الرابط.', 'error');
+        } finally {
+            setCreatingInvite(false);
+        }
+    };
+
+    const openManualShare = async () => {
+        if (!selectedOperator) return;
+        try {
+            let link = inviteLink || '';
+            if (!link) {
+                setCreatingInvite(true);
+                const res = await api.getBusOperatorInviteLink(selectedOperator.id);
+                link = res.activationLink || '';
+                setInviteLink(link);
+            }
+            setManualLink(link);
+            setShowManualShare(true);
+        } catch {
+            addToast('فشل إنشاء الرابط.', 'error');
+        } finally {
+            setCreatingInvite(false);
+        }
+    };
+
+    const saveDriver = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            setSavingDriver(true);
+            await api.createBusOperator(schoolId, driverForm);
+            addToast('تم إنشاء السائق بنجاح!', 'success');
+            setIsAddDriverOpen(false);
+            setDriverForm({ name: '', email: '', phone: '', licenseNumber: '', busPlateNumber: '', busCapacity: 20, busModel: '' });
+            fetchData();
+        } catch (error: any) {
+            addToast(error?.message || 'فشل إنشاء السائق.', 'error');
+        } finally {
+            setSavingDriver(false);
+        }
+    };
+
     const pendingOperators = operators.filter(op => op.status === BusOperatorStatus.Pending);
     const approvedOperators = operators.filter(op => op.status === BusOperatorStatus.Approved);
+    const selectedOperatorRoutes = selectedOperator ? routes.filter(r => r.busOperatorId === selectedOperator.id) : [];
 
     const renderContent = () => {
         if (loading) {
@@ -196,6 +268,7 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
                 return (
                      <div>
                         <div className="flex justify-end mb-4 gap-3">
+                             <button onClick={() => setIsAddDriverOpen(true)} className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إنشاء سائق</button>
                              <button onClick={() => setIsAddRouteModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إنشاء مسار</button>
                              <button onClick={() => setIsAutoAssignOpen(true)} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"><BusIcon className="h-5 w-5 ml-2" />توزيع تلقائي</button>
                         </div>
@@ -207,7 +280,11 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
                                         <div key={op.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-green-200 dark:border-green-700">
                                             <p className="font-bold">{op.name}</p>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">{op.busPlateNumber} ({op.busModel})</p>
+                                            {op.email && <p className="text-xs text-gray-500 dark:text-gray-500" dir="ltr">{op.email}</p>}
                                             <p className="text-xs text-gray-500 dark:text-gray-500" dir="ltr">{op.phone}</p>
+                                            <div className="mt-3 flex justify-end gap-3">
+                                              <button onClick={() => openDriverDetails(op)} className="text-sm font-medium text-teal-600 hover:underline">التفاصيل</button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -388,6 +465,187 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
                     )}
                   </div>
                 </div>
+            )}
+            {isAddDriverOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" onClick={() => setIsAddDriverOpen(false)}>
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl p-6 m-4" onClick={e => e.stopPropagation()}>
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">إنشاء سائق</h2>
+                    <form onSubmit={saveDriver} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">الاسم</label>
+                          <input value={driverForm.name} onChange={e => setDriverForm(p => ({ ...p, name: e.target.value }))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</label>
+                          <input type="email" value={driverForm.email} onChange={e => setDriverForm(p => ({ ...p, email: e.target.value }))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الهاتف</label>
+                          <input value={driverForm.phone} onChange={e => setDriverForm(p => ({ ...p, phone: e.target.value }))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الرخصة</label>
+                          <input value={driverForm.licenseNumber} onChange={e => setDriverForm(p => ({ ...p, licenseNumber: e.target.value }))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم اللوحة</label>
+                          <input value={driverForm.busPlateNumber} onChange={e => setDriverForm(p => ({ ...p, busPlateNumber: e.target.value }))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">الموديل</label>
+                          <input value={driverForm.busModel} onChange={e => setDriverForm(p => ({ ...p, busModel: e.target.value }))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">السعة</label>
+                          <input type="number" min={1} value={driverForm.busCapacity} onChange={e => setDriverForm(p => ({ ...p, busCapacity: Number(e.target.value || 0) }))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-4 pt-4">
+                        <button type="button" onClick={() => setIsAddDriverOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">إلغاء</button>
+                        <button type="submit" disabled={savingDriver} aria-disabled={savingDriver} className={`px-4 py-2 ${savingDriver ? 'bg-teal-400' : 'bg-teal-600 hover:bg-teal-700'} text-white rounded-lg`}>{savingDriver ? 'جاري الحفظ...' : 'حفظ'}</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+            )}
+            {selectedOperator && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-start pt-16" onClick={() => setSelectedOperator(null)}>
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-3xl p-6 m-4 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-2xl font-bold text-gray-800 dark:text-white">تفاصيل السائق</h2>
+                      <button type="button" onClick={() => setSelectedOperator(null)} className="px-3 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">إغلاق</button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <p><span className="font-semibold">الاسم:</span> {selectedOperator.name}</p>
+                        <p><span className="font-semibold">البريد:</span> <span dir="ltr">{selectedOperator.email || '-'}</span></p>
+                        <p><span className="font-semibold">الهاتف:</span> <span dir="ltr">{selectedOperator.phone}</span></p>
+                        <p><span className="font-semibold">الرخصة:</span> {selectedOperator.licenseNumber}</p>
+                      </div>
+                      <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <p><span className="font-semibold">الحافلة:</span> {selectedOperator.busPlateNumber} ({selectedOperator.busModel})</p>
+                        <p><span className="font-semibold">السعة:</span> {selectedOperator.busCapacity}</p>
+                        <p><span className="font-semibold">عدد المسارات:</span> {selectedOperatorRoutes.length}</p>
+                        <p><span className="font-semibold">إجمالي الطلاب:</span> {selectedOperatorRoutes.reduce((acc, r) => acc + (r.studentIds?.length || 0), 0)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-5">
+                      <h3 className="font-semibold mb-2">تقرير المسارات</h3>
+                      {selectedOperatorRoutes.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">لا توجد مسارات مرتبطة بهذا السائق.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                            <thead className="bg-gray-50 dark:bg-gray-700">
+                              <tr>
+                                <th className="px-4 py-2 text-right">المسار</th>
+                                <th className="px-4 py-2 text-right">وقت الانطلاق</th>
+                                <th className="px-4 py-2 text-right">الطلاب</th>
+                                <th className="px-4 py-2 text-right">السعة</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                              {selectedOperatorRoutes.map(r => (
+                                <tr key={r.id}>
+                                  <td className="px-4 py-2">{r.name}</td>
+                                  <td className="px-4 py-2">{r.departureTime || '-'}</td>
+                                  <td className="px-4 py-2">{r.studentIds?.length || 0}</td>
+                                  <td className="px-4 py-2">{selectedOperator.busCapacity}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-6 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <h3 className="font-semibold mb-2">رابط التفعيل</h3>
+                      {inviteLink ? (
+                        <a href={inviteLink} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all underline">{inviteLink}</a>
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">لم يتم إنشاء رابط بعد.</p>
+                      )}
+                      <div className="flex flex-wrap gap-3 justify-end mt-3">
+                        <button onClick={generateInviteLink} disabled={creatingInvite} aria-disabled={creatingInvite} className={`px-3 py-2 ${creatingInvite ? 'bg-gray-400' : 'bg-red-600 hover:bg-red-700'} text-white rounded-md`}>
+                          {creatingInvite ? 'جاري الإنشاء...' : 'إنشاء رابط'}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!inviteLink) return;
+                            try { await navigator.clipboard.writeText(inviteLink); addToast('تم نسخ الرابط.', 'success'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+                          }}
+                          disabled={!inviteLink}
+                          aria-disabled={!inviteLink}
+                          className={`px-3 py-2 ${inviteLink ? 'bg-teal-600 hover:bg-teal-700' : 'bg-gray-300'} text-white rounded-md`}
+                        >نسخ الرابط</button>
+                        <button
+                          onClick={async () => {
+                            if (!inviteLink) return;
+                            try {
+                              setSharingInvite(true);
+                              const anyNav = navigator as any;
+                              if (anyNav.share) {
+                                await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: inviteLink });
+                                addToast('تمت المشاركة بنجاح.', 'success');
+                              } else {
+                                await navigator.clipboard.writeText(inviteLink);
+                                addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
+                              }
+                            } catch {
+                              try { await navigator.clipboard.writeText(inviteLink); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+                            } finally {
+                              setSharingInvite(false);
+                            }
+                          }}
+                          disabled={!inviteLink || sharingInvite}
+                          aria-disabled={!inviteLink || sharingInvite}
+                          className={`px-3 py-2 ${(!inviteLink || sharingInvite) ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+                        >{sharingInvite ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
+                        <button onClick={openManualShare} disabled={creatingInvite} aria-disabled={creatingInvite} className="px-3 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900">عرض للمشاركة اليدوية</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            )}
+            {showManualShare && (
+              <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50" onClick={() => setShowManualShare(false)}>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[90%] max-w-lg text-right" onClick={e => e.stopPropagation()}>
+                  <h3 className="text-lg font-semibold mb-3">رابط التفعيل للمشاركة اليدوية</h3>
+                  <a href={manualLink} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 underline">{manualLink}</a>
+                  <div className="flex gap-3 mt-4 justify-end">
+                    <button
+                      onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); } }}
+                      className="px-3 py-2 bg-teal-600 text-white rounded-md"
+                    >نسخ الرابط</button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          setSharingInvite(true);
+                          const anyNav = navigator as any;
+                          if (anyNav.share) {
+                            await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
+                            addToast('تمت المشاركة بنجاح.', 'success');
+                          } else {
+                            await navigator.clipboard.writeText(manualLink);
+                            addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
+                          }
+                        } catch {
+                          try { await navigator.clipboard.writeText(manualLink); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+                        } finally {
+                          setSharingInvite(false);
+                        }
+                      }}
+                      disabled={sharingInvite}
+                      aria-disabled={sharingInvite}
+                      className={`px-3 py-2 ${sharingInvite ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+                    >{sharingInvite ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
+                    <button onClick={() => setShowManualShare(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
+                  </div>
+                </div>
+              </div>
             )}
         </>
     );

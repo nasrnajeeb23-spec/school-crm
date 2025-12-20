@@ -10,6 +10,7 @@ interface BusOperatorApplicationModalProps {
 const BusOperatorApplicationModal: React.FC<BusOperatorApplicationModalProps> = ({ onClose, onSave }) => {
     const [formData, setFormData] = useState<Omit<NewBusOperatorApplication, 'schoolId'> & { schoolId: string }>({
         name: '',
+        email: '',
         phone: '',
         licenseNumber: '',
         busPlateNumber: '',
@@ -39,6 +40,7 @@ const BusOperatorApplicationModal: React.FC<BusOperatorApplicationModalProps> = 
     const validate = (): boolean => {
         const newErrors: any = {};
         if (!formData.name.trim()) newErrors.name = "الاسم مطلوب.";
+        if (!String(formData.email || '').trim()) newErrors.email = "البريد الإلكتروني مطلوب.";
         if (!formData.phone.trim()) newErrors.phone = "رقم الهاتف مطلوب.";
         if (!formData.busPlateNumber.trim()) newErrors.busPlateNumber = "رقم اللوحة مطلوب.";
         if (!formData.schoolId) newErrors.schoolId = "يجب اختيار المدرسة.";
@@ -67,6 +69,11 @@ const BusOperatorApplicationModal: React.FC<BusOperatorApplicationModalProps> = 
                             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الاسم الكامل</label>
                             <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} required className={inputStyle} />
                             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                        </div>
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</label>
+                            <input type="email" name="email" id="email" value={formData.email} onChange={handleChange} required className={inputStyle} />
+                            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                         </div>
                         <div>
                             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الهاتف</label>

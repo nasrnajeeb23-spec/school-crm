@@ -1021,6 +1021,14 @@ export const rejectBusOperator = async (operatorId: string): Promise<void> => {
     await apiCall(`/transportation/operator/${operatorId}/reject`, { method: 'PUT' });
 };
 
+export const createBusOperator = async (schoolId: number, data: { name: string; email: string; phone: string; licenseNumber: string; busPlateNumber: string; busCapacity: number; busModel: string; }): Promise<BusOperator> => {
+    return await apiCall(`/transportation/${schoolId}/operators`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getBusOperatorInviteLink = async (operatorId: string): Promise<{ activationLink: string }> => {
+    return await apiCall(`/transportation/operator/${operatorId}/invite-link`, { method: 'GET' });
+};
+
 // ==================== Super Admin: Security Policies ====================
 export const getSecurityPolicies = async (): Promise<{ enforceMfaForAdmins: boolean; passwordMinLength: number; lockoutThreshold: number; allowedIpRanges: string[]; sessionMaxAgeHours: number; }> => {
     return await apiCall('/superadmin/security/policies', { method: 'GET' });

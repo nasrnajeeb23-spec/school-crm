@@ -4,6 +4,7 @@ const sequelize = require('../config/db');
 const BusOperator = sequelize.define('BusOperator', {
   id: { type: DataTypes.STRING, primaryKey: true },
   name: { type: DataTypes.STRING, allowNull: false },
+  email: { type: DataTypes.STRING, allowNull: true },
   phone: { type: DataTypes.STRING, allowNull: false },
   licenseNumber: { type: DataTypes.STRING, allowNull: false },
   busPlateNumber: { type: DataTypes.STRING, allowNull: false },
