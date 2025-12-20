@@ -212,6 +212,96 @@ router.put('/operator/:operatorId/reject', verifyToken, requireRole('SCHOOL_ADMI
   } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
 });
 
+router.get('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
+  try {
+    const op = await BusOperator.findByPk(req.params.operatorId);
+    if (!op) return res.status(404).json({ msg: 'Operator not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+    const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
+    return res.json({ ...op.toJSON(), status: statusMap[op.status] || op.status });
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error', error: e?.message });
+  }
+});
+
+router.put('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
+  try {
+    const op = await BusOperator.findByPk(req.params.operatorId);
+    if (!op) return res.status(404).json({ msg: 'Operator not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+
+    const fields = ['name', 'email', 'phone', 'licenseNumber', 'busPlateNumber', 'busModel', 'busCapacity'];
+    let changed = false;
+    for (const f of fields) {
+      if (req.body && Object.prototype.hasOwnProperty.call(req.body, f)) {
+        const val = req.body[f];
+        if (f === 'busCapacity') {
+          const n = Number(val);
+          if (!Number.isNaN(n) && n > 0) {
+            op.busCapacity = n;
+            changed = true;
+          }
+        } else if (f === 'email') {
+          op.email = typeof val === 'string' ? String(val).trim() || null : (val === null ? null : op.email);
+          changed = true;
+        } else if (typeof val === 'string') {
+          op[f] = String(val).trim();
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) return res.status(400).json({ msg: 'No changes provided' });
+
+    await op.save();
+
+    if (op.userId) {
+      try {
+        const user = await User.findByPk(op.userId);
+        if (user) {
+          if (op.name) user.name = op.name;
+          if (op.phone) user.phone = op.phone;
+          if (typeof op.email === 'string' && op.email.trim()) {
+            const emailLower = op.email.trim().toLowerCase();
+            const existing = await User.findOne({ where: { email: emailLower } });
+            if (existing && Number(existing.id) !== Number(user.id)) return res.status(409).json({ msg: 'Email already in use' });
+            user.email = emailLower;
+          }
+          await user.save();
+        }
+      } catch {}
+    }
+
+    const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
+    return res.json({ ...op.toJSON(), status: statusMap[op.status] || op.status });
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error', error: e?.message });
+  }
+});
+
+router.delete('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireModule('transportation'), async (req, res) => {
+  try {
+    const op = await BusOperator.findByPk(req.params.operatorId);
+    if (!op) return res.status(404).json({ msg: 'Operator not found' });
+    if (req.user.role !== 'SUPER_ADMIN' && Number(op.schoolId || 0) !== Number(req.user.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+
+    try {
+      await Route.update({ busOperatorId: null }, { where: { schoolId: op.schoolId, busOperatorId: op.id } });
+    } catch {}
+
+    if (op.userId) {
+      try {
+        await User.update({ isActive: false }, { where: { id: op.userId } });
+      } catch {}
+    }
+
+    await op.destroy();
+    return res.json({ deleted: true });
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error', error: e?.message });
+  }
+});
+
 // --- Routes ---
 router.get('/:schoolId/routes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), async (req, res) => {
   try {

@@ -36,6 +36,8 @@ const StaffManagement = React.lazy(() => import('../pages/StaffManagement'));
 const TeachersAttendance = React.lazy(() => import('../pages/TeachersAttendance'));
 const StaffAttendance = React.lazy(() => import('../pages/StaffAttendance'));
 const Transportation = React.lazy(() => import('../pages/Transportation'));
+const DriversList = React.lazy(() => import('../pages/DriversList'));
+const DriverProfile = React.lazy(() => import('../pages/DriverProfile'));
 const ModulesPage = React.lazy(() => import('../pages/ModulesPage'));
 const SchoolParentRequests = React.lazy(() => import('../pages/SchoolParentRequests'));
 const BackgroundJobs = React.lazy(() => import('../pages/BackgroundJobs'));
@@ -49,6 +51,7 @@ const viewTitles: { [key: string]: string } = {
     staff: 'إدارة الموظفين', classes: 'إدارة الفصول', transportation: 'النقل المدرسي', attendance: 'الحضور والغياب',
     schedule: 'الجدول الدراسي', calendar: 'التقويم والأحداث', grades: 'إدارة الدرجات', messaging: 'الرسائل',
     finance: 'المالية والرسوم', reports: 'التقارير', settings: 'الإعدادات', profile: 'ملفي الشخصي', modules: 'الوحدات',
+    drivers: 'إدارة السائقين',
 };
 
 
@@ -179,6 +182,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
     if (parentView === 'students' && currentView !== 'students') return 'ملف الطالب';
     if (parentView === 'teachers' && currentView !== 'teachers') return 'ملف المعلم';
     if (parentView === 'parents' && currentView !== 'parents') return 'إدارة ولي الأمر';
+    if (parentView === 'drivers' && currentView !== 'drivers') return 'إدارة السائق';
     return viewTitles[currentView] || 'لوحة التحكم';
   };
 
@@ -238,6 +242,8 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="staff/attendance" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffAttendance schoolId={school.id} /></ProtectedPage>} />
                     <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} /></ProtectedPage>} />
                     <Route path="transportation" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><Transportation schoolId={school.id} /></ProtectedPage>} />
+                    <Route path="transportation/drivers" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriversList schoolId={school.id} detailsPathPrefix="" /></ProtectedPage>} />
+                    <Route path="transportation/drivers/:operatorId" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriverProfile schoolId={school.id} /></ProtectedPage>} />
                     <Route path="attendance" element={<ProtectedPage permission={Permission.MANAGE_ATTENDANCE}><Attendance schoolId={school.id} /></ProtectedPage>} />
                     <Route path="schedule" element={<ProtectedPage permission={Permission.MANAGE_SCHEDULE}><Schedule schoolId={school.id} /></ProtectedPage>} />
                     <Route path="calendar" element={<ProtectedPage permission={Permission.MANAGE_CALENDAR}><Calendar schoolId={school.id} /></ProtectedPage>} />

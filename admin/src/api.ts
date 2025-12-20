@@ -1095,6 +1095,18 @@ export const getBusOperatorInviteLink = async (operatorId: string): Promise<{ ac
     return await apiCall(`/transportation/operator/${operatorId}/invite-link`, { method: 'GET' });
 };
 
+export const getBusOperatorById = async (operatorId: string): Promise<BusOperator> => {
+    return await apiCall(`/transportation/operator/${operatorId}`, { method: 'GET' });
+};
+
+export const updateBusOperator = async (operatorId: string, data: Partial<{ name: string; email: string | null; phone: string; licenseNumber: string; busPlateNumber: string; busCapacity: number; busModel: string; }>): Promise<BusOperator> => {
+    return await apiCall(`/transportation/operator/${operatorId}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
+export const deleteBusOperator = async (operatorId: string): Promise<{ deleted: boolean }> => {
+    return await apiCall(`/transportation/operator/${operatorId}`, { method: 'DELETE' });
+};
+
 // ==================== Super Admin: Security Policies ====================
 export const getSecurityPolicies = async (): Promise<{ enforceMfaForAdmins: boolean; passwordMinLength: number; lockoutThreshold: number; allowedIpRanges: string[]; sessionMaxAgeHours: number; }> => {
     return await apiCall('/superadmin/security/policies', { method: 'GET' });

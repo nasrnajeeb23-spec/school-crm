@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 declare const L: any;
+import { useLocation } from 'react-router-dom';
 import { BusOperator, BusOperatorStatus, Route } from '../types';
 import * as api from '../api';
 import { PlusIcon, BusIcon, UsersIcon, EditIcon, CheckIcon, CanceledIcon } from '../components/icons';
 import { useToast } from '../contexts/ToastContext';
 import AddRouteModal from '../components/AddRouteModal';
 import EditRouteStudentsModal from '../components/EditRouteStudentsModal';
+import DriversList from './DriversList';
 
 interface TransportationProps {
   schoolId: number;
@@ -19,6 +21,7 @@ const statusColors: { [key in BusOperatorStatus]: string } = {
 
 const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
     const [activeTab, setActiveTab] = useState('pending');
+    const location = useLocation();
     const [operators, setOperators] = useState<BusOperator[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [loading, setLoading] = useState(true);
@@ -100,6 +103,11 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    useEffect(() => {
+        const tab = (location.state as any)?.tab;
+        if (tab) setActiveTab(String(tab));
+    }, [location.state]);
 
     const handleApprove = async (operatorId: string) => {
         try {
@@ -311,6 +319,10 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
                         </div>
                     </div>
                 );
+            case 'drivers':
+                return (
+                    <DriversList schoolId={schoolId} withContainer={false} detailsPathPrefix="drivers/" />
+                );
             default: return null;
         }
     };
@@ -318,6 +330,7 @@ const Transportation: React.FC<TransportationProps> = ({ schoolId }) => {
     const tabs = [
         { id: 'pending', label: 'طلبات الانضمام', icon: UsersIcon },
         { id: 'fleet', label: 'أسطول النقل والمسارات', icon: BusIcon },
+        { id: 'drivers', label: 'إدارة السائقين', icon: UsersIcon },
     ];
 
     return (
