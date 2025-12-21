@@ -19,6 +19,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
     const [salaryStructures, setSalaryStructures] = useState<SalaryStructurePayload[]>([]);
     const [staff, setStaff] = useState<User[]>([]);
     const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [drivers, setDrivers] = useState<User[]>([]);
     const [salarySlips, setSalarySlips] = useState<any[]>([]);
     const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
     
@@ -28,7 +29,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
     const [editForm, setEditForm] = useState<SalaryStructurePayload | null>(null);
     const [detailSlip, setDetailSlip] = useState<any | null>(null);
     const slipPrintRef = useRef<HTMLDivElement>(null);
-    const handleSlipPrint = useReactToPrint({ content: () => slipPrintRef.current, documentTitle: detailSlip ? `SL-${schoolId}-${detailSlip.month}-${detailSlip.personType}-${detailSlip.personId}` : 'SalarySlip' });
+    const handleSlipPrint = useReactToPrint({ contentRef: slipPrintRef, documentTitle: detailSlip ? `SL-${schoolId}-${detailSlip.month}-${detailSlip.personType}-${detailSlip.personId}` : 'SalarySlip' });
     const [slipsStatusFilter, setSlipsStatusFilter] = useState<'all' | 'Draft' | 'Approved' | 'Paid'>('all');
     const [slipsSearch, setSlipsSearch] = useState<string>('');
     const [editSlipBase, setEditSlipBase] = useState<string>('');
@@ -40,7 +41,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
     const [csvCurrency, setCsvCurrency] = useState<string>('SAR');
     
     // Assignment State
-    const [assignTargetType, setAssignTargetType] = useState<'staff' | 'teacher'>('staff');
+    const [assignTargetType, setAssignTargetType] = useState<'staff' | 'teacher' | 'driver'>('staff');
     const [assignTargetId, setAssignTargetId] = useState<string>('');
     const [assignStructureId, setAssignStructureId] = useState<string>('');
     
@@ -82,23 +83,28 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
             api.getSalaryStructures(schoolId),
             api.getSchoolStaff(schoolId),
             api.getSchoolTeachers(schoolId),
-        ]).then(([structuresData, staffData, teachersData]) => {
+            api.getSchoolDrivers(schoolId),
+        ]).then(([structuresData, staffData, teachersData, driversData]) => {
             setSalaryStructures(structuresData);
             setStaff(staffData);
             setTeachers(teachersData);
+            setDrivers(driversData);
         }).catch(err => {
             console.error("Failed to fetch payroll data:", err);
             addErrorOnce("فشل تحميل بيانات الرواتب.");
         }).finally(() => setLoading(false));
     };
 
-    const personName = (type: 'staff' | 'teacher', id: string) => {
+    const personName = (type: 'staff' | 'teacher' | 'driver', id: string) => {
         if (type === 'staff') {
             const u = staff.find(s => String(s.id) === String(id));
             return u ? u.name : id;
-        } else {
+        } else if (type === 'teacher') {
             const t = teachers.find(s => String(s.id) === String(id));
             return t ? t.name : id;
+        } else {
+            const d = drivers.find(s => String(s.id) === String(id));
+            return d ? d.name : id;
         }
     };
 
@@ -148,7 +154,8 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
         try {
             if (!assignTargetId || !assignStructureId) return;
             if (assignTargetType === 'staff') await api.assignSalaryStructureToStaff(schoolId, assignTargetId, assignStructureId);
-            else await api.assignSalaryStructureToTeacher(schoolId, assignTargetId, assignStructureId);
+            else if (assignTargetType === 'teacher') await api.assignSalaryStructureToTeacher(schoolId, assignTargetId, assignStructureId);
+            else await api.assignSalaryStructureToDriver(schoolId, assignTargetId, assignStructureId);
             addToast('تم الربط بنجاح.', 'success');
         } catch (e) { addToast('فشل الربط.', 'error'); }
     };
@@ -173,7 +180,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
         for (const s of rows) {
             const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
             const name = personName(s.personType, String(s.personId));
-            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const type = s.personType === 'staff' ? 'الموظف' : (s.personType === 'teacher' ? 'المعلم' : 'السائق');
             const base = Number(s.baseAmount || 0).toFixed(2);
             const at = Number(s.allowancesTotal || 0).toFixed(2);
             const dt = Number(s.deductionsTotal || 0).toFixed(2);
@@ -235,7 +242,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
         for (const s of rows) {
             const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
             const name = personName(s.personType, String(s.personId));
-            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const type = s.personType === 'staff' ? 'الموظف' : (s.personType === 'teacher' ? 'المعلم' : 'السائق');
             const base = Number(s.baseAmount || 0).toFixed(2);
             const at = Number(s.allowancesTotal || 0).toFixed(2);
             const dt = Number(s.deductionsTotal || 0).toFixed(2);
@@ -268,7 +275,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
         for (const s of salarySlips) {
             const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
             const name = personName(s.personType, String(s.personId));
-            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const type = s.personType === 'staff' ? 'الموظف' : (s.personType === 'teacher' ? 'المعلم' : 'السائق');
             const monthStr = s.month;
             const allowances = Array.isArray(s.allowances) ? s.allowances : [];
             const deductions = Array.isArray(s.deductions) ? s.deductions : [];
@@ -303,7 +310,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
         for (const s of rows) {
             const num = `SL-${schoolId}-${s.month}-${s.personType}-${s.personId}`;
             const name = personName(s.personType, String(s.personId));
-            const type = s.personType === 'staff' ? 'الموظف' : 'المعلم';
+            const type = s.personType === 'staff' ? 'الموظف' : (s.personType === 'teacher' ? 'المعلم' : 'السائق');
             const base = Number(s.baseAmount || 0).toFixed(2);
             const at = Number(s.allowancesTotal || 0).toFixed(2);
             const dt = Number(s.deductionsTotal || 0).toFixed(2);
@@ -363,6 +370,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                     <select value={newStructure.appliesTo || 'staff'} onChange={e => setNewStructure(prev => ({ ...prev, appliesTo: e.target.value as any }))} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                         <option value="staff">الموظفون</option>
                         <option value="teacher">المعلمون</option>
+                        <option value="driver">السائقون</option>
                     </select>
                     <button onClick={handleCreateStructure} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">إضافة هيكل</button>
                 </div>
@@ -435,7 +443,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                     <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th className="px-6 py-3">الاسم</th><th className="px-6 py-3">النوع</th><th className="px-6 py-3">أساسي</th><th className="px-6 py-3">ينطبق على</th><th className="px-6 py-3">إجراءات</th></tr></thead>
                         <tbody>
-                            {salaryStructures.map(s => (<tr key={s.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{s.name}</td><td className="px-6 py-4">{s.type}</td><td className="px-6 py-4">{Number(s.baseAmount || 0).toFixed(2)}</td><td className="px-6 py-4">{s.appliesTo === 'staff' ? 'الموظفون' : 'المعلمون'}</td><td className="px-6 py-4"><div className="flex gap-3"><button onClick={() => { setEditingStructure(s); setEditForm({ ...s }); }} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">تحرير</button><button onClick={() => handleDeleteStructure(s.id!)} className="font-medium text-red-600 dark:text-red-500 hover:underline">حذف</button></div></td></tr>))}
+                            {salaryStructures.map(s => (<tr key={s.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{s.name}</td><td className="px-6 py-4">{s.type}</td><td className="px-6 py-4">{Number(s.baseAmount || 0).toFixed(2)}</td><td className="px-6 py-4">{s.appliesTo === 'staff' ? 'الموظفون' : (s.appliesTo === 'teacher' ? 'المعلمون' : 'السائقون')}</td><td className="px-6 py-4"><div className="flex gap-3"><button onClick={() => { setEditingStructure(s); setEditForm({ ...s }); }} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">تحرير</button><button onClick={() => handleDeleteStructure(s.id!)} className="font-medium text-red-600 dark:text-red-500 hover:underline">حذف</button></div></td></tr>))}
                 </tbody>
             </table>
         </div>
@@ -566,19 +574,20 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                 </BrandableCard>
             )}
             <BrandableCard schoolSettings={schoolSettings}>
-                <div className="flex items-center justify-between mb-4"><h4 className="font-semibold">الربط بين الموظفين/المعلمين وهيكل الراتب</h4></div>
+                <div className="flex items-center justify-between mb-4"><h4 className="font-semibold">الربط بين الأشخاص وهيكل الراتب</h4></div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <select value={assignTargetType} onChange={e => setAssignTargetType(e.target.value as any)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                         <option value="staff">الموظفون</option>
                         <option value="teacher">المعلمون</option>
+                        <option value="driver">السائقون</option>
                     </select>
                     <select value={assignTargetId} onChange={e => setAssignTargetId(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                         <option value="">اختر الشخص...</option>
-                        {(assignTargetType === 'staff' ? staff : teachers).map(p => (<option key={p.id} value={String(p.id)}>{p.name}</option>))}
+                        {(assignTargetType === 'staff' ? staff : (assignTargetType === 'teacher' ? teachers : drivers)).map(p => (<option key={p.id} value={String(p.id)}>{p.name}</option>))}
                     </select>
                     <select value={assignStructureId} onChange={e => setAssignStructureId(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                         <option value="">اختر الهيكل...</option>
-                        {salaryStructures.filter(s => (assignTargetType === 'staff' ? s.appliesTo === 'staff' : s.appliesTo === 'teacher')).map(s => (<option key={s.id} value={s.id!}>{s.name}</option>))}
+                        {salaryStructures.filter(s => (assignTargetType === 'staff' ? s.appliesTo === 'staff' : (assignTargetType === 'teacher' ? s.appliesTo === 'teacher' : s.appliesTo === 'driver'))).map(s => (<option key={s.id} value={s.id!}>{s.name}</option>))}
                     </select>
                     <button onClick={handleAssign} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">ربط</button>
                 </div>
@@ -630,7 +639,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                                 return filteredSlips.map(s => (
                                     <tr key={s.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                         <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{personName(s.personType, String(s.personId))}</td>
-                                        <td className="px-6 py-4">{s.personType === 'staff' ? 'الموظف' : 'المعلم'}</td>
+                                        <td className="px-6 py-4">{s.personType === 'staff' ? 'الموظف' : (s.personType === 'teacher' ? 'المعلم' : 'السائق')}</td>
                                         <td className="px-6 py-4">{s.month}</td>
                                         <td className="px-6 py-4 font-semibold">{Number(s.netAmount || 0).toFixed(2)}</td>
                                         <td className="px-6 py-4">{s.status}</td>
@@ -728,7 +737,7 @@ const FinancePayroll: React.FC<FinancePayrollProps> = ({ schoolId, schoolSetting
                   <div className="space-y-4 mb-6">
                     <div className="grid grid-cols-2 gap-4">
                       <div><span className="text-gray-600 dark:text-gray-400">الشخص:</span> {personName(detailSlip.personType, String(detailSlip.personId))}</div>
-                      <div><span className="text-gray-600 dark:text-gray-400">النوع:</span> {detailSlip.personType === 'staff' ? 'الموظف' : 'المعلم'}</div>
+                      <div><span className="text-gray-600 dark:text-gray-400">النوع:</span> {detailSlip.personType === 'staff' ? 'الموظف' : (detailSlip.personType === 'teacher' ? 'المعلم' : 'السائق')}</div>
                       <div><span className="text-gray-600 dark:text-gray-400">الشهر:</span> {detailSlip.month}</div>
                       <div><span className="text-gray-600 dark:text-gray-400">الحالة:</span> {detailSlip.status}</div>
                     </div>

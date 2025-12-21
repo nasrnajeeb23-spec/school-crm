@@ -197,6 +197,12 @@ router.get('/operator/:operatorId/invite-link', verifyToken, requireRole('SCHOOL
       } catch {}
     }
 
+    user.isActive = true;
+    user.passwordMustChange = true;
+    user.tokenVersion = Number(user.tokenVersion || 0) + 1;
+    try { user.lastInviteAt = new Date(); user.lastInviteChannel = 'manual'; } catch {}
+    await user.save();
+
     const inviteToken = jwt.sign({ id: user.id, type: 'invite', targetRole: 'Driver', tokenVersion: user.tokenVersion || 0 }, JWT_SECRET, { expiresIn: '72h' });
     const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
     const baseEnv = process.env.FRONTEND_URL || '';

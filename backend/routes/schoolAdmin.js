@@ -479,7 +479,7 @@ router.post('/:schoolId/salary-structures', verifyToken, requireRole('SCHOOL_ADM
     const type = String(payload.type || 'Fixed');
     const appliesTo = String(payload.appliesTo || 'staff');
     if (!['Fixed','Hourly','PartTime','PerLesson'].includes(type)) return res.status(400).json({ msg: 'Invalid type' });
-    if (!['staff','teacher'].includes(appliesTo)) return res.status(400).json({ msg: 'Invalid appliesTo' });
+    if (!['staff','teacher','driver'].includes(appliesTo)) return res.status(400).json({ msg: 'Invalid appliesTo' });
     const baseAmount = Number(payload.baseAmount || 0);
     const hourlyRate = payload.hourlyRate != null ? Number(payload.hourlyRate) : null;
     const lessonRate = payload.lessonRate != null ? Number(payload.lessonRate) : null;
@@ -528,7 +528,7 @@ router.put('/:schoolId/salary-structures/:id', verifyToken, requireRole('SCHOOL_
     if (p.overtimeRatePerMinute !== undefined) row.overtimeRatePerMinute = Math.max(0, Number(p.overtimeRatePerMinute));
     if (p.appliesTo !== undefined) {
       const at = String(p.appliesTo);
-      if (!['staff','teacher'].includes(at)) return res.status(400).json({ msg: 'Invalid appliesTo' });
+      if (!['staff','teacher','driver'].includes(at)) return res.status(400).json({ msg: 'Invalid appliesTo' });
       row.appliesTo = at;
     }
     if (p.isDefault !== undefined) row.isDefault = !!p.isDefault;
@@ -573,6 +573,50 @@ router.put('/:schoolId/teachers/:teacherId/salary-structure', verifyToken, requi
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
+router.get('/:schoolId/drivers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId, 10);
+    const rows = await User.findAll({
+      where: {
+        schoolId,
+        isActive: { [Op.not]: false },
+        [Op.or]: [
+          { role: 'Driver' },
+          { role: 'Staff', schoolRole: 'سائق' }
+        ]
+      },
+      attributes: { exclude: ['password'] },
+      order: [['name', 'ASC']]
+    });
+    res.json(Array.isArray(rows) ? rows.map(r => r.toJSON()) : []);
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.put('/:schoolId/drivers/:userId/salary-structure', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
+  try {
+    const schoolId = parseInt(req.params.schoolId, 10);
+    const userId = parseInt(req.params.userId, 10);
+    const driver = await User.findOne({
+      where: {
+        id: userId,
+        schoolId,
+        [Op.or]: [
+          { role: 'Driver' },
+          { role: 'Staff', schoolRole: 'سائق' }
+        ]
+      }
+    });
+    if (!driver) return res.status(404).json({ msg: 'Driver not found' });
+    const { salaryStructureId } = req.body || {};
+    if (!salaryStructureId) return res.status(400).json({ msg: 'salaryStructureId required' });
+    const struct = await SalaryStructure.findOne({ where: { id: salaryStructureId, schoolId, appliesTo: 'driver' } });
+    if (!struct) return res.status(404).json({ msg: 'Structure not found' });
+    driver.salaryStructureId = salaryStructureId;
+    await driver.save();
+    res.json({ id: driver.id, salaryStructureId: driver.salaryStructureId });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
 // Payroll processing
 router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('finance_salaries'), async (req, res) => {
   try {
@@ -585,6 +629,16 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
     const settingsRow = await SchoolSettings.findOne({ where: { schoolId } }).catch(() => null);
     const currencyCode = String(settingsRow?.defaultCurrency || 'SAR').toUpperCase();
     const staff = await User.findAll({ where: { schoolId, role: 'SchoolAdmin', isActive: { [Op.not]: false } } });
+    const drivers = await User.findAll({
+      where: {
+        schoolId,
+        isActive: { [Op.not]: false },
+        [Op.or]: [
+          { role: 'Driver' },
+          { role: 'Staff', schoolRole: 'سائق' }
+        ]
+      }
+    });
     const teachers = await Teacher.findAll({ where: { schoolId } });
     const structs = await SalaryStructure.findAll({ where: { schoolId } });
     const structMap = new Map(structs.map(s => [s.id, s]));
@@ -612,20 +666,22 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
       const isHourly = String(struct.type).toLowerCase() === 'hourly';
       const isPerLesson = String(struct.type).toLowerCase() === 'perlesson';
       if (isHourly || isPerLesson) {
-        const rows = personType === 'staff'
-          ? (staffAttendanceByUser.get(String(id)) || [])
-          : (teacherAttendanceByTeacher.get(String(id)) || []);
+        const rows = personType === 'teacher'
+          ? (teacherAttendanceByTeacher.get(String(id)) || [])
+          : (staffAttendanceByUser.get(String(id)) || []);
         const totalUnits = rows.reduce((sum, r) => sum + Number(r.hoursWorked || 0), 0);
         const rate = isHourly ? Number(struct.hourlyRate || 0) : Number(struct.lessonRate || 0);
         base = totalUnits * rate;
       }
       const allowancesArr = Array.isArray(struct.allowances) ? [...struct.allowances] : [];
       const deductionsArr = Array.isArray(struct.deductions) ? [...struct.deductions] : [];
-      const rows = personType === 'staff' ? (staffAttendanceByUser.get(String(id)) || []) : (teacherAttendanceByTeacher.get(String(id)) || []);
-      const absentDays = rows.filter(r => String(r.status).toLowerCase() === 'absent').length;
+      const rows = personType === 'teacher'
+        ? (teacherAttendanceByTeacher.get(String(id)) || [])
+        : (staffAttendanceByUser.get(String(id)) || []);
+      const absenceDays = rows.filter(r => String(r.status).toLowerCase() === 'absent').length;
       const lateMinutes = rows.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
       const overtimeMinutes = rows.reduce((sum, r) => sum + Number(r.overtimeMinutes || 0), 0);
-      const absencePenalty = Number(struct.absencePenaltyPerDay || 0) * absentDays;
+      const absencePenalty = Number(struct.absencePenaltyPerDay || 0) * absenceDays;
       const latePenalty = Number(struct.latePenaltyPerMinute || 0) * lateMinutes;
       const overtimeRatePerMinute = struct.overtimeRatePerMinute != null ? Number(struct.overtimeRatePerMinute) : (Number(struct.hourlyRate || 0) / 60);
       const overtimeAllowance = overtimeRatePerMinute * overtimeMinutes;
@@ -664,6 +720,12 @@ router.post('/:schoolId/payroll/process', verifyToken, requireRole('SCHOOL_ADMIN
     for (const t of teachers) {
       if (t.salaryStructureId) {
         const draft = computeSlip('teacher', t.id, t.salaryStructureId);
+        if (draft) toCreate.push(draft);
+      }
+    }
+    for (const d of drivers) {
+      if (d.salaryStructureId) {
+        const draft = computeSlip('driver', d.id, d.salaryStructureId);
         if (draft) toCreate.push(draft);
       }
     }
@@ -785,7 +847,7 @@ router.put('/:schoolId/payroll/salary-slips/:id/approve', verifyToken, requireRo
     if (row.personType === 'teacher') {
       const t = await Teacher.findByPk(row.personId);
       if (t) personName = t.name;
-    } else if (row.personType === 'staff') {
+    } else if (row.personType === 'staff' || row.personType === 'driver') {
       const s = await User.findByPk(row.personId);
       if (s) personName = s.name;
     }

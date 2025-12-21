@@ -104,4 +104,36 @@ router.get('/routes/:routeId', verifyToken, requireRole('DRIVER'), async (req, r
   }
 });
 
+router.get('/salary-slips', verifyToken, requireRole('DRIVER'), async (req, res) => {
+  try {
+    const { SalarySlip } = require('../models');
+    const schoolId = Number(req.user.schoolId || 0);
+    const userId = String(req.user.id);
+    const where = { personType: 'driver', personId: userId };
+    if (schoolId) where.schoolId = schoolId;
+    const rows = await SalarySlip.findAll({ where, order: [['month', 'DESC']] }).catch(() => []);
+    res.json(
+      Array.isArray(rows)
+        ? rows.map(r => ({
+            id: r.id,
+            month: r.month,
+            baseAmount: Number(r.baseAmount || 0),
+            allowancesTotal: Number(r.allowancesTotal || 0),
+            deductionsTotal: Number(r.deductionsTotal || 0),
+            netAmount: Number(r.netAmount || 0),
+            allowances: Array.isArray(r.allowances) ? r.allowances : [],
+            deductions: Array.isArray(r.deductions) ? r.deductions : [],
+            status: r.status,
+            currencyCode: String(r.currencyCode || 'SAR').toUpperCase(),
+            receiptNumber: r.receiptNumber || null,
+            receiptDate: r.receiptDate || null,
+            receivedBy: r.receivedBy || null,
+          }))
+        : []
+    );
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error', error: e?.message });
+  }
+});
+
 module.exports = router;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { getDriverMe, getDriverRoutes } from '../api';
+import { getDriverMe, getDriverRoutes, getDriverSalarySlips } from '../api';
 
 const DriverDashboard: React.FC = () => {
   const { currentUser } = useAppContext();
@@ -8,6 +8,7 @@ const DriverDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [me, setMe] = useState<any>(null);
   const [routes, setRoutes] = useState<any[]>([]);
+  const [salarySlips, setSalarySlips] = useState<any[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -15,10 +16,11 @@ const DriverDashboard: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const [mePayload, routesPayload] = await Promise.all([getDriverMe(), getDriverRoutes()]);
+        const [mePayload, routesPayload, slipsPayload] = await Promise.all([getDriverMe(), getDriverRoutes(), getDriverSalarySlips()]);
         if (!mounted) return;
         setMe(mePayload);
         setRoutes(routesPayload);
+        setSalarySlips(slipsPayload);
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message || 'حدث خطأ أثناء تحميل بيانات السائق.');
@@ -55,6 +57,10 @@ const DriverDashboard: React.FC = () => {
                   <span className="text-gray-500 dark:text-gray-400">عدد ملفات السائق</span>
                   <span>{Array.isArray(me?.operators) ? me.operators.length : 0}</span>
                 </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-500 dark:text-gray-400">عدد كشوف الراتب</span>
+                  <span>{Array.isArray(salarySlips) ? salarySlips.length : 0}</span>
+                </div>
               </div>
             </div>
 
@@ -84,6 +90,36 @@ const DriverDashboard: React.FC = () => {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-800 dark:text-white">الرواتب</h3>
+              {salarySlips.length === 0 ? (
+                <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">لا توجد كشوف رواتب لعرضها حالياً.</div>
+              ) : (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                      <tr>
+                        <th className="px-6 py-3">الشهر</th>
+                        <th className="px-6 py-3">الصافي</th>
+                        <th className="px-6 py-3">الحالة</th>
+                        <th className="px-6 py-3">العملة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salarySlips.slice(0, 6).map((s: any) => (
+                        <tr key={String(s.id)} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{s.month}</td>
+                          <td className="px-6 py-4 font-semibold">{Number(s.netAmount || 0).toFixed(2)}</td>
+                          <td className="px-6 py-4">{String(s.status || '')}</td>
+                          <td className="px-6 py-4">{String(s.currencyCode || 'SAR')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

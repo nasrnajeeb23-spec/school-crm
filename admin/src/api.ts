@@ -426,6 +426,11 @@ export const getSchoolStaff = async (schoolId: number): Promise<User[]> => {
     }
 };
 
+export const getSchoolDrivers = async (schoolId: number): Promise<User[]> => {
+    const rows: any[] = await apiCall(`/school/${schoolId}/drivers`, { method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
+};
+
 export const addSchoolStaff = async (schoolId: number, staffData: NewStaffData): Promise<User> => {
     return await apiCall(`/school/${schoolId}/staff`, {
         method: 'POST',
@@ -460,7 +465,7 @@ export interface SalaryStructurePayload {
     lessonRate?: number;
     allowances?: { name: string; amount: number; }[];
     deductions?: { name: string; amount: number; }[];
-    appliesTo?: 'staff' | 'teacher';
+    appliesTo?: 'staff' | 'teacher' | 'driver';
     isDefault?: boolean;
     absencePenaltyPerDay?: number;
     latePenaltyPerMinute?: number;
@@ -491,11 +496,15 @@ export const assignSalaryStructureToTeacher = async (schoolId: number, teacherId
     return await apiCall(`/school/${schoolId}/teachers/${teacherId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
 };
 
+export const assignSalaryStructureToDriver = async (schoolId: number, userId: string | number, salaryStructureId: string): Promise<{ id: string | number; salaryStructureId: string; }> => {
+    return await apiCall(`/school/${schoolId}/drivers/${userId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
+};
+
 export const processPayrollForMonth = async (schoolId: number, month: string): Promise<{ createdCount: number; }> => {
     return await apiCall(`/school/${schoolId}/payroll/process?month=${encodeURIComponent(month)}`, { method: 'POST' });
 };
 
-export const getSalarySlipsForSchool = async (schoolId: number, month?: string, options?: { personType?: 'staff' | 'teacher'; personId?: string | number }): Promise<any[]> => {
+export const getSalarySlipsForSchool = async (schoolId: number, month?: string, options?: { personType?: 'staff' | 'teacher' | 'driver'; personId?: string | number }): Promise<any[]> => {
     const qs: string[] = [];
     if (month) qs.push(`month=${encodeURIComponent(month)}`);
     if (options?.personType) qs.push(`personType=${encodeURIComponent(options.personType)}`);
@@ -1004,6 +1013,11 @@ export const getDriverMe = async (): Promise<any> => {
 
 export const getDriverRoutes = async (): Promise<any[]> => {
     const raw = await apiCall('/driver/routes', { method: 'GET' });
+    return Array.isArray(raw) ? raw : [];
+};
+
+export const getDriverSalarySlips = async (): Promise<any[]> => {
+    const raw = await apiCall('/driver/salary-slips', { method: 'GET' });
     return Array.isArray(raw) ? raw : [];
 };
 
