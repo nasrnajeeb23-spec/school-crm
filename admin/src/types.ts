@@ -1,14 +1,14 @@
 export enum SubscriptionStatus {
-  Active = 'نشط',
-  Trial = 'فترة تجريبية',
-  Canceled = 'ملغي',
-  PastDue = 'متأخر الدفع',
+    Active = 'نشط',
+    Trial = 'فترة تجريبية',
+    Canceled = 'ملغي',
+    PastDue = 'متأخر الدفع',
 }
 
 export enum PlanName {
-  Basic = 'الأساسية',
-  Premium = 'المميزة',
-  Enterprise = 'المؤسسات',
+    Basic = 'الأساسية',
+    Premium = 'المميزة',
+    Enterprise = 'المؤسسات',
 }
 
 export enum StudentStatus {
@@ -40,15 +40,15 @@ export enum ParentAccountStatus {
 }
 
 export enum UserRole {
-  SuperAdmin = 'SUPER_ADMIN',
-  SuperAdminFinancial = 'SUPER_ADMIN_FINANCIAL',
-  SuperAdminTechnical = 'SUPER_ADMIN_TECHNICAL',
-  SuperAdminSupervisor = 'SUPER_ADMIN_SUPERVISOR',
-  SchoolAdmin = 'SCHOOL_ADMIN',
-  Teacher = 'TEACHER',
-  Parent = 'PARENT',
-  Driver = 'DRIVER', // New role for bus drivers
-  Staff = 'STAFF',
+    SuperAdmin = 'SUPER_ADMIN',
+    SuperAdminFinancial = 'SUPER_ADMIN_FINANCIAL',
+    SuperAdminTechnical = 'SUPER_ADMIN_TECHNICAL',
+    SuperAdminSupervisor = 'SUPER_ADMIN_SUPERVISOR',
+    SchoolAdmin = 'SCHOOL_ADMIN',
+    Teacher = 'TEACHER',
+    Parent = 'PARENT',
+    Driver = 'DRIVER', // New role for bus drivers
+    Staff = 'STAFF',
 }
 
 export enum SchoolRole {
@@ -62,6 +62,7 @@ export enum SchoolRole {
 }
 
 export enum Permission {
+    // VIEW permissions
     VIEW_DASHBOARD = 'VIEW_DASHBOARD',
     VIEW_STUDENTS = 'VIEW_STUDENTS',
     VIEW_TEACHERS = 'VIEW_TEACHERS',
@@ -78,6 +79,8 @@ export enum Permission {
     VIEW_STAFF = 'VIEW_STAFF',
     VIEW_TRANSPORTATION = 'VIEW_TRANSPORTATION',
     VIEW_MODULES = 'VIEW_MODULES',
+
+    // MANAGE permissions
     MANAGE_STUDENTS = 'MANAGE_STUDENTS',
     MANAGE_TEACHERS = 'MANAGE_TEACHERS',
     MANAGE_PARENTS = 'MANAGE_PARENTS',
@@ -92,7 +95,30 @@ export enum Permission {
     MANAGE_SETTINGS = 'MANAGE_SETTINGS',
     MANAGE_STAFF = 'MANAGE_STAFF',
     MANAGE_TRANSPORTATION = 'MANAGE_TRANSPORTATION',
-    MANAGE_MODULES = 'MANAGE_MODULES', // New permission for school admin
+    MANAGE_MODULES = 'MANAGE_MODULES',
+
+    // DELETE permissions
+    DELETE_STUDENTS = 'DELETE_STUDENTS',
+    DELETE_TEACHERS = 'DELETE_TEACHERS',
+    DELETE_PARENTS = 'DELETE_PARENTS',
+    DELETE_CLASSES = 'DELETE_CLASSES',
+    DELETE_STAFF = 'DELETE_STAFF',
+
+    // EXPORT permissions
+    EXPORT_REPORTS = 'EXPORT_REPORTS',
+    EXPORT_STUDENTS = 'EXPORT_STUDENTS',
+    EXPORT_FINANCE = 'EXPORT_FINANCE',
+    EXPORT_DATA = 'EXPORT_DATA',
+
+    // IMPORT permissions
+    IMPORT_DATA = 'IMPORT_DATA',
+    IMPORT_STUDENTS = 'IMPORT_STUDENTS',
+    IMPORT_TEACHERS = 'IMPORT_TEACHERS',
+
+    // BULK operations
+    BULK_OPERATIONS = 'BULK_OPERATIONS',
+    BULK_DELETE = 'BULK_DELETE',
+    BULK_UPDATE = 'BULK_UPDATE',
 }
 
 export enum ModuleId {
@@ -194,8 +220,8 @@ export interface PaymentProofSubmission {
     method: PaymentMethod;
     amount: number;
     reference: string;
-    proofImage?: File; 
-    relatedService: string; 
+    proofImage?: File;
+    relatedService: string;
     schoolName: string;
 }
 
@@ -217,24 +243,24 @@ export interface SchoolModuleSubscription {
 }
 
 export interface PricingConfig {
-  pricePerStudent: number;
-  pricePerTeacher: number;
-  pricePerGBStorage: number;
-  pricePerInvoice: number;
-  pricePerEmail?: number;
-  pricePerSMS?: number;
-  currency?: string;
-  yearlyDiscountPercent?: number;
+    pricePerStudent: number;
+    pricePerTeacher: number;
+    pricePerGBStorage: number;
+    pricePerInvoice: number;
+    pricePerEmail?: number;
+    pricePerSMS?: number;
+    currency?: string;
+    yearlyDiscountPercent?: number;
 }
 
 export interface SubscriptionState {
-  subscription: { status: string; startDate: string | null; endDate: string | null; renewalDate: string | null; trialExpired: boolean; daysLeft?: number };
-  modules?: { allowed: string[]; active: string[] };
-  plan?: { id?: string | number; name?: string; price?: number; limits?: any } | any;
-  limits?: { students: number | 'غير محدود'; teachers: number | 'غير محدود'; invoices?: number | 'غير محدود'; storageGB?: number | 'غير محدود'; source: string };
-  usage?: { students: number; teachers: number; invoices?: number; storageGB?: number };
-  packs?: Array<{ type: 'students' | 'teachers' | 'invoices' | 'storageGB'; qty: number; price?: number }>;
-  billing?: { mode: 'hard_cap' | 'overage'; planPrice?: number; packTotal?: number; overageEstimate?: { students: number; teachers: number; invoices: number; storageGB: number; total: number; currency: string }; totalEstimated?: number };
+    subscription: { status: string; startDate: string | null; endDate: string | null; renewalDate: string | null; trialExpired: boolean; daysLeft?: number };
+    modules?: { allowed: string[]; active: string[] };
+    plan?: { id?: string | number; name?: string; price?: number; limits?: any } | any;
+    limits?: { students: number | 'غير محدود'; teachers: number | 'غير محدود'; invoices?: number | 'غير محدود'; storageGB?: number | 'غير محدود'; source: string };
+    usage?: { students: number; teachers: number; invoices?: number; storageGB?: number };
+    packs?: Array<{ type: 'students' | 'teachers' | 'invoices' | 'storageGB'; qty: number; price?: number }>;
+    billing?: { mode: 'hard_cap' | 'overage'; planPrice?: number; packTotal?: number; overageEstimate?: { students: number; teachers: number; invoices: number; storageGB: number; total: number; currency: string }; totalEstimated?: number };
 }
 
 export interface Expense {
@@ -294,7 +320,7 @@ export interface SchoolSettings {
     lessonStartTime?: string;
     lateThresholdMinutes?: number;
     departureTime?: string;
-    attendanceMethods?: ('QR'|'RFID'|'Manual')[];
+    attendanceMethods?: ('QR' | 'RFID' | 'Manual')[];
     terms?: { name: string; start: string; end: string; }[];
     holidays?: { date: string; title: string; }[];
     defaultCurrency?: string;
@@ -357,37 +383,37 @@ export interface SchoolEvent {
 }
 
 export interface BehaviorRecord {
-  id: number;
-  schoolId: number;
-  studentId: string;
-  type: 'Positive' | 'Negative';
-  title: string;
-  description?: string;
-  date: string;
-  recordedBy?: string;
-  actionTaken?: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  createdAt: string;
+    id: number;
+    schoolId: number;
+    studentId: string;
+    type: 'Positive' | 'Negative';
+    title: string;
+    description?: string;
+    date: string;
+    recordedBy?: string;
+    actionTaken?: string;
+    severity: 'Low' | 'Medium' | 'High' | 'Critical';
+    createdAt: string;
 }
 
 export interface User {
-  id: string;
-  email: string;
-  password?: unknown;
-  role: UserRole;
-  schoolId?: number; // Optional, only for SchoolAdmins, Teachers, Parents
-  teacherId?: string; // Optional, only for Teachers
-  parentId?: string; // Optional, only for Parents
-  name: string;
-  schoolRole?: SchoolRole; // For staff members
-  permissions?: Permission[];
-  phone?: string;
-  username?: string;
-  passwordMustChange?: boolean;
-  tokenVersion?: number;
-  isActive?: boolean;
-  department?: string;
-  bankAccount?: string;
+    id: string;
+    email: string;
+    password?: unknown;
+    role: UserRole;
+    schoolId?: number; // Optional, only for SchoolAdmins, Teachers, Parents
+    teacherId?: string; // Optional, only for Teachers
+    parentId?: string; // Optional, only for Parents
+    name: string;
+    schoolRole?: SchoolRole; // For staff members
+    permissions?: Permission[];
+    phone?: string;
+    username?: string;
+    passwordMustChange?: boolean;
+    tokenVersion?: number;
+    isActive?: boolean;
+    department?: string;
+    bankAccount?: string;
 }
 
 export interface NewStaffData {
@@ -402,61 +428,61 @@ export interface NewStaffData {
 
 
 export interface UsageLimit {
-  students: number | 'غير محدود';
-  teachers: number | 'غير محدود';
-  storageGB: number | 'غير محدود';
-  branches: number | 'غير محدود';
-  invoices: number | 'غير محدود';
-  packs?: Array<{ type: 'students' | 'teachers' | 'invoices' | 'storageGB'; qty: number; price?: number }>;
-  hardCap?: boolean;
-  allowOverage?: boolean;
+    students: number | 'غير محدود';
+    teachers: number | 'غير محدود';
+    storageGB: number | 'غير محدود';
+    branches: number | 'غير محدود';
+    invoices: number | 'غير محدود';
+    packs?: Array<{ type: 'students' | 'teachers' | 'invoices' | 'storageGB'; qty: number; price?: number }>;
+    hardCap?: boolean;
+    allowOverage?: boolean;
 }
 
 export interface Plan {
-  id: string;
-  name: PlanName;
-  price: number;
-  pricePeriod: string;
-  features: string[];
-  limits: UsageLimit;
-  recommended?: boolean;
+    id: string;
+    name: PlanName;
+    price: number;
+    pricePeriod: string;
+    features: string[];
+    limits: UsageLimit;
+    recommended?: boolean;
 }
 
 export interface School {
-  id: number;
-  name: string;
-  plan: PlanName;
-  status: SubscriptionStatus;
-  students: number;
-  teachers: number;
-  balance: number; // in USD
-  joinDate: string;
+    id: number;
+    name: string;
+    plan: PlanName;
+    status: SubscriptionStatus;
+    students: number;
+    teachers: number;
+    balance: number; // in USD
+    joinDate: string;
 }
 
 export interface Subscription {
-  id: string;
-  schoolId: number;
-  schoolName: string;
-  plan: PlanName;
-  status: SubscriptionStatus;
-  startDate: string;
-  renewalDate: string;
-  amount: number;
-  trialEndDate?: string;
-  customLimits?: UsageLimit;
-  modules?: SchoolModuleSubscription[];
+    id: string;
+    schoolId: number;
+    schoolName: string;
+    plan: PlanName;
+    status: SubscriptionStatus;
+    startDate: string;
+    renewalDate: string;
+    amount: number;
+    trialEndDate?: string;
+    customLimits?: UsageLimit;
+    modules?: SchoolModuleSubscription[];
 }
 
 export interface RevenueData {
-  month: string;
-  revenue: number;
+    month: string;
+    revenue: number;
 }
 
 export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  userCount: number;
+    id: string;
+    name: string;
+    description: string;
+    userCount: number;
 }
 
 export interface Student {
@@ -540,24 +566,24 @@ export interface UpdatableTeacherData {
 }
 
 export interface Class {
-  id: string;
-  name: string;
-  gradeLevel: string;
-  homeroomTeacherName: string;
-  studentCount: number;
-  capacity?: number;
-  subjects: string[];
-  subjectTeacherMap?: Record<string, string | number>;
-  section?: string;
+    id: string;
+    name: string;
+    gradeLevel: string;
+    homeroomTeacherName: string;
+    studentCount: number;
+    capacity?: number;
+    subjects: string[];
+    subjectTeacherMap?: Record<string, string | number>;
+    section?: string;
 }
 
 export interface NewClassData {
-  name: string;
-  gradeLevel: string;
-  homeroomTeacherId: string;
-  capacity?: number;
-  subjects: string[];
-  section?: string;
+    name: string;
+    gradeLevel: string;
+    homeroomTeacherId: string;
+    capacity?: number;
+    subjects: string[];
+    section?: string;
 }
 
 export interface ClassRosterUpdate {
@@ -596,13 +622,13 @@ export interface StudentGrades {
 }
 
 export interface ScheduleEntry {
-  id: string;
-  classId: string;
-  className?: string;
-  day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday';
-  timeSlot: string; // e.g., "08:00 - 09:00"
-  subject: string;
-  teacherName: string;
+    id: string;
+    classId: string;
+    className?: string;
+    day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday';
+    timeSlot: string; // e.g., "08:00 - 09:00"
+    subject: string;
+    teacherName: string;
 }
 
 export interface Message {
@@ -868,41 +894,59 @@ export interface NewAssignmentData {
 }
 
 export interface Submission {
-  id: string;
-  assignmentId: string;
-  studentId: string;
-  studentName: string;
-  submissionDate: string | null;
-  status: SubmissionStatus;
-  grade?: number;
-  feedback?: string;
-  attachments?: AttachmentMeta[];
+    id: string;
+    assignmentId: string;
+    studentId: string;
+    studentName: string;
+    submissionDate: string | null;
+    status: SubmissionStatus;
+    grade?: number;
+    feedback?: string;
+    attachments?: AttachmentMeta[];
 }
 
 export interface AttachmentMeta {
-  filename: string;
-  originalName?: string;
-  mimeType?: string;
-  size?: number;
-  url?: string;
-  uploadedAt?: string;
+    filename: string;
+    originalName?: string;
+    mimeType?: string;
+    size?: number;
+    url?: string;
+    uploadedAt?: string;
 }
 
 export type PaymentPlanType = 'Monthly' | 'Termly' | 'Installments';
 
 export interface DiscountRule {
-  type: 'Sibling' | 'TopAchiever' | 'Orphan';
-  percentage: number;
+    type: 'Sibling' | 'TopAchiever' | 'Orphan';
+    percentage: number;
 }
 
 export interface FeeSetup {
-  id: string;
-  stage: string;
-  tuitionFee: number;
-  bookFees: number;
-  uniformFees: number;
-  activityFees: number;
-  paymentPlanType: PaymentPlanType;
-  paymentPlanDetails?: any;
-  discounts: DiscountRule[];
+    id: string;
+    stage: string;
+    tuitionFee: number;
+    bookFees: number;
+    uniformFees: number;
+    activityFees: number;
+    paymentPlanType: PaymentPlanType;
+    paymentPlanDetails?: any;
+    discounts: DiscountRule[];
+}
+
+// Audit Log Types
+export interface AuditLog {
+    id: number;
+    userId: number;
+    userEmail?: string;
+    action: string;
+    entityType: string;
+    entityId?: string;
+    oldValue?: any;
+    newValue?: any;
+    ipAddress?: string;
+    userAgent?: string;
+    schoolId?: number;
+    metadata?: any;
+    riskLevel?: 'low' | 'medium' | 'high' | 'critical';
+    createdAt: string;
 }

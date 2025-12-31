@@ -3,6 +3,7 @@ function uniq(list) {
 }
 
 const ALL_PERMISSIONS = [
+  // VIEW permissions
   'VIEW_DASHBOARD',
   'VIEW_STUDENTS',
   'VIEW_TEACHERS',
@@ -19,6 +20,8 @@ const ALL_PERMISSIONS = [
   'VIEW_STAFF',
   'VIEW_TRANSPORTATION',
   'VIEW_MODULES',
+
+  // MANAGE permissions
   'MANAGE_STUDENTS',
   'MANAGE_TEACHERS',
   'MANAGE_PARENTS',
@@ -34,7 +37,31 @@ const ALL_PERMISSIONS = [
   'MANAGE_STAFF',
   'MANAGE_TRANSPORTATION',
   'MANAGE_MODULES',
+
+  // DELETE permissions
+  'DELETE_STUDENTS',
+  'DELETE_TEACHERS',
+  'DELETE_PARENTS',
+  'DELETE_CLASSES',
+  'DELETE_STAFF',
+
+  // EXPORT permissions
+  'EXPORT_REPORTS',
+  'EXPORT_STUDENTS',
+  'EXPORT_FINANCE',
+  'EXPORT_DATA',
+
+  // IMPORT permissions
+  'IMPORT_DATA',
+  'IMPORT_STUDENTS',
+  'IMPORT_TEACHERS',
+
+  // BULK operations
+  'BULK_OPERATIONS',
+  'BULK_DELETE',
+  'BULK_UPDATE',
 ];
+
 
 function normalizeDbRole(role) {
   const r = String(role || '').trim();
