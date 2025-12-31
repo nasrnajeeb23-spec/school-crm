@@ -11,6 +11,9 @@ const BusOperator = sequelize.define('BusOperator', {
   busCapacity: { type: DataTypes.INTEGER, allowNull: false },
   busModel: { type: DataTypes.STRING, allowNull: false },
   schoolId: { type: DataTypes.INTEGER, allowNull: true },
+  branchId: { type: DataTypes.STRING, allowNull: true },
+  stageId: { type: DataTypes.STRING, allowNull: true },
+  departmentId: { type: DataTypes.STRING, allowNull: true },
   status: { type: DataTypes.ENUM('Pending', 'Approved', 'Rejected'), allowNull: false, defaultValue: 'Pending' },
 });
 

@@ -24,6 +24,41 @@ const setJSON = async (redis, key, value) => {
   } catch {}
 };
 
+const mapSuperAdminRoleToDb = (role) => {
+  const key = String(role || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const m = {
+    SUPERADMIN: 'SuperAdmin',
+    SUPER_ADMIN: 'SuperAdmin',
+    SUPERADMINFINANCIAL: 'SuperAdminFinancial',
+    SUPER_ADMIN_FINANCIAL: 'SuperAdminFinancial',
+    SUPERADMINTECHNICAL: 'SuperAdminTechnical',
+    SUPER_ADMIN_TECHNICAL: 'SuperAdminTechnical',
+    SUPERADMINSUPERVISOR: 'SuperAdminSupervisor',
+    SUPER_ADMIN_SUPERVISOR: 'SuperAdminSupervisor',
+  };
+  return m[key] || null;
+};
+
+const mapSuperAdminRoleToApi = (role) => {
+  const key = String(role || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const m = {
+    SUPERADMIN: 'SUPER_ADMIN',
+    SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL',
+    SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL',
+    SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
+  };
+  return m[key] || 'SUPER_ADMIN';
+};
+
+const isStrongPassword = (pwd) => {
+  const lengthOk = typeof pwd === 'string' && pwd.length >= 10;
+  const upper = /[A-Z]/.test(pwd);
+  const lower = /[a-z]/.test(pwd);
+  const digit = /[0-9]/.test(pwd);
+  const special = /[^A-Za-z0-9]/.test(pwd);
+  return lengthOk && upper && lower && digit && special;
+};
+
 // @route   GET api/superadmin/stats
 // @desc    Get dashboard stats for SuperAdmin
 // @access  Private (SuperAdmin)
@@ -720,20 +755,167 @@ router.get('/onboarding/requests', verifyToken, requireRole('SUPER_ADMIN', 'SUPE
 router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
     try {
         const { User } = require('../models');
+        const { Op } = require('sequelize');
         // Fix: Use correct Enum values matching User model (PascalCase)
         const team = await User.findAll({
             where: {
                 role: {
-                    [require('sequelize').Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
+                    [Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
                 }
             },
-            attributes: ['id', 'name', 'email', 'role', 'lastLogin', 'isActive']
+            attributes: ['id', 'name', 'email', 'username', 'role', 'lastLoginAt', 'isActive', 'createdAt', 'permissions']
         });
-        res.json(team);
+        res.json((Array.isArray(team) ? team : []).map(u => {
+          const j = u.toJSON ? u.toJSON() : u;
+          return {
+            id: String(j.id),
+            name: j.name,
+            email: j.email,
+            username: j.username || j.email,
+            role: mapSuperAdminRoleToApi(j.role),
+            isActive: j.isActive !== false,
+            lastLoginAt: j.lastLoginAt || null,
+            createdAt: j.createdAt || null,
+            permissions: Array.isArray(j.permissions) ? j.permissions : []
+          };
+        }));
     } catch (err) {
         console.error('Team Error:', err.message);
         res.status(500).send('Server Error');
     }
+});
+
+router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { name, email, username, password, role, permissions } = req.body || {};
+    if (!name || !email || !username || !password || !role) {
+      return res.status(400).json({ msg: 'Invalid payload' });
+    }
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({ msg: 'Weak password' });
+    }
+    const dbRole = mapSuperAdminRoleToDb(role);
+    if (!dbRole || dbRole === 'SuperAdmin') {
+      return res.status(400).json({ msg: 'Invalid role' });
+    }
+
+    const emailNorm = String(email).trim().toLowerCase();
+    const usernameNorm = String(username).trim();
+    const dupeEmail = await User.findOne({ where: { email: emailNorm } });
+    if (dupeEmail) return res.status(409).json({ msg: 'Email already in use' });
+    const dupeUsername = await User.findOne({ where: { username: usernameNorm } });
+    if (dupeUsername) return res.status(409).json({ msg: 'Username already in use' });
+
+    const hashed = await bcrypt.hash(password, 10);
+    const created = await User.create({
+      name: String(name).trim(),
+      email: emailNorm,
+      username: usernameNorm,
+      password: hashed,
+      role: dbRole,
+      schoolId: null,
+      teacherId: null,
+      parentId: null,
+      schoolRole: null,
+      isActive: true,
+      permissions: Array.isArray(permissions) ? permissions.filter(Boolean).map(p => String(p)) : [],
+      tokenVersion: 0
+    });
+
+    const j = created.toJSON();
+    delete j.password;
+    return res.status(201).json({
+      id: String(j.id),
+      name: j.name,
+      email: j.email,
+      username: j.username || j.email,
+      role: mapSuperAdminRoleToApi(j.role),
+      isActive: j.isActive !== false,
+      lastLoginAt: j.lastLoginAt || null,
+      createdAt: j.createdAt || null,
+      permissions: Array.isArray(j.permissions) ? j.permissions : []
+    });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
+});
+
+router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ msg: 'Invalid id' });
+
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (String(user.role) === 'SuperAdmin') return res.status(400).json({ msg: 'Cannot edit SuperAdmin account' });
+
+    const { name, email, username, password, role, permissions, isActive } = req.body || {};
+
+    if (name !== undefined) user.name = String(name).trim();
+    if (email !== undefined) {
+      const emailNorm = String(email).trim().toLowerCase();
+      const dupeEmail = await User.findOne({ where: { email: emailNorm } });
+      if (dupeEmail && Number(dupeEmail.id) !== Number(user.id)) return res.status(409).json({ msg: 'Email already in use' });
+      user.email = emailNorm;
+    }
+    if (username !== undefined) {
+      const usernameNorm = String(username).trim();
+      const dupeUsername = await User.findOne({ where: { username: usernameNorm } });
+      if (dupeUsername && Number(dupeUsername.id) !== Number(user.id)) return res.status(409).json({ msg: 'Username already in use' });
+      user.username = usernameNorm;
+    }
+    if (role !== undefined) {
+      const dbRole = mapSuperAdminRoleToDb(role);
+      if (!dbRole || dbRole === 'SuperAdmin') return res.status(400).json({ msg: 'Invalid role' });
+      user.role = dbRole;
+    }
+    if (permissions !== undefined) {
+      user.permissions = Array.isArray(permissions) ? permissions.filter(Boolean).map(p => String(p)) : [];
+    }
+    if (isActive !== undefined) user.isActive = !!isActive;
+    if (password) {
+      if (!isStrongPassword(password)) return res.status(400).json({ msg: 'Weak password' });
+      user.password = await bcrypt.hash(password, 10);
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+    }
+
+    await user.save();
+    const j = user.toJSON();
+    delete j.password;
+    return res.json({
+      id: String(j.id),
+      name: j.name,
+      email: j.email,
+      username: j.username || j.email,
+      role: mapSuperAdminRoleToApi(j.role),
+      isActive: j.isActive !== false,
+      lastLoginAt: j.lastLoginAt || null,
+      createdAt: j.createdAt || null,
+      permissions: Array.isArray(j.permissions) ? j.permissions : []
+    });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
+});
+
+router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ msg: 'Invalid id' });
+    if (Number(req.user?.id) === Number(id)) return res.status(400).json({ msg: 'Cannot delete self' });
+
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (String(user.role) === 'SuperAdmin') return res.status(400).json({ msg: 'Cannot delete SuperAdmin account' });
+
+    await user.destroy();
+    return res.json({ deleted: true });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
 });
 
 // @route   GET api/superadmin/analytics/kpi

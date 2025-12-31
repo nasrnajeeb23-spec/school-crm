@@ -12,7 +12,7 @@ const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const samlAuth = require('./middleware/samlAuth');
 const { languageMiddleware } = require('./i18n/config');
-const { verifyToken, requireRole } = require('./middleware/auth');
+const { verifyToken, requireRole, isSuperAdminUser, isSuperAdminRole, normalizeRole } = require('./middleware/auth');
 const { createLogger, format, transports } = require('winston');
 const DailyRotate = require('winston-daily-rotate-file');
 
@@ -416,7 +416,7 @@ const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/superadmin', authLimiter, authSuperAdminRoutes);
 app.use('/api/users', usersRoutes);
-app.use('/api/schools', schoolsRoutes);
+app.use('/api/schools', verifyToken, schoolsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/superadmin', superadminRoutes);
@@ -821,13 +821,13 @@ app.post('/api/assignments', verifyToken, requireRole('TEACHER'), assignmentUplo
   }
 });
 
-app.get('/api/school/class/:classId/assignments', verifyToken, requireRole('TEACHER','SCHOOL_ADMIN'), async (req, res) => {
+app.get('/api/school/class/:classId/assignments', verifyToken, requireRole('TEACHER','SCHOOL_ADMIN','SUPER_ADMIN'), async (req, res) => {
   try {
     const { Assignment, Class, Teacher, Submission } = require('./models');
     const classId = String(req.params.classId);
     const cls = await Class.findByPk(classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(cls.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+    if (!isSuperAdminUser(req.user) && Number(req.user.schoolId || 0) !== Number(cls.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     const rows = await Assignment.findAll({ where: { classId }, include: [{ model: Class, attributes: ['gradeLevel','section'] }, { model: Teacher, attributes: ['name'] }], order: [['createdAt','DESC']] });
     const list = [];
     for (const a of rows) {
@@ -1244,10 +1244,11 @@ syncDatabase()
           const conv = await Conversation.findOne({ where: { roomId } });
           if (!conv) return;
           const u = socket.user || {};
-          const isAllowed = (u.role === 'PARENT' && conv.parentId === u.parentId) ||
-                            (u.role === 'TEACHER' && conv.teacherId === u.teacherId) ||
-                            (u.role === 'SCHOOL_ADMIN' && conv.schoolId === u.schoolId) ||
-                            (u.role === 'SUPER_ADMIN');
+          const role = normalizeRole(u.role);
+          const isAllowed = (role === 'PARENT' && String(conv.parentId || '') === String(u.parentId || '')) ||
+                            (role === 'TEACHER' && String(conv.teacherId || '') === String(u.teacherId || '')) ||
+                            (role === 'SCHOOL_ADMIN' && Number(conv.schoolId || 0) === Number(u.schoolId || 0)) ||
+                            isSuperAdminRole(u.role);
           if (!isAllowed) return;
           socket.join(roomId);
         } catch {}
@@ -1258,9 +1259,9 @@ syncDatabase()
           if (!conversationId || !roomId || !text || !senderId || !senderRole) return;
           const { Message } = require('./models');
           const sid = socket.user?.id || senderId;
-          const srole = socket.user?.role || senderRole;
+          const srole = normalizeRole(socket.user?.role || senderRole);
           const msg = await Message.create({ id: `msg_${Date.now()}`, conversationId, text, senderId: sid, senderRole: srole });
-          io.to(roomId).emit('new_message', { id: msg.id, conversationId, text, senderId, senderRole, timestamp: msg.createdAt });
+          io.to(roomId).emit('new_message', { id: msg.id, conversationId, text, senderId: sid, senderRole: srole, timestamp: msg.createdAt });
         } catch {}
       });
     });

@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { Parent, Student, Grade, Attendance, Invoice, Notification, Schedule, Class, Teacher, Assignment, Submission } = require('../models');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { Parent, Student, Grade, Attendance, Invoice, Notification, Schedule, Class, Teacher, Assignment, Submission, ParentStudent } = require('../models');
+const { verifyToken, requireRole, canParentAccessStudent, normalizeUserRole } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { Op } = require('sequelize');
 
 const MAX_ATTACHMENT_SIZE = parseInt(process.env.MAX_ATTACHMENT_SIZE || `${25 * 1024 * 1024}`, 10); // 25 MB
 const allowedMimeTypes = new Set([
@@ -39,6 +40,39 @@ const submissionUpload = multer({
   }
 });
 
+async function getParentAccessibleStudents({ schoolId, parentId }) {
+  const sid = Number(schoolId || 0);
+  const pid = Number(parentId || 0);
+  if (!sid || !pid) return [];
+
+  const map = new Map();
+  try {
+    const direct = await Student.findAll({ where: { schoolId: sid, parentId: pid }, order: [['name', 'ASC']] }).catch(() => []);
+    for (const s of direct || []) map.set(String(s.id), s);
+  } catch {}
+
+  try {
+    const links = await ParentStudent.findAll({
+      where: { schoolId: sid, parentId: pid, status: { [Op.ne]: 'inactive' } },
+      attributes: ['studentId']
+    }).catch(() => []);
+    const ids = Array.from(new Set((links || []).map(x => String(x.studentId)).filter(Boolean)));
+    if (ids.length > 0) {
+      const extra = await Student.findAll({ where: { schoolId: sid, id: { [Op.in]: ids } }, order: [['name', 'ASC']] }).catch(() => []);
+      for (const s of extra || []) map.set(String(s.id), s);
+    }
+  } catch {}
+
+  return Array.from(map.values());
+}
+
+function selectStudents(students, studentIdFilter) {
+  const list = Array.isArray(students) ? students : [];
+  const f = String(studentIdFilter || '').trim();
+  if (!f) return list;
+  return list.filter(s => String(s.id) === f);
+}
+
 // @route   GET api/parent/:parentId/dashboard
 // @desc    Get all necessary data for the parent dashboard
 // @access  Private (Parent)
@@ -47,12 +81,14 @@ router.get('/:parentId/dashboard', verifyToken, requireRole('PARENT'), async (re
         const { parentId } = req.params;
         if (String(req.user.parentId) !== String(parentId)) return res.status(403).json({ msg: 'Access denied' });
         const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
-        const parent = await Parent.findByPk(parentId, { include: { model: Student } });
-        if (!parent || !parent.Students || parent.Students.length === 0) return res.status(404).json({ msg: 'Parent or student not found' });
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId });
+        const targetStudents = selectStudents(students, studentIdFilter);
+        if (!students.length) return res.status(404).json({ msg: 'Parent or student not found' });
+        if (studentIdFilter && targetStudents.length === 0) return res.status(404).json({ msg: 'Student not found' });
         const attendanceStatusMap = { 'Present': 'حاضر', 'Absent': 'غائب', 'Late': 'متأخر', 'Excused': 'بعذر' };
         const invoiceStatusMap = { 'PAID': 'مدفوعة', 'UNPAID': 'غير مدفوعة', 'OVERDUE': 'متأخرة' };
         const actionItemTypeMap = { 'Warning': 'warning', 'Info': 'info', 'Approval': 'approval' };
-        const targetStudents = studentIdFilter ? parent.Students.filter(s => String(s.id) === studentIdFilter) : parent.Students;
         const children = [];
         for (const student of targetStudents) {
             let grades = [], attendance = [], invoices = [];
@@ -92,11 +128,10 @@ router.get('/:parentId/dashboard', verifyToken, requireRole('PARENT'), async (re
     } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-module.exports = router;
-
 // Parent requests
 router.get('/:parentId/requests', verifyToken, requireRole('PARENT'), async (req, res) => {
   try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
     const rows = await Notification.findAll({ where: { parentId: req.params.parentId }, order: [['createdAt','DESC']] });
     const statusMap = { 'Pending': 'قيد الانتظار', 'Approved': 'موافق عليه', 'Rejected': 'مرفوض' };
     res.json(rows.map(r => ({ id: String(r.id), title: r.title || 'طلب', description: r.description || '', status: statusMap[r.status] || 'قيد الانتظار', createdAt: r.createdAt.toISOString().split('T')[0] })));
@@ -105,6 +140,7 @@ router.get('/:parentId/requests', verifyToken, requireRole('PARENT'), async (req
 
 router.post('/:parentId/requests', verifyToken, requireRole('PARENT'), async (req, res) => {
   try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
     const { title, description } = req.body || {};
     if (!title) return res.status(400).json({ msg: 'title is required' });
     const row = await Notification.create({ parentId: req.params.parentId, type: 'Approval', title, description: description || '', status: 'Pending' });
@@ -114,7 +150,7 @@ router.post('/:parentId/requests', verifyToken, requireRole('PARENT'), async (re
 
 router.get('/action-items', verifyToken, requireRole('PARENT'), async (req, res) => {
   try {
-    const parentId = req.user.parentId || (req.user.role === 'PARENT' ? req.user.id : null);
+    const parentId = req.user.parentId || (normalizeUserRole(req.user) === 'PARENT' ? req.user.id : null);
     if (!parentId) return res.json([]);
     let rows = [];
     try {
@@ -146,11 +182,14 @@ router.get('/:parentId/student-schedule', verifyToken, requireRole('PARENT'), as
   try {
     if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
     const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
-    const parent = await Parent.findByPk(req.params.parentId, { include: { model: Student } });
-    if (!parent || !parent.Students || parent.Students.length === 0) return res.status(404).json({ msg: 'No student linked' });
-    const targets = studentIdFilter ? parent.Students.filter(s => String(s.id) === studentIdFilter) : parent.Students;
+    const schoolId = Number(req.user.schoolId || 0);
+    const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+    if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+    const targets = selectStudents(students, studentIdFilter);
+    if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
     const list = [];
     for (const student of targets) {
+      if (!student.classId) { list.push({ student: student.toJSON(), schedule: [] }); continue; }
       const rows = await Schedule.findAll({ where: { classId: student.classId }, include: [{ model: Teacher, attributes: ['name'] }, { model: Class, attributes: ['gradeLevel','section'] }], order: [['day','ASC'],['timeSlot','ASC']] });
       const schedule = rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: r.Class ? `${r.Class.gradeLevel} (${r.Class.section || 'أ'})` : '', day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' }));
       list.push({ student: student.toJSON(), schedule });
@@ -164,14 +203,17 @@ router.get('/:parentId/assignments', verifyToken, requireRole('PARENT'), async (
     try {
         if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
         const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
-        const parent = await Parent.findByPk(req.params.parentId, { include: { model: Student } });
-        if (!parent || !parent.Students || parent.Students.length === 0) return res.status(404).json({ msg: 'No student linked' });
-        const targets = studentIdFilter ? parent.Students.filter(s => String(s.id) === studentIdFilter) : parent.Students;
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+        if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+        const targets = selectStudents(students, studentIdFilter);
+        if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
         
         const list = [];
         for (const student of targets) {
+            if (!student.classId) { list.push({ student: student.toJSON(), assignments: [] }); continue; }
             const assignments = await Assignment.findAll({ 
-                where: { classId: student.classId },
+                where: { classId: student.classId, schoolId },
                 include: [{ model: Teacher, attributes: ['name'] }],
                 order: [['dueDate', 'DESC']] 
             });
@@ -206,6 +248,13 @@ router.get('/:parentId/assignments/:assignmentId/submission', verifyToken, requi
         if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
         const { studentId } = req.query;
         if (!studentId) return res.status(400).json({ msg: 'studentId is required' });
+        const schoolId = Number(req.user.schoolId || 0);
+        const ok = await canParentAccessStudent(req, schoolId, String(studentId));
+        if (!ok) return res.status(403).json({ msg: 'Access denied' });
+        const student = await Student.findOne({ where: { id: String(studentId), schoolId } }).catch(() => null);
+        if (!student) return res.status(404).json({ msg: 'Student not found' });
+        const assignment = await Assignment.findOne({ where: { id: Number(req.params.assignmentId), schoolId } }).catch(() => null);
+        if (!assignment || String(assignment.classId) !== String(student.classId || '')) return res.status(404).json({ msg: 'Assignment not found' });
         
         const submission = await Submission.findOne({ 
             where: { 
@@ -234,6 +283,17 @@ router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireR
         if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
         const { studentId, content } = req.body;
         if (!studentId) return res.status(400).json({ msg: 'studentId is required' });
+        const schoolId = Number(req.user.schoolId || 0);
+        const ok = await canParentAccessStudent(req, schoolId, String(studentId));
+        if (!ok) {
+          const files = Array.isArray(req.files) ? req.files : [];
+          for (const f of files) { try { fs.unlinkSync(f.path); } catch {} }
+          return res.status(403).json({ msg: 'Access denied' });
+        }
+        const student = await Student.findOne({ where: { id: String(studentId), schoolId } }).catch(() => null);
+        if (!student) return res.status(404).json({ msg: 'Student not found' });
+        const assignment = await Assignment.findOne({ where: { id: Number(req.params.assignmentId), schoolId } }).catch(() => null);
+        if (!assignment || String(assignment.classId) !== String(student.classId || '')) return res.status(404).json({ msg: 'Assignment not found' });
         
         let submission = await Submission.findOne({ 
             where: { 
@@ -289,10 +349,9 @@ router.get('/:parentId/submissions/:submissionId/attachments/:filename', verifyT
     if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
     const submission = await Submission.findByPk(req.params.submissionId).catch(() => null);
     if (!submission) return res.status(404).json({ msg: 'Submission not found' });
-    const parent = await Parent.findByPk(req.params.parentId, { include: { model: Student } }).catch(() => null);
-    const owns = parent && parent.Students && parent.Students.find(s => String(s.id) === String(submission.studentId));
-    if (!owns) return res.status(403).json({ msg: 'Access denied' });
     const schoolId = Number(req.user.schoolId || 0) || 0;
+    const ok = await canParentAccessStudent(req, schoolId, String(submission.studentId));
+    if (!ok) return res.status(403).json({ msg: 'Access denied' });
     const base = path.join(__dirname, '..', 'storage', 'submissions', String(schoolId), String(submission.studentId));
     const filePath = path.join(base, req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
@@ -304,9 +363,11 @@ router.get('/:parentId/grades', verifyToken, requireRole('PARENT'), async (req, 
     try {
         if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
         const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
-        const parent = await Parent.findByPk(req.params.parentId, { include: { model: Student } });
-        if (!parent || !parent.Students || parent.Students.length === 0) return res.status(404).json({ msg: 'No student linked' });
-        const targets = studentIdFilter ? parent.Students.filter(s => String(s.id) === studentIdFilter) : parent.Students;
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+        if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+        const targets = selectStudents(students, studentIdFilter);
+        if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
         
         const list = [];
         for (const student of targets) {
@@ -329,9 +390,11 @@ router.get('/:parentId/attendance', verifyToken, requireRole('PARENT'), async (r
     try {
         if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
         const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
-        const parent = await Parent.findByPk(req.params.parentId, { include: { model: Student } });
-        if (!parent || !parent.Students || parent.Students.length === 0) return res.status(404).json({ msg: 'No student linked' });
-        const targets = studentIdFilter ? parent.Students.filter(s => String(s.id) === studentIdFilter) : parent.Students;
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+        if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+        const targets = selectStudents(students, studentIdFilter);
+        if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
         const attendanceStatusMap = { 'Present': 'حاضر', 'Absent': 'غائب', 'Late': 'متأخر', 'Excused': 'بعذر' };
         
         const list = [];

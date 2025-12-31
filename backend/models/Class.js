@@ -42,6 +42,18 @@ const Class = sequelize.define('Class', {
     allowNull: true,
     defaultValue: 'أ',
   },
+  branchId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  stageId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  departmentId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   // Foreign keys schoolId, homeroomTeacherId are added via association
 });
 

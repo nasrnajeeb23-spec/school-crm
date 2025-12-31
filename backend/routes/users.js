@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { User, Teacher, Parent, Student } = require('../models');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, isSuperAdminUser, requireRole, requireSameSchoolQuery, normalizeRole, normalizeUserRole } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
 function isStrongPassword(pwd){
@@ -16,16 +16,10 @@ function isStrongPassword(pwd){
 // @route   POST api/users
 // @desc    Create a new user (SuperAdmin only for SchoolAdmin role)
 // @access  Private (SuperAdmin)
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, email, password, role, schoolId, phone } = req.body;
     
-    // Check permissions
-    const creatorRole = String(req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '');
-    if (creatorRole !== 'SUPERADMIN' && creatorRole !== 'SUPER_ADMIN') {
-      return res.status(403).json({ msg: 'Access denied' });
-    }
-
     // Validate input
     if (!name || !email || !password || !role) {
       return res.status(400).json({ msg: 'Please provide all required fields' });
@@ -72,7 +66,7 @@ router.put('/:id', verifyToken, async (req, res) => {
     
     // Check permissions: User can update self, or SuperAdmin can update anyone
     const isSelf = req.user.id === id;
-    const isSuperAdmin = ['SUPERADMIN', 'SUPER_ADMIN'].includes(String(req.user.role || '').toUpperCase().replace(/[^A-Z]/g, ''));
+    const isSuperAdmin = isSuperAdminUser(req.user);
     
     if (!isSelf && !isSuperAdmin) {
       return res.status(403).json({ msg: 'Access denied' });
@@ -146,24 +140,19 @@ router.put('/:id', verifyToken, async (req, res) => {
 
 module.exports = router;
  
-router.get('/by-role', verifyToken, async (req, res) => {
+const requireSchoolIdForSchoolAdmins = (req, res, next) => {
+  const role = normalizeUserRole(req.user);
+  if (role === 'SCHOOL_ADMIN') {
+    const sid = Number((req.query && req.query.schoolId) || 0);
+    if (!sid) return res.status(400).json({ msg: 'schoolId is required' });
+  }
+  return next();
+};
+
+router.get('/by-role', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSchoolIdForSchoolAdmins, requireSameSchoolQuery('schoolId'), async (req, res) => {
   try {
-    const normalizeRole = (role) => {
-      if (!role) return '';
-      const key = String(role).toUpperCase().replace(/[^A-Z]/g, '');
-      const map = {
-        SUPERADMIN: 'SUPER_ADMIN',
-        SCHOOLADMIN: 'SCHOOL_ADMIN'
-      };
-      return map[key] || String(role).toUpperCase();
-    };
-    const userRole = normalizeRole(req.user.role);
-    if (!['SCHOOL_ADMIN','SUPER_ADMIN'].includes(userRole)) return res.status(403).json({ msg: 'Access denied' });
-    const roleParam = String(req.query.role || '').toUpperCase();
-    const role = roleParam === 'SCHOOLADMIN' ? 'SCHOOL_ADMIN' : roleParam;
+    const role = normalizeRole(String(req.query.role || ''));
     const schoolId = req.query.schoolId ? Number(req.query.schoolId) : null;
-    if (userRole.startsWith('SCHOOL') && !schoolId) return res.status(400).json({ msg: 'schoolId is required' });
-    if (userRole.startsWith('SCHOOL') && Number(req.user.schoolId || 0) !== Number(schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
     if (!['TEACHER','PARENT','SCHOOL_ADMIN'].includes(role)) return res.status(400).json({ msg: 'Invalid role' });
     if (role === 'TEACHER') {
       const rows = await Teacher.findAll({ where: schoolId ? { schoolId } : {}, order: [['name','ASC']] });
@@ -180,8 +169,7 @@ router.get('/by-role', verifyToken, async (req, res) => {
       const where = schoolId ? { schoolId } : {};
       const rows = await User.findAll({ where, order: [['createdAt','DESC']] });
       const admins = rows.filter(u => {
-        const r = String(u.role || '').toUpperCase();
-        return r === 'SCHOOLADMIN' || r === 'SCHOOL_ADMIN';
+        return normalizeUserRole(u) === 'SCHOOL_ADMIN';
       });
       const list = admins.map(u => {
         const j = u.toJSON();

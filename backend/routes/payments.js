@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, canParentAccessStudent } = require('../middleware/auth');
 const { Invoice, Payment, Student } = require('../models');
 const { createPaymentSession, verifyPayment } = require('../utils/payment');
 
@@ -19,7 +19,8 @@ router.post('/session', verifyToken, requireRole('PARENT'), async (req, res) => 
     if (!inv) return res.status(404).json({ msg: 'Invoice not found' });
     const student = await Student.findByPk(inv.studentId);
     if (!student) return res.status(404).json({ msg: 'Student not found' });
-    if (String(req.user.parentId || '') !== String(student.parentId || '')) {
+    const ok = await canParentAccessStudent(req, Number(student.schoolId || req.user.schoolId || 0), String(student.id));
+    if (!ok) {
       return res.status(403).json({ msg: 'Access denied' });
     }
 

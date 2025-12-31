@@ -39,6 +39,18 @@ const Teacher = sequelize.define('Teacher', {
     type: DataTypes.DATEONLY,
     allowNull: false,
   },
+  branchId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  stageId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  departmentId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   // Foreign key schoolId is added via association
 });
 

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { User, School, Plan, Subscription, SchoolSettings, Parent, Teacher } = require('../models');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, isSuperAdminUser, normalizeUserRole, canAccessSchool } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const bcrypt = require('bcryptjs');
 const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
@@ -77,8 +77,10 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), val
 
     try { /* تم إزالة قيود الوحدات: الوصول يعتمد على حالة الاشتراك فقط */ } catch {}
 
+    const isSuperAdmin = isSuperAdminUser(user);
+
     // منع الدخول إذا كانت المدرسة موقوفة
-    if (user.role !== 'SUPER_ADMIN' && user.schoolId) {
+    if (!isSuperAdmin && user.schoolId) {
       try {
         const s = await SchoolSettings.findOne({ where: { schoolId: user.schoolId } });
         const st = String(s?.operationalStatus || 'ACTIVE').toUpperCase();
@@ -91,13 +93,12 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), val
     // التحقق من مطابقة المدرسة المختارة في واجهة الدخول مع مدرسة المستخدم
     try {
       const requestedSchoolId = Number(req.body?.schoolId || 0);
-      const isSuperAdmin = String(user.role || '').toUpperCase() === 'SUPER_ADMIN';
       if (requestedSchoolId && !isSuperAdmin) {
         const userSchoolId = Number(user.schoolId || 0);
-        if (!userSchoolId || userSchoolId !== requestedSchoolId) {
+        if (!canAccessSchool(user, requestedSchoolId)) {
           return res.status(403).json({ msg: 'Access denied for this school' });
         }
-        const isParent = String(user.role || '').toUpperCase() === 'PARENT';
+        const isParent = normalizeUserRole(user) === 'PARENT';
         if (isParent) {
           const parent = await Parent.findOne({ where: { id: user.parentId, schoolId: userSchoolId } });
           if (!parent) {
@@ -385,7 +386,7 @@ router.post('/parent/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
     if (!pid) return res.status(400).json({ msg: 'Invalid parentId' });
     const parent = await Parent.findByPk(pid);
     if (!parent) return res.status(404).json({ msg: 'Parent not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(parent.schoolId || 0)) {
+    if (!canAccessSchool(req.user, parent.schoolId)) {
       return res.status(403).json({ msg: 'Access denied' });
     }
     const channel = String(req.body.channel || 'email').toLowerCase();
@@ -507,7 +508,7 @@ router.post('/teacher/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
     if (!Number.isFinite(tid) || tid <= 0) return res.status(400).json({ msg: 'Invalid teacherId' });
     const teacher = await Teacher.findByPk(tid);
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(teacher.schoolId || 0)) {
+    if (!canAccessSchool(req.user, teacher.schoolId)) {
       return res.status(403).json({ msg: 'Access denied' });
     }
     const channel = String(req.body.channel || 'email').toLowerCase();
@@ -617,7 +618,7 @@ router.post('/parent/invite/revoke', verifyToken, requireRole('SCHOOL_ADMIN', 'S
     if (!pid) return res.status(400).json({ msg: 'Invalid parentId' });
     const parent = await Parent.findByPk(pid);
     if (!parent) return res.status(404).json({ msg: 'Parent not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(parent.schoolId || 0)) {
+    if (!canAccessSchool(req.user, parent.schoolId)) {
       return res.status(403).json({ msg: 'Access denied' });
     }
     const user = await User.findOne({ where: { parentId: parent.id } });
@@ -646,7 +647,7 @@ router.post('/teacher/invite/revoke', verifyToken, requireRole('SCHOOL_ADMIN', '
     if (!Number.isFinite(tid) || tid <= 0) return res.status(400).json({ msg: 'Invalid teacherId' });
     const teacher = await Teacher.findByPk(tid);
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(teacher.schoolId || 0)) {
+    if (!canAccessSchool(req.user, teacher.schoolId)) {
       return res.status(403).json({ msg: 'Access denied' });
     }
     const user = await User.findOne({ where: { teacherId: teacher.id } });
@@ -678,10 +679,11 @@ router.post('/staff/invite', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADM
     if (!uid) return res.status(400).json({ msg: 'Invalid userId' });
     let staff = await User.findByPk(uid);
     if (!staff) return res.status(404).json({ msg: 'Staff not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && Number(req.user.schoolId || 0) !== Number(staff.schoolId || 0)) {
+    if (!canAccessSchool(req.user, staff.schoolId)) {
       return res.status(403).json({ msg: 'Access denied' });
     }
-    if (String(staff.role || '').toUpperCase() !== 'STAFF' && String(staff.role || '').toUpperCase() !== 'SCHOOLADMIN') {
+    const staffRole = normalizeUserRole(staff);
+    if (staffRole !== 'STAFF' && staffRole !== 'SCHOOL_ADMIN') {
       return res.status(400).json({ msg: 'Not a staff user' });
     }
     const channel = String(req.body.channel || 'email').toLowerCase();

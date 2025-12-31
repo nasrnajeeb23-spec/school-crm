@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { School, Subscription, Plan, Student, Invoice, SchoolSettings } = require('../models');
 const { sequelize } = require('../models');
-const { verifyToken, requireRole, requireSameSchoolParam, requirePermission } = require('../middleware/auth');
+const { verifyToken, requireRole, requireSameSchoolParam, requirePermission, isSuperAdminUser } = require('../middleware/auth');
 const { requireModule, moduleMap } = require('../middleware/modules');
 const { derivePermissionsForUser } = require('../utils/permissionMatrix');
 
@@ -26,12 +26,12 @@ router.get('/public', async (req, res) => {
       return {
         id: s.id,
         name: s.name,
-        plan: s.Subscription?.Plan?.name || 'N/A',
-        status: s.Subscription?.status || 'N/A',
-        students: s.studentCount,
-        teachers: s.teacherCount,
-        balance: parseFloat(s.balance),
-        joinDate: new Date(s.createdAt).toISOString().split('T')[0],
+        plan: 'N/A',
+        status: 'N/A',
+        students: 0,
+        teachers: 0,
+        balance: 0,
+        joinDate: ''
       };
     });
     res.json(formattedSchools);
@@ -46,6 +46,9 @@ router.get('/public', async (req, res) => {
 // @access  Private (SuperAdmin) / Public for login screen
 router.get('/', async (req, res) => {
   try {
+    if (req.user && !isSuperAdminUser(req.user)) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     const Op = require('sequelize').Op;
     const schools = await School.findAll({
       include: [{ model: Subscription, include: { model: Plan } }],
@@ -59,20 +62,30 @@ router.get('/', async (req, res) => {
       return !st || String(st.operationalStatus).toUpperCase() !== 'DELETED';
     });
 
-    // Format the response to match the frontend's expected structure
     const formattedSchools = visible.map(school => {
       const schoolJSON = school.toJSON();
+      if (!req.user) {
+        return {
+          id: schoolJSON.id,
+          name: schoolJSON.name,
+          plan: 'N/A',
+          status: 'N/A',
+          students: 0,
+          teachers: 0,
+          balance: 0,
+          joinDate: ''
+        };
+      }
       return {
         id: schoolJSON.id,
         name: schoolJSON.name,
         plan: schoolJSON.Subscription?.Plan?.name || 'N/A',
-        // The frontend expects the ENUM key (e.g., 'ACTIVE')
-        status: schoolJSON.Subscription?.status || 'N/A', 
+        status: schoolJSON.Subscription?.status || 'N/A',
         students: schoolJSON.studentCount,
         teachers: schoolJSON.teacherCount,
         balance: parseFloat(schoolJSON.balance),
         joinDate: schoolJSON.createdAt.toISOString().split('T')[0],
-      }
+      };
     });
 
     res.json(formattedSchools);
@@ -85,7 +98,7 @@ router.get('/', async (req, res) => {
 // @route   GET api/schools/:id
 // @desc    Get a single school by id with its subscription details
 // @access  Private (SchoolAdmin) / Public where appropriate
-router.get('/:id', async (req, res) => {
+router.get('/:id', verifyToken, requireSameSchoolParam('id'), async (req, res) => {
   try {
     const school = await School.findByPk(req.params.id, {
       include: {

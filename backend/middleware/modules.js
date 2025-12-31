@@ -1,4 +1,5 @@
 const { User } = require('../models');
+const { isSuperAdminUser } = require('./auth');
 
 const moduleMap = {
   finance: ['finance', 'finance_fees', 'finance_salaries', 'finance_expenses'],
@@ -11,10 +12,7 @@ function requireModule(moduleId) {
   return async (req, res, next) => {
     try {
       // 1. Allow SuperAdmins to bypass module checks
-      if (req.user) {
-          const role = String(req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '');
-          if (role === 'SUPERADMIN' || role === 'SUPER_ADMIN') return next();
-      }
+      if (req.user && isSuperAdminUser(req.user)) return next();
 
       // 2. Identify School ID
       const schoolIdParam = req.params?.schoolId || req.params?.id || req.body?.schoolId || req.query?.schoolId || req.user?.schoolId;

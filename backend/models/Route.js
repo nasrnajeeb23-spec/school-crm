@@ -8,6 +8,9 @@ const Route = sequelize.define('Route', {
   busOperatorId: { type: DataTypes.STRING, allowNull: true },
   departureTime: { type: DataTypes.STRING, allowNull: true },
   stops: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+  branchId: { type: DataTypes.STRING, allowNull: true },
+  stageId: { type: DataTypes.STRING, allowNull: true },
+  departmentId: { type: DataTypes.STRING, allowNull: true },
 });
 
 module.exports = Route;

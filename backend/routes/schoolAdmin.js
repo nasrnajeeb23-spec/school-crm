@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { School, Student, Teacher, Class, Parent, Invoice, Expense, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord } = require('../models');
-const { verifyToken, requireRole, requireSameSchoolParam, requirePermission, JWT_SECRET } = require('../middleware/auth');
+const { sequelize, School, Student, Teacher, Class, Parent, Invoice, Expense, SchoolSettings, SchoolEvent, Grade, Attendance, Schedule, StudentNote, StudentDocument, User, Subscription, FeeSetup, Notification, AuditLog, BehaviorRecord, RbacRole, RbacPermission, RbacRolePermission, RbacScope, RbacUserRoleScope } = require('../models');
+const { verifyToken, requireRole, requireSameSchoolParam, requirePermission, JWT_SECRET, isSuperAdminUser, canAccessSchool, normalizeUserRole, getUserScopeContext, buildScopeWhere, canWriteToScopes, canTeacherAccessClass, canTeacherAccessSubject, canTeacherAccessStudent, canParentAccessStudent, requireSameSchoolAndRolePolicy } = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
+const crypto = require('crypto');
 const { SalaryStructure, SalarySlip } = require('../models');
 const { StaffAttendance, TeacherAttendance } = require('../models');
 const { deriveDesiredDbRole, derivePermissionsForUser } = require('../utils/permissionMatrix');
@@ -95,6 +96,12 @@ async function enforceActiveSubscription(req, res, next) {
 
 // Note: Do not apply global enforcement to avoid blocking benign GETs.
 
+router.use('/:schoolId/students', verifyToken, requireSameSchoolParam('schoolId'), requirePermission('MANAGE_STUDENTS'));
+router.use('/:schoolId/teachers', verifyToken, requireSameSchoolParam('schoolId'), requirePermission('MANAGE_TEACHERS'));
+router.use('/:schoolId/parents', verifyToken, requireSameSchoolParam('schoolId'), requirePermission('MANAGE_PARENTS'));
+router.use('/:schoolId/staff', verifyToken, requireSameSchoolParam('schoolId'), requirePermission('MANAGE_STAFF'));
+router.use('/:schoolId/classes', verifyToken, requireSameSchoolParam('schoolId'), requirePermission('MANAGE_CLASSES'));
+
 function parseFileSizeToBytes(input){
   try {
     const s = String(input || '').trim().toLowerCase();
@@ -109,6 +116,232 @@ function parseFileSizeToBytes(input){
     return num;
   } catch { return 0; }
 }
+
+function normalizeRbacKey(input) {
+  return String(input || '').trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+async function ensureSchoolRootScope(schoolId) {
+  const sid = Number(schoolId);
+  if (!sid) return null;
+  const existing = await RbacScope.findOne({ where: { schoolId: sid, type: 'SCHOOL', key: 'root' } }).catch(() => null);
+  if (existing) return existing;
+  const id = `scope_${sid}_school_root`;
+  const created = await RbacScope.create({ id, schoolId: sid, type: 'SCHOOL', key: 'root', name: 'School', parentScopeId: null }).catch(() => null);
+  return created;
+}
+
+async function computeUserPermissionsFromAssignments(userId, schoolId) {
+  const sid = Number(schoolId);
+  if (!sid || !userId) return [];
+  const assigns = await RbacUserRoleScope.findAll({
+    where: { userId: Number(userId), schoolId: sid },
+    include: [{ model: RbacRole, include: [{ model: RbacPermission, attributes: ['key'] }] }]
+  }).catch(() => []);
+  const set = new Set();
+  for (const a of assigns || []) {
+    const role = a.RbacRole || null;
+    const perms = role && Array.isArray(role.RbacPermissions) ? role.RbacPermissions : [];
+    for (const p of perms) set.add(p.key);
+  }
+  return Array.from(set);
+}
+
+router.get('/:schoolId/rbac/permissions', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const list = await RbacPermission.findAll({ order: [['key', 'ASC']] }).catch(() => []);
+    return res.json((list || []).map(x => x.toJSON()));
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.get('/:schoolId/rbac/roles', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const list = await RbacRole.findAll({
+      where: { [Op.or]: [{ schoolId: null }, { schoolId }] },
+      order: [['key', 'ASC']]
+    }).catch(() => []);
+    return res.json((list || []).map(x => x.toJSON()));
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.post('/:schoolId/rbac/roles', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), validate([
+  { name: 'key', required: true, type: 'string', minLength: 2 },
+  { name: 'name', required: true, type: 'string', minLength: 2 },
+  { name: 'description', required: false, type: 'string' },
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const baseKey = normalizeRbacKey(req.body.key);
+    if (!baseKey) return res.status(400).json({ msg: 'Invalid key' });
+    const key = isSuperAdminUser(req.user) ? baseKey : `SCHOOL_${schoolId}_${baseKey}`;
+    const exists = await RbacRole.findOne({ where: { key } }).catch(() => null);
+    if (exists) return res.status(409).json({ msg: 'Role key already exists' });
+    const id = crypto.randomUUID();
+    const row = await RbacRole.create({
+      id,
+      schoolId: isSuperAdminUser(req.user) ? null : schoolId,
+      key,
+      name: String(req.body.name),
+      description: req.body.description ? String(req.body.description) : null,
+      isSystem: false
+    });
+    return res.status(201).json(row.toJSON());
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.put('/:schoolId/rbac/roles/:roleId/permissions', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const roleId = String(req.params.roleId || '');
+    const role = await RbacRole.findByPk(roleId, { transaction });
+    if (!role) { await transaction.rollback(); return res.status(404).json({ msg: 'Role not found' }); }
+    if (role.schoolId !== null && !canAccessSchool(req.user, role.schoolId)) {
+      await transaction.rollback();
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+    const keys = Array.isArray(req.body.permissions) ? req.body.permissions : [];
+    const permKeys = keys.map(normalizeRbacKey).filter(Boolean);
+    const perms = await RbacPermission.findAll({ where: { key: { [Op.in]: permKeys } }, transaction });
+    await RbacRolePermission.destroy({ where: { roleId }, transaction });
+    const now = new Date();
+    const rows = perms.map(p => ({
+      id: crypto.randomUUID(),
+      roleId,
+      permissionId: p.id,
+      createdAt: now,
+      updatedAt: now
+    }));
+    if (rows.length) await RbacRolePermission.bulkCreate(rows, { transaction });
+    await transaction.commit();
+    const updated = await RbacRole.findByPk(roleId, { include: [{ model: RbacPermission }], order: [[RbacPermission, 'key', 'ASC']] }).catch(() => null);
+    return res.json(updated ? updated.toJSON() : { updated: true });
+  } catch (e) {
+    try { await transaction.rollback(); } catch {}
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.get('/:schoolId/rbac/scopes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    await ensureSchoolRootScope(schoolId);
+    const list = await RbacScope.findAll({ where: { schoolId }, order: [['type', 'ASC'], ['key', 'ASC']] }).catch(() => []);
+    return res.json((list || []).map(x => x.toJSON()));
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.post('/:schoolId/rbac/scopes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), validate([
+  { name: 'type', required: true, type: 'string' },
+  { name: 'key', required: true, type: 'string', minLength: 1 },
+  { name: 'name', required: true, type: 'string', minLength: 1 },
+  { name: 'parentScopeId', required: false, type: 'string' },
+]), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const type = String(req.body.type || '').trim().toUpperCase();
+    const allowed = new Set(['SCHOOL', 'BRANCH', 'STAGE', 'DEPARTMENT']);
+    if (!allowed.has(type)) return res.status(400).json({ msg: 'Invalid scope type' });
+    const key = String(req.body.key || '').trim();
+    if (!key) return res.status(400).json({ msg: 'Invalid scope key' });
+    const name = String(req.body.name || '').trim();
+    if (!name) return res.status(400).json({ msg: 'Invalid scope name' });
+    const parentScopeId = req.body.parentScopeId ? String(req.body.parentScopeId) : null;
+    const exists = await RbacScope.findOne({ where: { schoolId, type, key } }).catch(() => null);
+    if (exists) return res.status(409).json({ msg: 'Scope already exists' });
+    const id = crypto.randomUUID();
+    const row = await RbacScope.create({ id, schoolId, type, key, name, parentScopeId });
+    return res.status(201).json(row.toJSON());
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.get('/:schoolId/rbac/users/:userId/roles', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const userId = Number(req.params.userId);
+    const rows = await RbacUserRoleScope.findAll({
+      where: { schoolId, userId },
+      include: [{ model: RbacRole }, { model: RbacScope }],
+      order: [['createdAt', 'ASC']]
+    }).catch(() => []);
+    return res.json((rows || []).map(x => x.toJSON()));
+  } catch (e) {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+router.put('/:schoolId/rbac/users/:userId/roles', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const userId = Number(req.params.userId);
+    const user = await User.findOne({ where: { id: userId, schoolId }, transaction });
+    if (!user) { await transaction.rollback(); return res.status(404).json({ msg: 'User not found' }); }
+
+    const assignments = Array.isArray(req.body.assignments) ? req.body.assignments : [];
+    const normalized = assignments
+      .map(a => ({
+        roleId: a && a.roleId ? String(a.roleId) : '',
+        scopeId: a && a.scopeId ? String(a.scopeId) : null,
+      }))
+      .filter(a => a.roleId);
+
+    const roleIds = Array.from(new Set(normalized.map(a => a.roleId)));
+    const scopeIds = Array.from(new Set(normalized.map(a => a.scopeId).filter(Boolean)));
+
+    const roles = await RbacRole.findAll({ where: { id: { [Op.in]: roleIds } }, transaction });
+    const rolesById = new Map(roles.map(r => [String(r.id), r]));
+    for (const rid of roleIds) {
+      const r = rolesById.get(String(rid));
+      if (!r) { await transaction.rollback(); return res.status(400).json({ msg: 'Invalid roleId' }); }
+      if (r.schoolId !== null && !canAccessSchool(req.user, r.schoolId)) {
+        await transaction.rollback();
+        return res.status(403).json({ msg: 'Access denied' });
+      }
+    }
+
+    if (scopeIds.length > 0) {
+      const scopes = await RbacScope.findAll({ where: { id: { [Op.in]: scopeIds }, schoolId }, transaction });
+      const scopeSet = new Set(scopes.map(s => String(s.id)));
+      for (const sid of scopeIds) {
+        if (!scopeSet.has(String(sid))) { await transaction.rollback(); return res.status(400).json({ msg: 'Invalid scopeId' }); }
+      }
+    }
+
+    await RbacUserRoleScope.destroy({ where: { userId, schoolId }, transaction });
+    const now = new Date();
+    const rows = normalized.map(a => ({
+      id: crypto.randomUUID(),
+      userId,
+      schoolId,
+      roleId: a.roleId,
+      scopeId: a.scopeId || null,
+      createdAt: now,
+      updatedAt: now
+    }));
+    if (rows.length) await RbacUserRoleScope.bulkCreate(rows, { transaction });
+
+    const computed = await computeUserPermissionsFromAssignments(userId, schoolId);
+    user.permissions = computed;
+    await user.save({ transaction });
+    await transaction.commit();
+    return res.json({ userId, schoolId, permissions: computed, assignments: rows });
+  } catch (e) {
+    try { await transaction.rollback(); } catch {}
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
 
 // @route   GET api/school/:schoolId/stats/counts
 // @desc    Get quick counts for resource usage widget (uses aggregated stats if available)
@@ -298,9 +531,13 @@ router.get('/schools/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
+    const schoolId = Number(req.params.schoolId);
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
     const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
-    const students = await Student.findAll({ where: { schoolId: req.user.schoolId }, order: [['name', 'ASC']], limit, offset });
+    const ctx = await getUserScopeContext(req, schoolId);
+    const scopeWhere = buildScopeWhere(ctx);
+    const where = scopeWhere ? { schoolId, ...scopeWhere } : { schoolId };
+    const students = await Student.findAll({ where, order: [['name', 'ASC']], limit, offset });
     if (!students) return res.error(404, 'NOT_FOUND', 'No students found');
     
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
@@ -318,10 +555,17 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
   { name: 'grade', required: true, type: 'string' },
   { name: 'parentName', required: true, type: 'string' },
   { name: 'dateOfBirth', required: true, type: 'string' },
+  { name: 'branchId', required: false, type: 'string' },
+  { name: 'stageId', required: false, type: 'string' },
+  { name: 'departmentId', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
     const { schoolId } = req.params;
-    const { name, grade, parentName, dateOfBirth, address, city, homeLocation, lat, lng } = req.body;
+    const { name, grade, parentName, dateOfBirth, address, city, homeLocation, lat, lng, branchId, stageId, departmentId } = req.body;
+    const ctx = await getUserScopeContext(req, Number(schoolId));
+    if (!canWriteToScopes(ctx, { branchId: branchId || null, stageId: stageId || null, departmentId: departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
 
     const school = await School.findByPk(schoolId);
     if (!school) {
@@ -379,6 +623,9 @@ router.post('/:schoolId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
       parentName,
       dateOfBirth,
       schoolId: parseInt(schoolId),
+      branchId: branchId || null,
+      stageId: stageId || null,
+      departmentId: departmentId || null,
       status: 'Active', // Default status
       registrationDate: new Date(),
       profileImageUrl: `https://picsum.photos/seed/std_${Date.now()}/100/100`,
@@ -412,19 +659,32 @@ router.put('/:schoolId/students/:studentId', verifyToken, requireRole('SCHOOL_AD
   { name: 'parentName', required: true, type: 'string' },
   { name: 'dateOfBirth', required: true, type: 'string' },
   { name: 'status', required: true, type: 'string', enum: ['نشط', 'موقوف'] },
+  { name: 'branchId', required: false, type: 'string' },
+  { name: 'stageId', required: false, type: 'string' },
+  { name: 'departmentId', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
-    const { name, grade, parentName, dateOfBirth, status } = req.body;
+    const schoolId = Number(req.params.schoolId);
+    const { name, grade, parentName, dateOfBirth, status, branchId, stageId, departmentId } = req.body;
     if (!name || !grade || !parentName || !dateOfBirth || !status) {
       return res.error(400, 'VALIDATION_FAILED', 'Missing required fields');
     }
-    const student = await Student.findByPk(req.params.studentId);
+    const ctx = await getUserScopeContext(req, schoolId);
+    const scopeWhere = buildScopeWhere(ctx);
+    const where = scopeWhere ? { id: String(req.params.studentId), schoolId, ...scopeWhere } : { id: String(req.params.studentId), schoolId };
+    const student = await Student.findOne({ where });
     if (!student) return res.error(404, 'NOT_FOUND', 'Student not found');
+    if (!canWriteToScopes(ctx, { branchId: branchId ?? student.branchId ?? null, stageId: stageId ?? student.stageId ?? null, departmentId: departmentId ?? student.departmentId ?? null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     student.name = name;
     student.grade = grade;
     student.parentName = parentName;
     student.dateOfBirth = dateOfBirth;
     student.status = status === 'نشط' ? 'Active' : status === 'موقوف' ? 'Suspended' : student.status;
+    if (branchId !== undefined) student.branchId = branchId || null;
+    if (stageId !== undefined) student.stageId = stageId || null;
+    if (departmentId !== undefined) student.departmentId = departmentId || null;
     await student.save();
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
     return res.success({ ...student.toJSON(), status: statusMap[student.status] || student.status }, 'Student updated');
@@ -437,10 +697,14 @@ router.put('/:schoolId/students/:studentId', verifyToken, requireRole('SCHOOL_AD
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
+    const schoolId = Number(req.params.schoolId);
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
     const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+    const ctx = await getUserScopeContext(req, schoolId);
+    const scopeWhere = buildScopeWhere(ctx);
+    const where = scopeWhere ? { schoolId, ...scopeWhere } : { schoolId };
     const teachers = await Teacher.findAll({ 
-      where: { schoolId: req.params.schoolId }, 
+      where, 
       include: [{ model: User, attributes: ['id','email','lastInviteAt','lastInviteChannel'], required: false }],
       order: [['name', 'ASC']], 
       limit, 
@@ -923,10 +1187,17 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
   { name: 'department', required: false, type: 'string' },
   { name: 'bankAccount', required: false, type: 'string' },
   { name: 'email', required: false, type: 'string' },
+  { name: 'branchId', required: false, type: 'string' },
+  { name: 'stageId', required: false, type: 'string' },
+  { name: 'departmentId', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
     const { schoolId } = req.params;
-    const { name, subject, phone, department, bankAccount, email } = req.body;
+    const { name, subject, phone, department, bankAccount, email, branchId, stageId, departmentId } = req.body;
+    const scopeCtx = await getUserScopeContext(req, Number(schoolId));
+    if (!canWriteToScopes(scopeCtx, { branchId: branchId || null, stageId: stageId || null, departmentId: departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
 
     const school = await School.findByPk(req.user.schoolId);
     if (!school) return res.status(404).json({ msg: 'School not found' });
@@ -947,7 +1218,7 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
       }
       if (email && String(email).trim() !== '') {
         const existingUser = await User.findOne({ where: { email: String(email).toLowerCase() } });
-        if (existingUser && String(existingUser.schoolId || '') === String(req.user.schoolId) && String(existingUser.role || '').toUpperCase() === 'TEACHER') {
+        if (existingUser && String(existingUser.schoolId || '') === String(req.user.schoolId) && normalizeUserRole(existingUser) === 'TEACHER') {
           return res.status(409).json({ msg: 'البريد الإلكتروني مستخدم لمعلم آخر.', code: 'DUPLICATE_EMAIL' });
         }
       }
@@ -1000,6 +1271,9 @@ router.post('/:schoolId/teachers', verifyToken, requireRole('SCHOOL_ADMIN', 'SUP
       department: department || null,
       bankAccount: bankAccount || null,
       schoolId: parseInt(schoolId),
+      branchId: branchId || null,
+      stageId: stageId || null,
+      departmentId: departmentId || null,
       status: 'Active',
       joinDate: new Date(),
     });
@@ -1069,20 +1343,33 @@ router.put('/:schoolId/teachers/:teacherId', verifyToken, requireRole('SCHOOL_AD
   { name: 'department', required: false, type: 'string' },
   { name: 'bankAccount', required: false, type: 'string' },
   { name: 'email', required: false, type: 'string' },
+  { name: 'branchId', required: false, type: 'string' },
+  { name: 'stageId', required: false, type: 'string' },
+  { name: 'departmentId', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
-    const { name, subject, phone, status, department, bankAccount, email } = req.body;
+    const schoolId = Number(req.params.schoolId);
+    const { name, subject, phone, status, department, bankAccount, email, branchId, stageId, departmentId } = req.body;
     if (!name || !subject || !phone || !status) {
       return res.status(400).json({ msg: 'Missing required fields' });
     }
-    const teacher = await Teacher.findByPk(Number(req.params.teacherId));
+    const ctx = await getUserScopeContext(req, schoolId);
+    const scopeWhere = buildScopeWhere(ctx);
+    const where = scopeWhere ? { id: Number(req.params.teacherId), schoolId, ...scopeWhere } : { id: Number(req.params.teacherId), schoolId };
+    const teacher = await Teacher.findOne({ where });
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (!canWriteToScopes(ctx, { branchId: branchId ?? teacher.branchId ?? null, stageId: stageId ?? teacher.stageId ?? null, departmentId: departmentId ?? teacher.departmentId ?? null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     teacher.name = name;
     teacher.subject = subject;
     teacher.phone = phone;
     if (department !== undefined) teacher.department = department || null;
     if (bankAccount !== undefined) teacher.bankAccount = bankAccount || null;
     teacher.status = status === 'نشط' ? 'Active' : status === 'في إجازة' ? 'OnLeave' : teacher.status;
+    if (branchId !== undefined) teacher.branchId = branchId || null;
+    if (stageId !== undefined) teacher.stageId = stageId || null;
+    if (departmentId !== undefined) teacher.departmentId = departmentId || null;
     await teacher.save();
 
     let updatedEmail = null;
@@ -1142,9 +1429,14 @@ router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SC
     const schoolId = Number(req.params.schoolId);
     const teacherId = Number(req.params.teacherId);
     const { isActive } = req.body || {};
-    const teacher = await Teacher.findByPk(teacherId);
+    const ctx = await getUserScopeContext(req, schoolId);
+    const scopeWhere = buildScopeWhere(ctx);
+    const where = scopeWhere ? { id: teacherId, schoolId, ...scopeWhere } : { id: teacherId, schoolId };
+    const teacher = await Teacher.findOne({ where });
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
-    if (Number(teacher.schoolId) !== schoolId) return res.status(403).json({ msg: 'Access denied' });
+    if (!canWriteToScopes(ctx, { branchId: teacher.branchId || null, stageId: teacher.stageId || null, departmentId: teacher.departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
 
     let user = await User.findOne({ where: { teacherId: teacher.id } });
     if (user) {
@@ -1169,8 +1461,14 @@ router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SC
   try {
     const schoolId = Number(req.params.schoolId);
     const teacherId = Number(req.params.teacherId);
-    const teacher = await Teacher.findOne({ where: { id: teacherId, schoolId } });
+    const ctx = await getUserScopeContext(req, schoolId);
+    const scopeWhere = buildScopeWhere(ctx);
+    const where = scopeWhere ? { id: teacherId, schoolId, ...scopeWhere } : { id: teacherId, schoolId };
+    const teacher = await Teacher.findOne({ where });
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (!canWriteToScopes(ctx, { branchId: teacher.branchId || null, stageId: teacher.stageId || null, departmentId: teacher.departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     await Class.update({ homeroomTeacherId: null, homeroomTeacherName: 'غير محدد' }, { where: { homeroomTeacherId: teacher.id, schoolId } });
     const user = await User.findOne({ where: { teacherId: teacher.id } });
     if (user) await user.destroy();
@@ -1204,7 +1502,11 @@ router.put('/:schoolId/teachers/:teacherId/status', verifyToken, requireRole('SC
 // @access  Private (SchoolAdmin)
 router.get('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
-    const classes = await Class.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']] });
+    const schoolId = Number(req.params.schoolId);
+    const ctx = await getUserScopeContext(req, schoolId);
+    const scopeWhere = buildScopeWhere(ctx);
+    const where = scopeWhere ? { schoolId, ...scopeWhere } : { schoolId };
+    const classes = await Class.findAll({ where, order: [['name', 'ASC']] });
     res.json(classes.map(c => {
       const json = c.toJSON();
       const displayName = `${json.gradeLevel} (${json.section || 'أ'})`;
@@ -1223,11 +1525,19 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
   { name: 'subjects', required: true },
   { name: 'capacity', required: false, type: 'number' },
   { name: 'section', required: false, type: 'string' },
+  { name: 'branchId', required: false, type: 'string' },
+  { name: 'stageId', required: false, type: 'string' },
+  { name: 'departmentId', required: false, type: 'string' },
 ]), async (req, res) => {
   try {
-    const { name, gradeLevel, homeroomTeacherId, subjects, capacity, section } = req.body;
+    const { name, gradeLevel, homeroomTeacherId, subjects, capacity, section, branchId, stageId, departmentId } = req.body;
     if (!name || !gradeLevel || !homeroomTeacherId || !Array.isArray(subjects)) {
       return res.status(400).json({ msg: 'Missing required fields' });
+    }
+    const schoolId = Number(req.params.schoolId);
+    const ctx = await getUserScopeContext(req, schoolId);
+    if (!canWriteToScopes(ctx, { branchId: branchId || null, stageId: stageId || null, departmentId: departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
     }
     const teacher = await Teacher.findByPk(Number(homeroomTeacherId));
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
@@ -1243,6 +1553,9 @@ router.post('/:schoolId/classes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPE
       homeroomTeacherId: Number(homeroomTeacherId),
       subjects: subjects,
       section: typeof section === 'string' ? section : 'أ',
+      branchId: branchId || null,
+      stageId: stageId || null,
+      departmentId: departmentId || null,
     });
     const json = newClass.toJSON();
     const displayName = `${json.gradeLevel} (${json.section || 'أ'})`;
@@ -1333,6 +1646,10 @@ router.put('/:schoolId/classes/:classId/roster', verifyToken, requireRole('SCHOO
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     const uniqueIds = Array.from(new Set(studentIds.map(id => String(id))));
+    const scopeCtx = await getUserScopeContext(req, Number(req.params.schoolId));
+    if (!canWriteToScopes(scopeCtx, { branchId: cls.branchId || null, stageId: cls.stageId || null, departmentId: cls.departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     const currentMembers = await Student.findAll({ where: { schoolId: cls.schoolId, classId: cls.id }, attributes: ['id'] });
     const currentIds = new Set(currentMembers.map(s => String(s.id)));
     const toAdd = uniqueIds.filter(id => !currentIds.has(id));
@@ -1371,6 +1688,10 @@ router.put('/:schoolId/classes/:classId/details', verifyToken, requireRole('SCHO
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const scopeCtx = await getUserScopeContext(req, Number(req.params.schoolId));
+    if (!canWriteToScopes(scopeCtx, { branchId: cls.branchId || null, stageId: cls.stageId || null, departmentId: cls.departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     const { name, capacity, homeroomTeacherId, section } = req.body || {};
     if (typeof name === 'string' && name.trim()) cls.name = name.trim();
     if (typeof capacity === 'number' && capacity > 0) cls.capacity = capacity;
@@ -1392,6 +1713,10 @@ router.delete('/:schoolId/classes/:classId', verifyToken, requireRole('SCHOOL_AD
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const scopeCtx = await getUserScopeContext(req, Number(req.params.schoolId));
+    if (!canWriteToScopes(scopeCtx, { branchId: cls.branchId || null, stageId: cls.stageId || null, departmentId: cls.departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     const schedCount = await Schedule.count({ where: { classId: cls.id } });
     const attCount = await Attendance.count({ where: { classId: cls.id } });
     const gradeCount = await Grade.count({ where: { classId: cls.id } });
@@ -1410,6 +1735,10 @@ router.put('/:schoolId/classes/:classId/subjects', verifyToken, requireRole('SCH
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const scopeCtx = await getUserScopeContext(req, Number(req.params.schoolId));
+    if (!canWriteToScopes(scopeCtx, { branchId: cls.branchId || null, stageId: cls.stageId || null, departmentId: cls.departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     cls.subjects = subjects.filter(s => typeof s === 'string' && s.trim().length > 0);
     await cls.save();
     { const j = cls.toJSON(); const displayName = `${j.gradeLevel} (${j.section || 'أ'})`; res.json({ ...j, name: displayName, subjects: Array.isArray(j.subjects) ? j.subjects : [] }); }
@@ -1423,6 +1752,10 @@ router.put('/:schoolId/classes/:classId/subject-teachers', verifyToken, requireR
     const cls = await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (Number(cls.schoolId) !== Number(req.params.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const scopeCtx = await getUserScopeContext(req, Number(req.params.schoolId));
+    if (!canWriteToScopes(scopeCtx, { branchId: cls.branchId || null, stageId: cls.stageId || null, departmentId: cls.departmentId || null })) {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
     const map = {};
     for (const [subject, teacherId] of Object.entries(payload)) {
       if (typeof subject !== 'string' || !subject.trim()) continue;
@@ -1438,11 +1771,24 @@ router.put('/:schoolId/classes/:classId/subject-teachers', verifyToken, requireR
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+const resolveClassSchoolId = async (req) => {
+  if (req._classForAccess && String(req._classForAccess.id) === String(req.params.classId)) {
+    return Number(req._classForAccess.schoolId || 0);
+  }
+  const cls = await Class.findByPk(req.params.classId).catch(() => null);
+  req._classForAccess = cls || null;
+  return cls ? Number(cls.schoolId || 0) : 0;
+};
+
+router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolAndRolePolicy(resolveClassSchoolId), async (req, res) => {
   try {
-    const cls = await Class.findByPk(req.params.classId);
+    const cls = req._classForAccess || await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const role = normalizeUserRole(req.user);
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessClass(req, cls);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rows = await Schedule.findAll({ where: { classId: cls.id }, include: [{ model: Teacher, attributes: ['name'] }], order: [['day','ASC'],['timeSlot','ASC']] });
     const list = rows.map(r => ({ id: String(r.id), classId: String(cls.id), day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' }));
     res.json(list);
@@ -1463,13 +1809,12 @@ router.get('/:schoolId/teacher/:teacherId/schedule', verifyToken, requireRole('S
     res.json(list);
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
-router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolAndRolePolicy(resolveClassSchoolId), async (req, res) => {
   try {
     const { entries } = req.body || {};
     if (!Array.isArray(entries)) return res.status(400).json({ msg: 'entries must be an array' });
-    const cls = await Class.findByPk(req.params.classId);
+    const cls = req._classForAccess || await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
     const validDays = new Set(['Sunday','Monday','Tuesday','Wednesday','Thursday']);
     function parseSlot(s) {
       try {
@@ -1596,37 +1941,49 @@ router.post('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN',
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.get('/class/:classId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+router.get('/class/:classId/students', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolAndRolePolicy(resolveClassSchoolId), async (req, res) => {
   try {
-    const cls = await Class.findByPk(req.params.classId);
+    const cls = req._classForAccess || await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const role = normalizeUserRole(req.user);
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessClass(req, cls);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
     const students = await Student.findAll({ where: { schoolId: cls.schoolId, classId: cls.id }, order: [['name','ASC']] });
     const statusMap = { 'Active': 'نشط', 'Suspended': 'موقوف' };
     res.json(students.map(s => ({ ...s.toJSON(), status: statusMap[s.status] || s.status })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.get('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+router.get('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolAndRolePolicy(resolveClassSchoolId), async (req, res) => {
   try {
     const { date } = req.query;
     if (!date) return res.status(400).json({ msg: 'date is required' });
-    const cls = await Class.findByPk(req.params.classId);
+    const cls = req._classForAccess || await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const role = normalizeUserRole(req.user);
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessClass(req, cls);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rows = await Attendance.findAll({ where: { classId: cls.id, date }, order: [['studentId','ASC']] });
     const statusMap = { 'Present': 'حاضر', 'Absent': 'غائب', 'Late': 'متأخر', 'Excused': 'بعذر' };
     res.json(rows.map(r => ({ studentId: r.studentId, date: r.date, status: statusMap[r.status] || r.status })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.post('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+router.post('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolAndRolePolicy(resolveClassSchoolId), async (req, res) => {
   try {
     const { date, records } = req.body || {};
     if (!date || !Array.isArray(records)) return res.status(400).json({ msg: 'date and records are required' });
-    const cls = await Class.findByPk(req.params.classId);
+    const cls = req._classForAccess || await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const role = normalizeUserRole(req.user);
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessClass(req, cls);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rev = { 'حاضر': 'Present', 'غائب': 'Absent', 'متأخر': 'Late', 'بعذر': 'Excused' };
     const ids = Array.from(new Set(records.map(r => String(r.studentId))));
     const students = await Student.findAll({ where: { id: { [Op.in]: ids }, schoolId: cls.schoolId } });
@@ -1647,13 +2004,17 @@ router.post('/class/:classId/attendance', verifyToken, requireRole('SCHOOL_ADMIN
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.get('/class/:classId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+router.get('/class/:classId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolAndRolePolicy(resolveClassSchoolId), async (req, res) => {
   try {
     const { subject } = req.query;
     if (!subject) return res.status(400).json({ msg: 'subject is required' });
-    const cls = await Class.findByPk(req.params.classId);
+    const cls = req._classForAccess || await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const role = normalizeUserRole(req.user);
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessSubject(req, cls, String(subject));
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rows = await Grade.findAll({ where: { classId: cls.id, subject }, order: [['studentId','ASC']] });
     res.json(rows.map(r => ({ classId: String(cls.id), subject: r.subject, studentId: r.studentId, studentName: '', grades: { homework: r.homework, quiz: r.quiz, midterm: r.midterm, final: r.final } })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
@@ -1664,12 +2025,23 @@ router.post('/:schoolId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER
     const { entries } = req.body || {};
     if (!Array.isArray(entries) || entries.length === 0) return res.status(400).json({ msg: 'entries must be non-empty array' });
     const invalid = [];
+    const role = normalizeUserRole(req.user);
+    const cache = new Map();
     for (const e of entries) {
       const cls = await Class.findByPk(e.classId);
       if (!cls || Number(cls.schoolId) !== Number(req.params.schoolId)) { invalid.push({ classId: e.classId, reason: 'Invalid class for school' }); continue; }
       if (Array.isArray(cls.subjects) && cls.subjects.length > 0 && !cls.subjects.includes(e.subject)) { invalid.push({ classId: e.classId, subject: e.subject, reason: 'Subject not in class subjects' }); continue; }
       const s = await Student.findByPk(e.studentId);
       if (!s || Number(s.schoolId) !== Number(req.params.schoolId) || String(s.classId || '') !== String(cls.id)) { invalid.push({ studentId: e.studentId, classId: e.classId, reason: 'Student not in class' }); continue; }
+      if (role === 'TEACHER') {
+        const key = `${String(cls.id)}::${String(e.subject)}`;
+        let ok = cache.get(key);
+        if (ok === undefined) {
+          ok = await canTeacherAccessSubject(req, cls, String(e.subject));
+          cache.set(key, ok);
+        }
+        if (!ok) { invalid.push({ classId: e.classId, subject: e.subject, reason: 'Teacher not assigned' }); continue; }
+      }
     }
     if (invalid.length > 0) return res.status(400).json({ msg: 'Invalid grade entries', invalid });
     for (const e of entries) {
@@ -1679,9 +2051,10 @@ router.post('/:schoolId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER
         existing.quiz = e.grades.quiz;
         existing.midterm = e.grades.midterm;
         existing.final = e.grades.final;
+        if (role === 'TEACHER') existing.teacherId = req.user.teacherId;
         await existing.save();
       } else {
-        await Grade.create({ studentId: e.studentId, classId: e.classId, subject: e.subject, homework: e.grades.homework, quiz: e.grades.quiz, midterm: e.grades.midterm, final: e.grades.final });
+        await Grade.create({ studentId: e.studentId, classId: e.classId, subject: e.subject, homework: e.grades.homework, quiz: e.grades.quiz, midterm: e.grades.midterm, final: e.grades.final, teacherId: role === 'TEACHER' ? req.user.teacherId : (e.teacherId || null) });
       }
     }
     res.json({ ok: true });
@@ -1691,7 +2064,10 @@ router.post('/:schoolId/grades', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER
 router.get('/:schoolId/grades/all', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolParam('schoolId'), async (req, res) => {
   try {
     const schoolId = Number(req.params.schoolId);
+    const role = normalizeUserRole(req.user);
+    const where = role === 'TEACHER' ? { teacherId: req.user.teacherId } : {};
     const rows = await Grade.findAll({
+      where,
       include: [
         { model: Class, attributes: ['id'], where: { schoolId } },
         { model: Student, attributes: ['name'] }
@@ -1712,11 +2088,15 @@ router.get('/:schoolId/grades/all', verifyToken, requireRole('SCHOOL_ADMIN', 'SU
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), async (req, res) => {
+router.get('/class/:classId/schedule', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER'), requireSameSchoolAndRolePolicy(resolveClassSchoolId), async (req, res) => {
   try {
-    const cls = await Class.findByPk(req.params.classId);
+    const cls = req._classForAccess || await Class.findByPk(req.params.classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.schoolId && Number(req.user.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const role = normalizeUserRole(req.user);
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessClass(req, cls);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
     const rows = await Schedule.findAll({ where: { classId: cls.id }, order: [['day','ASC'],['timeSlot','ASC']] });
     res.json(rows.map(r => ({ id: String(r.id), classId: String(cls.id), className: cls.name, day: r.day, startTime: r.timeSlot.split(' - ')[0], endTime: r.timeSlot.split(' - ')[1] || r.timeSlot, subject: r.subject, teacher: '' })));
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
@@ -3530,13 +3910,14 @@ router.get('/:schoolId/students/:studentId/behavior', verifyToken, requireRole('
   try {
     const schoolId = parseInt(req.params.schoolId);
     const studentId = req.params.studentId;
-    
-    // Additional check for Parent role to ensure they only access their own children
-    if (req.user.role === 'PARENT') {
-       const student = await Student.findOne({ where: { id: studentId, schoolId } });
-       if (!student || student.parentId !== req.user.parentId) {
-           return res.status(403).json({ msg: 'Access denied' });
-       }
+    const role = normalizeUserRole(req.user);
+    if (role === 'PARENT') {
+      const ok = await canParentAccessStudent(req, schoolId, studentId);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessStudent(req, schoolId, studentId);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
     }
 
     const records = await BehaviorRecord.findAll({
@@ -3559,6 +3940,11 @@ router.post('/:schoolId/students/:studentId/behavior', verifyToken, requireSameS
     const schoolId = parseInt(req.params.schoolId);
     const studentId = req.params.studentId;
     const { type, title, description, date, actionTaken, severity } = req.body;
+    const role = normalizeUserRole(req.user);
+    if (role === 'TEACHER') {
+      const ok = await canTeacherAccessStudent(req, schoolId, studentId);
+      if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    }
 
     const record = await BehaviorRecord.create({
       schoolId,
