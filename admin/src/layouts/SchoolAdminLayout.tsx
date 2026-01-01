@@ -41,6 +41,7 @@ const DriverProfile = React.lazy(() => import('../pages/DriverProfile'));
 const ModulesPage = React.lazy(() => import('../pages/ModulesPage'));
 const SchoolParentRequests = React.lazy(() => import('../pages/SchoolParentRequests'));
 const BackgroundJobs = React.lazy(() => import('../pages/BackgroundJobs'));
+const HelpCenter = React.lazy(() => import('../pages/HelpCenter'));
 
 interface SchoolAdminLayoutProps {
   isSuperAdminView?: boolean;
@@ -259,12 +260,15 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="settings" element={<ProtectedPage permission={Permission.MANAGE_SETTINGS}><Settings schoolId={school.id} /></ProtectedPage>} />
                     <Route path="profile" element={<UserProfile />} />
                     <Route path="modules" element={<ProtectedPage permission={Permission.MANAGE_MODULES}><ModulesPage school={school} /></ProtectedPage>} />
+                    <Route path="help-center" element={<HelpCenter />} />
                 </Routes>
             </Suspense>
         </div>
       </main>
+      <TooltipGuide />
     </>
   );
 };
 
+import TooltipGuide from '../components/TooltipGuide';
 export default SchoolAdminLayout;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { DashboardIcon, StudentsIcon, UsersIcon, ClassesIcon, FinanceIcon, ReportsIcon, AttendanceIcon, GradesIcon, ScheduleIcon, MessagingIcon, ParentsIcon, SettingsIcon, EventIcon, LogoutIcon, ProfileIcon, BusIcon, ModuleIcon, NetProfitIcon, LockIcon, CloseIcon } from './icons';
+import { DashboardIcon, StudentsIcon, UsersIcon, ClassesIcon, FinanceIcon, ReportsIcon, AttendanceIcon, GradesIcon, ScheduleIcon, MessagingIcon, ParentsIcon, SettingsIcon, EventIcon, LogoutIcon, ProfileIcon, BusIcon, ModuleIcon, NetProfitIcon, LockIcon, CloseIcon, HelpIcon } from './icons';
 import { Permission } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -43,6 +43,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
     { id: 'jobs', label: 'مهام الخلفية', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/jobs` },
     { id: 'settings', label: 'الإعدادات', icon: SettingsIcon, requiredPermission: Permission.MANAGE_SETTINGS, path: `${basePath}/settings` },
     { id: 'modules', label: 'الباقات والاشتراكات', icon: ModuleIcon, requiredPermission: Permission.MANAGE_MODULES, path: `${basePath}/modules` },
+    { id: 'help_center', label: 'مركز المساعدة', icon: HelpIcon, requiredPermission: Permission.VIEW_DASHBOARD, path: `${basePath}/help-center` },
   ];
 
   const hasPermission = (item: typeof allNavItems[0]) => {

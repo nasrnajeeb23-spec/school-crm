@@ -69,6 +69,16 @@ function requireWithinLimits(resourceKey){
       const schoolId = Number(req.params.schoolId || req.user?.schoolId || req.headers['x-school-id']);
       if (!schoolId) return res.status(400).json({ code: 'BAD_REQUEST', msg: 'SchoolId required' });
       const sub = await Subscription.findOne({ where: { schoolId } });
+      
+      // Enforce subscription status
+      if (sub && sub.status !== 'ACTIVE' && sub.status !== 'TRIAL') {
+        return res.status(403).json({ 
+          code: 'SUBSCRIPTION_INACTIVE', 
+          msg: 'اشتراك المدرسة غير نشط. يرجى تجديد الاشتراك.',
+          data: { status: sub.status }
+        });
+      }
+
       const plan = sub ? await Plan.findByPk(sub.planId) : null;
       const settings = await SchoolSettings.findOne({ where: { schoolId } });
       const { limits, mode } = normalizeLimits(settings, plan, sub);

@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useAppContext } from '../contexts/AppContext';
 import ThemeToggle from '../components/ThemeToggle';
+import TooltipGuide from '../components/TooltipGuide';
 
 const viewTitles: { [key: string]: string } = {
   dashboard: 'لوحة التحكم الرئيسية',
@@ -55,6 +56,7 @@ const SuperAdminLayout: React.FC = () => {
           <Outlet />
         </div>
       </main>
+      <TooltipGuide />
     </>
   );
 };

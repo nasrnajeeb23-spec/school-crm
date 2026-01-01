@@ -1,10 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import * as api from '../api'
 
 type Tip = { selector: string; title: string; content: string; position: 'top' | 'bottom' | 'left' | 'right' }
 
 function getRouteKey(): string {
   const p = window.location.pathname.toLowerCase()
   if (p.includes('/help-center')) return 'help-center'
+  if (p.includes('/superadmin/dashboard')) return 'superadmin-dashboard'
+  if (p.includes('/superadmin/schools')) return 'superadmin-schools'
+  if (p.includes('/superadmin/subscriptions')) return 'superadmin-subscriptions'
+  if (p.includes('/superadmin/billing')) return 'superadmin-billing'
+  if (p.includes('/superadmin/content')) return 'superadmin-content'
+  if (p.includes('/superadmin/security')) return 'superadmin-security'
+  if (p.includes('/superadmin/settings')) return 'superadmin-settings'
+  
+  // Teacher Pages
+  if (p.includes('/teacher/dashboard')) return 'teacher-dashboard'
+  if (p.includes('/teacher/my_classes')) return 'teacher-classes'
+  if (p.includes('/teacher/schedule')) return 'teacher-schedule'
+  if (p.includes('/teacher/assignments')) return 'teacher-assignments'
+  if (p.includes('/teacher/attendance')) return 'teacher-attendance'
+  if (p.includes('/teacher/grades')) return 'teacher-grades'
+  if (p.includes('/teacher/finance')) return 'teacher-finance'
+  if (p.includes('/teacher/messaging')) return 'messaging'
+
+  // Parent Pages
+  if (p.includes('/parent/dashboard')) return 'parent-dashboard'
+  if (p.includes('/parent/grades')) return 'parent-grades'
+  if (p.includes('/parent/attendance')) return 'parent-attendance'
+  if (p.includes('/parent/finance')) return 'parent-finance'
+  if (p.includes('/parent/schedule')) return 'parent-schedule'
+  if (p.includes('/parent/assignments')) return 'parent-assignments'
+  if (p.includes('/parent/requests')) return 'parent-requests'
+  if (p.includes('/parent/messaging')) return 'messaging'
+  if (p.includes('/parent/transportation')) return 'parent-transportation'
+
   if (p.includes('/school') && p.includes('/settings')) return 'school-settings'
   if (p.includes('/teachers')) return 'teachers'
   if (p.includes('/classes')) return 'classes'
@@ -25,8 +55,8 @@ export default function TooltipGuide() {
   useEffect(() => {
     if (!open) return
     const routeKey = getRouteKey()
-    const base = (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) || '/api'
-    fetch(`${base.replace(/\/$/, '')}/help/tooltips?route=${encodeURIComponent(routeKey)}`)
+    const base = api.getApiBase().replace(/\/$/, '')
+    fetch(`${base}/help/tooltips?route=${encodeURIComponent(routeKey)}`)
       .then(r => r.json())
       .then(j => setTips(Array.isArray(j.tooltips) ? j.tooltips : []))
       .catch(() => setTips([]))

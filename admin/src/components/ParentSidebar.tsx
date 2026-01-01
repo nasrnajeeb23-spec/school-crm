@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, ScheduleIcon, RequestIcon, LogoutIcon, ProfileIcon, BusIcon, MessagingIcon, CloseIcon, AssignmentIcon } from './icons';
+import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, ScheduleIcon, RequestIcon, LogoutIcon, ProfileIcon, BusIcon, MessagingIcon, CloseIcon, AssignmentIcon, HelpIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface ParentSidebarProps {
@@ -21,6 +21,7 @@ const ParentSidebar: React.FC<ParentSidebarProps> = ({ isMobileOpen = false, onC
     { id: 'requests', label: 'الطلبات', icon: RequestIcon, path: '/parent/requests' },
     { id: 'messaging', label: 'الرسائل', icon: MessagingIcon, path: '/parent/messaging' },
     { id: 'transportation', label: 'النقل المدرسي', icon: BusIcon, path: '/parent/transportation' },
+    { id: 'help-center', label: 'مركز المساعدة', icon: HelpIcon, path: '/parent/help-center' },
   ];
 
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-2 rounded-lg transition-colors duration-200";

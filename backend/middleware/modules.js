@@ -17,24 +17,35 @@ function requireModule(moduleId) {
       // 2. Identify School ID
       const schoolIdParam = req.params?.schoolId || req.params?.id || req.body?.schoolId || req.query?.schoolId || req.user?.schoolId;
       if (!schoolIdParam) {
-          return next();
+        return next();
       }
 
       const schoolId = Number(schoolIdParam);
 
-      // 3. Enforce subscription state only
-      const { Subscription, School } = require('../models');
-      const sub = await Subscription.findOne({ where: { schoolId } });
+      // 3. Enforce subscription state and module access
+      const { Subscription, School, Plan, SubscriptionModule } = require('../models');
+      const sub = await Subscription.findOne({ 
+        where: { schoolId },
+        include: [
+          { model: Plan },
+          { model: SubscriptionModule, required: false, where: { active: true } }
+        ]
+      });
       const now = new Date();
-      
+
       if (sub) {
         const status = String(sub.status || '').toUpperCase();
         const expiry = sub.endDate || sub.renewalDate;
         const expired = expiry && now > new Date(expiry);
         const blocked = status === 'CANCELED' || status === 'PAST_DUE' || expired;
         if (blocked) {
-            return res.status(402).json({ msg: 'Subscription inactive or expired' });
+          return res.status(402).json({ msg: 'Subscription inactive or expired' });
         }
+        
+        // MODULE ACCESS CHECK
+        // Per requirement: All schools have access to all modules/features.
+        // We only enforce subscription status (Active/Trial).
+        // Usage limits (students, storage, etc.) are enforced in limits.js
         return next();
       } else {
         const school = await School.findByPk(schoolId);

@@ -10,6 +10,7 @@ const { SalaryStructure, SalarySlip } = require('../models');
 const { StaffAttendance, TeacherAttendance } = require('../models');
 const { deriveDesiredDbRole, derivePermissionsForUser } = require('../utils/permissionMatrix');
 const { auditStudentOperation, auditTeacherOperation, auditUserOperation, auditFinanceOperation, auditLog } = require('../middleware/auditLog');
+const { checkStorageLimit, updateUsedStorage } = require('../middleware/storageLimits');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -366,11 +367,13 @@ router.get('/:schoolId/stats/counts', verifyToken, requireRole('SCHOOL_ADMIN', '
       // But let's add a "performance" flag query param to force using stats if client wants
     }
 
-    const [students, teachers] = await Promise.all([
+    const [students, teachers, parents, staff] = await Promise.all([
       Student.count({ where: { schoolId } }),
-      Teacher.count({ where: { schoolId } })
+      Teacher.count({ where: { schoolId } }),
+      Parent.count({ where: { schoolId } }),
+      User.count({ where: { schoolId, role: 'Staff' } })
     ]);
-    res.json({ students, teachers });
+    res.json({ students, teachers, parents, staff });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
@@ -3313,8 +3316,14 @@ router.get('/:schoolId/subscription-state', verifyToken, requireRole('SCHOOL_ADM
       storageGB = totalBytes > 0 ? (totalBytes / (1024 * 1024 * 1024)) : 0;
     } catch { }
 
-    const allowedModules = [];
-    const activeModules = [];
+    const { ModuleCatalog } = require('../models');
+    let allowedModules = [];
+    let activeModules = [];
+    try {
+      const all = await ModuleCatalog.findAll({ attributes: ['id'] });
+      allowedModules = all.map(m => m.id);
+      activeModules = all.map(m => m.id);
+    } catch (e) { console.error('Error fetching modules:', e); }
 
     const now = Date.now();
     const endMs = sub?.renewalDate ? new Date(sub.renewalDate).getTime() : (sub?.endDate ? new Date(sub.endDate).getTime() : 0);
@@ -3634,7 +3643,7 @@ router.post('/:schoolId/backup/download', verifyToken, requireRole('SCHOOL_ADMIN
   } catch (e) { console.error(e); try { res.status(500).json({ msg: 'Server Error' }); } catch { } }
 });
 
-router.post('/:schoolId/backup/store', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.post('/:schoolId/backup/store', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), checkStorageLimit, async (req, res) => {
   try {
     const types = Array.isArray(req.body?.types) ? req.body.types : ['students', 'classes', 'subjects', 'classSubjectTeachers', 'grades', 'attendance', 'schedule', 'fees', 'teachers', 'parents'];
     const filters = req.body?.filters || {};
@@ -3651,11 +3660,30 @@ router.post('/:schoolId/backup/store', verifyToken, requireRole('SCHOOL_ADMIN', 
     await archive.finalize();
     out.on('close', async () => {
       try {
+        const size = archive.pointer();
         const { AuditLog } = require('../models');
-        await AuditLog.create({ action: 'school.backup.store', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: Number(req.params.schoolId), file: fname, size: archive.pointer(), types }), timestamp: new Date(), riskLevel: 'low' });
+        await updateUsedStorage(Number(req.params.schoolId), size);
+        await AuditLog.create({ action: 'school.backup.store', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: Number(req.params.schoolId), file: fname, size, types }), timestamp: new Date(), riskLevel: 'low' });
       } catch { }
       res.status(201).json({ file: fname, size: archive.pointer() });
     });
+  } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
+});
+
+router.delete('/:schoolId/backups/:file', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+  try {
+    const schoolId = Number(req.params.schoolId);
+    const dir = path.join(__dirname, '..', 'uploads', 'backups', String(schoolId));
+    const full = path.join(dir, req.params.file);
+    if (!fs.existsSync(full)) return res.status(404).json({ msg: 'Not Found' });
+    const stat = fs.statSync(full);
+    fs.unlinkSync(full);
+    try { await updateUsedStorage(schoolId, -stat.size); } catch { }
+    try {
+      const { AuditLog } = require('../models');
+      await AuditLog.create({ action: 'school.backup.delete', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId, file: req.params.file }), timestamp: new Date(), riskLevel: 'low' });
+    } catch { }
+    res.json({ msg: 'Backup deleted' });
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
@@ -3780,7 +3808,7 @@ router.delete('/:schoolId/fees/:id', verifyToken, requireRole('SCHOOL_ADMIN', 'S
   } catch (e) { console.error(e); res.status(500).json({ msg: 'Server Error' }); }
 });
 
-router.post('/:schoolId/logo', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), async (req, res) => {
+router.post('/:schoolId/logo', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), checkStorageLimit, async (req, res) => {
   try {
     const path = require('path');
     const fse = require('fs-extra');
@@ -3819,6 +3847,7 @@ router.post('/:schoolId/logo', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_A
       const publicUrl = `/uploads/school-logos/${file.filename}`;
       const settings = await SchoolSettings.findOne({ where: { schoolId: req.params.schoolId } });
       if (settings) { settings.schoolLogoUrl = publicUrl; await settings.save(); }
+      try { await updateUsedStorage(req.params.schoolId, file.size); } catch { }
       return res.status(201).json({ url: publicUrl });
     });
   } catch (e) { console.error(e); return res.status(500).json({ msg: 'Server Error' }); }

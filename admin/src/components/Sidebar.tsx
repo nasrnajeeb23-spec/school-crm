@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
-import { DashboardIcon, SchoolIcon, SubscriptionIcon, BillingIcon, ModuleIcon, ContentIcon, UsageLimitsIcon, PermissionsIcon, ProfileIcon, LogoutIcon, UsersIcon, ShieldIcon, CloseIcon } from './icons';
+import { DashboardIcon, SchoolIcon, SubscriptionIcon, BillingIcon, ModuleIcon, ContentIcon, UsageLimitsIcon, PermissionsIcon, ProfileIcon, LogoutIcon, UsersIcon, ShieldIcon, CloseIcon, HelpIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface SidebarProps {
@@ -65,6 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
     { id: 'messages', label: 'رسائل تواصل معنا', icon: ContentIcon, path: '/superadmin/messages' },
     { id: 'mfa', label: 'MFA', icon: ShieldIcon, path: '/superadmin/mfa' },
     { id: 'reports-center', label: 'مركز التقارير', icon: DashboardIcon, path: '/superadmin/reports_center' },
+    { id: 'help-center', label: 'مركز المساعدة', icon: HelpIcon, path: '/superadmin/help-center' },
   ];
 
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-2 rounded-lg transition-colors duration-200";

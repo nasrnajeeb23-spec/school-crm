@@ -5,7 +5,7 @@ import {
 } from './types';
 import * as SecureStore from 'expo-secure-store';
  
-export const API_BASE_URL = (process.env as any)?.REACT_APP_API_URL || (process.env as any)?.EXPO_PUBLIC_API_BASE_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
+export const API_BASE_URL = (process.env as any)?.REACT_APP_API_URL || (process.env as any)?.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
  
 let memoryToken: string | null = null;
  

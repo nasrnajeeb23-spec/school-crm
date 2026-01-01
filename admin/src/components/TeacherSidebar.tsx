@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { DashboardIcon, ClassesIcon, AttendanceIcon, GradesIcon, MessagingIcon, LogoutIcon, ProfileIcon, ScheduleIcon, FinanceIcon, AssignmentIcon, CloseIcon } from './icons';
+import { DashboardIcon, ClassesIcon, AttendanceIcon, GradesIcon, MessagingIcon, LogoutIcon, ProfileIcon, ScheduleIcon, FinanceIcon, AssignmentIcon, CloseIcon, HelpIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface TeacherSidebarProps {
@@ -20,6 +20,7 @@ const TeacherSidebar: React.FC<TeacherSidebarProps> = ({ isMobileOpen = false, o
     { id: 'grades', label: 'الدرجات', icon: GradesIcon, path: '/teacher/grades' },
     { id: 'finance', label: 'المالية', icon: FinanceIcon, path: '/teacher/finance' },
     { id: 'messaging', label: 'الرسائل', icon: MessagingIcon, path: '/teacher/messaging' },
+    { id: 'help-center', label: 'مركز المساعدة', icon: HelpIcon, path: '/teacher/help-center' },
   ];
 
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-2 rounded-lg transition-colors duration-200";

@@ -64,6 +64,17 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), val
 
     const user = await User.findOne({ where: loginField });
     if (!user) {
+      try {
+        await require('../models').AuditLog.create({
+          action: 'LOGIN_FAILED',
+          userId: 0,
+          userEmail: email || username || 'unknown',
+          ipAddress: ip,
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ reason: 'User not found', loginField }),
+          riskLevel: 'medium'
+        });
+      } catch {}
       return res.status(401).json({ msg: 'Invalid credentials' });
     }
     const stored = String(user.password || '');
@@ -72,6 +83,17 @@ router.post('/login', rateLimit({ name: 'login', windowMs: 60000, max: 5 }), val
       ok = await bcrypt.compare(password, stored);
     } catch { ok = false; }
     if (!ok) {
+      try {
+        await require('../models').AuditLog.create({
+          action: 'LOGIN_FAILED',
+          userId: user.id,
+          userEmail: user.email,
+          ipAddress: ip,
+          userAgent: req.headers['user-agent'] || '',
+          details: JSON.stringify({ reason: 'Invalid password' }),
+          riskLevel: 'medium'
+        });
+      } catch {}
       return res.status(401).json({ msg: 'Invalid credentials' });
     }
 

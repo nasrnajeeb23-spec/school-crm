@@ -93,8 +93,10 @@ const TeacherLayout: React.FC = () => {
           <Outlet />
         </div>
       </main>
+      <TooltipGuide />
     </>
   );
 };
 
+import TooltipGuide from '../components/TooltipGuide';
 export default TeacherLayout;

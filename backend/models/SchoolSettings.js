@@ -149,6 +149,12 @@ const SchoolSettings = sequelize.define('SchoolSettings', {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  usedStorage: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Used storage in bytes'
+  },
   operationalStatus: {
     type: DataTypes.STRING,
     allowNull: false,

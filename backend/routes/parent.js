@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Parent, Student, Grade, Attendance, Invoice, Notification, Schedule, Class, Teacher, Assignment, Submission, ParentStudent } = require('../models');
 const { verifyToken, requireRole, canParentAccessStudent, normalizeUserRole } = require('../middleware/auth');
+const { checkStorageLimit, updateUsedStorage } = require('../middleware/storageLimits');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -278,7 +279,7 @@ router.get('/:parentId/assignments/:assignmentId/submission', verifyToken, requi
     } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
 });
 
-router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireRole('PARENT'), submissionUpload.array('attachments', 10), async (req, res) => {
+router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireRole('PARENT'), checkStorageLimit, submissionUpload.array('attachments', 10), async (req, res) => {
     try {
         if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
         const { studentId, content } = req.body;
@@ -303,6 +304,20 @@ router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireR
         });
         
         const files = Array.isArray(req.files) ? req.files : [];
+        
+        // Calculate total size and update storage
+        let totalSize = 0;
+        for (const f of files) {
+          totalSize += f.size;
+        }
+        if (totalSize > 0) {
+          try {
+            await updateUsedStorage(schoolId, totalSize);
+          } catch (e) {
+            console.error('Storage update failed', e);
+          }
+        }
+
         const added = files.map(f => ({
           filename: f.filename,
           originalName: f.originalname,

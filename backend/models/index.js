@@ -50,7 +50,8 @@ const RbacUserRoleScope = require('./RbacUserRoleScope');
 const TeacherClassSubjectAssignment = require('./TeacherClassSubjectAssignment');
 const ParentStudent = require('./ParentStudent');
 const DriverRoute = require('./DriverRoute');
-
+const SchoolTransaction = require('./SchoolTransaction');
+const LandingPageContent = require('./LandingPageContent');
 
 // Define associations
 // School <-> Subscription (One-to-One)
@@ -296,6 +297,8 @@ const db = {
   TeacherClassSubjectAssignment,
   ParentStudent,
   DriverRoute,
+  SchoolTransaction,
+  LandingPageContent,
 };
 
 module.exports = db;

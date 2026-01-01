@@ -14,17 +14,55 @@ const PlansList: React.FC<PlansListProps> = ({ mode = 'admin', onSelectPlan }) =
   const [pricing, setPricing] = useState<PricingConfig | null>(null);
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
 
+  const featureLabelMap: Record<string, string> = {
+    all_modules: 'كل الوحدات',
+    basic_support: 'دعم أساسي',
+    priority_support: 'دعم أولوية',
+    advanced_reports: 'تقارير متقدمة',
+    dedicated_account_manager: 'مدير حساب مخصص',
+    api_access: 'وصول API',
+  };
+
+  const formatFeature = (feature: unknown): string => {
+    if (typeof feature === 'string') {
+      const v = feature.trim();
+      if (featureLabelMap[v]) return featureLabelMap[v];
+      if ((v.startsWith('[') && v.endsWith(']')) || (v.startsWith('{') && v.endsWith('}'))) {
+        try {
+          const parsed = JSON.parse(v);
+          return formatFeature(parsed);
+        } catch {}
+      }
+      return v;
+    }
+    if (Array.isArray(feature)) {
+      return feature.map(formatFeature).filter(Boolean).join('، ');
+    }
+    if (feature && typeof feature === 'object') {
+      const anyObj = feature as any;
+      const label = anyObj.title ?? anyObj.name ?? anyObj.label ?? anyObj.id;
+      if (typeof label === 'string' && label.trim()) return label.trim();
+      try { return JSON.stringify(feature); } catch { return String(feature); }
+    }
+    return feature === null || feature === undefined ? '' : String(feature);
+  };
+
   useEffect(() => {
     (async () => {
       try {
         const [data, conf] = await Promise.all([
-          api.getPlans(),
+          mode === 'public' ? api.apiCall('/plans?scope=public', { method: 'GET' }) : api.getPlans(),
           mode === 'public' ? api.apiCall('/pricing/public/config', { method: 'GET' }) : api.getPricingConfig()
         ]);
         setPlans(data);
         setPricing(conf as PricingConfig);
       } catch {
-        try { const data = await api.getPlans(); setPlans(data); } catch {}
+        try {
+          const data = mode === 'public'
+            ? await api.apiCall('/plans?scope=public', { method: 'GET' })
+            : await api.getPlans();
+          setPlans(data);
+        } catch {}
         setPricing({ pricePerStudent: 0, pricePerTeacher: 0, pricePerGBStorage: 0, pricePerInvoice: 0, currency: '$', yearlyDiscountPercent: 0 });
       } finally { setLoading(false); }
     })();
@@ -46,8 +84,52 @@ const PlansList: React.FC<PlansListProps> = ({ mode = 'admin', onSelectPlan }) =
     return { amount: base, period: 'شهرياً' };
   };
 
+  const handlePricingUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pricing) return;
+    try {
+      await api.updatePricingConfig(pricing);
+      alert('تم تحديث إعدادات التسعير بنجاح');
+    } catch (err) {
+      console.error(err);
+      alert('فشل تحديث الإعدادات');
+    }
+  };
+
   return (
     <div className="space-y-8">
+      {mode === 'admin' && pricing && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-8">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">إعدادات التسعير العالمية</h3>
+            <form onSubmit={handlePricingUpdate} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">العملة</label>
+                    <input type="text" value={pricing.currency} onChange={e => setPricing({...pricing, currency: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">سعر الطالب الإضافي</label>
+                    <input type="number" step="0.01" value={pricing.pricePerStudent} onChange={e => setPricing({...pricing, pricePerStudent: Number(e.target.value)})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">سعر المعلم الإضافي</label>
+                    <input type="number" step="0.01" value={pricing.pricePerTeacher} onChange={e => setPricing({...pricing, pricePerTeacher: Number(e.target.value)})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">سعر الجيجا (GB) الإضافية</label>
+                    <input type="number" step="0.01" value={pricing.pricePerGBStorage} onChange={e => setPricing({...pricing, pricePerGBStorage: Number(e.target.value)})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">خصم الدفع السنوي (%)</label>
+                    <input type="number" step="1" value={pricing.yearlyDiscountPercent} onChange={e => setPricing({...pricing, yearlyDiscountPercent: Number(e.target.value)})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                </div>
+                <div className="flex items-end">
+                    <button type="submit" className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        حفظ الإعدادات
+                    </button>
+                </div>
+            </form>
+        </div>
+      )}
       {mode === 'admin' && (
         <div className="flex justify-end items-center">
             <button className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
@@ -106,7 +188,7 @@ const PlansList: React.FC<PlansListProps> = ({ mode = 'admin', onSelectPlan }) =
                   <div className="flex-shrink-0">
                     <CheckIcon className="h-6 w-6 text-green-500" />
                   </div>
-                  <p className="mr-3 text-base text-gray-600 dark:text-gray-300">{feature}</p>
+                  <p className="mr-3 text-base text-gray-600 dark:text-gray-300">{formatFeature(feature)}</p>
                 </li>
               ))}
             </ul>
@@ -158,7 +240,7 @@ const PlansList: React.FC<PlansListProps> = ({ mode = 'admin', onSelectPlan }) =
                 <tr className="border-t border-gray-200 dark:border-gray-700">
                   <td className="px-4 py-2">أبرز الميزات</td>
                   {plans.map(p => (
-                    <td key={`f-${p.id}`} className="px-4 py-2">{Array.isArray(p.features) && p.features.length > 0 ? p.features.slice(0,3).join('، ') : '—'}</td>
+                    <td key={`f-${p.id}`} className="px-4 py-2">{Array.isArray(p.features) && p.features.length > 0 ? p.features.slice(0, 3).map(formatFeature).filter(Boolean).join('، ') : '—'}</td>
                   ))}
                 </tr>
               </tbody>

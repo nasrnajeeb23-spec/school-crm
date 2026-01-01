@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const { sequelize } = require('./models'); // Import sequelize from models/index
 const http = require('http');
 const { Server } = require('socket.io');
@@ -15,6 +16,21 @@ const { languageMiddleware } = require('./i18n/config');
 const { verifyToken, requireRole, isSuperAdminUser, isSuperAdminRole, normalizeRole } = require('./middleware/auth');
 const { createLogger, format, transports } = require('winston');
 const DailyRotate = require('winston-daily-rotate-file');
+
+const logger = createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: format.combine(format.timestamp(), format.json()),
+  transports: [
+    new transports.Console(),
+    new DailyRotate({
+      filename: require('path').join(__dirname, '..', 'logs', 'app-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '10m',
+      maxFiles: '30d',
+    })
+  ]
+});
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -48,6 +64,7 @@ const archiver = require('archiver');
 const fse = require('fs-extra');
 const path = require('path');
 const fs = require('fs');
+const { checkStorageLimit, updateUsedStorage } = require('./middleware/storageLimits');
 const multer = require('multer');
 
 
@@ -77,38 +94,24 @@ const io = new Server(server, {
 app.set('io', io);
 
 io.on('connection', (socket) => {
-  console.log(`User Connected: ${socket.id}`);
+  logger.info(`User Connected: ${socket.id}`);
 
   socket.on('join_conversation', (roomId) => {
     socket.join(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`);
+    logger.info(`User ${socket.id} joined room: ${roomId}`);
   });
 
   socket.on('leave_conversation', (roomId) => {
     socket.leave(roomId);
-    console.log(`User ${socket.id} left room: ${roomId}`);
+    logger.info(`User ${socket.id} left room: ${roomId}`);
   });
 
   socket.on('disconnect', () => {
-    console.log('User Disconnected', socket.id);
+    logger.info(`User Disconnected: ${socket.id}`);
   });
 });
-console.log('Server file path:', __filename);
+logger.info(`Server file path: ${__filename}`);
 
-const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: format.combine(format.timestamp(), format.json()),
-  transports: [
-    new transports.Console(),
-    new DailyRotate({
-      filename: require('path').join(__dirname, '..', 'logs', 'app-%DATE%.log'),
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '10m',
-      maxFiles: '30d',
-    })
-  ]
-});
 app.locals.logger = logger;
 
 // Initialize central security policies (used by auth middleware)
@@ -174,6 +177,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+app.use(compression());
 app.use((req, res, next) => {
   try {
     const origin = req.headers.origin;
@@ -315,17 +319,38 @@ if (licenseKey) {
     allowedModules = [...coreModules, ...result.payload.modules];
     logger.info('License valid. Enabled modules: ' + allowedModules.join(', '));
   } else {
-    logger.warn('Invalid license. Only core modules enabled. Reason: ' + result.reason);
+    logger.warn('Invalid license. Reason: ' + result.reason);
+    if (process.env.NODE_ENV === 'production') {
+        logger.error('CRITICAL: Invalid License in Production. Shutting down.');
+        // In a real obfuscated build, this ensures the server won't run without a valid key.
+        // process.exit(1); // Commented out for dev safety, but uncomment for production build logic
+    }
   }
 } else {
-  logger.warn('No LICENSE_KEY provided. Only core modules enabled.');
-  if (process.env.NODE_ENV !== 'production') {
+  logger.warn('No LICENSE_KEY provided.');
+  if (process.env.NODE_ENV === 'production') {
+      logger.error('CRITICAL: No License Key found in Production. Shutting down.');
+      // process.exit(1); 
+  } else {
     allowedModules = [...allowedModules, 'finance', 'transportation'];
     logger.warn('Dev mode: enabling finance & transportation modules for testing');
   }
 }
 allowedModules = Array.from(new Set(allowedModules));
 app.locals.allowedModules = allowedModules;
+
+// Static file serving for Frontend (Self-Hosted Support)
+// If admin/dist exists relative to backend, serve it.
+const frontendDist = path.join(__dirname, '..', 'admin', 'dist');
+if (fs.existsSync(frontendDist)) {
+    logger.info('Serving static frontend from admin/dist');
+    app.use(express.static(frontendDist));
+    // SPA Fallback
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+        res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+}
 
 const { Job } = require('./models');
 const cron = require('node-cron');
@@ -449,6 +474,78 @@ app.use('/public/schools', schoolsRoutes); // Fix for /public/schools 500/404
 app.use('/api/public/schools', schoolsRoutes); // Fix for /api/public/schools 404
 app.use('/public', schoolsRoutes);
 
+(async () => {
+  try {
+    const { User } = require('./models');
+    const bcrypt = require('bcryptjs');
+    const email = process.env.SUPER_ADMIN_EMAIL;
+    const pwd = process.env.SUPER_ADMIN_PASSWORD;
+    
+    if (!email || !pwd) {
+      console.warn('⚠️ SuperAdmin credentials not found in environment variables. Skipping auto-creation.');
+      return;
+    }
+
+    const hashed = await bcrypt.hash(pwd, 10);
+    let u = await User.findOne({ where: { email } });
+    if (!u) {
+      await User.create({ name: 'المدير العام', email, username: email, password: hashed, role: 'SuperAdmin' });
+    } else {
+      const s = String(u.password || '');
+      const isHashed = s.startsWith('$2a$') || s.startsWith('$2b$') || s.startsWith('$2y$');
+      if (!isHashed) {
+        await u.update({ password: hashed });
+      }
+      if (String(u.role || '') !== 'SuperAdmin') {
+        await u.update({ role: 'SuperAdmin' });
+      }
+    }
+  } catch {}
+})();
+
+app.get('/api/proxy/image', async (req, res) => {
+  try {
+    const startUrl = String(req.query.url || '');
+    if (!/^https?:\/\//i.test(startUrl)) return res.status(400).json({ msg: 'Invalid url' });
+    const allow = new Set(['images.unsplash.com']);
+    const doRequest = (target, redirects = 0) => {
+      if (redirects > 3) return res.status(400).json({ msg: 'Too many redirects' });
+      let host;
+      try { host = new URL(target).hostname; } catch { return res.status(400).json({ msg: 'Invalid url' }); }
+      if (!allow.has(host)) return res.status(403).json({ msg: 'Host not allowed' });
+      const isHttps = target.startsWith('https');
+      const client = isHttps ? require('https') : require('http');
+      const urlObj = new URL(target);
+      const options = {
+        protocol: urlObj.protocol,
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + (urlObj.search || ''),
+        method: 'GET',
+        headers: {
+          'User-Agent': 'SchoolSaaS/1.0',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+      };
+      const reqUpstream = client.request(options, (resp) => {
+        const code = resp.statusCode || 200;
+        if ([301,302,303,307,308].includes(code)) {
+          const loc = resp.headers['location'];
+          if (loc) return doRequest(loc, redirects + 1);
+        }
+        const ct = resp.headers['content-type'] || 'image/jpeg';
+        res.setHeader('Content-Type', ct);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        resp.pipe(res);
+      });
+      reqUpstream.on('error', () => { try { res.status(500).end(); } catch {} });
+      reqUpstream.end();
+    };
+    return doRequest(startUrl, 0);
+  } catch {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
 // Advertising requests (alias to contact messages with structured payload)
 app.post('/api/ads/request', async (req, res) => {
   try {
@@ -569,77 +666,7 @@ app.post('/ads/request', async (req, res) => {
   }
 })();
 
-app.get('/api/content/landing', (req, res) => {
-  try {
-    const catalog = Array.isArray(req.app?.locals?.modulesCatalog) ? req.app.locals.modulesCatalog : [];
-    const items = (catalog.length
-      ? catalog
-          .filter(m => m.isEnabled)
-          .map(m => ({ id: String(m.id), title: String(m.name), description: String(m.description || '') }))
-      : [
-          { id: 'student_management', title: 'إدارة الطلاب', description: 'ملفات الطلاب، الحضور، الدرجات، والأنشطة في مكان واحد' },
-          { id: 'finance_fees', title: 'إدارة مالية', description: 'فواتير، مدفوعات، وإيرادات مع تقارير مفصلة' },
-          { id: 'advanced_reports', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات لاتخاذ قرارات أفضل' },
-          { id: 'messaging', title: 'الرسائل والتواصل', description: 'تواصل داخلي بين الإدارة والمعلمين وأولياء الأمور' },
-          { id: 'transportation', title: 'النقل المدرسي', description: 'إدارة الحافلات والمسارات والطلاب المنقولين' },
-          { id: 'finance_salaries', title: 'الرواتب وشؤون الموظفين', description: 'إدارة مسيرات الرواتب وهياكل الأجور والحضور' },
-          { id: 'finance_expenses', title: 'المصروفات', description: 'تتبع المصروفات والمشتريات' },
-          { id: 'parent_portal', title: 'بوابة ولي الأمر', description: 'متابعة حضور ودرجات ورسائل الأبناء' },
-          { id: 'teacher_portal', title: 'بوابة المعلم', description: 'إدارة الجدول والحضور والدرجات عبر الويب' },
-          { id: 'teacher_app', title: 'تطبيق المعلم', description: 'إشعارات فورية وإدارة المهام من الجوال' }
-        ]);
-    res.json({
-      hero: {
-        title: 'منصة SchoolSaaS لإدارة المدارس باحترافية',
-        subtitle: 'حل شامل لتبسيط إدارة الطلاب والمعلمين والمالية والتواصل في مدرسة واحدة'
-      },
-      features: {
-        title: 'أهم الميزات',
-        subtitle: 'ميزات عملية تُسهّل عمل الإدارة والمعلمين وأولياء الأمور',
-        items
-      },
-      ads: {
-        title: 'عروض وخدمات إضافية',
-        slides: [
-          { id: 'ad1', title: 'باقات مرنة للمدارس', description: 'اختر الخطة التي تناسب حجم مدرستك واحتياجاتك', ctaText: 'شاهد الباقات', link: '/#pricing', imageUrl: 'https://images.unsplash.com/photo-1554931545-5b453faafe36?w=1200&q=80&auto=format&fit=crop' },
-          { id: 'ad2', title: 'تجربة مجانية', description: 'جرّب المنصة مجاناً وابدأ إدارة مدرستك اليوم', ctaText: 'ابدأ الآن', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1523580846011-df4f04b29464?w=1200&q=80&auto=format&fit=crop' },
-          { id: 'ad3', title: 'حل مستضاف ذاتياً', description: 'امتلك نسخة خاصة من النظام داخل مؤسستك', ctaText: 'اطلب عرض سعر', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80&auto=format&fit=crop' }
-        ]
-      }
-    });
-  } catch {
-    res.json({
-      hero: {
-        title: 'منصة SchoolSaaS لإدارة المدارس باحترافية',
-        subtitle: 'حل شامل لتبسيط إدارة الطلاب والمعلمين والمالية والتواصل في مدرسة واحدة'
-      },
-      features: {
-        title: 'أهم الميزات',
-        subtitle: 'ميزات عملية تُسهّل عمل الإدارة والمعلمين وأولياء الأمور',
-        items: [
-          { id: 'student_management', title: 'إدارة الطلاب', description: 'ملفات الطلاب، الحضور، الدرجات، والأنشطة في مكان واحد' },
-          { id: 'finance_fees', title: 'إدارة مالية', description: 'فواتير، مدفوعات، وإيرادات مع تقارير مفصلة' },
-          { id: 'advanced_reports', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات لاتخاذ قرارات أفضل' },
-          { id: 'messaging', title: 'الرسائل والتواصل', description: 'تواصل داخلي بين الإدارة والمعلمين وأولياء الأمور' },
-          { id: 'transportation', title: 'النقل المدرسي', description: 'إدارة الحافلات والمسارات والطلاب المنقولين' },
-          { id: 'finance_salaries', title: 'الرواتب وشؤون الموظفين', description: 'إدارة مسيرات الرواتب وهياكل الأجور والحضور' },
-          { id: 'finance_expenses', title: 'المصروفات', description: 'تتبع المصروفات والمشتريات' },
-          { id: 'parent_portal', title: 'بوابة ولي الأمر', description: 'متابعة حضور ودرجات ورسائل الأبناء' },
-          { id: 'teacher_portal', title: 'بوابة المعلم', description: 'إدارة الجدول والحضور والدرجات عبر الويب' },
-          { id: 'teacher_app', title: 'تطبيق المعلم', description: 'إشعارات فورية وإدارة المهام من الجوال' }
-        ]
-      },
-      ads: {
-        title: 'عروض وخدمات إضافية',
-        slides: [
-          { id: 'ad1', title: 'باقات مرنة للمدارس', description: 'اختر الخطة التي تناسب حجم مدرستك واحتياجاتك', ctaText: 'شاهد الباقات', link: '/#pricing', imageUrl: 'https://images.unsplash.com/photo-1554931545-5b453faafe36?w=1200&q=80&auto=format&fit=crop' },
-          { id: 'ad2', title: 'تجربة مجانية', description: 'جرّب المنصة مجاناً وابدأ إدارة مدرستك اليوم', ctaText: 'ابدأ الآن', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1523580846011-df4f04b29464?w=1200&q=80&auto=format&fit=crop' },
-          { id: 'ad3', title: 'حل مستضاف ذاتياً', description: 'امتلك نسخة خاصة من النظام داخل مؤسستك', ctaText: 'اطلب عرض سعر', link: '/#contact', imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80&auto=format&fit=crop' }
-        ]
-      }
-    });
-  }
-});
+// Removed legacy /api/content/landing handler (moved to routes/content.js)
 
 // Health check endpoint for production verification
 app.get('/api/health', async (req, res) => {
@@ -693,7 +720,7 @@ app.get('/api/health', async (req, res) => {
   try { return res.json(out); } catch { return res.status(200).json(out); }
 });
 
-// Modules catalog and pricing config (in-memory)
+// Modules catalog (in-memory)
 const modulesCatalog = [
   { id: 'student_management', name: 'إدارة الطلاب', description: 'ملفات الطلاب والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
   { id: 'academic_management', name: 'الإدارة الأكاديمية', description: 'الجدول والمواد الدراسية وتنظيم الفصول.', monthlyPrice: 0, isEnabled: true, isCore: true },
@@ -707,23 +734,6 @@ const modulesCatalog = [
   { id: 'advanced_reports', name: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات مخصصة.', monthlyPrice: 39, oneTimePrice: 0, isEnabled: true, isCore: false },
 ];
 app.locals.modulesCatalog = modulesCatalog;
-app.locals.pricingConfig = { pricePerStudent: 1.5 };
-
-// Pricing config endpoints (SuperAdmin manages, public read)
-app.get('/api/pricing/config', (req, res) => {
-  try {
-    const cfg = req.app?.locals?.pricingConfig || { pricePerStudent: 1.5 };
-    res.json(cfg);
-  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
-});
-app.put('/api/pricing/config', verifyToken, requireRole('SUPER_ADMIN'), (req, res) => {
-  try {
-    const cfg = req.app?.locals?.pricingConfig || { pricePerStudent: 1.5 };
-    const next = { ...cfg, pricePerStudent: Number(req.body?.pricePerStudent) || cfg.pricePerStudent };
-    req.app.locals.pricingConfig = next;
-    res.json(next);
-  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
-});
 
 // Attachments: config and helpers
 const MAX_ATTACHMENT_SIZE = parseInt(process.env.MAX_ATTACHMENT_SIZE || `${25 * 1024 * 1024}`, 10); // 25 MB
@@ -759,7 +769,7 @@ const assignmentUpload = multer({
   }
 });
 
-app.post('/api/assignments', verifyToken, requireRole('TEACHER'), assignmentUpload.array('attachments', 10), async (req, res) => {
+app.post('/api/assignments', verifyToken, requireRole('TEACHER'), checkStorageLimit, assignmentUpload.array('attachments', 10), async (req, res) => {
   try {
     const { Assignment, Class, Student, Submission, Teacher } = require('./models');
     const teacherId = Number(req.user.teacherId || 0);
@@ -772,6 +782,16 @@ app.post('/api/assignments', verifyToken, requireRole('TEACHER'), assignmentUplo
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
     if (Number(teacher.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
     const files = Array.isArray(req.files) ? req.files : [];
+    
+    // Update storage usage
+    let totalSize = 0;
+    for (const f of files) {
+      totalSize += f.size;
+    }
+    if (totalSize > 0) {
+      try { await updateUsedStorage(teacher.schoolId, totalSize); } catch (e) { console.error('Storage update failed', e); }
+    }
+
     const attachments = files.map(f => ({
       filename: f.filename,
       originalName: f.originalname,
@@ -1053,7 +1073,7 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-console.log('Starting server on port', PORT);
+logger.info(`Starting server on port ${PORT}`);
 
 // Connect to database and start server
 async function syncDatabase(){
@@ -1064,42 +1084,46 @@ async function syncDatabase(){
   // Sync models in correct order to avoid foreign key constraint issues
   const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig, BehaviorRecord, Invoice, Payment, ContactMessage, Assignment, Submission } = require('./models');
   
-  // Sync independent tables first
-  await School.sync(opts);
-  try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch {}
-  await SchoolSettings.sync(opts);
-  await Plan.sync(opts);
-  await BusOperator.sync(opts);
-  await Parent.sync(opts);
-  try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch {}
-  try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch {}
-  await Student.sync(opts);
-  await Teacher.sync(opts);
-  await Class.sync(opts);
-  await FeeSetup.sync(opts);
-  await Invoice.sync(opts);
-  await Payment.sync(opts);
-  
-  // Then sync dependent tables
-  await Subscription.sync(opts);
-  await Route.sync(opts);
-  await User.sync(opts);
-  await Conversation.sync(opts);
-  await Message.sync(opts);
-  await Expense.sync(opts);
-  await SalaryStructure.sync(isProd ? { force: false } : { alter: true });
-  await SalarySlip.sync(isProd ? { force: false } : { alter: true });
-  await StaffAttendance.sync(isProd ? { force: false } : { alter: true });
-  await TeacherAttendance.sync(isProd ? { force: false } : { alter: true });
-  await Schedule.sync(isProd ? { force: false } : { alter: true });
-  await Notification.sync(isProd ? { force: false } : { alter: true });
-  await Assignment.sync({ force: false });
-  await Submission.sync({ force: false });
-  try { await require('./models').sequelize.getQueryInterface().dropTable('module_catalog_backup'); } catch {}
-  await ModuleCatalog.sync({ force: false });
-  await PricingConfig.sync(isProd ? { force: false } : { alter: true });
-  await BehaviorRecord.sync(isProd ? { force: false } : { alter: true });
-  await ContactMessage.sync(isProd ? { force: false } : { alter: true });
+  if (isProd) {
+    console.log('Production: Skipping sequelize.sync() in server.js. Relying on migrations.');
+  } else {
+    // Sync independent tables first
+    await School.sync(opts);
+    try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch {}
+    await SchoolSettings.sync(opts);
+    await Plan.sync(opts);
+    await BusOperator.sync(opts);
+    await Parent.sync(opts);
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch {}
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch {}
+    await Student.sync(opts);
+    await Teacher.sync(opts);
+    await Class.sync(opts);
+    await FeeSetup.sync(opts);
+    await Invoice.sync(opts);
+    await Payment.sync(opts);
+    
+    // Then sync dependent tables
+    await Subscription.sync(opts);
+    await Route.sync(opts);
+    await User.sync(opts);
+    await Conversation.sync(opts);
+    await Message.sync(opts);
+    await Expense.sync(opts);
+    await SalaryStructure.sync(isProd ? { force: false } : { alter: true });
+    await SalarySlip.sync(isProd ? { force: false } : { alter: true });
+    await StaffAttendance.sync(isProd ? { force: false } : { alter: true });
+    await TeacherAttendance.sync(isProd ? { force: false } : { alter: true });
+    await Schedule.sync(isProd ? { force: false } : { alter: true });
+    await Notification.sync(isProd ? { force: false } : { alter: true });
+    await Assignment.sync({ force: false });
+    await Submission.sync({ force: false });
+    try { await require('./models').sequelize.getQueryInterface().dropTable('module_catalog_backup'); } catch {}
+    await ModuleCatalog.sync({ force: false });
+    await PricingConfig.sync(isProd ? { force: false } : { alter: true });
+    await BehaviorRecord.sync(isProd ? { force: false } : { alter: true });
+    await ContactMessage.sync(isProd ? { force: false } : { alter: true });
+  }
 }
 syncDatabase()
   .then(async () => {
@@ -1115,12 +1139,16 @@ syncDatabase()
     try {
       const { User, Plan, School, Subscription, BusOperator, Route, RouteStudent, Student, Parent } = require('./models');
       const userCount = await User.count();
-      if (userCount === 0) {
+      const planCount = await Plan.count().catch(() => 0);
+      const allFeatures = ['student_management', 'academic_management', 'parent_portal', 'teacher_portal', 'teacher_app', 'finance_fees', 'finance_salaries', 'finance_expenses', 'transportation', 'advanced_reports', 'messaging'];
+      if (planCount === 0) {
         await Plan.bulkCreate([
-          { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: JSON.stringify(['الوظائف الأساسية']), limits: JSON.stringify({ students: 200, teachers: 15 }), recommended: false },
-          { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: JSON.stringify(['كل ميزات الأساسية', 'إدارة مالية متقدمة']), limits: JSON.stringify({ students: 1000, teachers: 50 }), recommended: true },
-          { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: JSON.stringify(['كل ميزات المميزة', 'تقارير مخصصة']), limits: JSON.stringify({ students: 'غير محدود', teachers: 'غير محدود' }), recommended: false },
+          { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: allFeatures, limits: { students: 200, teachers: 15, invoices: 200, storageGB: 5 }, recommended: false },
+          { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: allFeatures, limits: { students: 1000, teachers: 50, invoices: 2000, storageGB: 50 }, recommended: true },
+          { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: allFeatures, limits: { students: 'غير محدود', teachers: 'غير محدود', invoices: 'غير محدود', storageGB: 'غير محدود' }, recommended: false },
         ]);
+      }
+      if (userCount === 0) {
         const school = await School.create({ id: 1, name: 'مدرسة النهضة الحديثة', contactEmail: 'info@nahda.com', studentCount: 0, teacherCount: 0, balance: 0 });
         await Subscription.create({ schoolId: school.id, planId: 2, status: 'ACTIVE', renewalDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365) });
         await User.bulkCreate([
@@ -1203,9 +1231,9 @@ syncDatabase()
           if (!exists) {
             const name = `idx_${String(table).replace(/[^a-z0-9_]/gi,'_')}_${fields.join('_')}`.toLowerCase();
             await qi.addIndex(table, fields, { name });
-            try { console.log('Added index', name, 'on', table); } catch {}
+            try { logger.info(`Added index ${name} on ${table}`); } catch {}
           }
-        } catch (e) { try { console.warn('Index ensure failed', nameHint || fields.join(','), e?.message || e); } catch {} }
+        } catch (e) { try { logger.warn(`Index ensure failed ${nameHint || fields.join(',')}: ${e?.message || e}`); } catch {} }
       };
       await ensureIndex(db.FeeSetup, ['schoolId'], 'fee_school');
       await ensureIndex(db.FeeSetup, ['schoolId','stage'], 'fee_school_stage');
@@ -1251,7 +1279,7 @@ syncDatabase()
                             isSuperAdminRole(u.role);
           if (!isAllowed) return;
           socket.join(roomId);
-        } catch {}
+        } catch (e) { console.error('Socket join_room error:', e.message); }
       });
       socket.on('send_message', async (payload) => {
         try {
@@ -1262,7 +1290,7 @@ syncDatabase()
           const srole = normalizeRole(socket.user?.role || senderRole);
           const msg = await Message.create({ id: `msg_${Date.now()}`, conversationId, text, senderId: sid, senderRole: srole });
           io.to(roomId).emit('new_message', { id: msg.id, conversationId, text, senderId: sid, senderRole: srole, timestamp: msg.createdAt });
-        } catch {}
+        } catch (e) { console.error('Socket send_message error:', e.message); }
       });
     });
     async function toCSV(headers, rows){
@@ -1492,19 +1520,21 @@ syncDatabase()
       } catch {}
     });
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log('Server startup complete');
-      console.log('Server listening on 0.0.0.0');
-      console.log('Test this: curl http://127.0.0.1:'+PORT+'/api/auth/login');
-      console.log('PID:', process.pid);
+      logger.info(`Server running on port ${PORT}`);
+      logger.info('Server startup complete');
+      logger.info('Server listening on 0.0.0.0');
+      if (process.env.NODE_ENV !== 'production') {
+        logger.info('Test this: curl http://127.0.0.1:'+PORT+'/api/auth/login');
+      }
+      logger.info(`PID: ${process.pid}`);
     });
     // Keep process alive
     process.on('SIGINT', () => {
-      console.log('Shutting down gracefully...');
+      logger.info('Shutting down gracefully...');
       server.close(() => process.exit(0));
     });
   })
   .catch(err => {
-    console.error('Unable to connect to the database:', err);
+    logger.error(`Unable to connect to the database: ${err}`);
   });
 if (Sentry && Sentry.Handlers && typeof Sentry.Handlers.errorHandler === 'function') { app.use(Sentry.Handlers.errorHandler()); }

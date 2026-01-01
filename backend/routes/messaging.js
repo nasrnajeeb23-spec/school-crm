@@ -8,6 +8,7 @@ const fse = require('fs-extra');
 const net = require('net');
 const { spawn } = require('child_process');
 const multer = require('multer');
+const { checkStorageLimit, updateUsedStorage } = require('../middleware/storageLimits');
 const { scanFile, verifyFileSignature } = require('../utils/fileSecurity');
 const allowedMimes = new Set(['image/png','image/jpeg','application/pdf']);
 const allowedExts = new Set(['.png','.jpg','.jpeg','.pdf']);
@@ -79,7 +80,7 @@ router.post('/conversations', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_AD
   } catch (e) { res.status(500).send('Server Error'); }
 });
 
-router.post('/upload', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), upload.single('file'), async (req, res) => {
+router.post('/upload', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PARENT'), checkStorageLimit, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: 'No file' });
     const schoolId = Number(req.body?.schoolId || req.query?.schoolId || req.user?.schoolId || 0);
@@ -101,6 +102,7 @@ router.post('/upload', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN', '
     const scan = await scanFile(req.file.path);
     if (!scan.clean) { try { await fse.remove(req.file.path); } catch {} return res.status(400).json({ msg: 'Malware detected' }); }
     await fse.move(req.file.path, targetPath, { overwrite: true });
+    try { await updateUsedStorage(schoolId, req.file.size); } catch {}
     const url = `/api/messaging/attachments/${schoolId}/${safeName}`;
     res.json({ url, name: req.file.originalname, type: ext });
   } catch (e) { res.status(500).send('Server Error'); }

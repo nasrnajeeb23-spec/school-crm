@@ -42,6 +42,7 @@ const OnboardingRequests = React.lazy(() => import('./pages/OnboardingRequests')
 const SuperAdminSchoolManage = React.lazy(() => import('./pages/SuperAdminSchoolManage'));
 const SuperAdminMessages = React.lazy(() => import('./pages/SuperAdminMessages'));
 const SetPassword = React.lazy(() => import('./pages/SetPassword'));
+const HelpCenter = React.lazy(() => import('./pages/HelpCenter'));
 
 // School Admin Pages
 const SchoolDashboard = React.lazy(() => import('./pages/SchoolDashboard'));
@@ -235,6 +236,7 @@ const App: React.FC = () => {
               <Route path="reports_center" element={<ReportsCenter />} />
               <Route path="license" element={<LicenseManagement />} />
               <Route path="profile" element={<UserProfile />} />
+              <Route path="help-center" element={<HelpCenter />} />
             </Route>
             <Route path="/manage/school/:schoolId/*" element={<SchoolAdminLayout isSuperAdminView />} />
           </Route>
@@ -268,6 +270,7 @@ const App: React.FC = () => {
                 <Route path="finance" element={<TeacherFinance />} />
                 <Route path="messaging" element={<Messaging />} />
                 <Route path="profile" element={<UserProfile />} />
+                <Route path="help-center" element={<HelpCenter />} />
             </Route>
           </Route>
 
@@ -285,6 +288,7 @@ const App: React.FC = () => {
                 <Route path="messaging" element={<Messaging />} />
                 <Route path="transportation" element={<ParentTransportation />} />
                 <Route path="profile" element={<UserProfile />} />
+                <Route path="help-center" element={<HelpCenter />} />
              </Route>
           </Route>
           
