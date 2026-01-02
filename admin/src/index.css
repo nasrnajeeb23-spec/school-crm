@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Basic CSS for the application */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Cairo', sans-serif;
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.dark body {
+  background-color: #111827;
+  color: #f9fafb;
+}
+
+#root {
+  min-height: 100vh;
+}

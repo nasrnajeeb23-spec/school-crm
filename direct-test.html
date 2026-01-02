@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Messaging Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Direct Messaging Component Test</h1>
+        
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <h2 class="text-lg font-semibold mb-2">Test Navigation:</h2>
+            <div class="space-y-2">
+                <a href="/admin/src/pages/Messaging.tsx" class="block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    Test Messaging Component Directly
+                </a>
+                <a href="/index.html" class="block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+                    Go to Main Application
+                </a>
+            </div>
+        </div>
+        
+        <div id="test-results" class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-lg font-semibold mb-2">Manual Test Instructions:</h2>
+            <ol class="list-decimal list-inside space-y-2 text-sm">
+                <li>Click "Go to Main Application" to access the login page</li>
+                <li>Login with test credentials (if available)</li>
+                <li>Navigate to the messaging section from the dashboard</li>
+                <li>Verify that the messaging interface loads without white screen</li>
+                <li>Test creating conversations and sending messages</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

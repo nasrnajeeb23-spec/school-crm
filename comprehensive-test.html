@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Deployment Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-result { 
+            margin: 10px 0; 
+            padding: 15px; 
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success { 
+            background-color: #e8f5e8; 
+            color: #2d5a2d; 
+            border-left-color: #4caf50;
+        }
+        .error { 
+            background-color: #ffeaea; 
+            color: #d32f2f; 
+            border-left-color: #f44336;
+        }
+        .info { 
+            background-color: #e3f2fd; 
+            color: #1565c0; 
+            border-left-color: #2196f3;
+        }
+        .warning { 
+            background-color: #fff8e1; 
+            color: #f57c00; 
+            border-left-color: #ff9800;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden { display: none; }
+        .console-output {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 اختبار شامل لصفحة تسجيل دخول المدير العام</h1>
+        <p>هذا الاختبار يتحقق من جميع الجوانب المحتملة للمشكلة</p>
+        
+        <div class="test-section">
+            <h3>📊 نتائج الاختبار</h3>
+            <div id="test-results">
+                <div class="test-result info">جاري التحميل... <span class="loading"></span></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🖥️ معلومات المتصفح</h3>
+            <div id="browser-info"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 أدوات التطوير</h3>
+            <button onclick="runAdvancedTests()">تشغيل اختبارات متقدمة</button>
+            <button onclick="clearConsole()">مسح السجل</button>
+            <div class="console-output" id="console-output"></div>
+        </div>
+    </div>
+
+    <script>
+        const resultsDiv = document.getElementById('test-results');
+        const consoleDiv = document.getElementById('console-output');
+        const browserDiv = document.getElementById('browser-info');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            resultsDiv.appendChild(div);
+            consoleDiv.innerHTML += `[${new Date().toLocaleTimeString()}] ${message}<br>`;
+        }
+
+        function clearConsole() {
+            consoleDiv.innerHTML = '';
+        }
+
+        function logToConsole(message) {
+            consoleDiv.innerHTML += `[${new Date().toLocaleTimeString()}] ${message}<br>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        // Browser info
+        function displayBrowserInfo() {
+            const info = `
+                <div class="test-result info">
+                    <strong>User Agent:</strong> ${navigator.userAgent}<br>
+                    <strong>Language:</strong> ${navigator.language}<br>
+                    <strong>Cookies Enabled:</strong> ${navigator.cookieEnabled}<br>
+                    <strong>Online Status:</strong> ${navigator.onLine ? 'Online' : 'Offline'}<br>
+                    <strong>Screen Resolution:</strong> ${screen.width}x${screen.height}<br>
+                    <strong>Viewport:</strong> ${window.innerWidth}x${window.innerHeight}
+                </div>
+            `;
+            browserDiv.innerHTML = info;
+        }
+
+        async function testUrl(url, description, timeout = 10000) {
+            log(`جاري اختبار: ${description} (${url})`, 'info');
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, { 
+                    method: 'GET',
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'ar,en-US;q=0.7,en;q=0.3'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                const contentType = response.headers.get('content-type');
+                const contentLength = response.headers.get('content-length');
+                
+                if (response.ok) {
+                    const text = await response.text();
+                    const hasReactContent = text.includes('react') || text.includes('React');
+                    const hasScriptTags = text.includes('<script');
+                    const hasRootDiv = text.includes('id="root"');
+                    
+                    log(`✅ نجاح: ${description} (${response.status} ${response.statusText})`, 'success');
+                    log(`📋 نوع المحتوى: ${contentType}`, 'info');
+                    log(`📏 حجم المحتوى: ${contentLength || text.length + ' bytes'}`, 'info');
+                    log(`🔍 React محتوى: ${hasReactContent ? 'نعم' : 'لا'}`, hasReactContent ? 'success' : 'warning');
+                    log(`📝 Script tags: ${hasScriptTags ? 'نعم' : 'لا'}`, hasScriptTags ? 'success' : 'warning');
+                    log(`🎯 Root div: ${hasRootDiv ? 'نعم' : 'لا'}`, hasRootDiv ? 'success' : 'warning');
+                    
+                    if (text.length < 100) {
+                        log(`⚠️ محتوى قصير جدًا: ${text.substring(0, 200)}`, 'warning');
+                    }
+                    
+                    return { success: true, content: text, status: response.status };
+                } else {
+                    log(`❌ فشل: ${description} - خطأ ${response.status} ${response.statusText}`, 'error');
+                    return { success: false, status: response.status };
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    log(`⏰ انتهى الوقت: ${description} - تجاوز الوقت المسموح (${timeout}ms)`, 'error');
+                } else {
+                    log(`❌ خطأ في الاتصال: ${description} - ${error.message}`, 'error');
+                }
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testAssets(baseUrl) {
+            const assets = [
+                { url: `${baseUrl}/assets/index.js`, description: 'ملف JavaScript الرئيسي' },
+                { url: `${baseUrl}/assets/index.css`, description: 'ملف CSS الرئيسي' },
+                { url: `${baseUrl}/_redirects`, description: 'ملف إعادة التوجيه' }
+            ];
+
+            for (const asset of assets) {
+                await testUrl(asset.url, asset.description);
+            }
+        }
+
+        async function runBasicTests() {
+            resultsDiv.innerHTML = '';
+            const baseUrl = 'https://school-crm-admin.onrender.com';
+            
+            log('🚀 بدء الاختبار الشامل...', 'info');
+            
+            // Test main page
+            await testUrl(baseUrl, 'الصفحة الرئيسية');
+            
+            // Test superadmin login page
+            await testUrl(`${baseUrl}/superadmin/login`, 'صفحة تسجيل دخول المدير العام');
+            
+            // Test direct access to login page
+            await testUrl(`${baseUrl}/login`, 'صفحة تسجيل الدخول العامة');
+            
+            // Test assets
+            await testAssets(baseUrl);
+            
+            log('✅ تم الانتهاء من الاختبارات الأساسية', 'info');
+        }
+
+        async function runAdvancedTests() {
+            log('🔬 تشغيل اختبارات متقدمة...', 'info');
+            
+            // Test CORS
+            try {
+                const response = await fetch('https://school-crschool-crm-backendm.onrender.com/api/health', {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                log(`🌐 CORS Test: ${response.ok ? '✅ ناجح' : '❌ فشل'} (${response.status})`, response.ok ? 'success' : 'error');
+            } catch (error) {
+                log(`🌐 CORS Test: ❌ خطأ - ${error.message}`, 'error');
+            }
+            
+            // Test local storage
+            try {
+                localStorage.setItem('test', 'value');
+                const value = localStorage.getItem('test');
+                localStorage.removeItem('test');
+                log(`💾 LocalStorage Test: ${value === 'value' ? '✅ ناجح' : '❌ فشل'}`, value === 'value' ? 'success' : 'error');
+            } catch (error) {
+                log(`💾 LocalStorage Test: ❌ خطأ - ${error.message}`, 'error');
+            }
+            
+            // Test if React is available
+            setTimeout(() => {
+                if (window.React) {
+                    log('⚛️ React متاح عالميًا: ✅ نعم', 'success');
+                } else {
+                    log('⚛️ React متاح عالميًا: ❌ لا', 'error');
+                }
+                
+                if (window.ReactDOM) {
+                    log('🌐 ReactDOM متاح عالميًا: ✅ نعم', 'success');
+                } else {
+                    log('🌐 ReactDOM متاح عالميًا: ❌ لا', 'error');
+                }
+            }, 3000);
+        }
+
+        // Initialize
+        displayBrowserInfo();
+        runBasicTests();
+    </script>
+</body>
+</html>

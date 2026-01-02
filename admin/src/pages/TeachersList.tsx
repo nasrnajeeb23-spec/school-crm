@@ -1,0 +1,509 @@
+
+
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Teacher, TeacherStatus, NewTeacherData } from '../types';
+import * as api from '../api';
+import TeacherFormModal from '../components/TeacherFormModal';
+import { PlusIcon, UsersIcon } from '../components/icons';
+import { useToast } from '../contexts/ToastContext';
+import TableSkeleton from '../components/TableSkeleton';
+import EmptyState from '../components/EmptyState';
+import Pagination from '../components/Pagination';
+import ResponsiveTable from '../components/ResponsiveTable';
+import SearchBar from '../components/SearchBar';
+import { useSortableTable } from '../hooks/useSortableTable';
+
+const statusColorMap: { [key in TeacherStatus]: string } = {
+  [TeacherStatus.Active]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  [TeacherStatus.OnLeave]: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+};
+
+interface TeachersListProps {
+  schoolId: number;
+}
+
+const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { addToast } = useToast();
+  const location = useLocation();
+
+  const [sendingId, setSendingId] = useState<string | number | null>(null);
+  const [channelByTeacher, setChannelByTeacher] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
+  const [showManualShare, setShowManualShare] = useState(false);
+  const [manualLink, setManualLink] = useState('');
+  const [cooldownByTeacher, setCooldownByTeacher] = useState<Record<string, number>>({});
+  const [sharing, setSharing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+
+  // Pagination and Sort state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  useEffect(() => {
+    setLoading(true);
+    api.getSchoolTeachers(schoolId).then(data => {
+      setTeachers(data);
+    }).catch(err => {
+      console.error("Failed to fetch teachers:", err);
+      addToast("فشل تحميل قائمة المعلمين.", 'error');
+    }).finally(() => {
+      setLoading(false);
+    });
+  }, [schoolId, addToast]);
+
+  const handleAddTeacher = async (teacherData: NewTeacherData) => {
+    try {
+      const newTeacher: any = await api.addSchoolTeacher(schoolId, teacherData);
+      setTeachers(prevTeachers => [newTeacher, ...prevTeachers]);
+      setIsModalOpen(false);
+      if (newTeacher.activationLink) {
+        setManualLink(newTeacher.activationLink);
+        setShowManualShare(true);
+        addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح. تم إنشاء رابط التفعيل.`, 'success');
+      } else {
+        addToast(`تم إضافة المعلم "${newTeacher.name}" بنجاح.`, 'success');
+      }
+    } catch (error: any) {
+      const msg = String(error?.message || '');
+      if (msg.includes('LIMIT_EXCEEDED') || msg.includes('تم بلوغ حد الموارد')) {
+        addToast('تم بلوغ حد المعلمين. يرجى الترقية أو زيادة الحد.', 'warning');
+        try { window.location.assign('/superadmin/subscriptions'); } catch { }
+        return;
+      }
+      if (msg.includes('409') || msg.includes('DUPLICATE') || msg.includes('موجود مسبقًا') || msg.includes('البريد الإلكتروني مستخدم')) {
+        addToast('لا يمكن إضافة معلم مكرر. تحقق من البريد أو الهاتف أو الاسم والمادة.', 'warning');
+        return;
+      }
+      console.error("Failed to add teacher:", error);
+      addToast("فشل إضافة المعلم. الرجاء المحاولة مرة أخرى.", 'error');
+    }
+  };
+
+<<<<<<< HEAD
+=======
+  const filteredTeachers = teachers.filter(teacher => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return true;
+    const nameMatch = (teacher.name || '').toLowerCase().includes(term);
+    const emailMatch = (teacher.email || '').toLowerCase().includes(term);
+    return nameMatch || emailMatch;
+  });
+
+  const [sendingId, setSendingId] = useState<string | number | null>(null);
+  const [channelByTeacher, setChannelByTeacher] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
+  const [showManualShare, setShowManualShare] = useState(false);
+  const [manualLink, setManualLink] = useState('');
+  const [cooldownByTeacher, setCooldownByTeacher] = useState<Record<string, number>>({});
+  const [sharing, setSharing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+  const handleInviteTeacher = async (teacherId: string | number) => {
+    try {
+      setSendingId(teacherId);
+      const channel = channelByTeacher[String(teacherId)] || 'manual';
+      const res = await api.inviteTeacher(String(teacherId), channel);
+      // Refresh server data to sync lastInviteAt/lastInviteChannel across devices
+      try {
+        const list = await api.getSchoolTeachers(schoolId);
+        setTeachers(list);
+      } catch { }
+      if (channel === 'manual') {
+        if (res.activationLink) {
+          setManualLink(res.activationLink);
+          setShowManualShare(true);
+        }
+        addToast('تم إنشاء رابط التفعيل للمشاركة اليدوية.', 'success');
+      } else if (channel === 'sms') {
+        addToast('تم تسجيل طلب إرسال رسالة نصية. قد يتطلب إعداد مزوّد SMS.', 'info');
+      } else {
+        if (res.inviteSent) {
+          addToast('تم إرسال الدعوة عبر البريد الإلكتروني.', 'success');
+        } else {
+          if (res.activationLink) { setManualLink(res.activationLink); setShowManualShare(true); }
+          addToast('لا يوجد بريد صالح. تم إنشاء رابط للمشاركة اليدوية.', 'warning');
+        }
+      }
+    } catch (e) {
+      addToast('فشل إرسال دعوة المعلم.', 'error');
+    } finally {
+      setSendingId(null);
+      setCooldownByTeacher(prev => ({ ...prev, [String(teacherId)]: Date.now() + 2500 }));
+    }
+  };
+
+  const handleDeleteTeacher = async (teacherId: string | number, teacherName: string) => {
+    try {
+      if (!confirm(`هل أنت متأكد من حذف المعلم "${teacherName}"؟`)) return;
+      setDeletingId(teacherId);
+      await api.deleteSchoolTeacher(schoolId, teacherId);
+      setTeachers(prev => prev.filter(t => String(t.id) !== String(teacherId)));
+      try {
+        const list = await api.getSchoolTeachers(schoolId);
+        const exists = Array.isArray(list) && list.some(t => String(t.id) === String(teacherId));
+        setTeachers(list);
+        if (exists) {
+          addToast('تم الإبلاغ بالحذف لكن لم يتم الحذف فعليًا بسبب اعتماديات. الرجاء المحاولة لاحقًا.', 'warning');
+        } else {
+          addToast('تم حذف المعلم بنجاح.', 'success');
+        }
+      } catch {
+        addToast('تم حذف المعلم. تم تحديث القائمة لاحقًا.', 'success');
+      }
+    } catch (e) {
+      console.error('Failed to delete teacher:', e);
+      addToast('فشل حذف المعلم.', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Filter and Sort
+  const filteredTeachers = teachers.filter(teacher =>
+    teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const { sortedData: sortedTeachers, handleSort, getSortIcon } = useSortableTable(filteredTeachers, 'name');
+
+  // Pagination Logic
+  const totalPages = Math.ceil(sortedTeachers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTeachers = sortedTeachers.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleItemsPerPageChange = (items: number) => {
+    setItemsPerPage(items);
+    setCurrentPage(1);
+  };
+
+  const renderRow = (teacher: Teacher) => (
+    <>
+      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{teacher.name}</td>
+      <td className="px-6 py-4">{teacher.subject}</td>
+      <td className="px-6 py-4" dir="ltr">{teacher.phone}</td>
+      <td className="px-6 py-4">
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
+          {teacher.status}
+        </span>
+      </td>
+      <td className="px-6 py-4">{teacher.joinDate}</td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="flex items-center gap-3">
+          <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
+            عرض التفاصيل
+          </Link>
+          {(() => {
+            const lastInviteAt = (teacher as any).lastInviteAt ? new Date(String((teacher as any).lastInviteAt)) : null;
+            let ago = 'لا يوجد';
+            let valid = false;
+            if (lastInviteAt && !isNaN(lastInviteAt.getTime())) {
+              const diff = Math.max(0, Date.now() - lastInviteAt.getTime());
+              const mins = Math.floor(diff / 60000);
+              const hours = Math.floor(diff / 3600000);
+              const days = Math.floor(diff / 86400000);
+              ago = days > 0 ? `${days} يوم` : hours > 0 ? `${hours} ساعة` : `${mins} دقيقة`;
+              valid = lastInviteAt.getTime() + 72 * 3600 * 1000 > Date.now();
+            }
+            return (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                آخر دعوة: {ago} • حالة الرابط: {ago === 'لا يوجد' ? 'لا يوجد' : (valid ? 'صالح' : 'منتهي')}
+              </span>
+            );
+          })()}
+          <select
+            value={channelByTeacher[String(teacher.id)] || 'manual'}
+            onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
+          >
+            <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
+            <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
+            <option value="manual">مشاركة يدوية (مجاني)</option>
+          </select>
+          {(() => {
+            const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
+            const disabled = sendingId === teacher.id || cool;
+            const label = sendingId === teacher.id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : 'دعوة';
+            return (
+              <button
+                onClick={() => handleInviteTeacher(teacher.id)}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
+              >
+                {label}
+              </button>
+            );
+          })()}
+          <button
+            onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+            disabled={deletingId === teacher.id}
+            aria-disabled={deletingId === teacher.id}
+            className={`font-medium ${deletingId === teacher.id ? 'text-red-400 dark:text-red-400' : 'text-red-600 dark:text-red-500'} hover:underline`}
+          >
+            {deletingId === teacher.id ? 'جارٍ الحذف...' : 'حذف'}
+          </button>
+        </div>
+      </td>
+    </>
+  );
+
+  const renderCard = (teacher: Teacher) => (
+    <div key={teacher.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-white">{teacher.name}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{teacher.subject}</p>
+        </div>
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
+          {teacher.status}
+        </span>
+      </div>
+      <div className="space-y-2 text-sm mb-4">
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">رقم الاتصال:</span>
+          <span className="text-gray-900 dark:text-white" dir="ltr">{teacher.phone}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">تاريخ الانضمام:</span>
+          <span className="text-gray-900 dark:text-white">{teacher.joinDate}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <select
+          value={channelByTeacher[String(teacher.id)] || 'manual'}
+          onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
+          className="w-full px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm"
+        >
+          <option value="email" disabled={!((teacher as any).email && String((teacher as any).email).trim() !== '')}>البريد الإلكتروني (مدفوع)</option>
+          <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
+          <option value="manual">مشاركة يدوية (مجاني)</option>
+        </select>
+        <div className="flex gap-2">
+          <Link to={`${location.pathname}/${teacher.id}`} className="flex-1 text-center py-2 px-4 bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors">
+            التفاصيل
+          </Link>
+          {(() => {
+            const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
+            const disabled = sendingId === teacher.id || cool;
+            const label = sendingId === teacher.id ? 'جاري...' : cool ? 'انتظر' : 'دعوة';
+            return (
+              <button
+                onClick={() => handleInviteTeacher(teacher.id)}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={`flex-1 py-2 px-4 rounded-lg text-white transition-colors ${disabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+              >
+                {label}
+              </button>
+            );
+          })()}
+          <button
+            onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+            disabled={deletingId === teacher.id}
+            aria-disabled={deletingId === teacher.id}
+            className={`px-4 py-2 rounded-lg text-white transition-colors ${deletingId === teacher.id ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+          >
+            {deletingId === teacher.id ? 'حذف...' : 'حذف'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+          <SearchBar
+            onSearch={setSearchTerm}
+            placeholder="ابحث عن معلم..."
+            className="w-full md:w-80"
+          />
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+          >
+            <PlusIcon className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" />
+            إضافة معلم جديد
+          </button>
+        </div>
+
+        {loading ? (
+          <TableSkeleton />
+        ) : filteredTeachers.length === 0 ? (
+          <EmptyState
+            icon={UsersIcon}
+            title="لا يوجد معلمون"
+            message={searchTerm ? `لم يتم العثور على معلمين يطابقون بحثك "${searchTerm}".` : "ابدأ بإضافة المعلمين إلى مدرستك."}
+            actionText="إضافة معلم جديد"
+            onAction={() => setIsModalOpen(true)}
+          />
+        ) : (
+          <>
+            <ResponsiveTable
+              headers={['اسم المعلم', 'المادة', 'رقم الاتصال', 'الحالة', 'تاريخ الانضمام', 'إجراءات']}
+              data={paginatedTeachers}
+              renderRow={renderRow}
+              renderCard={renderCard}
+              keyExtractor={(t) => String(t.id)}
+            />
+<<<<<<< HEAD
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              totalItems={sortedTeachers.length}
+            />
+          </>
+        )}
+=======
+          ) : (
+            <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+              <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                <tr>
+                  <th scope="col" className="px-6 py-3">اسم المعلم</th>
+                  <th scope="col" className="px-6 py-3">المادة</th>
+                  <th scope="col" className="px-6 py-3">البريد الإلكتروني</th>
+                  <th scope="col" className="px-6 py-3">رقم الاتصال</th>
+                  <th scope="col" className="px-6 py-3">الحالة</th>
+                  <th scope="col" className="px-6 py-3">تاريخ الانضمام</th>
+                  <th scope="col" className="px-6 py-3">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTeachers.map((teacher) => (
+                  <tr key={teacher.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{teacher.name}</td>
+                    <td className="px-6 py-4">{teacher.subject}</td>
+                    <td className="px-6 py-4" dir="ltr">{(teacher as any).email || '—'}</td>
+                    <td className="px-6 py-4" dir="ltr">{teacher.phone}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
+                        {teacher.status}
+                      </span>
+                    </td>
+                  <td className="px-6 py-4">{teacher.joinDate}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
+                        عرض التفاصيل
+                      </Link>
+                      {(() => {
+                        const lastInviteAt = (teacher as any).lastInviteAt ? new Date(String((teacher as any).lastInviteAt)) : null;
+                        let ago = 'لا يوجد';
+                        let valid = false;
+                        if (lastInviteAt && !isNaN(lastInviteAt.getTime())) {
+                          const diff = Math.max(0, Date.now() - lastInviteAt.getTime());
+                          const mins = Math.floor(diff / 60000);
+                          const hours = Math.floor(diff / 3600000);
+                          const days = Math.floor(diff / 86400000);
+                          ago = days > 0 ? `${days} يوم` : hours > 0 ? `${hours} ساعة` : `${mins} دقيقة`;
+                          valid = lastInviteAt.getTime() + 72 * 3600 * 1000 > Date.now();
+                        }
+                        return (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            آخر دعوة: {ago} • حالة الرابط: {ago === 'لا يوجد' ? 'لا يوجد' : (valid ? 'صالح' : 'منتهي')}
+                          </span>
+                        );
+                      })()}
+                      <select
+                        value={channelByTeacher[String(teacher.id)] || 'manual'}
+                        onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
+                        className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
+                      >
+                          <option value="email" disabled={!((teacher.email && String(teacher.email).trim() !== ''))}>البريد الإلكتروني (مدفوع)</option>
+                          <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
+                          <option value="manual">مشاركة يدوية (مجاني)</option>
+                        </select>
+                        {(() => {
+                          const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
+                          const disabled = sendingId === teacher.id || cool;
+                          const label = sendingId === teacher.id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : 'دعوة';
+                          return (
+                            <button
+                              onClick={() => handleInviteTeacher(teacher.id)}
+                              disabled={disabled}
+                              aria-disabled={disabled}
+                              className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })()}
+                        <button
+                          onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+                          disabled={deletingId === teacher.id}
+                          aria-disabled={deletingId === teacher.id}
+                          className={`font-medium ${deletingId === teacher.id ? 'text-red-400 dark:text-red-400' : 'text-red-600 dark:text-red-500'} hover:underline`}
+                        >
+                          {deletingId === teacher.id ? 'جارٍ الحذف...' : 'حذف'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+      </div>
+      {isModalOpen && (
+        <TeacherFormModal
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleAddTeacher}
+        />
+      )}
+      {showManualShare && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[90%] max-w-lg text-right">
+            <h3 className="text-lg font-semibold mb-3">رابط التفعيل للمشاركة اليدوية</h3>
+            <a href={manualLink} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 underline">{manualLink}</a>
+            <div className="flex gap-3 mt-4 justify-end">
+              <button
+                onClick={() => { try { navigator.clipboard.writeText(manualLink); addToast('تم نسخ الرابط.', 'success'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); } }}
+                className="px-3 py-2 bg-teal-600 text-white rounded-md"
+              >نسخ الرابط</button>
+              <button
+                onClick={async () => {
+                  try {
+                    setSharing(true);
+                    const anyNav = navigator as any;
+                    if (anyNav.share) {
+                      await anyNav.share({ title: 'تفعيل الحساب', text: 'رابط تفعيل الحساب', url: manualLink });
+                      addToast('تمت المشاركة بنجاح.', 'success');
+                    } else {
+                      await navigator.clipboard.writeText(manualLink);
+                      addToast('تم نسخ الرابط. يمكنك مشاركته يدويًا.', 'info');
+                    }
+                  } catch {
+                    try { await navigator.clipboard.writeText(manualLink); addToast('تعذرت المشاركة. تم نسخ الرابط.', 'warning'); } catch { addToast('تعذر نسخ الرابط. انسخه يدويًا.', 'error'); }
+                  } finally {
+                    setSharing(false);
+                  }
+                }}
+                disabled={sharing}
+                aria-disabled={sharing}
+                className={`px-3 py-2 ${sharing ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
+              >{sharing ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
+              <button onClick={() => setShowManualShare(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default TeachersList;

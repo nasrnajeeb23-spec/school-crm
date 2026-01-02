@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "d:\\school-crm (1)\\logs\\.29847bfa3acb1cf6b5c2dbae003ec21b58d0d50b-audit.json",
+    "files": [
+        {
+            "date": 1765394304636,
+            "name": "d:\\school-crm (1)\\logs\\app-2025-12-10.log",
+            "hash": "61057c550d92c6ee105430cb918d3a6016a24ed4059b78a686fc64e4fc6e6510"
+        }
+    ],
+    "hashType": "sha256"
+}

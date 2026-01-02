@@ -1,0 +1,50 @@
+const { Sequelize } = require('sequelize');
+const path = require('path');
+
+const DATABASE_URL = process.env.DATABASE_URL;
+
+let sequelize;
+if (DATABASE_URL) {
+  const useSSL = String(process.env.PG_SSL || '').toLowerCase() === 'true';
+  sequelize = new Sequelize(DATABASE_URL, {
+    dialect: 'postgres',
+    logging: false,
+    dialectOptions: useSSL ? { ssl: { require: true, rejectUnauthorized: false } } : {},
+    pool: {
+      max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+      min: parseInt(process.env.DB_POOL_MIN || '2', 10),
+      idle: parseInt(process.env.DB_POOL_IDLE_MS || '10000', 10),
+      acquire: parseInt(process.env.DB_POOL_ACQUIRE_MS || '30000', 10)
+    }
+  });
+} else {
+  const isTest = process.env.NODE_ENV === 'test';
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: isTest ? ':memory:' : path.join(__dirname, '..', 'dev.sqlite'),
+    logging: false,
+    ...(isTest
+      ? {
+          pool: {
+            max: 1,
+            min: 0,
+            idle: 0,
+            acquire: parseInt(process.env.DB_POOL_ACQUIRE_MS || '30000', 10)
+          }
+        }
+      : {})
+  });
+
+  if (isTest) {
+    sequelize.addHook('afterConnect', async (connection) => {
+      await new Promise((resolve, reject) => {
+        connection.run('PRAGMA foreign_keys = OFF;', (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    });
+  }
+}
+
+module.exports = sequelize;

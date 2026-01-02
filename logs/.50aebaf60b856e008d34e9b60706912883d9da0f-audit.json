@@ -1,0 +1,75 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\school-crm (1)\\logs\\.50aebaf60b856e008d34e9b60706912883d9da0f-audit.json",
+    "files": [
+        {
+            "date": 1765226419123,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-08.log",
+            "hash": "3879cf8331868ce3b63ee8c59f8dc3a1398e73f68c8eb8fafb24b8b83a317677"
+        },
+        {
+            "date": 1765227838323,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-09.log",
+            "hash": "579a6b74ab398ef7b652193d6c68ae65e7a446ed8fc851b8d61bc5d7b6e2b304"
+        },
+        {
+            "date": 1765319248271,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-10.log",
+            "hash": "f3e28883f35f586a3ab007f9ddd52c61f0940816c1028a3f3c9635a29eb664b5"
+        },
+        {
+            "date": 1765401581321,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-11.log",
+            "hash": "9e1cbebd8ad7d84c21c200c47a0e5519c4cd2ec3ca792920fcb23ae698581e8f"
+        },
+        {
+            "date": 1765658081778,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-13.log",
+            "hash": "0c3e85a9884e94f88393493800536eb48e54ea524757cc205440b1a5e226320b"
+        },
+        {
+            "date": 1765659679874,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-14.log",
+            "hash": "97e3e7a2d1f3bb89edcc06da5d764b87e9d4ca2d3abf4e3268701082c266f1ba"
+        },
+        {
+            "date": 1766002970626,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-17.log",
+            "hash": "f942228e252ba82b71e4ef9700e4a911a5626aaaa50474c5e951d724e4f19103"
+        },
+        {
+            "date": 1766006082937,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-18.log",
+            "hash": "5ff3dc4d8861014bc9981e1ec5b668bb20a318df684195519022bd10f258a0a8"
+        },
+        {
+            "date": 1766094230352,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-19.log",
+            "hash": "622fc9d4b96967696edcde41fa515f801f360b2dca2109d0af278659483520a3"
+        },
+        {
+            "date": 1766189443761,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-20.log",
+            "hash": "acacee312d53bd998445eaadefebc34f0658c7fae9cc6cac72dee169c8d59d63"
+        },
+        {
+            "date": 1766264517243,
+            "name": "D:\\school-crm (1)\\logs\\app-2025-12-21.log",
+            "hash": "3164097a0fc70ba146007215d9267daf38a7d713b77ea03ac532886ab7f34649"
+        },
+        {
+            "date": 1767222703192,
+            "name": "D:\\school-crm (1)\\logs\\app-2026-01-01.log",
+            "hash": "137482c4daa669cfe3151668e95f9f531b658def4c0bb5e5812a1c4ec3494c23"
+        },
+        {
+            "date": 1767301795476,
+            "name": "D:\\school-crm (1)\\logs\\app-2026-01-02.log",
+            "hash": "35309470ba0d5a6daf8a64f92f32f8588bed9982a2e683f111ae8b37fa84b0e0"
+        }
+    ],
+    "hashType": "sha256"
+}

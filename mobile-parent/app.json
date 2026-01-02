@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "SchoolSaaS - Parent",
+    "slug": "mobile-parent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "package": "com.schoolsaas.parent",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "schoolsaas.com",
+              "pathPrefix": "/parent"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "SchoolSaaS - Parent",
+      "shortName": "SchoolParent",
+      "description": "School Management System - Parent Portal",
+      "themeColor": "#4f46e5",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "scope": "/apps/parent/",
+      "startUrl": "/apps/parent/",
+      "lang": "ar"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-localization"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ff875e66-21e4-45eb-9912-6608e0e1acaa"
+      }
+    }
+  }
+}

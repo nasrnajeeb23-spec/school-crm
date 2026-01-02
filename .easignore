@@ -1,0 +1,26 @@
+# Ignore huge directories to save space and upload time
+.gradle_cache/
+android-sdk/
+node_modules/
+backend/
+admin/
+monitoring/
+nginx/
+src/
+deploy/
+docs/
+components/
+*.apk
+*.zip
+*.tar.gz
+*.hprof
+*.log
+hs_err_pid*.log
+
+# Ignore mobile builds artifacts
+mobile-parent/android/.gradle
+mobile-parent/android/build
+mobile-parent/node_modules
+mobile-teacher/android/.gradle
+mobile-teacher/android/build
+mobile-teacher/node_modules

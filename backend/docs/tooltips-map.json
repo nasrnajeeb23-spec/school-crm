@@ -1,0 +1,68 @@
+{
+  "dashboard": [
+    { "selector": "[data-tip='dashboard-metrics']", "title": "اللوحة", "content": "مؤشرات الأداء الرئيسية للمدرسة.", "position": "bottom" },
+    { "selector": "[data-tip='dashboard-period']", "title": "الفترة", "content": "اختر الفترة الزمنية لتحليل المؤشرات.", "position": "bottom" }
+  ],
+  "school-settings": [
+    { "selector": "[data-tip='settings-working-days']", "title": "أيام العمل", "content": "حدد أيام الدراسة الرسمية.", "position": "right" },
+    { "selector": "[data-tip='settings-working-hours']", "title": "ساعات العمل", "content": "اضبط بداية ونهاية الدوام.", "position": "right" },
+    { "selector": "[data-tip='settings-stages']", "title": "المراحل الدراسية", "content": "حدد المراحل المتاحة في المدرسة.", "position": "right" }
+  ],
+  "teachers": [
+    { "selector": "[data-tip='teachers-add']", "title": "إضافة معلم", "content": "أدخل الاسم والبريد والحالة ثم احفظ.", "position": "left" },
+    { "selector": "[data-tip='teachers-homeroom']", "title": "معلم غرفة", "content": "اربط معلم غرفة بالفصل المناسب.", "position": "left" }
+  ],
+  "classes": [
+    { "selector": "[data-tip='classes-add']", "title": "إضافة فصل", "content": "أدخل المرحلة والقسم والسعة ومعلم غرفة.", "position": "left" },
+    { "selector": "[data-tip='classes-roster']", "title": "قائمة الفصل", "content": "عدّل المواد ومعلمي المواد للفصل.", "position": "left" }
+  ],
+  "students": [
+    { "selector": "[data-tip='students-add']", "title": "إضافة طالب", "content": "أدخل بيانات الطالب واربطه بولي الأمر والفصل.", "position": "left" },
+    { "selector": "[data-tip='students-import']", "title": "استيراد CSV", "content": "حمّل ملفًا متوافقًا لمجموعة من الطلاب.", "position": "left" }
+  ],
+  "finance": [
+    { "selector": "[data-tip='fees-add']", "title": "إعداد الرسوم", "content": "أضف مرحلة وحدد الرسوم والخطة والتخفيضات.", "position": "right" },
+    { "selector": "[data-tip='invoices-generate']", "title": "توليد الفواتير", "content": "ولّد فواتير جماعية حسب المرحلة أو الفصل.", "position": "right" }
+  ],
+  "attendance": [
+    { "selector": "[data-tip='attendance-class']", "title": "حضور الفصل", "content": "سجّل حالة كل طالب.", "position": "bottom" },
+    { "selector": "[data-tip='attendance-staff']", "title": "حضور الموظفين", "content": "أدخل التاريخ والحالة والساعات.", "position": "bottom" }
+  ],
+  "messaging": [
+    { "selector": "[data-tip='messaging-conversation']", "title": "المحادثة", "content": "أنشئ محادثة مع معلم أو ولي أمر.", "position": "left" },
+    { "selector": "[data-tip='messaging-send']", "title": "إرسال", "content": "أرسل رسالة أو مرفق داخل المحادثة.", "position": "left" }
+  ],
+  "analytics": [
+    { "selector": "[data-tip='analytics-overview']", "title": "نظرة عامة", "content": "تحليل مؤشرات الأداء العامة.", "position": "bottom" },
+    { "selector": "[data-tip='analytics-cache']", "title": "الكاش", "content": "الطلبات المتكررة تصبح أسرع ضمن فترة TTL.", "position": "bottom" }
+  ],
+  "superadmin-dashboard": [
+    { "selector": "[data-tip='sa-dashboard-stats']", "title": "الإحصائيات", "content": "ملخص المدارس والاشتراكات النشطة.", "position": "bottom" },
+    { "selector": "[data-tip='sa-dashboard-revenue']", "title": "الإيرادات", "content": "مخطط الإيرادات الشهرية.", "position": "bottom" }
+  ],
+  "superadmin-schools": [
+    { "selector": "[data-tip='sa-schools-add']", "title": "إضافة مدرسة", "content": "إنشاء مدرسة جديدة وتعيين مدير لها.", "position": "left" },
+    { "selector": "[data-tip='sa-schools-list']", "title": "قائمة المدارس", "content": "إدارة المدارس والتحكم بحالتها.", "position": "top" }
+  ],
+  "superadmin-subscriptions": [
+    { "selector": "[data-tip='sa-subs-plans']", "title": "الخطط", "content": "إدارة الخطط والأسعار.", "position": "left" },
+    { "selector": "[data-tip='sa-subs-active']", "title": "الاشتراكات", "content": "متابعة الاشتراكات النشطة والمنتهية.", "position": "top" }
+  ],
+  "teacher-dashboard": [
+    { "selector": "[data-tip='teacher-stats']", "title": "الإحصائيات", "content": "عدد الفصول والطلاب والواجبات النشطة.", "position": "bottom" },
+    { "selector": "[data-tip='teacher-schedule']", "title": "جدول اليوم", "content": "حصصك الدراسية لهذا اليوم.", "position": "left" }
+  ],
+  "teacher-classes": [
+    { "selector": "[data-tip='teacher-class-card']", "title": "بطاقة الفصل", "content": "اضغط للدخول إلى تفاصيل الفصل والطلاب.", "position": "top" }
+  ],
+  "teacher-grades": [
+    { "selector": "[data-tip='teacher-grades-add']", "title": "رصد الدرجات", "content": "أدخل الدرجات للطلاب واحفظ التغييرات.", "position": "left" }
+  ],
+  "parent-dashboard": [
+    { "selector": "[data-tip='parent-children']", "title": "الأبناء", "content": "قائمة أبنائك في المدرسة.", "position": "bottom" },
+    { "selector": "[data-tip='parent-finance']", "title": "الرصيد", "content": "المبالغ المستحقة والمدفوعة.", "position": "bottom" }
+  ],
+  "parent-grades": [
+    { "selector": "[data-tip='parent-report-card']", "title": "الشهادة", "content": "عرض وتحميل شهادة الدرجات.", "position": "left" }
+  ]
+}

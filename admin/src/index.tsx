@@ -1,0 +1,72 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
+import { ToastProvider } from './contexts/ToastContext';
+import { AppProvider } from './contexts/AppContext';
+import App from './App';
+import './index.css';
+
+if (typeof window !== 'undefined') {
+  try {
+    const key = 'api_base';
+    const envApi = (((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || ''));
+    const host = window.location.hostname || '';
+    const cur = localStorage.getItem(key) || '';
+    const hasApi = (v: string) => /\/api\/?$/.test(v || '');
+    const withApi = (v: string) => {
+      const s = String(v || '').replace(/\/$/, '');
+      return hasApi(s) ? s.replace(/\/$/, '') : `${s}/api`;
+    };
+
+    // Allow override via query param: ?api_base=https://backend.onrender.com/api
+    const params = new URLSearchParams(window.location.search);
+    const qp = params.get('api_base');
+    if (qp && /^https?:\/\//.test(qp)) {
+      localStorage.setItem(key, withApi(decodeURIComponent(qp)));
+    } else if (envApi) {
+      localStorage.setItem(key, withApi(envApi));
+    } else if (!cur || /localhost|127\.0\.0\.1/i.test(cur)) {
+      let candidate = '';
+      if (host.endsWith('.onrender.com')) {
+        const sub = host.split('.onrender.com')[0];
+        const back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
+        candidate = `https://${back}.onrender.com/api`;
+      }
+      localStorage.setItem(key, candidate || 'http://localhost:5000/api');
+    } else if (!hasApi(cur)) {
+      localStorage.setItem(key, withApi(cur));
+    }
+  } catch {}
+}
+
+const container = document.getElementById('root');
+if (container) {
+<<<<<<< HEAD
+  const isRenderHost = typeof window !== 'undefined' && /\.onrender\.com$/i.test(window.location.hostname || '');
+  const useHash = ((import.meta.env.VITE_HASH_ROUTER === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
+=======
+  const useHash = ((((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_HASH_ROUTER) || '') === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+  const root = ReactDOM.createRoot(container);
+  root.render(
+    <React.StrictMode>
+      {useHash ? (
+        <HashRouter>
+          <ToastProvider>
+            <AppProvider>
+              <App />
+            </AppProvider>
+          </ToastProvider>
+        </HashRouter>
+      ) : (
+        <BrowserRouter>
+          <ToastProvider>
+            <AppProvider>
+              <App />
+            </AppProvider>
+          </ToastProvider>
+        </BrowserRouter>
+      )}
+    </React.StrictMode>
+  );
+}

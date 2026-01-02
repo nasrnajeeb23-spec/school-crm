@@ -1,0 +1,16 @@
+# قالب ملف البيئة للإنتاج - School CRM
+# انسخ هذا الملف إلى .env.production وقم بتعبئة القيم
+
+# استخدم: node scripts/generate-secrets.js لتوليد مفاتيح قوية
+
+JWT_SECRET=
+SESSION_SECRET=
+LICENSE_SECRET=
+NODE_ENV=production
+PORT=5000
+DATABASE_URL=
+REDIS_URL=
+CORS_ORIGIN=
+FRONTEND_URL=
+SUPER_ADMIN_IP_WHITELIST=
+DEFAULT_PASSWORD=

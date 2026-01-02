@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار API نظام إدارة المدارس</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; direction: rtl; }
+        .test-section { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .result { margin: 10px 0; padding: 10px; background: white; border-radius: 3px; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; }
+        .test-btn { background: #007bff; color: white; }
+        .clear-btn { background: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🧪 اختبار شامل لنظام إدارة المدارس</h1>
+    
+    <div class="test-section">
+        <h3>1. اختبار نظام الدخول</h3>
+        <button class="test-btn" onclick="testSuperAdminLogin()">تسجيل دخول المدير العام</button>
+        <button class="test-btn" onclick="testSchoolAdminLogin()">تسجيل دخول مدير المدرسة</button>
+        <button class="test-btn" onclick="testParentLogin()">تسجيل دخول ولي الأمر</button>
+        <button class="test-btn" onclick="testInvalidLogin()">تسجيل دخول خاطئ</button>
+    </div>
+
+    <div class="test-section">
+        <h3>2. اختبار لوحة تحكم المدير العام</h3>
+        <button class="test-btn" onclick="testSuperAdminDashboard()">الإحصائيات العامة</button>
+        <button class="test-btn" onclick="testSchoolsList()">قائمة المدارس</button>
+        <button class="test-btn" onclick="testSchoolAdminsList()">مدراء المدارس</button>
+        <button class="test-btn" onclick="testSubscriptions()">الاشتراكات</button>
+    </div>
+
+    <div class="test-section">
+        <h3>3. اختبار النظام المالي</h3>
+        <button class="test-btn" onclick="testInvoices()">الفواتير</button>
+        <button class="test-btn" onclick="testExpenses()">المصاريف</button>
+        <button class="test-btn" onclick="testPayments()">المدفوعات</button>
+    </div>
+
+    <div class="test-section">
+        <h3>4. اختبار نظام النقل</h3>
+        <button class="test-btn" onclick="testTransportation()">المواصلات</button>
+        <button class="test-btn" onclick="testBusOperators()">السائقين</button>
+        <button class="test-btn" onclick="testRoutes()">المسارات</button>
+    </div>
+
+    <div class="test-section">
+        <h3>5. اختبار وظائف المعلم</h3>
+        <button class="test-btn" onclick="testTeacherDashboard()">لوحة تحكم المعلم</button>
+        <button class="test-btn" onclick="testTeacherClasses()">صفوف المعلم</button>
+        <button class="test-btn" onclick="testAssignments()">الواجبات</button>
+    </div>
+
+    <div class="test-section">
+        <h3>6. اختبار وظائف ولي الأمر</h3>
+        <button class="test-btn" onclick="testParentDashboard()">لوحة تحكم ولي الأمر</button>
+        <button class="test-btn" onclick="testParentGrades()">الدرجات</button>
+        <button class="test-btn" onclick="testParentAttendance()">الحضور</button>
+    </div>
+
+    <div class="test-section">
+        <h3>نتائج الاختبار</h3>
+        <button class="clear-btn" onclick="clearResults()">مسح النتائج</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let authToken = null;
+        let currentUser = null;
+
+        function addResult(testName, success, data, error = null) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = `
+                <strong>${testName}:</strong> 
+                <span class="${success ? 'success' : 'error'}">
+                    ${success ? '✅ ناجح' : '❌ فشل'}
+                </span>
+                ${data ? `<br><small>البيانات: ${JSON.stringify(data, null, 2)}</small>` : ''}
+                ${error ? `<br><small class="error">الخطأ: ${error}</small>` : ''}
+            `;
+            resultsDiv.insertBefore(resultDiv, resultsDiv.firstChild);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // اختبارات الدخول
+        async function testSuperAdminLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'super@admin.com', password: 'password' })
+                });
+                const data = await response.json();
+                if (data.user && data.user.role === 'SuperAdmin') {
+                    authToken = data.token;
+                    currentUser = data.user;
+                    addResult('دخول المدير العام', true, data);
+                } else {
+                    addResult('دخول المدير العام', false, data, 'صلاحية غير صحيحة');
+                }
+            } catch (error) {
+                addResult('دخول المدير العام', false, null, error.message);
+            }
+        }
+
+        async function testSchoolAdminLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'admin@school.com', password: 'password' })
+                });
+                const data = await response.json();
+                if (data.user && data.user.role === 'SchoolAdmin') {
+                    addResult('دخول مدير المدرسة', true, data);
+                } else {
+                    addResult('دخول مدير المدرسة', false, data, 'صلاحية غير صحيحة');
+                }
+            } catch (error) {
+                addResult('دخول مدير المدرسة', false, null, error.message);
+            }
+        }
+
+        async function testParentLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'parent@school.com', password: 'password' })
+                });
+                const data = await response.json();
+                if (data.user && data.user.role === 'Parent') {
+                    addResult('دخول ولي الأمر', true, data);
+                } else {
+                    addResult('دخول ولي الأمر', false, data, 'صلاحية غير صحيحة');
+                }
+            } catch (error) {
+                addResult('دخول ولي الأمر', false, null, error.message);
+            }
+        }
+
+        async function testInvalidLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'invalid@user.com', password: 'wrongpassword' })
+                });
+                const data = await response.json();
+                addResult('دخول خاطئ (يجب أن يفشل)', !data.user, data);
+            } catch (error) {
+                addResult('دخول خاطئ', true, null, 'فشل كما هو متوقع');
+            }
+        }
+
+        // اختبارات لوحة تحكم المدير العام
+        async function testSuperAdminDashboard() {
+            if (!authToken) {
+                addResult('إحصائيات المدير العام', false, null, 'يجب تسجيل الدخول أولاً');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/superadmin/stats`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                addResult('إحصائيات المدير العام', response.ok, data);
+            } catch (error) {
+                addResult('إحصائيات المدير العام', false, null, error.message);
+            }
+        }
+
+        async function testSchoolsList() {
+            try {
+                const response = await fetch(`${API_BASE}/schools`);
+                const data = await response.json();
+                addResult('قائمة المدارس', response.ok, data);
+            } catch (error) {
+                addResult('قائمة المدارس', false, null, error.message);
+            }
+        }
+
+        async function testSchoolAdminsList() {
+            if (!authToken) {
+                addResult('مدراء المدارس', false, null, 'يجب تسجيل الدخول أولاً');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/superadmin/users?role=SchoolAdmin`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                addResult('مدراء المدارس', response.ok, data);
+            } catch (error) {
+                addResult('مدراء المدارس', false, null, error.message);
+            }
+        }
+
+        async function testSubscriptions() {
+            if (!authToken) {
+                addResult('الاشتراكات', false, null, 'يجب تسجيل الدخول أولاً');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/superadmin/subscriptions`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                addResult('الاشتراكات', response.ok, data);
+            } catch (error) {
+                addResult('الاشتراكات', false, null, error.message);
+            }
+        }
+
+        // اختبارات النظام المالي
+        async function testInvoices() {
+            try {
+                const response = await fetch(`${API_BASE}/school/1/invoices`);
+                const data = await response.json();
+                addResult('الفواتير', response.ok, data);
+            } catch (error) {
+                addResult('الفواتير', false, null, error.message);
+            }
+        }
+
+        async function testExpenses() {
+            try {
+                const response = await fetch(`${API_BASE}/school/1/expenses`);
+                const data = await response.json();
+                addResult('المصاريف', response.ok, data);
+            } catch (error) {
+                addResult('المصاريف', false, null, error.message);
+            }
+        }
+
+        async function testPayments() {
+            try {
+                const response = await fetch(`${API_BASE}/school/1/payments`);
+                const data = await response.json();
+                addResult('المدفوعات', response.ok, data);
+            } catch (error) {
+                addResult('المدفوعات', false, null, error.message);
+            }
+        }
+
+        // اختبارات النقل
+        async function testTransportation() {
+            try {
+                const response = await fetch(`${API_BASE}/transportation/1/routes`);
+                const data = await response.json();
+                addResult('نظام النقل', response.ok, data);
+            } catch (error) {
+                addResult('نظام النقل', false, null, error.message);
+            }
+        }
+
+        async function testBusOperators() {
+            try {
+                const response = await fetch(`${API_BASE}/transportation/1/operators`);
+                const data = await response.json();
+                addResult('السائقين', response.ok, data);
+            } catch (error) {
+                addResult('السائقين', false, null, error.message);
+            }
+        }
+
+        async function testRoutes() {
+            try {
+                const response = await fetch(`${API_BASE}/transportation/1/routes`);
+                const data = await response.json();
+                addResult('المسارات', response.ok, data);
+            } catch (error) {
+                addResult('المسارات', false, null, error.message);
+            }
+        }
+
+        // اختبارات المعلم
+        async function testTeacherDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/teacher/tech_001/dashboard`);
+                const data = await response.json();
+                addResult('لوحة تحكم المعلم', response.ok, data);
+            } catch (error) {
+                addResult('لوحة تحكم المعلم', false, null, error.message);
+            }
+        }
+
+        async function testTeacherClasses() {
+            try {
+                const response = await fetch(`${API_BASE}/teacher/tech_001/classes`);
+                const data = await response.json();
+                addResult('صفوف المعلم', response.ok, data);
+            } catch (error) {
+                addResult('صفوف المعلم', false, null, error.message);
+            }
+        }
+
+        async function testAssignments() {
+            try {
+                const response = await fetch(`${API_BASE}/school/1/assignments`);
+                const data = await response.json();
+                addResult('الواجبات', response.ok, data);
+            } catch (error) {
+                addResult('الواجبات', false, null, error.message);
+            }
+        }
+
+        // اختبارات ولي الأمر
+        async function testParentDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/parent/parent_001/dashboard`);
+                const data = await response.json();
+                addResult('لوحة تحكم ولي الأمر', response.ok, data);
+            } catch (error) {
+                addResult('لوحة تحكم ولي الأمر', false, null, error.message);
+            }
+        }
+
+        async function testParentGrades() {
+            try {
+                const response = await fetch(`${API_BASE}/parent/parent_001/grades`);
+                const data = await response.json();
+                addResult('درجات ولي الأمر', response.ok, data);
+            } catch (error) {
+                addResult('درجات ولي الأمر', false, null, error.message);
+            }
+        }
+
+        async function testParentAttendance() {
+            try {
+                const response = await fetch(`${API_BASE}/parent/parent_001/attendance`);
+                const data = await response.json();
+                addResult('حضور ولي الأمر', response.ok, data);
+            } catch (error) {
+                addResult('حضور ولي الأمر', false, null, error.message);
+            }
+        }
+    </script>
+</body>
+</html>

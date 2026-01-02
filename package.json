@@ -1,0 +1,21 @@
+{
+  "name": "school-crm-root",
+  "version": "1.0.0",
+  "description": "Root package for SchoolSaaS CRM",
+  "scripts": {
+    "build": "npm run build --prefix admin",
+    "start": "cd admin && npm start",
+    "dev": "cd admin && npm run dev",
+    "postinstall": "npm install --prefix admin"
+  },
+  "engines": {
+    "node": ">=20.15.1 <21"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "axios": "^1.13.2"
+  }
+}

@@ -1,0 +1,60 @@
+staticSites:
+  - name: school-crm-admin
+    buildCommand: npm run build
+    publishPath: dist
+    rootDir: .
+    envVars:
+      - key: REACT_APP_HASH_ROUTER
+        value: "false"
+      - key: REACT_APP_API_URL
+        value: https://<BACKEND_HOST>/api
+      - key: REACT_APP_ENVIRONMENT
+        value: production
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=1536"
+
+services:
+  - type: web
+    name: school-crm-backend
+    rootDir: backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: CORS_ORIGIN
+        value: https://<FRONTEND_HOST>
+      - key: FRONTEND_URL
+        value: https://<FRONTEND_HOST>
+      - key: DATABASE_URL
+        value: postgresql://<USER>:<PASSWORD>@<HOST>:<PORT>/<DB>
+      - key: DB_DIALECT
+        value: postgres
+      - key: LICENSE_KEY
+        value: <LICENSE_KEY>
+      - key: LICENSE_SECRET
+        value: <LICENSE_SECRET>
+      - key: JWT_SECRET
+        value: <JWT_SECRET>
+      - key: JWT_REFRESH_SECRET
+        value: <JWT_REFRESH_SECRET>
+      - key: SESSION_SECRET
+        value: <SESSION_SECRET>
+      - key: LOG_LEVEL
+        value: info
+      - key: MAX_FILE_SIZE
+        value: "10485760"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "300"
+      - key: RATE_LIMIT_WINDOW
+        value: "15"
+      - key: REDIS_URL
+        value: <REDIS_URL>

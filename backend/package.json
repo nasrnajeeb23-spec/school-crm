@@ -1,0 +1,108 @@
+{
+  "name": "school-crm-backend",
+  "version": "3.0.0",
+  "description": "School CRM Backend API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+<<<<<<< HEAD
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch --runInBand",
+    "test:coverage": "jest --coverage --runInBand",
+    "lint": "eslint . --ext .js",
+    "format": "prettier --write \"**/*.js\""
+=======
+    "db:seed": "node seed.js",
+    "db:seed:staff": "node scripts/seedStaff.js",
+    "db:migrate": "node scripts/migrate.js",
+    "start:pm2": "pm2 start ecosystem.config.js --env production",
+    "test:smoke": "node scripts/smokeTest.js",
+    "test:e2e": "node scripts/e2e-smoke.js",
+    "test:plans": "node scripts/testPlans.js",
+    "env:print": "node scripts/printEnv.js"
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+  },
+  "dependencies": {
+    "@azure/msal-node": "^3.8.4",
+    "arabic-reshaper": "^1.1.0",
+    "archiver": "^7.0.1",
+    "bcryptjs": "^2.4.3",
+<<<<<<< HEAD
+    "cookie-parser": "^1.4.6",
+=======
+    "chart.js": "^4.4.1",
+    "compression": "^1.8.1",
+    "connect-redis": "^7.0.0",
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+    "cors": "^2.8.5",
+    "csurf": "^1.11.0",
+    "dompurify": "^3.3.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-session": "^1.18.2",
+    "express-validator": "^7.0.1",
+<<<<<<< HEAD
+    "fs-extra": "^11.3.2",
+    "googleapis": "^169.0.0",
+    "helmet": "^7.1.0",
+    "i18next": "^25.7.3",
+    "i18next-fs-backend": "^2.6.1",
+    "i18next-http-middleware": "^3.9.0",
+    "jsdom": "^22.1.0",
+=======
+    "fs-extra": "^11.2.0",
+    "googleapis": "^128.0.0",
+    "helmet": "^7.0.0",
+    "i18next": "^23.7.6",
+    "i18next-fs-backend": "^2.3.1",
+    "i18next-http-middleware": "^3.5.0",
+    "javascript-obfuscator": "^5.1.0",
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.11",
+    "passport": "^0.7.0",
+    "passport-saml": "^3.2.4",
+    "pdfkit": "^0.17.2",
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
+    "prom-client": "^15.1.3",
+    "qrcode": "^1.5.4",
+    "rate-limit-redis": "^4.2.0",
+    "redis": "^4.6.11",
+    "sequelize": "^6.35.2",
+    "simple-statistics": "^7.8.8",
+    "socket.io": "^4.8.1",
+    "speakeasy": "^2.0.0",
+    "sqlite3": "^5.1.7",
+    "validator": "^13.15.23",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "devDependencies": {
+<<<<<<< HEAD
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "prettier": "^3.1.1",
+    "supertest": "^6.3.3"
+=======
+    "nodemon": "^3.1.11",
+    "pm2": "^6.0.13",
+    "socket.io-client": "^4.8.3"
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
+}

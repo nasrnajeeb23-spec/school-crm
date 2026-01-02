@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Test</title>
+</head>
+<body>
+    <div id="test-root"></div>
+    
+    <script type="module">
+        // Test if React is loading properly
+        console.log('Testing React loading...');
+        
+        // Check if the built files are accessible
+        fetch('/assets/index.js')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✅ index.js loaded successfully');
+                } else {
+                    console.error('❌ index.js failed to load:', response.status);
+                }
+            })
+            .catch(error => {
+                console.error('❌ index.js fetch error:', error);
+            });
+            
+        // Test React import
+        try {
+            import('/assets/index.js').then(module => {
+                console.log('✅ React module loaded:', module);
+            }).catch(error => {
+                console.error('❌ React module loading failed:', error);
+            });
+        } catch (error) {
+            console.error('❌ React import error:', error);
+        }
+        
+        // Check if React is available globally
+        setTimeout(() => {
+            if (window.React) {
+                console.log('✅ React available globally');
+            } else {
+                console.error('❌ React not available globally');
+            }
+            
+            if (window.ReactDOM) {
+                console.log('✅ ReactDOM available globally');
+            } else {
+                console.error('❌ ReactDOM not available globally');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

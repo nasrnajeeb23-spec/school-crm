@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "admin/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/admin/dist/$1"
+    },
+    {
+      "src": "/superadmin/(.*)",
+      "dest": "/admin/dist/index.html"
+    },
+    {
+      "src": "/login",
+      "dest": "/admin/dist/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/admin/dist/index.html"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/admin/dist/index.html"
+    }
+  ]
+}

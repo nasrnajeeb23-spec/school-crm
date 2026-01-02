@@ -1,0 +1,42 @@
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T21:50:48.368Z"}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T22:38:38.794Z"}
+{"durationMs":10,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/metrics","role":null,"status":404,"timestamp":"2025-12-01T22:39:05.914Z","userId":null}
+{"durationMs":2,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/metrics","role":null,"status":404,"timestamp":"2025-12-01T22:39:40.139Z","userId":null}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T22:40:11.113Z"}
+{"durationMs":7,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/metrics","role":null,"status":404,"timestamp":"2025-12-01T22:40:34.207Z","userId":null}
+{"durationMs":3,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/metrics","role":null,"status":404,"timestamp":"2025-12-01T22:40:55.477Z","userId":null}
+{"durationMs":2,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/metrics","role":null,"status":404,"timestamp":"2025-12-01T22:41:10.056Z","userId":null}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T22:43:02.350Z"}
+{"durationMs":180,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/metrics","role":null,"status":200,"timestamp":"2025-12-01T22:43:15.710Z","userId":null}
+{"level":"error","message":"Expected property name or '}' in JSON at position 1","timestamp":"2025-12-01T22:43:37.882Z"}
+{"durationMs":28,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/auth/login","role":null,"status":400,"timestamp":"2025-12-01T22:43:37.885Z","userId":null}
+{"durationMs":3,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/metrics","role":null,"status":200,"timestamp":"2025-12-01T22:43:56.441Z","userId":null}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T23:19:49.644Z"}
+{"durationMs":11,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"HEAD","path":"/api/auth/login","role":null,"status":404,"timestamp":"2025-12-01T23:20:51.665Z","userId":null}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T23:22:21.344Z"}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T23:24:41.840Z"}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T23:26:57.421Z"}
+{"level":"warn","message":"Invalid license. Only core modules enabled. Reason: Malformed","timestamp":"2025-12-01T23:29:00.313Z"}
+{"durationMs":22,"ip":"::1","level":"info","message":"http_access","method":"GET","path":"/api/auth/login","role":null,"status":404,"timestamp":"2025-12-01T23:29:22.535Z","userId":null}
+{"durationMs":5,"ip":"::1","level":"info","message":"http_access","method":"GET","path":"/favicon.ico","role":null,"status":404,"timestamp":"2025-12-01T23:29:22.694Z","userId":null}
+{"durationMs":3,"ip":"::1","level":"info","message":"http_access","method":"GET","path":"/api/auth/login/","role":null,"status":404,"timestamp":"2025-12-01T23:30:39.469Z","userId":null}
+{"level":"warn","message":"No LICENSE_KEY provided. Only core modules enabled.","timestamp":"2025-12-01T23:48:07.325Z"}
+{"level":"warn","message":"Dev mode: enabling finance & transportation modules for testing","timestamp":"2025-12-01T23:48:07.332Z"}
+{"durationMs":7,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/health","role":null,"status":200,"timestamp":"2025-12-01T23:48:24.442Z","userId":null}
+{"durationMs":172,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/auth/login","role":null,"status":200,"timestamp":"2025-12-01T23:48:24.620Z","userId":null}
+{"durationMs":14,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/api/school/1/staff","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.637Z","userId":2}
+{"durationMs":15,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/api/school/1/invoices","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.654Z","userId":2}
+{"durationMs":7,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/auth/refresh","role":null,"status":200,"timestamp":"2025-12-01T23:48:24.664Z","userId":null}
+{"durationMs":82,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/auth/mfa/enroll","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.749Z","userId":2}
+{"durationMs":7,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/auth/mfa/verify","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.760Z","userId":2}
+{"durationMs":6,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/api/auth/me","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.768Z","userId":2}
+{"durationMs":35,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/school/1/students","role":"SchoolAdmin","status":201,"timestamp":"2025-12-01T23:48:24.805Z","userId":2}
+{"durationMs":14,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/school/1/invoices","role":"SchoolAdmin","status":201,"timestamp":"2025-12-01T23:48:24.823Z","userId":2}
+{"durationMs":15,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/school/1/invoices/6/payments","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.840Z","userId":2}
+{"durationMs":9,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"GET","path":"/api/school/1/classes","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.852Z","userId":2}
+{"durationMs":19,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/school/1/teachers","role":"SchoolAdmin","status":201,"timestamp":"2025-12-01T23:48:24.873Z","userId":2}
+{"durationMs":8,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"PUT","path":"/api/school/1/classes/cls_1764195914166_330/subjects","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.884Z","userId":2}
+{"durationMs":18,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"PUT","path":"/api/school/1/classes/cls_1764195914166_330/subject-teachers","role":"SchoolAdmin","status":200,"timestamp":"2025-12-01T23:48:24.905Z","userId":2}
+{"durationMs":47,"ip":"::ffff:127.0.0.1","level":"info","message":"http_access","method":"POST","path":"/api/school/class/cls_1764195914166_330/schedule","role":"SchoolAdmin","status":409,"timestamp":"2025-12-01T23:48:24.954Z","userId":2}
+{"level":"warn","message":"No LICENSE_KEY provided. Only core modules enabled.","timestamp":"2025-12-02T01:06:26.973Z"}
+{"level":"warn","message":"Dev mode: enabling finance & transportation modules for testing","timestamp":"2025-12-02T01:06:26.975Z"}

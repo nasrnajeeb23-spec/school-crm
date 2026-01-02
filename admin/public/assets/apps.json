@@ -1,0 +1,12 @@
+{
+  "parent": {
+    "apkUrl": "/apps/android/parent.apk",
+    "label": "release",
+    "sha256": "a753ec02a54a6e0d8b61137dc48ec290216e5a2a6c0efd9999d6470f6284036e"
+  },
+  "teacher": {
+    "apkUrl": "/apps/android/teacher.apk",
+    "label": "release",
+    "sha256": "c7120bd7c1d4ffd280b58192535eb3222ca63ed766e8ba61ac06443decd6f412"
+  }
+}

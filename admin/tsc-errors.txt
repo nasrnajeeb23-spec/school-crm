@@ -1,0 +1,1 @@
+﻿        Type 'unknown' is not assignable to type 'AttendanceStatus'.

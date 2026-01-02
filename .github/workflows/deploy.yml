@@ -1,0 +1,193 @@
+name: School CRM Production Deployment
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PROJECT_NAME: school-crm
+  DOCKER_COMPOSE_FILE: docker-compose.prod.yml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: school_crm_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        npm ci
+    
+    - name: Run security audit
+      run: |
+        cd backend
+        npm audit --audit-level=high
+    
+    - name: Run tests
+      run: |
+        cd backend
+        npm test
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/school_crm_test
+        JWT_SECRET: test_jwt_secret
+        LICENSE_SECRET: test_license_secret
+        NODE_ENV: test
+
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [test, security-scan]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup deployment environment
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Validate environment secrets
+      run: |
+        if [ -z "${{ secrets.JWT_SECRET }}" ]; then
+          echo "❌ JWT_SECRET is not set"
+          exit 1
+        fi
+        if [ -z "${{ secrets.LICENSE_SECRET }}" ]; then
+          echo "❌ LICENSE_SECRET is not set"
+          exit 1
+        fi
+        if [ -z "${{ secrets.POSTGRES_PASSWORD }}" ]; then
+          echo "❌ POSTGRES_PASSWORD is not set"
+          exit 1
+        fi
+        echo "✅ All required secrets are set"
+    
+    - name: Deploy to production
+      env:
+        SSH_HOST: ${{ secrets.SSH_HOST }}
+        SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+        SSH_PORT: ${{ secrets.SSH_PORT }}
+      run: |
+        ssh -i ~/.ssh/deploy_key -p $SSH_PORT $SSH_USERNAME@$SSH_HOST << 'EOF'
+          set -e
+          
+          echo "🚀 Starting deployment..."
+          cd /opt/school-crm
+          
+          # Create environment file with secrets
+          cat > backend/.env.production << 'ENVFILE'
+        DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@db:5432/school_crm
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
+        LICENSE_SECRET=${{ secrets.LICENSE_SECRET }}
+        CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+        LICENSE_KEY=${{ secrets.LICENSE_KEY }}
+        NODE_ENV=production
+        PORT=5000
+        MAX_FILE_SIZE=10485760
+        MAX_FILES=5
+        RATE_LIMIT_WINDOW=15
+        RATE_LIMIT_MAX_REQUESTS=300
+        SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+        LOG_LEVEL=info
+        ENVFILE
+          
+          # Update code
+          echo "📥 Updating code..."
+          git fetch origin
+          git reset --hard origin/main
+          
+          # Make deploy script executable
+          chmod +x deploy/deploy.sh
+          
+          # Run deployment
+          echo "🔧 Running deployment script..."
+          ./deploy/deploy.sh
+          
+          echo "✅ Deployment completed successfully!"
+        EOF
+    
+    - name: Post-deployment health check
+      run: |
+        sleep 30
+        response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.SSH_HOST }}:5000/health)
+        if [ "$response" != "200" ]; then
+          echo "❌ Health check failed with status code: $response"
+          exit 1
+        fi
+        echo "✅ Health check passed"
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -f ~/.ssh/deploy_key
+        
+  notify:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [deploy]
+    
+    steps:
+    - name: Notify deployment status
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          School CRM Deployment ${{ job.status }}
+          Branch: ${{ github.ref }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      if: env.SLACK_WEBHOOK_URL != ''

@@ -1,0 +1,432 @@
+const express = require('express');
+const router = express.Router();
+const { Parent, Student, Grade, Attendance, Invoice, Notification, Schedule, Class, Teacher, Assignment, Submission, ParentStudent } = require('../models');
+const { verifyToken, requireRole, canParentAccessStudent, normalizeUserRole } = require('../middleware/auth');
+const { checkStorageLimit, updateUsedStorage } = require('../middleware/storageLimits');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { Op } = require('sequelize');
+
+const MAX_ATTACHMENT_SIZE = parseInt(process.env.MAX_ATTACHMENT_SIZE || `${25 * 1024 * 1024}`, 10); // 25 MB
+const allowedMimeTypes = new Set([
+  'image/png','image/jpeg','image/jpg','image/gif',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain'
+]);
+function ensureDir(p){ try { fs.mkdirSync(p, { recursive: true }); } catch {} }
+function safeName(name){ return `${Date.now()}_${Math.random().toString(36).slice(2,8)}_${path.basename(name).replace(/[^A-Za-z0-9._-]+/g,'_')}`; }
+const submissionStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    try {
+      const assignmentId = req.params.assignmentId;
+      const parentId = req.params.parentId;
+      const studentId = (req.body && req.body.studentId) || '';
+      const schoolId = Number(req.user?.schoolId || 0) || 0;
+      const dir = path.join(__dirname, '..', 'storage', 'submissions', String(schoolId || 'unknown'), String(studentId || 'unknown'));
+      ensureDir(dir);
+      cb(null, dir);
+    } catch (e) { cb(e); }
+  },
+  filename: (_req, file, cb) => cb(null, safeName(file.originalname))
+});
+const submissionUpload = multer({
+  storage: submissionStorage,
+  limits: { fileSize: MAX_ATTACHMENT_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (allowedMimeTypes.has(file.mimetype)) cb(null, true);
+    else cb(new Error('Unsupported file type'));
+  }
+});
+
+async function getParentAccessibleStudents({ schoolId, parentId }) {
+  const sid = Number(schoolId || 0);
+  const pid = Number(parentId || 0);
+  if (!sid || !pid) return [];
+
+  const map = new Map();
+  try {
+    const direct = await Student.findAll({ where: { schoolId: sid, parentId: pid }, order: [['name', 'ASC']] }).catch(() => []);
+    for (const s of direct || []) map.set(String(s.id), s);
+  } catch {}
+
+  try {
+    const links = await ParentStudent.findAll({
+      where: { schoolId: sid, parentId: pid, status: { [Op.ne]: 'inactive' } },
+      attributes: ['studentId']
+    }).catch(() => []);
+    const ids = Array.from(new Set((links || []).map(x => String(x.studentId)).filter(Boolean)));
+    if (ids.length > 0) {
+      const extra = await Student.findAll({ where: { schoolId: sid, id: { [Op.in]: ids } }, order: [['name', 'ASC']] }).catch(() => []);
+      for (const s of extra || []) map.set(String(s.id), s);
+    }
+  } catch {}
+
+  return Array.from(map.values());
+}
+
+function selectStudents(students, studentIdFilter) {
+  const list = Array.isArray(students) ? students : [];
+  const f = String(studentIdFilter || '').trim();
+  if (!f) return list;
+  return list.filter(s => String(s.id) === f);
+}
+
+// @route   GET api/parent/:parentId/dashboard
+// @desc    Get all necessary data for the parent dashboard
+// @access  Private (Parent)
+router.get('/:parentId/dashboard', verifyToken, requireRole('PARENT'), async (req, res) => {
+    try {
+        const { parentId } = req.params;
+        if (String(req.user.parentId) !== String(parentId)) return res.status(403).json({ msg: 'Access denied' });
+        const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId });
+        const targetStudents = selectStudents(students, studentIdFilter);
+        if (!students.length) return res.status(404).json({ msg: 'Parent or student not found' });
+        if (studentIdFilter && targetStudents.length === 0) return res.status(404).json({ msg: 'Student not found' });
+        const attendanceStatusMap = { 'Present': 'حاضر', 'Absent': 'غائب', 'Late': 'متأخر', 'Excused': 'بعذر' };
+        const invoiceStatusMap = { 'PAID': 'مدفوعة', 'UNPAID': 'غير مدفوعة', 'OVERDUE': 'متأخرة' };
+        const actionItemTypeMap = { 'Warning': 'warning', 'Info': 'info', 'Approval': 'approval' };
+        const children = [];
+        for (const student of targetStudents) {
+            let grades = [], attendance = [], invoices = [];
+            try {
+                [grades, attendance, invoices] = await Promise.all([
+                    Grade.findAll({ where: { studentId: student.id }, limit: 5, order: [['createdAt','DESC']] }),
+                    Attendance.findAll({ where: { studentId: student.id }, limit: 30, order: [['date','DESC']] }),
+                    Invoice.findAll({ where: { studentId: student.id }, order: [['dueDate','DESC']] })
+                ]);
+            } catch (innerErr) { console.error('Error fetching details for student ' + student.id, innerErr); }
+
+            children.push({
+                student: student.toJSON(),
+                grades: grades.map(g => ({ ...g.toJSON(), studentId: g.studentId, studentName: student.name, classId: g.classId, grades: { homework: g.homework, quiz: g.quiz, midterm: g.midterm, final: g.final } })),
+                attendance: attendance.map(a => ({ studentId: a.studentId, status: attendanceStatusMap[a.status] || a.status, date: a.date })),
+                invoices: invoices.map(inv => ({ id: inv.id.toString(), studentId: inv.studentId, studentName: student.name, status: invoiceStatusMap[inv.status] || inv.status, issueDate: inv.createdAt.toISOString().split('T')[0], dueDate: inv.dueDate.toISOString().split('T')[0], items: [{ description: 'رسوم دراسية', amount: parseFloat(inv.amount) }], totalAmount: parseFloat(inv.amount) }))
+            });
+        }
+        let actionItems = [];
+        try {
+            actionItems = await Notification.findAll({ where: { parentId, isRead: false }, order: [['date','DESC']] });
+        } catch {}
+        
+        if (studentIdFilter || children.length === 1) {
+            const single = children[0];
+            return res.json({
+                student: single.student,
+                grades: single.grades,
+                attendance: single.attendance,
+                invoices: single.invoices,
+                actionItems: actionItems.map(item => ({ id: item.id.toString(), type: actionItemTypeMap[item.type] || 'info', title: item.title, description: item.description, date: item.date.toISOString().split('T')[0] })),
+                announcements: [{ id: 'conv_05', type: 'إعلان', participantName: 'إعلانات عامة للمدرسة', lastMessage: 'تذكير: اجتماع أولياء الأمور غدًا.', timestamp: '11:00 ص' }],
+                children
+            });
+        }
+        return res.json({ children, actionItems: actionItems.map(item => ({ id: item.id.toString(), type: actionItemTypeMap[item.type] || 'info', title: item.title, description: item.description, date: item.date.toISOString().split('T')[0] })) });
+    } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+// Parent requests
+router.get('/:parentId/requests', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Notification.findAll({ where: { parentId: req.params.parentId }, order: [['createdAt','DESC']] });
+    const statusMap = { 'Pending': 'قيد الانتظار', 'Approved': 'موافق عليه', 'Rejected': 'مرفوض' };
+    res.json(rows.map(r => ({ id: String(r.id), title: r.title || 'طلب', description: r.description || '', status: statusMap[r.status] || 'قيد الانتظار', createdAt: r.createdAt.toISOString().split('T')[0] })));
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:parentId/requests', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const { title, description } = req.body || {};
+    if (!title) return res.status(400).json({ msg: 'title is required' });
+    const row = await Notification.create({ parentId: req.params.parentId, type: 'Approval', title, description: description || '', status: 'Pending' });
+    res.status(201).json({ id: String(row.id), title: row.title, description: row.description, status: 'قيد الانتظار', createdAt: row.createdAt.toISOString().split('T')[0] });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/action-items', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    const parentId = req.user.parentId || (normalizeUserRole(req.user) === 'PARENT' ? req.user.id : null);
+    if (!parentId) return res.json([]);
+    let rows = [];
+    try {
+      rows = await Notification.findAll({ where: { parentId }, order: [['date','DESC']] });
+    } catch (inner) {
+      console.error('Notification query failed for parent action-items:', inner && inner.message ? inner.message : inner);
+      return res.json([]);
+    }
+    const typeMap = { 'Warning': 'warning', 'Info': 'info', 'Approval': 'approval' };
+    const items = rows.map(r => {
+      const d = r.date instanceof Date ? r.date : new Date(r.date || Date.now());
+      return {
+        id: String(r.id),
+        type: typeMap[r.type] || 'info',
+        title: r.title,
+        description: r.description,
+        date: d.toISOString().split('T')[0],
+        isRead: !!r.isRead
+      };
+    });
+    res.json(items);
+  } catch (e) {
+    console.error(e.message);
+    res.json([]);
+  }
+});
+
+router.get('/:parentId/student-schedule', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
+    const schoolId = Number(req.user.schoolId || 0);
+    const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+    if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+    const targets = selectStudents(students, studentIdFilter);
+    if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
+    const list = [];
+    for (const student of targets) {
+      if (!student.classId) { list.push({ student: student.toJSON(), schedule: [] }); continue; }
+      const rows = await Schedule.findAll({ where: { classId: student.classId }, include: [{ model: Teacher, attributes: ['name'] }, { model: Class, attributes: ['gradeLevel','section'] }], order: [['day','ASC'],['timeSlot','ASC']] });
+      const schedule = rows.map(r => ({ id: String(r.id), classId: String(r.classId), className: r.Class ? `${r.Class.gradeLevel} (${r.Class.section || 'أ'})` : '', day: r.day, timeSlot: r.timeSlot, subject: r.subject, teacherName: r.Teacher ? r.Teacher.name : '' }));
+      list.push({ student: student.toJSON(), schedule });
+    }
+    if (studentIdFilter || list.length === 1) return res.json(list[0]);
+    return res.json({ children: list });
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/assignments', verifyToken, requireRole('PARENT'), async (req, res) => {
+    try {
+        if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+        const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+        if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+        const targets = selectStudents(students, studentIdFilter);
+        if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
+        
+        const list = [];
+        for (const student of targets) {
+            if (!student.classId) { list.push({ student: student.toJSON(), assignments: [] }); continue; }
+            const assignments = await Assignment.findAll({ 
+                where: { classId: student.classId, schoolId },
+                include: [{ model: Teacher, attributes: ['name'] }],
+                order: [['dueDate', 'DESC']] 
+            });
+            list.push({ 
+                student: student.toJSON(), 
+                assignments: assignments.map(a => ({
+                    id: String(a.id),
+                    title: a.title,
+                    description: a.description,
+                    dueDate: a.dueDate,
+                    teacherName: a.Teacher ? a.Teacher.name : 'Unknown',
+                    status: a.status,
+                    attachments: Array.isArray(a.attachments) ? a.attachments.map(att => ({
+                      filename: att.filename,
+                      originalName: att.originalName,
+                      mimeType: att.mimeType,
+                      size: att.size,
+                      url: `/api/parent/${req.params.parentId}/assignments/${a.id}/attachments/${encodeURIComponent(att.filename)}`,
+                      uploadedAt: att.uploadedAt
+                    })) : []
+                }))
+            });
+        }
+        
+        if (studentIdFilter || list.length === 1) return res.json(list[0]);
+        return res.json({ children: list });
+    } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/assignments/:assignmentId/submission', verifyToken, requireRole('PARENT'), async (req, res) => {
+    try {
+        if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+        const { studentId } = req.query;
+        if (!studentId) return res.status(400).json({ msg: 'studentId is required' });
+        const schoolId = Number(req.user.schoolId || 0);
+        const ok = await canParentAccessStudent(req, schoolId, String(studentId));
+        if (!ok) return res.status(403).json({ msg: 'Access denied' });
+        const student = await Student.findOne({ where: { id: String(studentId), schoolId } }).catch(() => null);
+        if (!student) return res.status(404).json({ msg: 'Student not found' });
+        const assignment = await Assignment.findOne({ where: { id: Number(req.params.assignmentId), schoolId } }).catch(() => null);
+        if (!assignment || String(assignment.classId) !== String(student.classId || '')) return res.status(404).json({ msg: 'Assignment not found' });
+        
+        const submission = await Submission.findOne({ 
+            where: { 
+                assignmentId: req.params.assignmentId,
+                studentId: studentId
+            }
+        });
+        
+        if (!submission) return res.json(null);
+        const mapped = submission.toJSON();
+        const atts = Array.isArray(mapped.attachments) ? mapped.attachments : [];
+        mapped.attachments = atts.map(att => ({
+          filename: att.filename,
+          originalName: att.originalName,
+          mimeType: att.mimeType,
+          size: att.size,
+          uploadedAt: att.uploadedAt,
+          url: `/api/parent/${req.params.parentId}/submissions/${mapped.id}/attachments/${encodeURIComponent(att.filename)}`
+        }));
+        return res.json(mapped);
+    } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.post('/:parentId/assignments/:assignmentId/submit', verifyToken, requireRole('PARENT'), checkStorageLimit, submissionUpload.array('attachments', 10), async (req, res) => {
+    try {
+        if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+        const { studentId, content } = req.body;
+        if (!studentId) return res.status(400).json({ msg: 'studentId is required' });
+        const schoolId = Number(req.user.schoolId || 0);
+        const ok = await canParentAccessStudent(req, schoolId, String(studentId));
+        if (!ok) {
+          const files = Array.isArray(req.files) ? req.files : [];
+          for (const f of files) { try { fs.unlinkSync(f.path); } catch {} }
+          return res.status(403).json({ msg: 'Access denied' });
+        }
+        const student = await Student.findOne({ where: { id: String(studentId), schoolId } }).catch(() => null);
+        if (!student) return res.status(404).json({ msg: 'Student not found' });
+        const assignment = await Assignment.findOne({ where: { id: Number(req.params.assignmentId), schoolId } }).catch(() => null);
+        if (!assignment || String(assignment.classId) !== String(student.classId || '')) return res.status(404).json({ msg: 'Assignment not found' });
+        
+        let submission = await Submission.findOne({ 
+            where: { 
+                assignmentId: req.params.assignmentId,
+                studentId: studentId
+            }
+        });
+        
+        const files = Array.isArray(req.files) ? req.files : [];
+        
+        // Calculate total size and update storage
+        let totalSize = 0;
+        for (const f of files) {
+          totalSize += f.size;
+        }
+        if (totalSize > 0) {
+          try {
+            await updateUsedStorage(schoolId, totalSize);
+          } catch (e) {
+            console.error('Storage update failed', e);
+          }
+        }
+
+        const added = files.map(f => ({
+          filename: f.filename,
+          originalName: f.originalname,
+          mimeType: f.mimetype,
+          size: f.size,
+          uploadedAt: new Date().toISOString()
+        }));
+        if (submission) {
+            submission.content = content || submission.content;
+            submission.status = 'Submitted';
+            submission.submissionDate = new Date();
+            submission.attachments = Array.isArray(submission.attachments) ? [...submission.attachments, ...added] : added;
+            await submission.save();
+        } else {
+            submission = await Submission.create({
+                assignmentId: req.params.assignmentId,
+                studentId: studentId,
+                content: content || '',
+                status: 'Submitted',
+                submissionDate: new Date(),
+                attachments: added
+            });
+        }
+        
+        return res.json(submission);
+    } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/assignments/:assignmentId/attachments/:filename', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const schoolId = Number(req.user.schoolId || 0) || 0;
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(__dirname, '..', 'storage', 'assignments', String(schoolId), filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename=${filename}`);
+    res.type(path.extname(filename));
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/submissions/:submissionId/attachments/:filename', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const submission = await Submission.findByPk(req.params.submissionId).catch(() => null);
+    if (!submission) return res.status(404).json({ msg: 'Submission not found' });
+    const schoolId = Number(req.user.schoolId || 0) || 0;
+    const ok = await canParentAccessStudent(req, schoolId, String(submission.studentId));
+    if (!ok) return res.status(403).json({ msg: 'Access denied' });
+    const base = path.join(__dirname, '..', 'storage', 'submissions', String(schoolId), String(submission.studentId));
+    const filePath = path.join(base, req.params.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    return res.sendFile(filePath);
+  } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/grades', verifyToken, requireRole('PARENT'), async (req, res) => {
+    try {
+        if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+        const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+        if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+        const targets = selectStudents(students, studentIdFilter);
+        if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
+        
+        const list = [];
+        for (const student of targets) {
+            const grades = await Grade.findAll({ 
+                where: { studentId: student.id }, 
+                order: [['createdAt', 'DESC']] 
+            });
+            list.push({ 
+                student: student.toJSON(), 
+                grades: grades.map(g => ({ ...g.toJSON(), studentId: g.studentId, studentName: student.name, classId: g.classId, grades: { homework: g.homework, quiz: g.quiz, midterm: g.midterm, final: g.final } }))
+            });
+        }
+        
+        if (studentIdFilter || list.length === 1) return res.json(list[0]);
+        return res.json({ children: list });
+    } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+router.get('/:parentId/attendance', verifyToken, requireRole('PARENT'), async (req, res) => {
+    try {
+        if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+        const studentIdFilter = req.query?.studentId ? String(req.query.studentId) : '';
+        const schoolId = Number(req.user.schoolId || 0);
+        const students = await getParentAccessibleStudents({ schoolId, parentId: req.params.parentId });
+        if (!students.length) return res.status(404).json({ msg: 'No student linked' });
+        const targets = selectStudents(students, studentIdFilter);
+        if (studentIdFilter && targets.length === 0) return res.status(404).json({ msg: 'Student not found' });
+        const attendanceStatusMap = { 'Present': 'حاضر', 'Absent': 'غائب', 'Late': 'متأخر', 'Excused': 'بعذر' };
+        
+        const list = [];
+        for (const student of targets) {
+            const attendance = await Attendance.findAll({ 
+                where: { studentId: student.id }, 
+                order: [['date', 'DESC']] 
+            });
+            list.push({ 
+                student: student.toJSON(), 
+                attendance: attendance.map(a => ({ studentId: a.studentId, status: attendanceStatusMap[a.status] || a.status, date: a.date }))
+            });
+        }
+        
+        if (studentIdFilter || list.length === 1) return res.json(list[0]);
+        return res.json({ children: list });
+    } catch (e) { console.error(e.message); res.status(500).send('Server Error'); }
+});
+
+module.exports = router;

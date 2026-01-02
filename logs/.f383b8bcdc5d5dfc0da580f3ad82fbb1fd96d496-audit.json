@@ -1,0 +1,80 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\.f383b8bcdc5d5dfc0da580f3ad82fbb1fd96d496-audit.json",
+    "files": [
+        {
+            "date": 1763597535678,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-20.log",
+            "hash": "63502880e385929f5d287725c31fbf63da33a78e60503328ea0d4fd7e7c234da"
+        },
+        {
+            "date": 1763732036711,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-21.log",
+            "hash": "786ed49407f165508885ea834c2a15bc378765dab4bd8fe11878cd16c0154610"
+        },
+        {
+            "date": 1763839074055,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-22.log",
+            "hash": "9c7d8d637af10381b891feccbe882089db5b1d1d93125c574c1c0062d1e62ebc"
+        },
+        {
+            "date": 1763901956162,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-23.log",
+            "hash": "ada52d39c086042e29b5c2149727afdc7ab0bd2d71b7cf00c3bb6fda1d2ed80d"
+        },
+        {
+            "date": 1764188774578,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-26.log",
+            "hash": "63745107f5b21d55a3348454d5d9b1ee6f2a38d83ab83dc5ed9b6a1373f16a7b"
+        },
+        {
+            "date": 1764195407825,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-27.log",
+            "hash": "6774f679221362d60b987a3f27222c4ba9f044f0a4db1f0b5cf253a4c3529dee"
+        },
+        {
+            "date": 1764356240982,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-28.log",
+            "hash": "08b0c00de42057e9ac41b8e2b3887d6ea1ad9781374942703d58710f73200f2a"
+        },
+        {
+            "date": 1764535114848,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-11-30.log",
+            "hash": "0d7687a1ddafb119d7d922b2e95b37e7d1ebceec6ddab1bfadb6ce52d92eabde"
+        },
+        {
+            "date": 1764610387716,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-12-01.log",
+            "hash": "fd6e5da7940a19ae56092d68ab772ba9bfaf073e150e2ac271ff3aa9fcfd3f3c"
+        },
+        {
+            "date": 1764625848355,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-12-02.log",
+            "hash": "bfcc394d960159b55dc954891b24d0e1c40328fe3d232c7642b25ec5537c2702"
+        },
+        {
+            "date": 1764726943473,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-12-03.log",
+            "hash": "31918e64bf97a9c6f55fe0a7b6fdf5a1f13195f7ca75e4cf2b27b119b9640103"
+        },
+        {
+            "date": 1764804950960,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-12-04.log",
+            "hash": "9cc3d8554f6d49c7b5622ac52bc42e7f1f116c91ea7a2a92146f6601ab418aaa"
+        },
+        {
+            "date": 1764892003875,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-12-05.log",
+            "hash": "e98d57167f48b10960226069dac9ea47b498b552da97dd714b6e9ae1d4815c7c"
+        },
+        {
+            "date": 1765142616518,
+            "name": "C:\\Users\\ش\\Downloads\\school-crm (1)\\logs\\app-2025-12-08.log",
+            "hash": "fb4899029bb62528fc3885c750ef5943428a3f214df7202c8ee172c2371ab0a4"
+        }
+    ],
+    "hashType": "sha256"
+}
