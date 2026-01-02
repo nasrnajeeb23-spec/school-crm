@@ -15,6 +15,7 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ classes, 
     dueDate: new Date().toISOString().split('T')[0],
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -24,7 +25,7 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ classes, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    await onSave(formData);
+    await onSave({ ...formData, files });
     // Parent handles closing
   };
 
@@ -54,6 +55,22 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ classes, 
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الوصف والتعليمات</label>
             <textarea name="description" id="description" value={formData.description} onChange={handleChange} required rows={5} className={`${inputStyle} resize-y`}></textarea>
+          </div>
+          <div>
+            <label htmlFor="attachments" className="block text-sm font-medium text-gray-700 dark:text-gray-300">المرفقات (اختياري)</label>
+            <input 
+              type="file" 
+              id="attachments" 
+              name="attachments" 
+              multiple 
+              accept=".pdf,.docx,.xlsx,image/*,text/plain"
+              onChange={(e) => {
+                const list = Array.from(e.target.files || []);
+                setFiles(list);
+              }}
+              className={inputStyle}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">الأنواع المسموحة: صور، PDF، DOCX، نص. الحد الأقصى لكل ملف 25MB.</p>
           </div>
         </form>
         <div className="flex justify-end gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">

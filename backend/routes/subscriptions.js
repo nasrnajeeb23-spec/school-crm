@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { Subscription, School, Plan } = require('../models');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
 
 // @route   GET api/subscriptions
 // @desc    Get all subscriptions
 // @access  Private (SuperAdmin)
-router.get('/', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.get('/', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('VIEW_FINANCE'), async (req, res) => {
   try {
     const subscriptions = await Subscription.findAll({
       include: [

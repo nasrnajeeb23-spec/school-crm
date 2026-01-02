@@ -77,6 +77,7 @@ const ParentTransportation: React.FC = () => {
                         ) : 'لا توجد نقطة قريبة'}
                     </div>
                 </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">تنبيه: التتبُّع تقريبي وغير لحظي. قد يتأخر تحديث الموقع.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

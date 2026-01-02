@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AdSlideContent } from '../types';
+import { getApiBase } from '../api';
 
 interface AdCarouselProps {
     slides: AdSlideContent[];
@@ -45,11 +46,16 @@ const AdCarousel: React.FC<AdCarouselProps> = ({ slides }) => {
     }
     
     const currentSlide = slides[currentIndex];
+    const toSafeUrl = (u: string) => {
+        if (!u) return '';
+        if (/^https?:\/\//i.test(u)) return `${getApiBase()}/proxy/image?url=${encodeURIComponent(u)}`;
+        return u;
+    };
 
     return (
         <div className="h-[500px] w-full m-auto relative group">
             <div
-                style={{ backgroundImage: `url(${currentSlide.imageUrl})` }}
+                style={{ backgroundImage: `url(${toSafeUrl(currentSlide.imageUrl)})` }}
                 className="w-full h-full rounded-2xl bg-center bg-cover transition-all duration-700 ease-in-out"
             >
                 {/* Overlay */}

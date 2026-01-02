@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import * as api from '../api';
-import { AttendanceRecord, AttendanceStatus, Student } from '../types';
+import { AttendanceRecord, AttendanceStatus } from '../types';
 import { MyClassesStackParamList } from '../navigation/MyClassesNavigator';
 import { CheckCircleIcon, XCircleIcon, ClockIcon, InfoCircleIcon } from '../components/icons';
 
@@ -28,7 +28,7 @@ const TeacherAttendanceScreen: React.FC<Props> = ({ route }) => {
             api.getClassStudents(classId),
             api.getAttendance(classId, selectedDate)
         ]).then(([students, attendanceData]) => {
-            const recordsMap = attendanceData ? new Map(attendanceData.records.map(r => [r.studentId, r.status])) : new Map();
+            const recordsMap = new Map(attendanceData.records.map((r: AttendanceRecord) => [r.studentId, r.status]));
             const fullRosterWithStatus = students.map(student => ({
                 studentId: student.id,
                 studentName: student.name,

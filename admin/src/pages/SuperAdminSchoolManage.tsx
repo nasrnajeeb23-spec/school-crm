@@ -4,6 +4,7 @@ import * as api from '../api';
 import { School, Invoice, SchoolSettings, Subscription } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import StatsCard from '../components/StatsCard';
+import { formatCurrency } from '../currency-config';
 import { BackIcon, SchoolIcon, SubscriptionIcon, BillingIcon, UsersIcon, ModuleIcon } from '../components/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -162,6 +163,10 @@ const SuperAdminSchoolManage: React.FC = () => {
 
   const inputStyle = 'mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700';
   const colors = ['#4f46e5','#10b981','#f59e0b','#ef4444','#6366f1','#14b8a6'];
+  const PieAny: any = Pie;
+  const PieChartAny: any = PieChart;
+  const ResponsiveContainerAny: any = ResponsiveContainer;
+  const CellAny: any = Cell;
 
   return (
     <div className="space-y-8">
@@ -182,7 +187,7 @@ const SuperAdminSchoolManage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard icon={SubscriptionIcon} title="الخطة" value={subscription?.plan || school.plan} description={subscription?.status || school.status} />
-        <StatsCard icon={BillingIcon} title="القيمة الشهرية" value={`$${baseCost.toFixed(2)}`} description="سعر الخطة" />
+        <StatsCard icon={BillingIcon} title="القيمة الشهرية" value={formatCurrency(Number(baseCost || 0), 'USD')} description="سعر الخطة" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -202,7 +207,7 @@ const SuperAdminSchoolManage: React.FC = () => {
             <div><div className="text-gray-500">مدفوعة</div><div className="text-green-600">{billingSummary?.paidCount ?? 0}</div></div>
             <div><div className="text-gray-500">غير مدفوعة</div><div className="text-yellow-600">{billingSummary?.unpaidCount ?? 0}</div></div>
             <div><div className="text-gray-500">متأخرة</div><div className="text-red-600">{billingSummary?.overdueCount ?? 0}</div></div>
-            <div className="col-span-2"><div className="text-gray-500">رصيد مستحق</div><div className="text-gray-900 dark:text-white">${(billingSummary?.outstandingAmount ?? 0).toFixed(2)}</div></div>
+            <div className="col-span-2"><div className="text-gray-500">رصيد مستحق</div><div className="text-gray-900 dark:text-white">{formatCurrency(Number(billingSummary?.outstandingAmount ?? 0), String(settings?.defaultCurrency || 'SAR'))}</div></div>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
@@ -232,7 +237,7 @@ const SuperAdminSchoolManage: React.FC = () => {
             <button onClick={activateSubscription} disabled={saving} className="px-4 py-2 bg-teal-600 text-white rounded-lg disabled:bg-teal-400">تفعيل الاشتراك</button>
             <button onClick={async () => { try { await api.updateSchoolOperationalStatus(id, 'SUSPENDED'); addToast('تم إيقاف المدرسة مؤقتًا.', 'success'); } catch { addToast('فشل الإيقاف المؤقت.', 'error'); } }} disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:bg-red-400">إيقاف مؤقت</button>
             <button onClick={async () => { const msg = window.prompt('اكتب رسالة تنبيه للمدرسة'); if (!msg) return; try { await api.notifySchool(id, msg); addToast('تم إرسال التنبيه.', 'success'); } catch { addToast('فشل إرسال التنبيه.', 'error'); } }} disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-lg disabled:bg-amber-400">إرسال تنبيه</button>
-            <button onClick={async () => { const ok = window.confirm('سيتم حذف المدرسة بشكل غير قابل للاسترجاع مع تعطيل المستخدمين المرتبطين. هل توافق؟'); if (!ok) return; try { await api.deleteSchool(id); addToast('تم حذف المدرسة.', 'success'); navigate('/superadmin/schools'); } catch { addToast('فشل حذف المدرسة.', 'error'); } }} disabled={saving} className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:bg-gray-600">حذف المدرسة</button>
+            <button onClick={async () => { const ok = window.confirm('سيتم حذف المدرسة مع تعطيل المستخدمين المرتبطين. هل توافق؟'); if (!ok) return; const reason = window.prompt('اذكر سبب الحذف'); try { await api.deleteSchool(id, reason || undefined); addToast('تم حذف المدرسة.', 'success'); navigate('/superadmin/schools'); } catch { addToast('فشل حذف المدرسة.', 'error'); } }} disabled={saving} className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:bg-gray-600">حذف المدرسة</button>
           </div>
         </div>
       </div>
@@ -241,15 +246,15 @@ const SuperAdminSchoolManage: React.FC = () => {
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">إحصائية توزيع الطلاب بحسب الصف</h3>
         {distribution.length > 0 ? (
           <div className="w-full h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={distribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
+            <ResponsiveContainerAny>
+              <PieChartAny>
+                <PieAny data={distribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
                   {distribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                    <CellAny key={`cell-${index}`} fill={colors[index % colors.length]} />
                   ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+                </PieAny>
+              </PieChartAny>
+            </ResponsiveContainerAny>
           </div>
         ) : (
           <p className="text-gray-500 dark:text-gray-400">لا توجد بيانات متاحة.</p>

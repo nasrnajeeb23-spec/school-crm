@@ -1,12 +1,13 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, isSuperAdminRole, isSuperAdminUser } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { User, AuditLog } = require('../models');
 const { verifyToken } = require('../middleware/auth');
 const speakeasy = require('speakeasy');
 const router = express.Router();
+const { Op } = require('sequelize');
 
 // Super Admin IP whitelist (should be in environment variables in production)
 const SUPER_ADMIN_WHITELIST = process.env.SUPER_ADMIN_IP_WHITELIST ?
@@ -271,11 +272,16 @@ router.post('/login', [
       });
     }
 
+<<<<<<< HEAD
     // Find SuperAdmin user
     const user = await User.findOne({
       where: {
+=======
+    const user = await User.findOne({ 
+      where: { 
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         email: email,
-        role: 'SuperAdmin'
+        role: { [Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'] }
       }
     });
 
@@ -318,9 +324,15 @@ router.post('/login', [
     }
 
     // Check if MFA is required
+<<<<<<< HEAD
     const requiresMfa = ((String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification || (policies.enforceMfaForAdmins === true));
     const tempToken = requiresMfa ?
       jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m', algorithm: 'HS256' }) :
+=======
+    const requiresMfa = ((isSuperAdminRole(user.role) && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification);
+    const tempToken = requiresMfa ? 
+      jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) : 
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       undefined;
 
     // Clear rate limit on successful login
@@ -423,7 +435,7 @@ router.post('/verify-mfa', [
 
     // Find user
     const user = await User.findByPk(decoded.userId);
-    if (!user || user.role !== 'SuperAdmin') {
+    if (!user || !isSuperAdminRole(user.role)) {
       return res.status(401).json({
         success: false,
         message: 'Invalid user'
@@ -440,8 +452,21 @@ router.post('/verify-mfa', [
         window: 1
       });
     } else {
-      const validCodes = ['123456', '654321', '000000'];
-      otpValid = validCodes.includes(mfaCode);
+      if (isDev) {
+        const validCodes = ['123456', '654321', '000000'];
+        otpValid = validCodes.includes(mfaCode);
+      } else {
+        await logSuperAdminAction('mfa_verify.failed', {
+          userId: user.id,
+          userEmail: user.email,
+          reason: 'MFA not enabled',
+          ipAddress: clientIP
+        }, req);
+        return res.status(401).json({
+          success: false,
+          message: 'MFA not enabled'
+        });
+      }
     }
 
     if (!otpValid) {
@@ -562,7 +587,7 @@ router.get('/superadmin/security-status', (req, res) => {
 // @access  Private (SuperAdmin only)
 router.post('/superadmin/logout', verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== 'SuperAdmin') {
+    if (!isSuperAdminUser(req.user)) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -599,7 +624,7 @@ router.post('/change-password', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid input' });
     }
     const user = await User.findByPk(req.user.id);
-    if (!user || String(user.role).toUpperCase() !== 'SUPERADMIN') {
+    if (!user || !isSuperAdminRole(user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
     const policies = await getSecurityPolicies(req.app);
@@ -643,7 +668,7 @@ router.post('/request-reset', async (req, res) => {
   try {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ success: false, message: 'Email required' });
-    const user = await User.findOne({ where: { email, role: 'SuperAdmin' } });
+    const user = await User.findOne({ where: { email, role: { [Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'] } } });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     const token = jwt.sign({ userId: user.id, type: 'reset' }, JWT_SECRET, { expiresIn: '10m', algorithm: 'HS256' });
     if (req.app.locals.redisClient) {
@@ -661,7 +686,7 @@ router.post('/reset', async (req, res) => {
     try { decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); } catch { return res.status(401).json({ success: false, message: 'Invalid or expired token' }); }
     if (decoded.type !== 'reset') return res.status(401).json({ success: false, message: 'Invalid token type' });
     const user = await User.findByPk(decoded.userId);
-    if (!user || user.role !== 'SuperAdmin') return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user || !isSuperAdminRole(user.role)) return res.status(404).json({ success: false, message: 'User not found' });
     const policies = await getSecurityPolicies(req.app);
 
     const hashed = await bcrypt.hash(newPassword, 10);
@@ -674,7 +699,7 @@ router.post('/reset', async (req, res) => {
 // MFA management
 router.post('/mfa/setup', verifyToken, async (req, res) => {
   try {
-    if (String(req.user.role).toUpperCase() !== 'SUPERADMIN') return res.status(403).json({ success: false, message: 'Access denied' });
+    if (!isSuperAdminUser(req.user)) return res.status(403).json({ success: false, message: 'Access denied' });
     const secret = speakeasy.generateSecret({ length: 20, name: 'SchoolSaaS' });
     res.json({ success: true, base32: secret.base32, otpauthUrl: secret.otpauth_url });
   } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
@@ -684,7 +709,7 @@ router.post('/mfa/enable', verifyToken, async (req, res) => {
   try {
     const { secret, code } = req.body || {};
     const user = await User.findByPk(req.user.id);
-    if (!user || String(user.role).toUpperCase() !== 'SUPERADMIN') return res.status(403).json({ success: false, message: 'Access denied' });
+    if (!user || !isSuperAdminRole(user.role)) return res.status(403).json({ success: false, message: 'Access denied' });
     const ok = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window: 1 });
     if (!ok) return res.status(401).json({ success: false, message: 'Invalid code' });
     await user.update({ mfaSecret: secret, mfaEnabled: true });
@@ -695,7 +720,7 @@ router.post('/mfa/enable', verifyToken, async (req, res) => {
 router.post('/mfa/disable', verifyToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
-    if (!user || String(user.role).toUpperCase() !== 'SUPERADMIN') return res.status(403).json({ success: false, message: 'Access denied' });
+    if (!user || !isSuperAdminRole(user.role)) return res.status(403).json({ success: false, message: 'Access denied' });
     await user.update({ mfaEnabled: false });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, SchoolRole, NewStaffData } from '../types';
+import { User, SchoolRole, NewStaffData, Role } from '../types';
 import * as api from '../api';
-import { PlusIcon, UsersIcon } from '../components/icons';
+import { PlusIcon, UsersIcon, KeyIcon, ShieldIcon } from '../components/icons';
 import { useToast } from '../contexts/ToastContext';
 import AddStaffModal from '../components/AddStaffModal';
 import TableSkeleton from '../components/TableSkeleton';
@@ -19,6 +19,7 @@ const roleColors: { [key in SchoolRole]: string } = {
   [SchoolRole.AcademicCoordinator]: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
   [SchoolRole.Secretary]: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
   [SchoolRole.Supervisor]: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+  [SchoolRole.Driver]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
 };
 
 const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
@@ -212,24 +213,180 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
     }
   };
 
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<User | null>(null);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [rolesList, setRolesList] = useState<Role[]>([]);
+  const [scopesList, setScopesList] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<{ roleId: string; scopeId?: string | null; roleName?: string; scopeName?: string }[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const [selectedScopeId, setSelectedScopeId] = useState<string | ''>('');
+  const openAssignRoles = async (member: User) => {
+    try {
+      setAssignTarget(member);
+      setShowAssignModal(true);
+      setAssignLoading(true);
+      const [roles, scopes, current] = await Promise.all([
+        api.getSchoolRbacRoles(schoolId),
+        api.getSchoolRbacScopes(schoolId),
+        api.getUserRoleAssignmentsForSchool(schoolId, (member as any).id)
+      ]);
+      setRolesList(Array.isArray(roles) ? roles : []);
+      setScopesList(Array.isArray(scopes) ? scopes : []);
+      const mapped = (Array.isArray(current) ? current : []).map((r: any) => ({
+        roleId: String(r.roleId || (r.RbacRole?.id || '')),
+        scopeId: r.scopeId ? String(r.scopeId) : null,
+        roleName: r.RbacRole?.name || roles.find((x: any) => String(x.id) === String(r.roleId))?.name || '',
+        scopeName: r.RbacScope?.name || ''
+      })).filter(a => a.roleId);
+      setAssignments(mapped);
+      setSelectedRoleId('');
+      setSelectedScopeId('');
+    } catch {
+      addToast('فشل تحميل الأدوار والتعيينات.', 'error');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+  const addAssignmentRow = () => {
+    const rid = String(selectedRoleId || '');
+    if (!rid) return;
+    const sid = selectedScopeId ? String(selectedScopeId) : '';
+    const exists = assignments.some(a => String(a.roleId) === rid && String(a.scopeId || '') === sid);
+    if (exists) return;
+    const role = rolesList.find(r => String(r.id) === rid);
+    const scope = scopesList.find((s: any) => String(s.id) === sid);
+    setAssignments(prev => [...prev, { roleId: rid, scopeId: sid || null, roleName: role?.name || '', scopeName: scope?.name || '' }]);
+    setSelectedScopeId('');
+  };
+  const removeAssignmentRow = (idx: number) => {
+    setAssignments(prev => prev.filter((_, i) => i !== idx));
+  };
+  const saveAssignments = async () => {
+    if (!assignTarget) return;
+    try {
+      setAssignSaving(true);
+      const payload = assignments.map(a => ({ roleId: String(a.roleId), scopeId: a.scopeId ? String(a.scopeId) : null }));
+      await api.updateUserRolesForSchool(schoolId, (assignTarget as any).id, payload);
+      addToast('تم حفظ التعيينات بنجاح.', 'success');
+      setShowAssignModal(false);
+      setAssignTarget(null);
+      setAssignments([]);
+    } catch {
+      addToast('فشل حفظ التعيينات.', 'error');
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const [showRolesModal, setShowRolesModal] = useState(false);
+  const [rolesManageLoading, setRolesManageLoading] = useState(false);
+  const [rolesManageSaving, setRolesManageSaving] = useState(false);
+  const [rolesManageList, setRolesManageList] = useState<Role[]>([]);
+  const [permissionsList, setPermissionsList] = useState<any[]>([]);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [selectedPermKeys, setSelectedPermKeys] = useState<Set<string>>(new Set());
+  const [newRoleKey, setNewRoleKey] = useState('');
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleDesc, setNewRoleDesc] = useState('');
+  const openRolesManage = async () => {
+    try {
+      setShowRolesModal(true);
+      setRolesManageLoading(true);
+      const [roles, perms] = await Promise.all([
+        api.getSchoolRbacRoles(schoolId),
+        api.getSchoolRbacPermissions(schoolId)
+      ]);
+      setRolesManageList(Array.isArray(roles) ? roles : []);
+      setPermissionsList(Array.isArray(perms) ? perms : []);
+      setEditingRole(null);
+      setSelectedPermKeys(new Set());
+    } catch {
+      addToast('فشل تحميل الأدوار والصلاحيات.', 'error');
+    } finally {
+      setRolesManageLoading(false);
+    }
+  };
+  const createRole = async () => {
+    try {
+      if (!newRoleKey.trim() || !newRoleName.trim()) return;
+      setRolesManageSaving(true);
+      const r = await api.createSchoolRbacRole(schoolId, { key: newRoleKey.trim(), name: newRoleName.trim(), description: newRoleDesc.trim() });
+      setRolesManageList(prev => [r, ...prev]);
+      setNewRoleKey('');
+      setNewRoleName('');
+      setNewRoleDesc('');
+      addToast('تم إنشاء الدور.', 'success');
+    } catch {
+      addToast('فشل إنشاء الدور.', 'error');
+    } finally {
+      setRolesManageSaving(false);
+    }
+  };
+  const startEditRolePerms = async (role: Role) => {
+    try {
+      setEditingRole(role);
+      setRolesManageSaving(true);
+      const current = await api.getRolePermissions(String(role.id));
+      const keys = new Set((Array.isArray(current) ? current : []).map((p: any) => String(p.key)));
+      setSelectedPermKeys(keys);
+    } catch {
+      addToast('فشل تحميل صلاحيات الدور.', 'error');
+    } finally {
+      setRolesManageSaving(false);
+    }
+  };
+  const togglePermKey = (key: string) => {
+    setSelectedPermKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const saveRolePerms = async () => {
+    if (!editingRole) return;
+    try {
+      setRolesManageSaving(true);
+      const keys = Array.from(selectedPermKeys.values());
+      await api.updateSchoolRolePermissions(schoolId, String(editingRole.id), keys);
+      addToast('تم حفظ صلاحيات الدور.', 'success');
+      setEditingRole(null);
+      setSelectedPermKeys(new Set());
+    } catch {
+      addToast('فشل حفظ صلاحيات الدور.', 'error');
+    } finally {
+      setRolesManageSaving(false);
+    }
+  };
+
   return (
     <>
       <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">إدارة الموظفين</h2>
-          <button 
-            onClick={() => { setEditing(null); setIsModalOpen(true); }}
-            className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <PlusIcon className="h-5 w-5 ml-2" />
-            إضافة موظف جديد
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={openRolesManage}
+              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <ShieldIcon className="h-5 w-5 ml-2" />
+              أدوار وصلاحيات المدرسة
+            </button>
+            <button 
+              onClick={() => { setEditing(null); setIsModalOpen(true); }}
+              className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              <PlusIcon className="h-5 w-5 ml-2" />
+              إضافة موظف جديد
+            </button>
+          </div>
         </div>
         <div className="space-y-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
             <div className="flex gap-3 min-w-max items-center">
               <button onClick={() => setRoleFilter('all')} className={`px-3 py-1 rounded-md text-sm ${roleFilter === 'all' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>الكل ({staff.length})</button>
-              {Object.values(SchoolRole).map(r => (
+              {Object.values(SchoolRole).filter(r => r !== SchoolRole.Driver).map(r => (
                 <button key={r} onClick={() => setRoleFilter(r as SchoolRole)} className={`px-3 py-1 rounded-md text-sm ${roleFilter === r ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>
                   {r} ({roleSummary.find(s => s.role === r)?.count || 0})
                 </button>
@@ -287,7 +444,7 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                     <td className="px-6 py-4">{member.email}</td>
                     <td className="px-6 py-4">
                       {member.schoolRole && (
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleColors[member.schoolRole]}`}>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleColors[member.schoolRole as SchoolRole] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
                           {member.schoolRole}
                         </span>
                       )}
@@ -361,6 +518,10 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
                         })()}
                         <button onClick={() => { setEditing(member); setIsModalOpen(true); }} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">تعديل</button>
                         <button onClick={() => handleDeleteStaff(member)} disabled={member.schoolRole === SchoolRole.Admin} className="font-medium text-red-600 dark:text-red-500 hover:underline disabled:text-red-300 disabled:cursor-not-allowed">حذف</button>
+                        <button onClick={() => openAssignRoles(member)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline flex items-center gap-1">
+                          <KeyIcon className="h-4 w-4" />
+                          تعيين الأدوار
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -413,6 +574,155 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ schoolId }) => {
               >{sharing ? 'جارٍ المشاركة...' : 'مشاركة'}</button>
               <button onClick={() => setShowManualShare(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
             </div>
+          </div>
+        </div>
+      )}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[95%] max-w-3xl text-right">
+            <h3 className="text-lg font-semibold mb-3">تعيين الأدوار للموظف</h3>
+            {assignLoading ? (
+              <div className="py-8 text-center text-gray-600 dark:text-gray-300">جاري التحميل...</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                  <div>
+                    <label className="block text-sm mb-1">الدور</label>
+                    <select value={selectedRoleId} onChange={(e) => setSelectedRoleId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                      <option value="">اختر دورًا</option>
+                      {rolesList.map(r => (
+                        <option key={r.id} value={String(r.id)}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">النطاق (اختياري)</label>
+                    <select value={selectedScopeId} onChange={(e) => setSelectedScopeId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                      <option value="">بدون نطاق</option>
+                      {scopesList.map((s: any) => (
+                        <option key={s.id} value={String(s.id)}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button onClick={addAssignmentRow} className="px-3 py-2 bg-indigo-600 text-white rounded-md">إضافة تعيين</button>
+                </div>
+                <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-md">
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                      <tr>
+                        <th className="px-4 py-2">الدور</th>
+                        <th className="px-4 py-2">النطاق</th>
+                        <th className="px-4 py-2">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignments.length === 0 ? (
+                        <tr><td colSpan={3} className="px-4 py-4 text-center text-gray-600 dark:text-gray-300">لا توجد تعيينات</td></tr>
+                      ) : assignments.map((a, i) => (
+                        <tr key={`${a.roleId}-${a.scopeId || ''}`} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                          <td className="px-4 py-2">{a.roleName || rolesList.find(r => String(r.id) === String(a.roleId))?.name || a.roleId}</td>
+                          <td className="px-4 py-2">{a.scopeName || (a.scopeId ? (scopesList.find((s: any) => String(s.id) === String(a.scopeId))?.name || a.scopeId) : '—')}</td>
+                          <td className="px-4 py-2">
+                            <button onClick={() => removeAssignmentRow(i)} className="font-medium text-red-600 dark:text-red-500 hover:underline">إزالة</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex gap-3 mt-4 justify-end">
+                  <button onClick={() => { setShowAssignModal(false); setAssignTarget(null); }} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
+                  <button onClick={saveAssignments} disabled={assignSaving} aria-disabled={assignSaving} className={`px-3 py-2 ${assignSaving ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}>{assignSaving ? 'جارٍ الحفظ...' : 'حفظ'}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {showRolesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md w-[95%] max-w-4xl text-right">
+            <h3 className="text-lg font-semibold mb-3">أدوار وصلاحيات المدرسة</h3>
+            {rolesManageLoading ? (
+              <div className="py-8 text-center text-gray-600 dark:text-gray-300">جاري التحميل...</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                  <div>
+                    <label className="block text-sm mb-1">المعرف</label>
+                    <input value={newRoleKey} onChange={(e) => setNewRoleKey(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700" placeholder="مثال: STAFF_MANAGER" />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">الاسم</label>
+                    <input value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700" placeholder="اسم الدور" />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">الوصف</label>
+                    <input value={newRoleDesc} onChange={(e) => setNewRoleDesc(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700" placeholder="وصف اختياري" />
+                  </div>
+                  <button onClick={createRole} disabled={rolesManageSaving} aria-disabled={rolesManageSaving} className={`px-3 py-2 ${rolesManageSaving ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}>{rolesManageSaving ? 'جارٍ الإنشاء...' : 'إنشاء دور'}</button>
+                </div>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                      <tr>
+                        <th className="px-6 py-3">الاسم</th>
+                        <th className="px-6 py-3">المعرف</th>
+                        <th className="px-6 py-3">المدرسة</th>
+                        <th className="px-6 py-3">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rolesManageList.length === 0 ? (
+                        <tr><td colSpan={4} className="px-6 py-4 text-center text-gray-600 dark:text-gray-300">لا توجد أدوار</td></tr>
+                      ) : rolesManageList.map(r => (
+                        <tr key={r.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                          <td className="px-6 py-4">{r.name}</td>
+                          <td className="px-6 py-4">{r.key || '—'}</td>
+                          <td className="px-6 py-4">{typeof r.schoolId === 'number' ? r.schoolId : 'نظام'}</td>
+                          <td className="px-6 py-4">
+                            {typeof r.schoolId === 'number' ? (
+                              <button onClick={() => startEditRolePerms(r)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">تعديل صلاحيات</button>
+                            ) : (
+                              <span className="text-gray-400">غير قابل للتعديل</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {editingRole && (
+                  <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-md p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <ShieldIcon className="h-5 w-5 text-indigo-600" />
+                        <span className="font-semibold">{editingRole.name}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setEditingRole(null); setSelectedPermKeys(new Set()); }} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إلغاء</button>
+                        <button onClick={saveRolePerms} disabled={rolesManageSaving} aria-disabled={rolesManageSaving} className={`px-3 py-2 ${rolesManageSaving ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}>{rolesManageSaving ? 'جارٍ الحفظ...' : 'حفظ الصلاحيات'}</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {permissionsList.map((p: any) => (
+                        <label key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 dark:bg-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={selectedPermKeys.has(String(p.key))}
+                            onChange={() => togglePermKey(String(p.key))}
+                          />
+                          <span>{p.name || p.key}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-3 mt-4 justify-end">
+                  <button onClick={() => setShowRolesModal(false)} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">إغلاق</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

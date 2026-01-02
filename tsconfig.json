@@ -10,6 +10,10 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
@@ -24,6 +28,7 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
+<<<<<<< HEAD
   "include": [
     "admin/src/**/*",
     "admin/vite-env.d.ts"
@@ -40,4 +45,7 @@
     "admin/src/setupTests.ts",
     "admin/src/test-imports.tsx"
   ]
+=======
+  "exclude": ["node_modules", "admin", "mobile-parent", "mobile-teacher"]
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 }

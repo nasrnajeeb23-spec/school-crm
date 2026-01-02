@@ -2,7 +2,6 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from './AppNavigator';
-import { User } from '../types';
 import TeacherDashboardScreen from '../screens/TeacherDashboardScreen';
 import MyClassesNavigator from './MyClassesNavigator';
 import MessagesNavigator from './MessagesNavigator';
@@ -11,7 +10,16 @@ import MoreNavigator from './MoreNavigator';
 import AssignmentsNavigator from './AssignmentsNavigator';
 import { DashboardIcon, ClassesIcon, MessagesIcon, ScheduleIcon, MoreIcon, AssignmentIcon } from '../components/icons';
 
-const Tab = createBottomTabNavigator();
+export type MainTabParamList = {
+  Dashboard: undefined;
+  Classes: undefined;
+  Assignments: undefined;
+  Schedule: undefined;
+  Messages: undefined;
+  More: undefined;
+};
+
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 type Props = StackScreenProps<RootStackParamList, 'Main'>;
 

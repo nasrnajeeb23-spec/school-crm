@@ -16,6 +16,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md}\""
   },
   "dependencies": {
+<<<<<<< HEAD
     "@google/genai": "^1.33.0",
     "@heroicons/react": "^2.1.0",
     "@sentry/react": "^7.91.0",
@@ -28,6 +29,13 @@
     "autoprefixer": "^10.4.23",
     "chart.js": "^4.4.1",
     "lucide-react": "^0.561.0",
+=======
+    "@google/genai": "^1.30.0",
+    "@hcaptcha/react-hcaptcha": "^1.17.1",
+    "autoprefixer": "^10.4.22",
+    "esbuild": "^0.19.12",
+    "lucide-react": "^0.294.0",
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     "postcss": "^8.5.6",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
@@ -44,6 +52,7 @@
     "web-vitals": "^3.5.0"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "@playwright/test": "^1.50.1",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
@@ -58,4 +67,12 @@
     "prettier": "^3.1.1",
     "ts-jest": "^29.1.1"
   }
+=======
+    "@types/node": "^25.0.3",
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7"
+  },
+  "author": "",
+  "license": "MIT"
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 }

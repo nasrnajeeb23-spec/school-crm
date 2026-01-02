@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import * as api from '../api';
-import { Submission, SubmissionStatus } from '../types';
+import { Submission, SubmissionStatus, AttachmentMeta } from '../types';
 import { AssignmentsStackParamList } from '../navigation/AssignmentsNavigator';
+import * as Linking from 'expo-linking';
 
 type Props = StackScreenProps<AssignmentsStackParamList, 'AssignmentDetails'>;
 
@@ -32,6 +33,16 @@ const AssignmentDetailsScreen: React.FC<Props> = ({ route }) => {
             <View style={{flex: 1}}>
                 <Text style={styles.studentName}>{item.studentName}</Text>
                 {item.submissionDate && <Text style={styles.submissionDate}>تاريخ التسليم: {item.submissionDate}</Text>}
+                {Array.isArray(item.attachments) && item.attachments.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={styles.attachmentsHeader}>مرفقات التسليم</Text>
+                    {item.attachments.map((a: AttachmentMeta, idx: number) => (
+                      <TouchableOpacity key={`${a.filename}-${idx}`} onPress={() => a.url && Linking.openURL(api.getAssetUrl(a.url!))}>
+                        <Text style={styles.attachmentLink}>{a.originalName || a.filename}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
             </View>
             <View style={[styles.statusBadge, { backgroundColor: statusColorMap[item.status].bg }]}>
                 <Text style={[styles.statusText, { color: statusColorMap[item.status].text }]}>{item.status}</Text>
@@ -54,6 +65,16 @@ const AssignmentDetailsScreen: React.FC<Props> = ({ route }) => {
                     <Text style={styles.title}>{assignment.title}</Text>
                     <Text style={styles.description}>{assignment.description}</Text>
                     <Text style={styles.dueDate}>تاريخ التسليم: {assignment.dueDate}</Text>
+                    {Array.isArray((assignment as any).attachments) && (assignment as any).attachments.length > 0 && (
+                      <View style={{ marginTop: 12 }}>
+                        <Text style={styles.attachmentsHeader}>مرفقات المعلم</Text>
+                        {(assignment as any).attachments.map((a: AttachmentMeta, idx: number) => (
+                          <TouchableOpacity key={`${a.filename}-${idx}`} onPress={() => a.url && Linking.openURL(api.getAssetUrl(a.url!))}>
+                            <Text style={styles.attachmentLink}>{a.originalName || a.filename}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
                 </View>
             }
             ListEmptyComponent={<View style={styles.center}><Text>لا توجد تسليمات لعرضها.</Text></View>}
@@ -97,6 +118,19 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#6b7280',
         textAlign: 'right',
+    },
+    attachmentsHeader: {
+        fontSize: 14,
+        color: '#374151',
+        textAlign: 'right',
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    attachmentLink: {
+        color: '#1d4ed8',
+        textDecorationLine: 'underline',
+        textAlign: 'right',
+        marginTop: 4,
     },
     submissionItem: {
         backgroundColor: '#fff',

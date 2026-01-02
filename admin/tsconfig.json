@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "types": ["node", "vite/client", "jest"],
@@ -7,3 +8,22 @@
   },
   "include": ["src/**/*", "vite-env.d.ts"]
 }
+=======
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}
+
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae

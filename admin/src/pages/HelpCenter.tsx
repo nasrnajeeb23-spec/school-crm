@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Download, Book, FileText, ChevronRight, X, HelpCircle, ArrowLeft } from 'lucide-react';
+import { Search, Download, FileText, ChevronRight, HelpCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import * as api from '../api';
 
 interface DocFile {
   id: string;
@@ -60,19 +61,22 @@ const HelpCenter: React.FC = () => {
     const loadDocFiles = async () => {
       try {
         setLoading(true);
-        // Load the get-started.ar.md file as initial content
-        const response = await fetch('/backend/docs/get-started.ar.md');
+        const response = await fetch(`${api.getApiBase()}/help/list`);
         if (response.ok) {
-          const content = await response.text();
-          const files: DocFile[] = [{
-            id: '1',
-            title: 'كيفية البدء - خطوات بلا أخطاء',
-            content: content,
-            category: 'البدء',
-            fileName: 'get-started.ar.md',
-            language: 'ar'
-          }];
-          setDocFiles(files);
+          const docs = await response.json();
+          // Fetch full content for each doc (or we could rely on list preview, but let's get content for search)
+          // For optimization, we can just load list and fetch content on click, but to keep search working client-side:
+          const fullDocs = await Promise.all(docs.map(async (d: any) => {
+            try {
+               const res = await fetch(`${api.getApiBase()}/help/content/${d.fileName}`);
+               const data = await res.json();
+               return { ...d, content: data.content || '' };
+            } catch { return d; }
+          }));
+          setDocFiles(fullDocs);
+        } else {
+            // Fallback if API fails
+            throw new Error('API failed');
         }
       } catch (error) {
         console.error('Error loading documentation:', error);

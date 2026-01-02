@@ -61,8 +61,8 @@ const StaffAttendance: React.FC<StaffAttendanceProps> = ({ schoolId }) => {
         }
     };
 
-    const handleStatusChange = (userId: string, status: AttendanceStatus) => {
-        setAttendanceMap(prev => ({ ...prev, [userId]: status }));
+    const handleStatusChange = (userId: string | number, status: AttendanceStatus) => {
+        setAttendanceMap(prev => ({ ...prev, [String(userId)]: status }));
     };
 
     const handleSave = async () => {

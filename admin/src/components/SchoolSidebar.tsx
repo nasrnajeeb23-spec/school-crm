@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { DashboardIcon, StudentsIcon, UsersIcon, ClassesIcon, FinanceIcon, ReportsIcon, AttendanceIcon, GradesIcon, ScheduleIcon, MessagingIcon, ParentsIcon, SettingsIcon, EventIcon, LogoutIcon, ProfileIcon, BusIcon, ModuleIcon, NetProfitIcon, LockIcon, CloseIcon } from './icons';
+import { DashboardIcon, StudentsIcon, UsersIcon, ClassesIcon, FinanceIcon, ReportsIcon, AttendanceIcon, GradesIcon, ScheduleIcon, MessagingIcon, ParentsIcon, SettingsIcon, EventIcon, LogoutIcon, ProfileIcon, BusIcon, ModuleIcon, NetProfitIcon, LockIcon, CloseIcon, HelpIcon } from './icons';
 import { Permission } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -18,7 +18,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
   const { logout } = useAppContext();
   const location = useLocation();
 
-  const basePath = isSuperAdminView ? location.pathname.split('/').slice(0, 4).join('/') : '/school';
+  const basePath = isSuperAdminView ? location.pathname.split('/').slice(0, 4).join('/') : (location.pathname.startsWith('/staff') ? '/staff' : '/school');
 
   const allNavItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: DashboardIcon, requiredPermission: Permission.VIEW_DASHBOARD, path: `${basePath}/dashboard` },
@@ -43,6 +43,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
     { id: 'jobs', label: 'مهام الخلفية', icon: ReportsIcon, requiredPermission: Permission.MANAGE_REPORTS, path: `${basePath}/jobs` },
     { id: 'settings', label: 'الإعدادات', icon: SettingsIcon, requiredPermission: Permission.MANAGE_SETTINGS, path: `${basePath}/settings` },
     { id: 'modules', label: 'الباقات والاشتراكات', icon: ModuleIcon, requiredPermission: Permission.MANAGE_MODULES, path: `${basePath}/modules` },
+    { id: 'help_center', label: 'مركز المساعدة', icon: HelpIcon, requiredPermission: Permission.VIEW_DASHBOARD, path: `${basePath}/help-center` },
   ];
 
   const hasPermission = (item: typeof allNavItems[0]) => {
@@ -94,6 +95,7 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
               return (
                 <li key={item.id} className="px-2">
                   <NavLink to={item.path} className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`} end>
+<<<<<<< HEAD
                     {({ isActive }) => (
                       <>
                         {isActive && <div className="absolute right-0 h-6 w-1 bg-teal-600 dark:bg-teal-400 rounded-l-full"></div>}
@@ -103,6 +105,20 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
                         </span>
                       </>
                     )}
+=======
+                    {({ isActive }) => {
+                      const Icon: any = (item as any).icon || (() => null);
+                      return (
+                        <>
+                          {isActive && <div className="absolute right-0 h-6 w-1 bg-teal-600 dark:bg-teal-400 rounded-l-full"></div>}
+                          <Icon className="h-6 w-6" />
+                          <span className="hidden md:block mr-4 flex items-center gap-2">
+                            <span>{item.label}</span>
+                          </span>
+                        </>
+                      );
+                    }}
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
                   </NavLink>
                 </li>
               );

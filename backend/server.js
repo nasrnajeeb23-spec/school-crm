@@ -1,6 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+<<<<<<< HEAD
+=======
+const compression = require('compression');
+const { sequelize } = require('./models'); // Import sequelize from models/index
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 const http = require('http');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
@@ -11,9 +16,24 @@ const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const samlAuth = require('./middleware/samlAuth');
 const { languageMiddleware } = require('./i18n/config');
-const { verifyToken, requireRole } = require('./middleware/auth');
+const { verifyToken, requireRole, isSuperAdminUser, isSuperAdminRole, normalizeRole } = require('./middleware/auth');
 const { createLogger, format, transports } = require('winston');
 const DailyRotate = require('winston-daily-rotate-file');
+
+const logger = createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: format.combine(format.timestamp(), format.json()),
+  transports: [
+    new transports.Console(),
+    new DailyRotate({
+      filename: require('path').join(__dirname, '..', 'logs', 'app-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '10m',
+      maxFiles: '30d',
+    })
+  ]
+});
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -40,14 +60,26 @@ const pricingRoutes = require('./routes/pricing');
 const billingRoutes = require('./routes/billing');
 const contactRoutes = require('./routes/contact');
 const reportsRoutes = require('./routes/reports');
+<<<<<<< HEAD
 const adsRoutes = require('./routes/ads');
 const accountingRoutes = require('./routes/accounting');
+=======
+const driverRoutes = require('./routes/driver');
+const contentRoutes = require('./routes/content');
+const CronService = require('./services/CronService');
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
 const fse = require('fs-extra');
 const path = require('path');
 const fs = require('fs');
+<<<<<<< HEAD
 const { requestIdMiddleware, suspiciousActivityMiddleware } = require('./middleware/securityMiddleware');
+=======
+const { checkStorageLimit, updateUsedStorage } = require('./middleware/storageLimits');
+const multer = require('multer');
+const crypto = require('crypto');
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 
 const app = express();
@@ -76,24 +108,82 @@ const io = new Server(server, {
 app.set('io', io);
 
 io.on('connection', (socket) => {
-  console.log(`User Connected: ${socket.id}`);
+  logger.info(`User Connected: ${socket.id}`);
 
-  socket.on('join_conversation', (roomId) => {
-    socket.join(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`);
-  });
+  try {
+    const raw = socket.handshake?.auth?.token || socket.handshake?.query?.token;
+    const token = Array.isArray(raw) ? raw[0] : raw;
+    if (token) {
+      const payload = jwt.verify(String(token), JWT_SECRET);
+      socket.user = payload;
+    }
+  } catch { }
 
-  socket.on('leave_conversation', (roomId) => {
-    socket.leave(roomId);
-    console.log(`User ${socket.id} left room: ${roomId}`);
+  const canJoinRoom = async (roomId) => {
+    if (!socket.user) return true;
+    const { Conversation } = require('./models');
+    const conv = await Conversation.findOne({ where: { roomId } });
+    if (!conv) return false;
+    const u = socket.user || {};
+    const role = normalizeRole(u.role);
+    return (
+      (role === 'PARENT' && String(conv.parentId || '') === String(u.parentId || '')) ||
+      (role === 'TEACHER' && String(conv.teacherId || '') === String(u.teacherId || '')) ||
+      (role === 'SCHOOL_ADMIN' && Number(conv.schoolId || 0) === Number(u.schoolId || 0)) ||
+      isSuperAdminRole(u.role)
+    );
+  };
+
+  const tryJoin = async (roomId) => {
+    try {
+      if (!roomId) return;
+      const rid = String(roomId);
+      const allowed = await canJoinRoom(rid);
+      if (!allowed) return;
+      socket.join(rid);
+      logger.info(`User ${socket.id} joined room: ${rid}`);
+    } catch (e) {
+      try { logger.error(`Socket join error: ${e?.message || e}`); } catch { }
+    }
+  };
+
+  const tryLeave = (roomId) => {
+    try {
+      if (!roomId) return;
+      const rid = String(roomId);
+      socket.leave(rid);
+      logger.info(`User ${socket.id} left room: ${rid}`);
+    } catch { }
+  };
+
+  socket.on('join_conversation', (roomId) => { void tryJoin(roomId); });
+  socket.on('join_room', (roomId) => { void tryJoin(roomId); });
+  socket.on('leave_conversation', (roomId) => { tryLeave(roomId); });
+  socket.on('leave_room', (roomId) => { tryLeave(roomId); });
+
+  socket.on('send_message', async (payload) => {
+    try {
+      const { conversationId, roomId, text, senderId, senderRole } = payload || {};
+      if (!conversationId || !roomId || !text || !senderId || !senderRole) return;
+      const { Message } = require('./models');
+      const sid = socket.user?.id || senderId;
+      const srole = normalizeRole(socket.user?.role || senderRole);
+      const msg = await Message.create({ id: `msg_${Date.now()}`, conversationId, text, senderId: sid, senderRole: srole });
+      const out = { id: msg.id, conversationId, text, senderId: sid, senderRole: srole, timestamp: msg.createdAt };
+      io.to(roomId).emit('new_message', out);
+      io.to(roomId).emit('receive_message', out);
+    } catch (e) {
+      try { logger.error(`Socket send_message error: ${e?.message || e}`); } catch { }
+    }
   });
 
   socket.on('disconnect', () => {
-    console.log('User Disconnected', socket.id);
+    logger.info(`User Disconnected: ${socket.id}`);
   });
 });
-console.log('Server file path:', __filename);
+logger.info(`Server file path: ${__filename}`);
 
+<<<<<<< HEAD
 async function toCSV(headers, rows) {
   const esc = (v) => { const s = v === null || v === undefined ? '' : String(v); return (s.includes(',') || s.includes('\n') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const head = headers.join(',');
@@ -241,23 +331,194 @@ const logger = createLogger({
     })
   ]
 });
+=======
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 app.locals.logger = logger;
 
+function getDbInfo() {
+  try {
+    const dial = sequelize.getDialect();
+    const info = { dialect: dial };
+    if (dial === 'sqlite') {
+      info.storage = (sequelize.options && sequelize.options.storage) ? sequelize.options.storage : null;
+    } else if (process.env.DATABASE_URL) {
+      try {
+        const u = new URL(process.env.DATABASE_URL);
+        info.host = u.hostname;
+        info.database = String(u.pathname || '').replace(/^\//, '');
+      } catch { }
+    }
+    return info;
+  } catch {
+    return {};
+  }
+}
+try { logger.info('db_info', getDbInfo()); } catch { }
+
+// Initialize central security policies (used by auth middleware)
+app.locals.securityPolicies = {
+  enforceMfaForAdmins: true,
+  passwordMinLength: 8,
+  lockoutThreshold: 3,
+  allowedIpRanges: [],
+  sessionMaxAgeHours: 24
+};
+// Load persisted policies if present
+(async () => {
+  try {
+    const { SecurityPolicy } = require('./models');
+    const dbPolicy = await SecurityPolicy.findOne();
+    if (dbPolicy) {
+      app.locals.securityPolicies = {
+        enforceMfaForAdmins: !!dbPolicy.enforceMfaForAdmins,
+        passwordMinLength: Number(dbPolicy.passwordMinLength || 8),
+        lockoutThreshold: Number(dbPolicy.lockoutThreshold || 3),
+        allowedIpRanges: (() => { try { return JSON.parse(dbPolicy.allowedIpRanges || '[]'); } catch { return []; } })(),
+        sessionMaxAgeHours: Number(dbPolicy.sessionMaxAgeHours || 24)
+      };
+    }
+  } catch { }
+})();
+
+// Ensure RBAC permissions exist
+(async () => {
+  try {
+    const { RbacPermission } = require('./models');
+    const { ALL_PERMISSIONS } = require('./utils/permissionMatrix');
+    const existing = await RbacPermission.findAll({ attributes: ['key'] });
+    const existingKeys = new Set(existing.map(p => String(p.key)));
+    const toAdd = (Array.isArray(ALL_PERMISSIONS) ? ALL_PERMISSIONS : []).filter(k => !existingKeys.has(String(k)));
+    if (toAdd.length > 0) {
+      const display = { VIEW_CONTENT: 'عرض المحتوى', MANAGE_CONTENT: 'إدارة المحتوى' };
+      const rows = toAdd.map(k => ({
+        id: `perm_${String(k).toLowerCase().replace(/[^a-z0-9_]+/g, '_')}`,
+        key: String(k),
+        name: display[String(k)] || String(k).replace(/_/g, ' '),
+        description: null,
+        isSystem: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }));
+      await RbacPermission.bulkCreate(rows, { ignoreDuplicates: true });
+    }
+  } catch { }
+})();
+
+// Apply recommended permissions to SuperAdmin variants (merge mode)
+(async () => {
+  try {
+    const { User } = require('./models');
+    const { derivePermissionsForUser, normalizeDbRole } = require('./utils/permissionMatrix');
+    const { Op } = require('sequelize');
+    const users = await User.findAll({
+      where: { role: { [Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'] } },
+      order: [['id', 'ASC']]
+    });
+    let updated = 0;
+    for (const user of users) {
+      const recommended = derivePermissionsForUser({ role: normalizeDbRole(user.role) });
+      const current = Array.isArray(user.permissions) ? user.permissions : [];
+      const next = Array.from(new Set([...current, ...recommended]));
+      const a = [...current].slice().sort();
+      const b = [...next].slice().sort();
+      const same = JSON.stringify(a) === JSON.stringify(b);
+      if (!same) {
+        user.permissions = next;
+        await user.save();
+        updated++;
+      }
+    }
+    try { logger.info(`Applied recommended SuperAdmin variant permissions (merge). updated=${updated}`); } catch { }
+  } catch (e) { try { logger.warn(`Apply recommended SuperAdmin permissions failed: ${e.message}`); } catch { } }
+})();
+
+// Ensure global Content Manager role exists with content permissions
+(async () => {
+  try {
+    const { RbacRole, RbacPermission, RbacRolePermission } = require('./models');
+    const { Op } = require('sequelize');
+    const roleKey = 'CONTENT_MANAGER';
+    const roleName = 'مدير محتوى';
+    const roleDesc = 'يدير المحتوى العام للنظام';
+    let role = await RbacRole.findOne({ where: { key: roleKey, schoolId: null } });
+    if (!role) {
+      role = await RbacRole.create({
+        id: 'role_' + Date.now() + Math.random().toString(36).slice(2, 6),
+        key: roleKey,
+        name: roleName,
+        description: roleDesc,
+        schoolId: null,
+        isSystem: true
+      });
+    } else {
+      const updates = {};
+      if (role.name !== roleName) updates.name = roleName;
+      if (role.description !== roleDesc) updates.description = roleDesc;
+      if (Object.keys(updates).length) await role.update(updates);
+    }
+    const desiredKeys = ['VIEW_DASHBOARD', 'VIEW_CONTENT', 'MANAGE_CONTENT'];
+    const perms = await RbacPermission.findAll({ where: { key: { [Op.in]: desiredKeys } } });
+    const ids = perms.map(p => String(p.id));
+    await RbacRolePermission.destroy({ where: { roleId: String(role.id) } });
+    const now = new Date();
+    const rows = ids.map(pid => ({ id: crypto.randomUUID(), roleId: String(role.id), permissionId: pid, createdAt: now, updatedAt: now }));
+    if (rows.length) await RbacRolePermission.bulkCreate(rows, { ignoreDuplicates: true });
+  } catch { }
+})();
 // Middleware
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin;
+    if (!origin) return next();
+    const allowAny = allowedOrigins.includes('*');
+    const allowed = allowAny || allowedOrigins.includes(origin);
+    if (allowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      const reqHeaders = req.headers['access-control-request-headers'];
+      res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, x-school-id, x-client, x-requested-with');
+    }
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    return next();
+  } catch {
+    return next();
+  }
+});
+
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes('*')) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins.includes('*')) return callback(null, origin);
+    if (allowedOrigins.includes(origin)) return callback(null, origin);
     logger.warn(`CORS blocked request from: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id', 'x-client', 'x-requested-with'],
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+<<<<<<< HEAD
 // Enhanced Security Headers with Helmet
+=======
+app.options('*', cors(corsOptions));
+app.use(compression());
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin;
+    if (origin && res.getHeader('Access-Control-Allow-Origin') === '*') {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+  } catch { }
+  next();
+});
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -280,6 +541,7 @@ app.use(helmet({
   }
 }));
 
+<<<<<<< HEAD
 if (!isTestEnv) {
   const rateLimitWindow = parseInt(process.env.RATE_LIMIT_WINDOW) || 15;
   const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300;
@@ -292,6 +554,27 @@ if (!isTestEnv) {
     }
   }));
 }
+=======
+const rateLimitWindow = parseInt(process.env.RATE_LIMIT_WINDOW) || 15;
+const rateLimitMaxRaw = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300;
+const isLocalFrontend = (() => {
+  try {
+    const url = String(process.env.FRONTEND_URL || '');
+    return !url || url.includes('localhost') || url.includes('127.0.0.1');
+  } catch { return true; }
+})();
+const rateLimitMax = isLocalFrontend ? Math.max(5000, rateLimitMaxRaw) : rateLimitMaxRaw;
+app.use(rateLimit({
+  windowMs: rateLimitWindow * 60 * 1000,
+  max: rateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: rateLimitWindow * 60
+  }
+}));
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 // Basic HTTP request logging
 app.use((req, res, next) => {
@@ -305,6 +588,7 @@ app.use((req, res, next) => {
   });
   next();
 });
+<<<<<<< HEAD
 
 // Security Middleware
 app.use(requestIdMiddleware);
@@ -312,15 +596,25 @@ if (!isTestEnv) {
   app.use(suspiciousActivityMiddleware);
 }
 
+=======
+app.use(express.json({ limit: '2mb' }));
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 // Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Serve generated downloads
 app.use('/downloads', express.static(path.join(__dirname, '..', 'admin', 'public', 'downloads')));
 // Standard API response middleware
+<<<<<<< HEAD
 app.use(require('./middleware/response').responseFormatter);
 let promClient;
 try { promClient = require('prom-client'); } catch { }
 if (promClient && !isTestEnv) {
+=======
+try { app.use(require('./middleware/response').responseFormatter); } catch { }
+let promClient;
+try { promClient = require('prom-client'); } catch { }
+if (promClient) {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   promClient.collectDefaultMetrics();
   const httpRequestCounter = new promClient.Counter({ name: 'http_requests_total', help: 'Total HTTP requests', labelNames: ['method', 'route', 'status'] });
   const httpRequestDuration = new promClient.Histogram({ name: 'http_request_duration_seconds', help: 'HTTP request duration in seconds', labelNames: ['method', 'route', 'status'], buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10] });
@@ -374,7 +668,11 @@ try {
       const redis = require('redis');
       const useTls = process.env.REDIS_URL.startsWith('rediss://');
       client = redis.createClient({ url: process.env.REDIS_URL, socket: useTls ? { tls: true } : {} });
+<<<<<<< HEAD
       client.on('error', (_err) => { try { logger.warn('Redis client error'); } catch { } });
+=======
+      client.on('error', (err) => { try { logger.warn('Redis client error'); } catch { } });
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       client.connect().catch(() => { });
       sessionConfig.store = new RedisStore({ client });
       app.locals.redisClient = client;
@@ -443,17 +741,38 @@ if (licenseKey) {
     allowedModules = [...coreModules, ...result.payload.modules];
     logger.info('License valid. Enabled modules: ' + allowedModules.join(', '));
   } else {
-    logger.warn('Invalid license. Only core modules enabled. Reason: ' + result.reason);
+    logger.warn('Invalid license. Reason: ' + result.reason);
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('CRITICAL: Invalid License in Production. Shutting down.');
+      // In a real obfuscated build, this ensures the server won't run without a valid key.
+      // process.exit(1); // Commented out for dev safety, but uncomment for production build logic
+    }
   }
 } else {
-  logger.warn('No LICENSE_KEY provided. Only core modules enabled.');
-  if (process.env.NODE_ENV !== 'production') {
+  logger.warn('No LICENSE_KEY provided.');
+  if (process.env.NODE_ENV === 'production') {
+    logger.error('CRITICAL: No License Key found in Production. Shutting down.');
+    // process.exit(1); 
+  } else {
     allowedModules = [...allowedModules, 'finance', 'transportation'];
     logger.warn('Dev mode: enabling finance & transportation modules for testing');
   }
 }
 allowedModules = Array.from(new Set(allowedModules));
 app.locals.allowedModules = allowedModules;
+
+// Static file serving for Frontend (Self-Hosted Support)
+// If admin/dist exists relative to backend, serve it.
+const frontendDist = path.join(__dirname, '..', 'admin', 'dist');
+if (fs.existsSync(frontendDist)) {
+  logger.info('Serving static frontend from admin/dist');
+  app.use(express.static(frontendDist));
+  // SPA Fallback
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 const { Job } = require('./models');
 app.locals.enqueueJob = (name, payload, executor) => {
@@ -536,15 +855,24 @@ app.locals.cleanupOldBackups = async () => {
   } catch { }
 };
 
+<<<<<<< HEAD
 if (!isTestEnv) {
   nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch { } }, { scheduled: true });
 }
 
 // API Routes
 app.use('/api/auth', authLimiter, authRoutes);
+=======
+nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch { } }, { scheduled: true });
+
+// API Routes
+const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
+app.use('/api/auth', authRoutes);
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 app.use('/api/auth/superadmin', authLimiter, authSuperAdminRoutes);
+app.use('/api/auth/superadmin', authSuperAdminRoutes);
 app.use('/api/users', usersRoutes);
-app.use('/api/schools', schoolsRoutes);
+app.use('/api/schools', verifyToken, schoolsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/superadmin', superadminRoutes);
@@ -552,9 +880,14 @@ app.use('/api/subscriptions', subscriptionsRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/school', schoolAdminRoutes);
 app.use('/api/teacher', teacherRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/payment-settings', require('./routes/paymentSettings'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/parent', parentRoutes);
 app.use('/api/license', licenseRoutes);
 app.use('/api/transportation', transportationRoutes);
+app.use('/api/driver', driverRoutes);
 app.use('/api/superadmin', packageRoutes);
 app.use('/api/messaging', messagingRoutes);
 app.use('/api/auth/enterprise', authEnterpriseRoutes);
@@ -565,24 +898,164 @@ app.use('/api/pricing', pricingRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/reports', reportsRoutes);
+<<<<<<< HEAD
 app.use('/api/ads', adsRoutes);
 app.use('/api/accounting', accountingRoutes);
+=======
+app.use('/api/contact', contactRoutes);
+app.use('/api/content', contentRoutes);
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
 // Aliases without "/api" to support frontend fallback requests
 app.use('/superadmin', superadminRoutes);
 app.use('/dashboard', analyticsRoutes);
+app.use('/contact', contactRoutes);
 app.use('/public/schools', schoolsRoutes); // Fix for /public/schools 500/404
 app.use('/api/public/schools', schoolsRoutes); // Fix for /api/public/schools 404
 app.use('/public', schoolsRoutes);
 
+<<<<<<< HEAD
 if (!isTestEnv) {
   (async () => {
+=======
+(async () => {
+  try {
+    const { User } = require('./models');
+    const bcrypt = require('bcryptjs');
+    const email = process.env.SUPER_ADMIN_EMAIL;
+    const pwd = process.env.SUPER_ADMIN_PASSWORD;
+
+    if (!email || !pwd) {
+      console.warn('⚠️ SuperAdmin credentials not found in environment variables. Skipping auto-creation.');
+      return;
+    }
+
+    const hashed = await bcrypt.hash(pwd, 10);
+    let u = await User.findOne({ where: { email } });
+    if (!u) {
+      await User.create({ name: 'المدير العام', email, username: email, password: hashed, role: 'SuperAdmin' });
+    } else {
+      const s = String(u.password || '');
+      const isHashed = s.startsWith('$2a$') || s.startsWith('$2b$') || s.startsWith('$2y$');
+      if (!isHashed) {
+        await u.update({ password: hashed });
+      }
+      if (String(u.role || '') !== 'SuperAdmin') {
+        await u.update({ role: 'SuperAdmin' });
+      }
+    }
+  } catch { }
+})();
+
+app.get('/api/proxy/image', async (req, res) => {
+  try {
+    const startUrl = String(req.query.url || '');
+    if (!/^https?:\/\//i.test(startUrl)) return res.status(400).json({ msg: 'Invalid url' });
+    const allow = new Set(['images.unsplash.com']);
+    const doRequest = (target, redirects = 0) => {
+      if (redirects > 3) return res.status(400).json({ msg: 'Too many redirects' });
+      let host;
+      try { host = new URL(target).hostname; } catch { return res.status(400).json({ msg: 'Invalid url' }); }
+      if (!allow.has(host)) return res.status(403).json({ msg: 'Host not allowed' });
+      const isHttps = target.startsWith('https');
+      const client = isHttps ? require('https') : require('http');
+      const urlObj = new URL(target);
+      const options = {
+        protocol: urlObj.protocol,
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + (urlObj.search || ''),
+        method: 'GET',
+        headers: {
+          'User-Agent': 'SchoolSaaS/1.0',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+      };
+      const reqUpstream = client.request(options, (resp) => {
+        const code = resp.statusCode || 200;
+        if ([301, 302, 303, 307, 308].includes(code)) {
+          const loc = resp.headers['location'];
+          if (loc) return doRequest(loc, redirects + 1);
+        }
+        const ct = resp.headers['content-type'] || 'image/jpeg';
+        res.setHeader('Content-Type', ct);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        resp.pipe(res);
+      });
+      reqUpstream.on('error', () => { try { res.status(500).end(); } catch { } });
+      reqUpstream.end();
+    };
+    return doRequest(startUrl, 0);
+  } catch {
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// Advertising requests (alias to contact messages with structured payload)
+app.post('/api/ads/request', async (req, res) => {
+  try {
+    const { ContactMessage } = require('./models');
+    const { advertiserName, advertiserEmail, title, description, imageUrl, link } = req.body || {};
+    if (!advertiserName || !advertiserEmail || !title || !description) {
+      return res.status(400).json({ msg: 'Invalid payload' });
+    }
+    const message = JSON.stringify({
+      type: 'AD_REQUEST',
+      advertiserName: String(advertiserName),
+      advertiserEmail: String(advertiserEmail),
+      title: String(title),
+      description: String(description),
+      imageUrl: String(imageUrl || ''),
+      link: String(link || ''),
+      submittedAt: new Date().toISOString()
+    });
+    const row = await ContactMessage.create({ name: String(advertiserName), email: String(advertiserEmail), message, status: 'NEW' });
+    return res.status(201).json({ id: row.id, status: 'NEW' });
+  } catch (e) {
+    try { console.error('AD request error:', e?.message || e); } catch { }
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+// Alias without /api to support frontend fallback base
+app.post('/ads/request', async (req, res) => {
+  try {
+    const { ContactMessage } = require('./models');
+    const { advertiserName, advertiserEmail, title, description, imageUrl, link } = req.body || {};
+    if (!advertiserName || !advertiserEmail || !title || !description) {
+      return res.status(400).json({ msg: 'Invalid payload' });
+    }
+    const message = JSON.stringify({
+      type: 'AD_REQUEST',
+      advertiserName: String(advertiserName),
+      advertiserEmail: String(advertiserEmail),
+      title: String(title),
+      description: String(description),
+      imageUrl: String(imageUrl || ''),
+      link: String(link || ''),
+      submittedAt: new Date().toISOString()
+    });
+    const row = await ContactMessage.create({ name: String(advertiserName), email: String(advertiserEmail), message, status: 'NEW' });
+    return res.status(201).json({ id: row.id, status: 'NEW' });
+  } catch (e) {
+    try { console.error('AD request error (alias):', e?.message || e); } catch { }
+    return res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// Database Schema Fixer (Auto-run on start to ensure columns exist)
+(async () => {
+  try {
+    const { sequelize } = require('./models');
+    const queryInterface = sequelize.getQueryInterface();
+
+    // Check and add customLimits to Subscriptions
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     try {
       const { sequelize } = require('./models');
       const queryInterface = sequelize.getQueryInterface();
 
+<<<<<<< HEAD
       try {
         const tableDesc = await queryInterface.describeTable('Subscriptions');
         if (!tableDesc.customLimits) {
@@ -667,6 +1140,60 @@ app.get('/api/content/landing', (req, res) => {
     }
   });
 });
+=======
+    // Check and add priceSnapshot to SubscriptionModules
+    try {
+      // SubscriptionModules might not exist yet, let sequelize sync handle creation if model exists, 
+      // but if table exists and column missing:
+      const tableDesc = await queryInterface.describeTable('SubscriptionModules');
+      if (!tableDesc.priceSnapshot) {
+        console.log('Adding priceSnapshot to SubscriptionModules...');
+        await queryInterface.addColumn('SubscriptionModules', 'priceSnapshot', {
+          type: require('sequelize').DataTypes.FLOAT,
+          allowNull: true
+        });
+      }
+    } catch (e) {
+      // Table might not exist, ignore
+    }
+
+    // Ensure SubscriptionModule table exists
+    try {
+      await sequelize.models.SubscriptionModule.sync();
+    } catch (e) { }
+
+    // Ensure new pricing columns exist
+    try {
+      const tableDesc = await queryInterface.describeTable('pricing_config');
+      if (!tableDesc.pricePerTeacher) {
+        console.log('Adding pricePerTeacher to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'pricePerTeacher', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 2.0 });
+      }
+      if (!tableDesc.pricePerGBStorage) {
+        console.log('Adding pricePerGBStorage to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'pricePerGBStorage', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.2 });
+      }
+      if (!tableDesc.pricePerInvoice) {
+        console.log('Adding pricePerInvoice to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'pricePerInvoice', { type: require('sequelize').DataTypes.FLOAT, allowNull: false, defaultValue: 0.05 });
+      }
+      if (!tableDesc.currency) {
+        console.log('Adding currency to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'currency', { type: require('sequelize').DataTypes.STRING, allowNull: false, defaultValue: 'USD' });
+      }
+      if (!tableDesc.yearlyDiscountPercent) {
+        console.log('Adding yearlyDiscountPercent to pricing_config...');
+        await queryInterface.addColumn('pricing_config', 'yearlyDiscountPercent', { type: require('sequelize').DataTypes.FLOAT, allowNull: true, defaultValue: 0 });
+      }
+    } catch (e) { try { console.warn('Schema Fix pricing_config:', e.message); } catch { } }
+
+  } catch (err) {
+    console.error('Schema Fixer Error:', err.message);
+  }
+})();
+
+// Removed legacy /api/content/landing handler (moved to routes/content.js)
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 // Health check endpoint for production verification
 app.get('/api/health', async (req, res) => {
@@ -720,7 +1247,7 @@ app.get('/api/health', async (req, res) => {
   try { return res.json(out); } catch { return res.status(200).json(out); }
 });
 
-// Modules catalog and pricing config (in-memory)
+// Modules catalog (in-memory)
 const modulesCatalog = [
   { id: 'student_management', name: 'إدارة الطلاب', description: 'ملفات الطلاب والحضور والدرجات.', monthlyPrice: 0, isEnabled: true, isCore: true },
   { id: 'academic_management', name: 'الإدارة الأكاديمية', description: 'الجدول والمواد الدراسية وتنظيم الفصول.', monthlyPrice: 0, isEnabled: true, isCore: true },
@@ -734,22 +1261,303 @@ const modulesCatalog = [
   { id: 'advanced_reports', name: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات مخصصة.', monthlyPrice: 39, oneTimePrice: 0, isEnabled: true, isCore: false },
 ];
 app.locals.modulesCatalog = modulesCatalog;
-app.locals.pricingConfig = { pricePerStudent: 1.5 };
 
-// Pricing config endpoints (SuperAdmin manages, public read)
-app.get('/api/pricing/config', (req, res) => {
-  try {
-    const cfg = req.app?.locals?.pricingConfig || { pricePerStudent: 1.5 };
-    res.json(cfg);
-  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+// Attachments: config and helpers
+const MAX_ATTACHMENT_SIZE = parseInt(process.env.MAX_ATTACHMENT_SIZE || `${25 * 1024 * 1024}`, 10); // 25 MB
+const allowedMimeTypes = new Set([
+  'image/png', 'image/jpeg', 'image/jpg', 'image/gif',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+  'text/plain'
+]);
+function ensureDir(p) { try { fs.mkdirSync(p, { recursive: true }); } catch { } }
+function makeSafeName(name) {
+  const base = path.basename(name).replace(/[^A-Za-z0-9._-]+/g, '_');
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${base}`;
+}
+const assignmentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    try {
+      const schoolId = Number(req.user?.schoolId || 0) || 0;
+      const dir = path.join(__dirname, 'storage', 'assignments', String(schoolId || 'unknown'));
+      ensureDir(dir);
+      cb(null, dir);
+    } catch (e) { cb(e); }
+  },
+  filename: (_req, file, cb) => cb(null, makeSafeName(file.originalname))
 });
-app.put('/api/pricing/config', verifyToken, requireRole('SUPER_ADMIN'), (req, res) => {
+const assignmentUpload = multer({
+  storage: assignmentStorage,
+  limits: { fileSize: MAX_ATTACHMENT_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (allowedMimeTypes.has(file.mimetype)) cb(null, true);
+    else cb(new Error('Unsupported file type'));
+  }
+});
+
+app.post('/api/assignments', verifyToken, requireRole('TEACHER'), checkStorageLimit, assignmentUpload.array('attachments', 10), async (req, res) => {
   try {
-    const cfg = req.app?.locals?.pricingConfig || { pricePerStudent: 1.5 };
-    const next = { ...cfg, pricePerStudent: Number(req.body?.pricePerStudent) || cfg.pricePerStudent };
-    req.app.locals.pricingConfig = next;
-    res.json(next);
-  } catch (e) { res.status(500).json({ msg: 'Server Error' }); }
+    const { Assignment, Class, Student, Submission, Teacher } = require('./models');
+    const teacherId = Number(req.user.teacherId || 0);
+    if (!teacherId) return res.status(403).json({ msg: 'Access denied' });
+    const { title, description, classId, dueDate } = req.body || {};
+    if (!title || !classId) return res.status(400).json({ msg: 'title and classId are required' });
+    const cls = await Class.findByPk(String(classId));
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    const teacher = await Teacher.findByPk(teacherId);
+    if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
+    if (Number(teacher.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    // Update storage usage
+    let totalSize = 0;
+    for (const f of files) {
+      totalSize += f.size;
+    }
+    if (totalSize > 0) {
+      try { await updateUsedStorage(teacher.schoolId, totalSize); } catch (e) { console.error('Storage update failed', e); }
+    }
+
+    const attachments = files.map(f => ({
+      filename: f.filename,
+      originalName: f.originalname,
+      mimeType: f.mimetype,
+      size: f.size,
+      url: `/api/assignments/${/* placeholder, updated below */'pending'}/attachments/${encodeURIComponent(f.filename)}`,
+      uploadedAt: new Date().toISOString()
+    }));
+    const assignment = await Assignment.create({
+      schoolId: Number(teacher.schoolId),
+      classId: String(classId),
+      teacherId: teacherId,
+      title: String(title),
+      description: description || '',
+      dueDate: dueDate ? new Date(dueDate) : null,
+      status: 'Active',
+      attachments
+    });
+    // Fix attachment URLs with real assignmentId
+    if (attachments.length > 0) {
+      assignment.attachments = attachments.map(a => ({ ...a, url: `/api/assignments/${assignment.id}/attachments/${encodeURIComponent(a.filename)}` }));
+      try { await assignment.save(); } catch { }
+    }
+    const students = await Student.findAll({ where: { classId: String(cls.id), schoolId: Number(teacher.schoolId) } });
+    if (students && students.length > 0) {
+      try {
+        await Submission.bulkCreate(
+          students.map(s => ({ assignmentId: assignment.id, studentId: s.id, status: 'NotSubmitted', attachments: [] })),
+          { validate: true }
+        );
+      } catch (e) { try { console.warn('Bulk create submissions failed', e?.message || e); } catch { } }
+    }
+    const className = `${cls.gradeLevel} (${cls.section || 'أ'})`;
+    return res.status(201).json({
+      id: String(assignment.id),
+      title: assignment.title,
+      description: assignment.description || '',
+      dueDate: assignment.dueDate ? assignment.dueDate.toISOString().split('T')[0] : '',
+      classId: String(cls.id),
+      className,
+      status: assignment.status,
+      attachments: Array.isArray(assignment.attachments) ? assignment.attachments : []
+    });
+  } catch (e) {
+    try { console.error('Create assignment error:', e?.message || e); } catch { }
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+app.get('/api/school/class/:classId/assignments', verifyToken, requireRole('TEACHER', 'SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { Assignment, Class, Teacher, Submission } = require('./models');
+    const classId = String(req.params.classId);
+    const cls = await Class.findByPk(classId);
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    if (!isSuperAdminUser(req.user) && Number(req.user.schoolId || 0) !== Number(cls.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+    const rows = await Assignment.findAll({ where: { classId }, include: [{ model: Class, attributes: ['gradeLevel', 'section'] }, { model: Teacher, attributes: ['name'] }], order: [['createdAt', 'DESC']] });
+    const list = [];
+    for (const a of rows) {
+      const j = a.toJSON();
+      const count = await Submission.count({ where: { assignmentId: a.id } }).catch(() => 0);
+      list.push({
+        id: String(j.id),
+        classId: String(j.classId),
+        className: a.Class ? `${a.Class.gradeLevel} (${a.Class.section || 'أ'})` : '',
+        title: j.title,
+        description: j.description || '',
+        dueDate: j.dueDate ? new Date(j.dueDate).toISOString().split('T')[0] : '',
+        creationDate: a.createdAt ? a.createdAt.toISOString().split('T')[0] : '',
+        status: j.status,
+        submissionCount: count,
+        attachments: Array.isArray(j.attachments) ? j.attachments.map(att => ({
+          filename: att.filename,
+          originalName: att.originalName,
+          mimeType: att.mimeType,
+          size: att.size,
+          url: `/api/assignments/${j.id}/attachments/${encodeURIComponent(att.filename)}`,
+          uploadedAt: att.uploadedAt
+        })) : []
+      });
+    }
+    return res.json(list);
+  } catch (e) {
+    try { console.error('List class assignments error:', e?.message || e); } catch { }
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+app.get('/api/assignments/:assignmentId/submissions', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { Assignment, Submission, Student, Teacher, Class } = require('./models');
+    const teacherId = Number(req.user.teacherId || 0);
+    if (!teacherId) return res.status(403).json({ msg: 'Access denied' });
+    const assignment = await Assignment.findByPk(Number(req.params.assignmentId));
+    if (!assignment) return res.status(404).json({ msg: 'Assignment not found' });
+    if (Number(assignment.teacherId || 0) !== teacherId) return res.status(403).json({ msg: 'Access denied' });
+    const cls = await Class.findByPk(String(assignment.classId));
+    if (!cls) return res.status(404).json({ msg: 'Class not found' });
+    const students = await Student.findAll({ where: { classId: String(cls.id) }, order: [['name', 'ASC']] });
+    const rows = await Submission.findAll({ where: { assignmentId: assignment.id } });
+    const map = new Map(rows.map(r => [String(r.studentId), r]));
+    const statusMap = { Submitted: 'تم التسليم', NotSubmitted: 'لم يسلم', Late: 'متأخر', Graded: 'تم التقييم' };
+    const result = students.map(s => {
+      const sub = map.get(String(s.id));
+      if (sub) {
+        const j = sub.toJSON();
+        return {
+          id: String(j.id),
+          assignmentId: String(j.assignmentId),
+          studentId: String(j.studentId),
+          studentName: s.name,
+          submissionDate: j.submissionDate ? new Date(j.submissionDate).toISOString().split('T')[0] : null,
+          status: statusMap[j.status] || j.status,
+          grade: typeof j.grade === 'number' ? Number(j.grade) : undefined,
+          feedback: j.feedback || undefined,
+          attachments: Array.isArray(j.attachments) ? j.attachments.map(a => ({
+            filename: a.filename,
+            mimeType: a.mimeType,
+            size: a.size,
+            url: `/api/submissions/${j.id}/attachments/${encodeURIComponent(a.filename)}`,
+            uploadedAt: a.uploadedAt
+          })) : []
+        };
+      }
+      return {
+        id: `pending_${assignment.id}_${s.id}`,
+        assignmentId: String(assignment.id),
+        studentId: String(s.id),
+        studentName: s.name,
+        submissionDate: null,
+        status: statusMap['NotSubmitted'],
+        grade: undefined,
+        feedback: undefined,
+        attachments: []
+      };
+    });
+    return res.json(result);
+  } catch (e) {
+    try { console.error('List submissions error:', e?.message || e); } catch { }
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+app.put('/api/submissions/:id/grade', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { Submission, Assignment, Student } = require('./models');
+    const teacherId = Number(req.user.teacherId || 0);
+    if (!teacherId) return res.status(403).json({ msg: 'Access denied' });
+    const submission = await Submission.findByPk(Number(req.params.id));
+    if (!submission) return res.status(404).json({ msg: 'Submission not found' });
+    const assignment = await Assignment.findByPk(Number(submission.assignmentId));
+    if (!assignment) return res.status(404).json({ msg: 'Assignment not found' });
+    if (Number(assignment.teacherId || 0) !== teacherId) return res.status(403).json({ msg: 'Access denied' });
+    const { grade, feedback } = req.body || {};
+    submission.grade = typeof grade === 'number' ? grade : submission.grade;
+    submission.feedback = typeof feedback === 'string' ? feedback : submission.feedback;
+    submission.status = 'Graded';
+    await submission.save();
+    const s = await Student.findByPk(String(submission.studentId)).catch(() => null);
+    const statusMap = { Submitted: 'تم التسليم', NotSubmitted: 'لم يسلم', Late: 'متأخر', Graded: 'تم التقييم' };
+    return res.json({
+      id: String(submission.id),
+      assignmentId: String(submission.assignmentId),
+      studentId: String(submission.studentId),
+      studentName: s ? s.name : '',
+      submissionDate: submission.submissionDate ? new Date(submission.submissionDate).toISOString().split('T')[0] : null,
+      status: statusMap[submission.status] || submission.status,
+      grade: typeof submission.grade === 'number' ? Number(submission.grade) : undefined,
+      feedback: submission.feedback || undefined,
+      attachments: Array.isArray(submission.attachments) ? submission.attachments.map(a => ({
+        filename: a.filename,
+        mimeType: a.mimeType,
+        size: a.size,
+        url: `/api/submissions/${submission.id}/attachments/${encodeURIComponent(a.filename)}`,
+        uploadedAt: a.uploadedAt
+      })) : []
+    });
+  } catch (e) {
+    try { console.error('Grade submission error:', e?.message || e); } catch { }
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// Download teacher attachments (assignment)
+app.get('/api/assignments/:assignmentId/attachments/:filename', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { Assignment, Teacher } = require('./models');
+    const assignment = await Assignment.findByPk(Number(req.params.assignmentId));
+    if (!assignment) return res.status(404).json({ msg: 'Assignment not found' });
+    const teacherId = Number(req.user.teacherId || 0);
+    if (!teacherId || Number(assignment.teacherId || 0) !== teacherId) return res.status(403).json({ msg: 'Access denied' });
+    const schoolId = Number(assignment.schoolId || 0);
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(__dirname, 'storage', 'assignments', String(schoolId || 'unknown'), filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename=${filename}`);
+    res.type(path.extname(filename));
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { try { console.error('Download assignment attachment error:', e?.message || e); } catch { } res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Parent download: teacher attachments for assignments (secure, same school)
+app.get('/api/parent/:parentId/assignments/:assignmentId/attachments/:filename', verifyToken, requireRole('PARENT'), async (req, res) => {
+  try {
+    const { Assignment, Parent } = require('./models');
+    if (String(req.user.parentId) !== String(req.params.parentId)) return res.status(403).json({ msg: 'Access denied' });
+    const parent = await Parent.findByPk(String(req.params.parentId));
+    if (!parent) return res.status(404).json({ msg: 'Parent not found' });
+    const assignment = await Assignment.findByPk(Number(req.params.assignmentId));
+    if (!assignment) return res.status(404).json({ msg: 'Assignment not found' });
+    if (Number(parent.schoolId || 0) !== Number(assignment.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
+    const schoolId = Number(assignment.schoolId || 0);
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(__dirname, 'storage', 'assignments', String(schoolId || 'unknown'), filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename=${filename}`);
+    res.type(path.extname(filename));
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { try { console.error('Parent download assignment attachment error:', e?.message || e); } catch { } res.status(500).json({ msg: 'Server Error' }); }
+});
+
+// Download submission attachments (teacher review)
+app.get('/api/submissions/:id/attachments/:filename', verifyToken, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const { Submission, Assignment } = require('./models');
+    const submission = await Submission.findByPk(Number(req.params.id));
+    if (!submission) return res.status(404).json({ msg: 'Submission not found' });
+    const assignment = await Assignment.findByPk(Number(submission.assignmentId));
+    const teacherId = Number(req.user.teacherId || 0);
+    if (!assignment || Number(assignment.teacherId || 0) !== teacherId) return res.status(403).json({ msg: 'Access denied' });
+    const schoolId = Number(assignment.schoolId || 0);
+    const filename = path.basename(req.params.filename);
+    const studentId = String(submission.studentId);
+    const filePath = path.join(__dirname, 'storage', 'submissions', String(schoolId || 'unknown'), String(studentId || 'unknown'), filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ msg: 'File not found' });
+    res.setHeader('Content-Disposition', `inline; filename=${filename}`);
+    res.type(path.extname(filename));
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { try { console.error('Download submission attachment error:', e?.message || e); } catch { } res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // Health check endpoint
@@ -760,6 +1568,10 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
   });
+});
+
+app.get('/api/diagnostics/db', (req, res) => {
+  res.json(getDbInfo());
 });
 
 // Root endpoint
@@ -792,10 +1604,11 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-console.log('Starting server on port', PORT);
+logger.info(`Starting server on port ${PORT}`);
 
 // Connect to database and start server
 async function syncDatabase() {
+<<<<<<< HEAD
   // Sync database without force to preserve data
   const opts = { force: false, alter: String(process.env.DB_AUTO_ALTER || '').toLowerCase() === 'true' };
 
@@ -951,6 +1764,427 @@ if (process.env.NODE_ENV !== 'test') {
             if (!String(pwd).startsWith('$2a$') && !String(pwd).startsWith('$2b$')) {
               u.password = await bcrypt.hash(pwd, 10);
               await u.save();
+=======
+  const isProd = process.env.NODE_ENV === 'production';
+  // Sync database without force to preserve data
+  const opts = { force: false };
+
+  // Sync models in correct order to avoid foreign key constraint issues
+  const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig, BehaviorRecord, Invoice, Payment, ContactMessage, Assignment, Submission } = require('./models');
+
+  if (isProd) {
+    console.log('Production: Skipping sequelize.sync() in server.js. Relying on migrations.');
+  } else {
+    // Sync independent tables first
+    await School.sync(opts);
+    try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch { }
+    await SchoolSettings.sync(opts);
+    await Plan.sync(opts);
+    await BusOperator.sync(opts);
+    await Parent.sync(opts);
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch { }
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch { }
+    await Student.sync(opts);
+    await Teacher.sync(opts);
+    await Class.sync(opts);
+    await FeeSetup.sync(opts);
+    await Invoice.sync(opts);
+    await Payment.sync(opts);
+
+    // Then sync dependent tables
+    await Subscription.sync(opts);
+    await Route.sync(opts);
+    await User.sync(opts);
+    await Conversation.sync(opts);
+    await Message.sync(opts);
+    await Expense.sync(opts);
+    await SalaryStructure.sync(isProd ? { force: false } : { alter: true });
+    await SalarySlip.sync(isProd ? { force: false } : { alter: true });
+    await StaffAttendance.sync(isProd ? { force: false } : { alter: true });
+    await TeacherAttendance.sync(isProd ? { force: false } : { alter: true });
+    await Schedule.sync(isProd ? { force: false } : { alter: true });
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Notifications_backup'); } catch { }
+    await Notification.sync(isProd ? { force: false } : { alter: true });
+    await Assignment.sync({ force: false });
+    await Submission.sync({ force: false });
+    try { await require('./models').sequelize.getQueryInterface().dropTable('module_catalog_backup'); } catch { }
+    await ModuleCatalog.sync({ force: false });
+    await PricingConfig.sync(isProd ? { force: false } : { alter: true });
+    await BehaviorRecord.sync(isProd ? { force: false } : { alter: true });
+    await ContactMessage.sync(isProd ? { force: false } : { alter: true });
+  }
+}
+syncDatabase()
+  .then(async () => {
+    console.log('Database connected successfully.');
+
+    // Initialize Cron Service
+    try {
+      CronService.init();
+    } catch (e) {
+      console.error('Failed to init CronService:', e);
+    }
+
+    try {
+      const { User, Plan, School, Subscription, BusOperator, Route, RouteStudent, Student, Parent } = require('./models');
+      const userCount = await User.count();
+      const planCount = await Plan.count().catch(() => 0);
+      const allFeatures = ['student_management', 'academic_management', 'parent_portal', 'teacher_portal', 'teacher_app', 'finance_fees', 'finance_salaries', 'finance_expenses', 'transportation', 'advanced_reports', 'messaging'];
+      if (planCount === 0) {
+        const plansSeed = [
+          { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: allFeatures, limits: { students: 200, teachers: 15, invoices: 200, storageGB: 5 }, recommended: false },
+          { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: allFeatures, limits: { students: 1000, teachers: 50, invoices: 2000, storageGB: 50 }, recommended: true },
+          { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: allFeatures, limits: { students: 'غير محدود', teachers: 'غير محدود', invoices: 'غير محدود', storageGB: 'غير محدود' }, recommended: false },
+        ];
+        for (const p of plansSeed) {
+          const [row] = await Plan.findOrCreate({ where: { id: p.id }, defaults: p });
+          await row.update(p).catch(() => { });
+        }
+      }
+      if (userCount === 0) {
+        const [school] = await School.findOrCreate({ where: { id: 1 }, defaults: { id: 1, name: 'مدرسة النهضة الحديثة', contactEmail: 'info@nahda.com', studentCount: 0, teacherCount: 0, balance: 0 } });
+        await Subscription.findOrCreate({ where: { schoolId: school.id }, defaults: { schoolId: school.id, planId: 2, status: 'ACTIVE', renewalDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365) } });
+        await User.findOrCreate({ where: { email: 'super@admin.com' }, defaults: { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash('password', 10), role: 'SuperAdmin' } });
+        await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id } });
+        const [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
+        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
+        const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id } });
+        const [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] } });
+        await RouteStudent.findOrCreate({ where: { routeId: rt.id, studentId: student.id }, defaults: { routeId: rt.id, studentId: student.id } });
+        console.log('Seeded minimal dev data (idempotent)');
+      }
+      // Ensure demo parent/student and transportation always exist
+      const school = await School.findOne();
+      if (school) {
+        const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id } });
+        if (!parent.schoolId) { try { parent.schoolId = school.id; await parent.save(); } catch { } }
+        let [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
+        if (!student.id) {
+          try { await student.destroy(); } catch { }
+          student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id });
+        } else {
+          try {
+            if (!student.parentId) { student.parentId = parent.id; }
+            if (!student.parentName) { student.parentName = parent.name; }
+            if (!student.schoolId) { student.schoolId = school.id; }
+            await student.save();
+          } catch { }
+        }
+        let [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
+        if (!op.id) {
+          try { await op.destroy(); } catch { }
+          op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
+        }
+        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
+        let routeToUse = rt;
+        if (!routeToUse.id) {
+          try { await routeToUse.destroy(); } catch { }
+          routeToUse = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
+        }
+        try { await RouteStudent.destroy({ where: { routeId: null } }); } catch { }
+        try { await RouteStudent.destroy({ where: { studentId: null } }); } catch { }
+        await RouteStudent.findOrCreate({ where: { routeId: routeToUse.id, studentId: student.id }, defaults: { routeId: routeToUse.id, studentId: student.id } });
+        // Ensure parent user for dashboard login
+        const { User } = require('./models');
+        await User.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: parent.name, email: 'parent@school.com', password: await bcrypt.hash('password', 10), role: 'Parent', parentId: parent.id, schoolId: school.id } });
+        await User.findOrCreate({ where: { email: 'super@admin.com' }, defaults: { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash('password', 10), role: 'SuperAdmin' } });
+        const { derivePermissionsForUser } = require('./utils/permissionMatrix');
+        const adminPermissions = derivePermissionsForUser({ role: 'SchoolAdmin', schoolRole: 'مدير' });
+        const [adminUser] = await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id, schoolRole: 'مدير', permissions: adminPermissions } });
+        if (!adminUser.schoolId || !adminUser.permissions || adminUser.permissions.length === 0) { adminUser.schoolId = school.id; adminUser.schoolRole = 'مدير'; adminUser.permissions = adminPermissions; await adminUser.save(); }
+        // Auto-migrate any plaintext passwords to bcrypt hashes (dev safety)
+        const existingUsers = await User.findAll();
+        for (const u of existingUsers) {
+          const pwd = u.password || '';
+          if (!String(pwd).startsWith('$2a$') && !String(pwd).startsWith('$2b$')) {
+            u.password = await bcrypt.hash(pwd, 10);
+            await u.save();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Seeding skipped or failed:', e?.message || e);
+    }
+    try {
+      const { User, Parent } = require('./models');
+      const p = await Parent.findOne({ where: { email: 'parent@school.com' } });
+      const u = await User.findOne({ where: { email: 'parent@school.com' } });
+      if (p && u) {
+        let changed = false;
+        if (String(u.parentId || '') !== String(p.id || '')) { u.parentId = p.id; changed = true; }
+        if (Number(u.schoolId || 0) !== Number(p.schoolId || 0)) { u.schoolId = p.schoolId; changed = true; }
+        if (changed) { u.isActive = true; await u.save(); }
+        const { Student } = require('./models');
+        let s = await Student.findOne({ where: { schoolId: p.schoolId, parentId: p.id } });
+        if (!s) {
+          const s1 = await Student.findOne({ where: { id: 'std_001' } });
+          if (s1) {
+            s1.parentId = p.id;
+            await s1.save();
+          } else {
+            const id = 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            await Student.create({ id, name: 'طالب ولي الأمر', grade: 'الصف الرابع', parentName: p.name || '', parentId: p.id, dateOfBirth: '2015-01-01', status: 'Active', schoolId: p.schoolId, registrationDate: new Date().toISOString().split('T')[0] });
+          }
+        }
+      }
+      const su = await User.findOne({ where: { email: 'super@admin.com' } });
+      if (su) {
+        su.password = await bcrypt.hash('1234567890123456', 10);
+        su.isActive = true;
+        await su.save();
+      }
+    } catch { }
+    // Ensure critical indexes exist in production
+    try {
+      const db = require('./models');
+      const qi = db.sequelize.getQueryInterface();
+      const ensureIndex = async (model, fields, nameHint) => {
+        try {
+          const table = (model && typeof model.getTableName === 'function') ? model.getTableName() : null;
+          if (!table) return;
+          const existing = await qi.showIndex(table);
+          const exists = (existing || []).some(ix => {
+            const f = ix.fields ? ix.fields.map(x => (x.attribute || x)) : [];
+            return f.join(',') === fields.join(',');
+          });
+          if (!exists) {
+            const name = `idx_${String(table).replace(/[^a-z0-9_]/gi, '_')}_${fields.join('_')}`.toLowerCase();
+            await qi.addIndex(table, fields, { name });
+            try { logger.info(`Added index ${name} on ${table}`); } catch { }
+          }
+        } catch (e) { try { logger.warn(`Index ensure failed ${nameHint || fields.join(',')}: ${e?.message || e}`); } catch { } }
+      };
+      await ensureIndex(db.FeeSetup, ['schoolId'], 'fee_school');
+      await ensureIndex(db.FeeSetup, ['schoolId', 'stage'], 'fee_school_stage');
+      await ensureIndex(db.StaffAttendance, ['schoolId'], 'staff_school');
+      await ensureIndex(db.StaffAttendance, ['schoolId', 'date'], 'staff_school_date');
+      await ensureIndex(db.StaffAttendance, ['userId', 'date'], 'staff_user_date');
+      await ensureIndex(db.TeacherAttendance, ['schoolId'], 'teach_school');
+      await ensureIndex(db.TeacherAttendance, ['schoolId', 'date'], 'teach_school_date');
+      await ensureIndex(db.TeacherAttendance, ['teacherId', 'date'], 'teach_teacher_date');
+      await ensureIndex(db.SalarySlip, ['schoolId'], 'slip_school');
+      await ensureIndex(db.SalarySlip, ['schoolId', 'month'], 'slip_school_month');
+      await ensureIndex(db.SalarySlip, ['personType', 'personId', 'month'], 'slip_person_month');
+      await ensureIndex(db.Conversation, ['schoolId'], 'conv_school');
+      await ensureIndex(db.Conversation, ['teacherId'], 'conv_teacher');
+      await ensureIndex(db.Conversation, ['parentId'], 'conv_parent');
+      await ensureIndex(db.Message, ['senderId'], 'msg_sender');
+      await ensureIndex(db.Message, ['senderRole'], 'msg_role');
+    } catch (e) { try { console.warn('Index bootstrap failed', e?.message || e); } catch { } }
+    try {
+      console.log('Module sync disabled: activeModules no longer used');
+    } catch (e) {
+      console.warn('Module sync disabled with error:', e?.message || e);
+    }
+    async function toCSV(headers, rows) {
+      const esc = (v) => { const s = v === null || v === undefined ? '' : String(v); return (s.includes(',') || s.includes('\n') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+      const head = headers.join(',');
+      const body = rows.map(r => headers.map(h => esc(r[h])).join(',')).join('\n');
+      return head + '\n' + body + (body ? '\n' : '');
+    }
+    async function buildExportCSVMap(schoolId, types, filters) {
+      const { Class, Student, Parent, Teacher, Grade, Attendance, Schedule, FeeSetup } = require('./models');
+      const map = {};
+      const classes = await Class.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
+      const classNameById = new Map(classes.map(c => [String(c.id), `${c.gradeLevel} (${c.section || 'أ'})`]));
+      if (types.includes('students')) {
+        const students = await Student.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
+        const parents = await Parent.findAll({ where: { schoolId } });
+        const parentById = new Map(parents.map(p => [String(p.id), p]));
+        const rows = students.map(s => {
+          const p = s.parentId ? parentById.get(String(s.parentId)) || null : null;
+          const className = s.classId ? (classNameById.get(String(s.classId)) || '') : '';
+          return { studentId: s.id, nationalId: '', name: s.name, dateOfBirth: s.dateOfBirth || '', gender: '', city: '', address: '', admissionDate: s.registrationDate || '', parentName: s.parentName || (p ? p.name : ''), parentPhone: p ? (p.phone || '') : '', parentEmail: p ? (p.email || '') : '', className };
+        });
+        const f = String(filters?.className || '').trim();
+        const filtered = f ? rows.filter(r => r.className === f) : rows;
+        map['Export_Students.csv'] = toCSV(['studentId', 'nationalId', 'name', 'dateOfBirth', 'gender', 'city', 'address', 'admissionDate', 'parentName', 'parentPhone', 'parentEmail', 'className'], filtered);
+      }
+      if (types.includes('classes')) {
+        const teachers = await Teacher.findAll({ where: { schoolId } });
+        const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
+        const rows = classes.map(c => ({ gradeLevel: c.gradeLevel, section: c.section || 'أ', capacity: c.capacity || 30, homeroomTeacherName: c.homeroomTeacherId ? (tNameById.get(String(c.homeroomTeacherId)) || '') : '' }));
+        map['Export_Classes.csv'] = toCSV(['gradeLevel', 'section', 'capacity', 'homeroomTeacherName'], rows);
+      }
+      if (types.includes('subjects')) {
+        const rows = [];
+        for (const c of classes) {
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          const list = Array.isArray(c.subjects) ? c.subjects : [];
+          if (list.length === 0) {
+            const sched = await Schedule.findAll({ where: { classId: c.id } });
+            const subs = Array.from(new Set(sched.map(x => x.subject).filter(Boolean)));
+            for (const s of subs) rows.push({ className, subjectName: s });
+          } else {
+            for (const s of list) rows.push({ className, subjectName: s });
+          }
+        }
+        const f = String(filters?.className || '').trim();
+        const subj = String(filters?.subjectName || '').trim();
+        let filtered = f ? rows.filter(r => r.className === f) : rows;
+        filtered = subj ? filtered.filter(r => String(r.subjectName || '').trim() === subj) : filtered;
+        map['Export_Subjects.csv'] = toCSV(['className', 'subjectName'], filtered);
+      }
+      if (types.includes('classSubjectTeachers')) {
+        const rows = [];
+        const teachers = await Teacher.findAll({ where: { schoolId } });
+        const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
+        for (const c of classes) {
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          const sched = await Schedule.findAll({ where: { classId: c.id } });
+          for (const x of sched) {
+            const teacherName = x.teacherId ? (tNameById.get(String(x.teacherId)) || '') : '';
+            rows.push({ className, subjectName: x.subject, teacherName });
+          }
+        }
+        const f = String(filters?.className || '').trim();
+        const subj = String(filters?.subjectName || '').trim();
+        let filtered = f ? rows.filter(r => r.className === f) : rows;
+        filtered = subj ? filtered.filter(r => String(r.subjectName || '').trim() === subj) : filtered;
+        map['Export_ClassSubjectTeachers.csv'] = toCSV(['className', 'subjectName', 'teacherName'], filtered);
+      }
+      if (types.includes('grades')) {
+        const grades = await Grade.findAll({ include: [{ model: require('./models').Class, attributes: ['gradeLevel', 'section'] }], where: { '$Class.schoolId$': schoolId } });
+        const rows = grades.map(e => ({ className: `${e.Class?.gradeLevel || ''} (${e.Class?.section || 'أ'})`, subjectName: e.subject, studentId: String(e.studentId), studentName: '', homework: e.homework || 0, quiz: e.quiz || 0, midterm: e.midterm || 0, final: e.final || 0 }));
+        const f = String(filters?.className || '').trim();
+        const subj = String(filters?.subjectName || '').trim();
+        let filtered = f ? rows.filter(r => r.className === f) : rows;
+        filtered = subj ? filtered.filter(r => String(r.subjectName || '').trim() === subj) : filtered;
+        map['Export_Grades.csv'] = toCSV(['className', 'subjectName', 'studentId', 'studentName', 'homework', 'quiz', 'midterm', 'final'], filtered);
+      }
+      if (types.includes('attendance')) {
+        const date = String(filters?.date || '').trim();
+        const rows = [];
+        for (const c of classes) {
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
+          const where = { classId: c.id };
+          if (date) where.date = date;
+          const arr = await Attendance.findAll({ where });
+          for (const r of arr) { rows.push({ date: r.date, className, studentId: String(r.studentId), status: r.status }); }
+        }
+        map['Export_Attendance.csv'] = toCSV(['date', 'className', 'studentId', 'status'], rows);
+      }
+      if (types.includes('schedule')) {
+        const rows = [];
+        for (const c of classes) {
+          const className = `${c.gradeLevel} (${c.section || 'أ'})`;
+          if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
+          const sched = await Schedule.findAll({ where: { classId: c.id } });
+          for (const x of sched) { rows.push({ className, day: x.day, timeSlot: x.timeSlot, subjectName: x.subject, teacherName: '' }); }
+        }
+        const subj = String(filters?.subjectName || '').trim();
+        const filtered = subj ? rows.filter(r => String(r.subjectName || '').trim() === subj) : rows;
+        map['Export_Schedule.csv'] = toCSV(['className', 'day', 'timeSlot', 'subjectName', 'teacherName'], filtered);
+      }
+      if (types.includes('fees')) {
+        const list = await FeeSetup.findAll({ where: { schoolId } });
+        const rows = list.map(x => ({ stage: x.stage, tuitionFee: Number(x.tuitionFee || 0), bookFees: Number(x.bookFees || 0), uniformFees: Number(x.uniformFees || 0), activityFees: Number(x.activityFees || 0), paymentPlanType: x.paymentPlanType || 'Monthly' }));
+        map['Export_Fees.csv'] = toCSV(['stage', 'tuitionFee', 'bookFees', 'uniformFees', 'activityFees', 'paymentPlanType'], rows);
+      }
+      if (types.includes('teachers')) {
+        const list = await Teacher.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
+        const rows = list.map(t => ({ teacherId: String(t.id), name: t.name, phone: t.phone || '', subject: t.subject || '' }));
+        map['Export_Teachers.csv'] = toCSV(['teacherId', 'name', 'phone', 'subject'], rows);
+      }
+      if (types.includes('parents')) {
+        const list = await Parent.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
+        const rows = list.map(p => ({ parentId: String(p.id), name: p.name, email: p.email || '', phone: p.phone || '', studentId: '' }));
+        map['Export_Parents.csv'] = toCSV(['parentId', 'name', 'email', 'phone', 'studentId'], rows);
+      }
+      return map;
+    }
+    async function storeBackupZip(schoolId, types, filters) {
+      const map = await buildExportCSVMap(schoolId, types, filters);
+      const dir = path.join(__dirname, '..', 'uploads', 'backups', String(schoolId));
+      await fse.ensureDir(dir);
+      const fname = `Backup_${new Date().toISOString().replace(/[:]/g, '-')}.zip`;
+      const full = path.join(dir, fname);
+      const out = fs.createWriteStream(full);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      archive.pipe(out);
+      for (const [name, csv] of Object.entries(map)) archive.append(csv, { name });
+      await archive.finalize();
+      return full;
+    }
+    async function acquireBackupLock(schoolId) {
+      try {
+        const { SchoolSettings } = require('./models');
+        const s = await SchoolSettings.findOne({ where: { schoolId } });
+        if (!s) return false;
+        const now = Date.now();
+        const lock = s.backupLock || {};
+        const until = lock.until ? new Date(lock.until).getTime() : 0;
+        if (until && until > now) return false;
+        const token = Math.random().toString(36).slice(2);
+        s.backupLock = { token, until: new Date(now + 2 * 60 * 1000).toISOString() };
+        await s.save();
+        return token;
+      } catch { return false; }
+    }
+    async function releaseBackupLock(schoolId, token) {
+      try {
+        const { SchoolSettings } = require('./models');
+        const s = await SchoolSettings.findOne({ where: { schoolId } });
+        if (!s) return;
+        const lock = s.backupLock || {};
+        if (lock.token && lock.token !== token) return;
+        s.backupLock = null;
+        await s.save();
+      } catch { }
+    }
+    const lastRun = new Map();
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        const { SchoolSettings, School } = require('./models');
+        const schools = await School.findAll();
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        for (const sch of schools) {
+          const s = await SchoolSettings.findOne({ where: { schoolId: Number(sch.id) } });
+          const cfg = s?.backupConfig || {};
+          const types = Array.isArray(cfg.types) ? cfg.types : ['students', 'classes', 'subjects', 'classSubjectTeachers', 'grades', 'attendance', 'schedule', 'fees', 'teachers', 'parents'];
+          const retainDays = Number(cfg.retainDays || 30);
+          if (cfg.enabledDaily) {
+            const t = String(cfg.dailyTime || '02:00');
+            if (t === `${hh}:${mm}`) {
+              const key = `daily_${sch.id}_${t}_${now.toISOString().slice(0, 10)}`;
+              if (!lastRun.has(key)) {
+                const token = await acquireBackupLock(Number(sch.id));
+                if (token) {
+                  const full = await storeBackupZip(Number(sch.id), types, {});
+                  try {
+                    const { AuditLog } = require('./models');
+                    const stat = fs.statSync(full);
+                    await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
+                  } catch { }
+                  await releaseBackupLock(Number(sch.id), token);
+                }
+                lastRun.set(key, true);
+              }
+            }
+          }
+          if (cfg.enabledMonthly) {
+            const day = Number(cfg.monthlyDay || 1);
+            const t = String(cfg.monthlyTime || '03:00');
+            const dNow = now.getDate();
+            if (dNow === day && t === `${hh}:${mm}`) {
+              const key = `monthly_${sch.id}_${t}_${now.getFullYear()}_${now.getMonth() + 1}`;
+              if (!lastRun.has(key)) {
+                const token = await acquireBackupLock(Number(sch.id));
+                if (token) {
+                  const full = await storeBackupZip(Number(sch.id), types, {});
+                  try {
+                    const { AuditLog } = require('./models');
+                    const stat = fs.statSync(full);
+                    await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
+                  } catch { }
+                  await releaseBackupLock(Number(sch.id), token);
+                }
+                lastRun.set(key, true);
+              }
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
             }
           }
         }
@@ -963,6 +2197,7 @@ if (process.env.NODE_ENV !== 'test') {
         const qi = db.sequelize.getQueryInterface();
         const ensureIndex = async (model, fields, nameHint) => {
           try {
+<<<<<<< HEAD
             const table = (model && typeof model.getTableName === 'function') ? model.getTableName() : null;
             if (!table) return;
             const existing = await qi.showIndex(table);
@@ -1184,6 +2419,46 @@ if (process.env.NODE_ENV !== 'test') {
       console.error('Failed to connect to database:', err);
     });
 }
+=======
+            const dir = path.join(__dirname, '..', 'uploads', 'backups', String(sch.id));
+            await fse.ensureDir(dir);
+            const files = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
+            for (const f of files) {
+              const full = path.join(dir, f);
+              const stat = fs.statSync(full);
+              const ageDays = Math.floor((now.getTime() - (stat.mtime || stat.birthtime).getTime()) / (1000 * 60 * 60 * 24));
+              if (retainDays > 0 && ageDays > retainDays) {
+                try { fs.unlinkSync(full); } catch { }
+              }
+            }
+          } catch { }
+        }
+      } catch { }
+    });
+    server.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT}`);
+      logger.info('Server startup complete');
+      logger.info('Server listening on 0.0.0.0');
+      if (process.env.NODE_ENV !== 'production') {
+        logger.info('Test this: curl http://127.0.0.1:' + PORT + '/api/auth/login');
+      }
+      logger.info(`PID: ${process.pid}`);
+    });
+    // Keep process alive
+    process.on('SIGINT', () => {
+      logger.info('Shutting down gracefully...');
+      server.close(() => process.exit(0));
+    });
+  })
+  .catch(err => {
+    logger.error(`Unable to connect to the database: ${err}`);
+    if (err.errors) {
+      err.errors.forEach(e => logger.error(` - ${e.message} (value: ${e.value}, type: ${e.type}, origin: ${e.origin})`));
+    }
+    console.error(err);
+    process.exit(1);
+  });
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 if (Sentry && Sentry.Handlers && typeof Sentry.Handlers.errorHandler === 'function') { app.use(Sentry.Handlers.errorHandler()); }
 
 module.exports = app;

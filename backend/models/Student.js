@@ -38,6 +38,18 @@ const Student = sequelize.define('Student', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  branchId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  stageId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  departmentId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   homeLocation: {
     type: DataTypes.JSON,
     allowNull: true,
@@ -50,7 +62,10 @@ const Student = sequelize.define('Student', {
     { fields: ['grade'] },
     { fields: ['status'] },
     { fields: ['schoolId', 'status'] },
-    { fields: ['classId'] }
+    { fields: ['classId'] },
+    { fields: ['schoolId', 'branchId'] },
+    { fields: ['schoolId', 'stageId'] },
+    { fields: ['schoolId', 'departmentId'] }
   ]
 });
 

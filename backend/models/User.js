@@ -61,7 +61,11 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
   role: {
+<<<<<<< HEAD
     type: DataTypes.ENUM('SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor', 'SchoolAdmin', 'Teacher', 'Parent', 'Staff', 'Accountant'),
+=======
+    type: DataTypes.ENUM('SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor', 'SchoolAdmin', 'Teacher', 'Parent', 'Staff', 'Driver'),
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     allowNull: false,
   },
   schoolId: {

@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { formatCurrency } = require('../i18n/config');
 
 class EmailService {
   constructor() {
@@ -13,7 +14,7 @@ class EmailService {
     });
   }
 
-  async sendPaymentReceipt(toEmail, studentName, amount, currency = '$', receiptId, date, schoolId = null) {
+  async sendPaymentReceipt(toEmail, studentName, amount, currency = 'USD', receiptId, date, schoolId = null) {
     if (!toEmail) return false;
 
     let transporter = this.transporter;
@@ -64,7 +65,7 @@ class EmailService {
             </tr>
             <tr>
               <td style="padding: 10px; border: 1px solid #dee2e6;">المبلغ</td>
-              <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>${amount} ${currency}</strong></td>
+              <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>${typeof amount === 'number' ? formatCurrency(amount, 'ar', currency) : amount}</strong></td>
             </tr>
             <tr style="background-color: #f8f9fa;">
               <td style="padding: 10px; border: 1px solid #dee2e6;">رقم السند</td>

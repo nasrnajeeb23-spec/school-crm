@@ -5,7 +5,6 @@ import { UsersIcon, StudentsIcon, ClassesIcon as BookIcon, PlusIcon, ClassesIcon
 import EditClassRosterModal from '../components/EditClassRosterModal';
 import AddClassModal from '../components/AddClassModal';
 import { useToast } from '../contexts/ToastContext';
-import { useAppContext } from '../contexts/AppContext';
 import EmptyState from '../components/EmptyState';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { Teacher } from '../types';
@@ -25,7 +24,10 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId, schoolSettings }) =
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { addToast } = useToast();
+<<<<<<< HEAD
   // const { schoolSettings } = useAppContext(); // Removed as we use prop now
+=======
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   const [addDefaults, setAddDefaults] = useState<{ stage?: string; grade?: string } | null>(null);
   const [stageFilter, setStageFilter] = useState<string>('');
   const [gradeFilterUI, setGradeFilterUI] = useState<string>('');
@@ -604,6 +606,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId, schoolSettings }) =
         />
       )}
       {isAddModalOpen && (
+<<<<<<< HEAD
         <AddClassModal
           schoolId={schoolId}
           onClose={() => setIsAddModalOpen(false)}
@@ -612,6 +615,15 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId, schoolSettings }) =
           defaultGrade={addDefaults?.grade}
           teachers={teachers}
           schoolSettings={schoolSettings}
+=======
+        <AddClassModal 
+            schoolId={schoolId}
+            schoolSettings={schoolSettings}
+            onClose={() => setIsAddModalOpen(false)}
+            onSave={handleAddClass}
+            defaultStage={addDefaults?.stage}
+            defaultGrade={addDefaults?.grade}
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         />
       )}
       {isRolloverOpen && (

@@ -41,6 +41,11 @@ const Payment = sequelize.define('Payment', {
   recordedBy: {
     type: DataTypes.INTEGER, // User ID of the admin/staff who recorded it
     allowNull: true,
+  },
+  currencyCode: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'SAR',
   }
 }, {
   tableName: 'payments',

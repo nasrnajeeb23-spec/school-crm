@@ -71,6 +71,7 @@ async function run(){
   const classesRes = await req('GET','/api/school/1/classes', { Authorization: 'Bearer ' + newAccess });
   const classes = classesRes.ok ? JSON.parse(classesRes.body) : [];
   let classId = classes[0] ? classes[0].id : null;
+<<<<<<< HEAD
   const randomPhone = '050' + String(Math.floor(1000000 + Math.random() * 9000000));
   const randomName = 'معلم smoke ' + Math.random().toString(36).slice(2,6);
   const t1 = await req('POST','/api/school/1/teachers', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: randomName, subject: 'الرياضيات', phone: randomPhone }));
@@ -85,6 +86,23 @@ async function run(){
   } else {
     const tData = JSON.parse(t1.body);
     tid = tData.id;
+=======
+  const teachersRes = await req('GET','/api/school/1/teachers', { Authorization: 'Bearer ' + newAccess });
+  const teachers = teachersRes.ok ? JSON.parse(teachersRes.body) : [];
+  let tid = teachers[0] ? teachers[0].id : null;
+  if (!tid) {
+    const rand = String(Date.now()).slice(-8);
+    const t1 = await req('POST','/api/school/1/teachers', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: `معلم جدول ${rand}`, subject: 'الرياضيات', phone: `050${rand}` }));
+    if (t1.ok) {
+      const tData = JSON.parse(t1.body);
+      tid = tData.id;
+    } else {
+      const t2 = await req('GET','/api/school/1/teachers', { Authorization: 'Bearer ' + newAccess });
+      const tList = t2.ok ? JSON.parse(t2.body) : [];
+      tid = tList[0] ? tList[0].id : null;
+      if (!tid) throw new Error('create teacher failed');
+    }
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   }
   if (!classId) {
     const crtClass = await req('POST','/api/school/1/classes', { 'Content-Type': 'application/json', Authorization: 'Bearer ' + newAccess }, JSON.stringify({ name: 'فصل اختبار', gradeLevel: 'الصف الأول', homeroomTeacherId: String(tid), capacity: 30, subjects: ['الرياضيات'] }));

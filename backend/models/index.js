@@ -42,6 +42,7 @@ const Submission = require('./Submission');
 const SubscriptionModule = require('./SubscriptionModule');
 const CommunicationUsage = require('./CommunicationUsage');
 const ContactMessage = require('./ContactMessage');
+<<<<<<< HEAD
 const InvitationLog = require('./InvitationLog');
 const AdRequest = require('./AdRequest');
 
@@ -51,6 +52,20 @@ const JournalEntry = require('./JournalEntry');
 const JournalEntryLine = require('./JournalEntryLine');
 const FiscalPeriod = require('./FiscalPeriod');
 
+=======
+const RbacRole = require('./RbacRole');
+const RbacPermission = require('./RbacPermission');
+const RbacRolePermission = require('./RbacRolePermission');
+const RbacScope = require('./RbacScope');
+const RbacUserRoleScope = require('./RbacUserRoleScope');
+const TeacherClassSubjectAssignment = require('./TeacherClassSubjectAssignment');
+const ParentStudent = require('./ParentStudent');
+const DriverRoute = require('./DriverRoute');
+const SchoolTransaction = require('./SchoolTransaction');
+const LandingPageContent = require('./LandingPageContent');
+const UsageSnapshot = require('./UsageSnapshot');
+const PaymentMethod = require('./PaymentMethod');
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 // Define associations
 // School <-> Subscription (One-to-One)
@@ -101,6 +116,13 @@ Class.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 Teacher.hasOne(Class, { as: 'HomeroomClass', foreignKey: 'homeroomTeacherId', onDelete: 'SET NULL' });
 Class.belongsTo(Teacher, { as: 'HomeroomTeacher', foreignKey: 'homeroomTeacherId', onDelete: 'SET NULL' });
 
+School.hasMany(TeacherClassSubjectAssignment, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+TeacherClassSubjectAssignment.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+Teacher.hasMany(TeacherClassSubjectAssignment, { foreignKey: 'teacherId', onDelete: 'CASCADE', hooks: true });
+TeacherClassSubjectAssignment.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'CASCADE' });
+Class.hasMany(TeacherClassSubjectAssignment, { foreignKey: 'classId', onDelete: 'CASCADE', hooks: true });
+TeacherClassSubjectAssignment.belongsTo(Class, { foreignKey: 'classId', onDelete: 'CASCADE' });
+
 
 // School <-> Parent (One-to-Many)
 School.hasMany(Parent, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
@@ -109,6 +131,13 @@ Parent.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 // Parent <-> Student (One-to-Many, a parent can have multiple children)
 Parent.hasMany(Student, { foreignKey: 'parentId', onDelete: 'SET NULL' });
 Student.belongsTo(Parent, { foreignKey: 'parentId', onDelete: 'SET NULL' });
+
+School.hasMany(ParentStudent, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+ParentStudent.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+Parent.hasMany(ParentStudent, { foreignKey: 'parentId', onDelete: 'CASCADE', hooks: true });
+ParentStudent.belongsTo(Parent, { foreignKey: 'parentId', onDelete: 'CASCADE' });
+Student.hasMany(ParentStudent, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
+ParentStudent.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
 
 // Student <-> Invoice (One-to-Many)
 Student.hasMany(Invoice, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
@@ -184,6 +213,9 @@ Schedule.belongsTo(Teacher, { foreignKey: 'teacherId', onDelete: 'SET NULL' });
 School.hasMany(BusOperator, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 BusOperator.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
+User.hasOne(BusOperator, { foreignKey: 'userId', onDelete: 'SET NULL' });
+BusOperator.belongsTo(User, { foreignKey: 'userId', onDelete: 'SET NULL' });
+
 School.hasMany(Route, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 Route.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 BusOperator.hasMany(Route, { foreignKey: 'busOperatorId', onDelete: 'CASCADE', hooks: true });
@@ -193,6 +225,13 @@ Route.hasMany(RouteStudent, { foreignKey: 'routeId', onDelete: 'CASCADE', hooks:
 RouteStudent.belongsTo(Route, { foreignKey: 'routeId', onDelete: 'CASCADE' });
 Student.hasMany(RouteStudent, { foreignKey: 'studentId', onDelete: 'CASCADE', hooks: true });
 RouteStudent.belongsTo(Student, { foreignKey: 'studentId', onDelete: 'CASCADE' });
+
+School.hasMany(DriverRoute, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+DriverRoute.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+User.hasMany(DriverRoute, { foreignKey: 'driverUserId', onDelete: 'CASCADE', hooks: true });
+DriverRoute.belongsTo(User, { foreignKey: 'driverUserId', onDelete: 'CASCADE' });
+Route.hasMany(DriverRoute, { foreignKey: 'routeId', onDelete: 'CASCADE', hooks: true });
+DriverRoute.belongsTo(Route, { foreignKey: 'routeId', onDelete: 'CASCADE' });
 
 // --- Messaging Associations ---
 Conversation.hasMany(Message, { foreignKey: 'conversationId', onDelete: 'CASCADE', hooks: true });
@@ -206,6 +245,23 @@ Conversation.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
 
 School.hasMany(CommunicationUsage, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
 CommunicationUsage.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+School.hasMany(RbacScope, { foreignKey: 'schoolId', onDelete: 'CASCADE', hooks: true });
+RbacScope.belongsTo(School, { foreignKey: 'schoolId', onDelete: 'CASCADE' });
+
+RbacRole.belongsToMany(RbacPermission, { through: RbacRolePermission, foreignKey: 'roleId', otherKey: 'permissionId' });
+RbacPermission.belongsToMany(RbacRole, { through: RbacRolePermission, foreignKey: 'permissionId', otherKey: 'roleId' });
+RbacRolePermission.belongsTo(RbacRole, { foreignKey: 'roleId', onDelete: 'CASCADE' });
+RbacRolePermission.belongsTo(RbacPermission, { foreignKey: 'permissionId', onDelete: 'CASCADE' });
+RbacRole.hasMany(RbacRolePermission, { foreignKey: 'roleId', onDelete: 'CASCADE', hooks: true });
+RbacPermission.hasMany(RbacRolePermission, { foreignKey: 'permissionId', onDelete: 'CASCADE', hooks: true });
+
+User.hasMany(RbacUserRoleScope, { foreignKey: 'userId', onDelete: 'CASCADE', hooks: true });
+RbacUserRoleScope.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+RbacRole.hasMany(RbacUserRoleScope, { foreignKey: 'roleId', onDelete: 'CASCADE', hooks: true });
+RbacUserRoleScope.belongsTo(RbacRole, { foreignKey: 'roleId', onDelete: 'CASCADE' });
+RbacScope.hasMany(RbacUserRoleScope, { foreignKey: 'scopeId', onDelete: 'SET NULL', hooks: true });
+RbacUserRoleScope.belongsTo(RbacScope, { foreignKey: 'scopeId', onDelete: 'SET NULL' });
 
 const db = {
   sequelize,
@@ -252,12 +308,27 @@ const db = {
   SubscriptionModule,
   CommunicationUsage,
   ContactMessage,
+<<<<<<< HEAD
   InvitationLog,
   AdRequest,
   Account,
   JournalEntry,
   JournalEntryLine,
   FiscalPeriod,
+=======
+  RbacRole,
+  RbacPermission,
+  RbacRolePermission,
+  RbacScope,
+  RbacUserRoleScope,
+  TeacherClassSubjectAssignment,
+  ParentStudent,
+  DriverRoute,
+  SchoolTransaction,
+  LandingPageContent,
+  UsageSnapshot,
+  PaymentMethod,
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 };
 
 // Accounting Associations

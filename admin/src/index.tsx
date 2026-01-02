@@ -9,7 +9,7 @@ import './index.css';
 if (typeof window !== 'undefined') {
   try {
     const key = 'api_base';
-    const envApi = (process.env.REACT_APP_API_URL || ((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || ''));
+    const envApi = (((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) || ''));
     const host = window.location.hostname || '';
     const cur = localStorage.getItem(key) || '';
     const hasApi = (v: string) => /\/api\/?$/.test(v || '');
@@ -41,8 +41,12 @@ if (typeof window !== 'undefined') {
 
 const container = document.getElementById('root');
 if (container) {
+<<<<<<< HEAD
   const isRenderHost = typeof window !== 'undefined' && /\.onrender\.com$/i.test(window.location.hostname || '');
   const useHash = ((import.meta.env.VITE_HASH_ROUTER === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
+=======
+  const useHash = ((((typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_HASH_ROUTER) || '') === 'true') || (typeof window !== 'undefined' && localStorage.getItem('use_hash_router') === 'true'));
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   const root = ReactDOM.createRoot(container);
   root.render(
     <React.StrictMode>

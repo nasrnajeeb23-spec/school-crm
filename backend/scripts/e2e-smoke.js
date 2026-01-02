@@ -52,8 +52,18 @@ async function waitFor(url, { headers = {}, timeoutMs = 7000, intervalMs = 400 }
 }
 
 (async () => {
-  const base = process.env.BASE_API || 'http://127.0.0.1:5002/api';
-  function log(step, ok, extra) { console.log(JSON.stringify({ step, ok, ...(extra||{}) })); }
+  const rawBase = process.env.BASE_URL || process.env.BASE_API || 'http://127.0.0.1:5002';
+  const base = (() => {
+    const b = String(rawBase || '').trim().replace(/\/$/, '');
+    if (/\/api$/i.test(b)) return b;
+    return `${b}/api`;
+  })();
+  const criticalSteps = new Set(['operator_application', 'approve_operator', 'driver_invite_link', 'create_transport_route', 'assign_students_to_route']);
+  let criticalFailed = false;
+  function log(step, ok, extra) {
+    if (criticalSteps.has(step) && !ok) criticalFailed = true;
+    console.log(JSON.stringify({ step, ok, ...(extra || {}) }));
+  }
   try {
     const u = new URL(base);
     const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80));
@@ -104,25 +114,40 @@ async function waitFor(url, { headers = {}, timeoutMs = 7000, intervalMs = 400 }
 
     // Login parent and create conversation using real parentId
     const parentLogin = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'parent@school.com', password: 'password' }) });
-    const parentData = await parentLogin.json();
+    const parentData = await parentLogin.json().catch(() => ({}));
     const parentToken = parentData.token;
     const parentsResp = await fetch(`${base}/school/1/parents`, { headers: { Authorization: `Bearer ${adminToken}` } });
     const parentsList = parentsResp.ok ? await parentsResp.json() : [];
     const parentItem = parentsList.find(p => p.email === 'parent@school.com') || parentsList[0];
     const parentId = parentItem ? parentItem.id : null;
-    log('login_parent', !!parentToken, { parentId });
+    log('login_parent', parentLogin.ok && !!parentToken, { parentId });
 
     try {
       resp = await fetch(`${base}/messaging/conversations`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${superToken}` }, body: JSON.stringify({ title: 'اختبار محادثة', schoolId: 1, parentId }) });
-      const conv = await resp.json();
-      log('create_conversation', true, { roomId: conv.roomId, conversationId: conv.id });
+      const convOk = resp.ok;
+      const conv = await resp.json().catch(() => null);
+      log('create_conversation', convOk, { roomId: conv?.roomId, conversationId: conv?.id });
+      if (!convOk || !conv?.id || !conv?.roomId) throw new Error('create_conversation_failed');
+
       const socket = io(`${u.protocol}//${host}:${port}`, { transports: ['websocket'], auth: { token: adminToken } });
-      await new Promise(res => socket.on('connect', res));
-      socket.emit('join_room', conv.roomId);
-      socket.emit('send_message', { conversationId: conv.id, roomId: conv.roomId, text: 'رسالة اختبار', senderId: 'user_002', senderRole: 'SCHOOL_ADMIN' });
-      const got = await new Promise(res => socket.once('new_message', msg => res(msg)));
-      log('socket_send_receive', !!got, { msgId: got?.id });
-      socket.disconnect();
+      try {
+        await Promise.race([
+          new Promise((res, rej) => {
+            socket.on('connect', res);
+            socket.on('connect_error', rej);
+          }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('socket_connect_timeout')), 5000))
+        ]);
+        socket.emit('join_room', conv.roomId);
+        socket.emit('send_message', { conversationId: conv.id, roomId: conv.roomId, text: 'رسالة اختبار', senderId: 'user_002', senderRole: 'SCHOOL_ADMIN' });
+        const got = await Promise.race([
+          new Promise(res => socket.once('new_message', msg => res(msg))),
+          new Promise(res => setTimeout(() => res(null), 5000))
+        ]);
+        log('socket_send_receive', !!got, { msgId: got?.id });
+      } finally {
+        socket.disconnect();
+      }
 
       try {
         resp = await fetch(`${base}/messaging/conversations/${conv.id}/messages`, { headers: { Authorization: `Bearer ${adminToken}` } });
@@ -150,11 +175,85 @@ async function waitFor(url, { headers = {}, timeoutMs = 7000, intervalMs = 400 }
     }
 
     // Parent dashboard
-    const parentResp = await fetch(`${base}/parent/${parentId}/dashboard`, { headers: { Authorization: `Bearer ${parentToken}` } });
-    log('parent_dashboard', parentResp.ok);
+    if (parentToken && parentId) {
+      const parentResp = await fetch(`${base}/parent/${parentId}/dashboard`, { headers: { Authorization: `Bearer ${parentToken}` } });
+      log('parent_dashboard', parentResp.ok);
+    } else {
+      log('parent_dashboard', false, { reason: 'missing_parent_token' });
+    }
+
+    // Transportation: full operator → route → student assignment → parent view flow
+    try {
+      // 1) Submit a bus operator application (public)
+      const opReqBody = {
+        name: 'سائق اختبار ' + Date.now(),
+        email: `driver_${Date.now()}_${Math.floor(Math.random() * 10000)}@example.com`,
+        phone: '055' + Math.floor(1000000 + Math.random() * 8999999),
+        licenseNumber: 'LIC' + Math.floor(Math.random() * 100000),
+        busPlateNumber: 'TEST-' + Math.floor(Math.random() * 10000),
+        busCapacity: 20,
+        busModel: 'MiniBus 2020',
+        schoolId: 1
+      };
+      resp = await fetch(`${base}/transportation/operator/application`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(opReqBody) });
+      const op = await resp.json();
+      const operatorId = op?.id || op?.data?.id || null;
+      log('operator_application', resp.ok, { operatorId });
+
+      // 2) Approve operator (creates driver account)
+      if (operatorId) {
+        resp = await fetch(`${base}/transportation/operator/${operatorId}/approve`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` } });
+        const approveData = await resp.json();
+        log('approve_operator', resp.ok, { driverAccountCreated: !!approveData?.driverAccountCreated, userId: approveData?.userId || null });
+        resp = await fetch(`${base}/transportation/operator/${operatorId}/invite-link`, { headers: { Authorization: `Bearer ${adminToken}` } });
+        const inviteData = await resp.json().catch(() => ({}));
+        log('driver_invite_link', resp.ok, { hasLink: !!inviteData?.activationLink });
+      } else {
+        log('approve_operator', false, { reason: 'missing_operator_id' });
+      }
+
+      // 3) Create a route assigned to this operator
+      let routeId = null;
+      if (operatorId) {
+        const routeName = 'مسار تجريبي ' + Math.floor(Math.random() * 1000);
+        resp = await fetch(`${base}/transportation/1/routes`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ name: routeName, busOperatorId: operatorId }) });
+        const route = await resp.json();
+        routeId = route?.id || route?.data?.id || null;
+        log('create_transport_route', resp.ok, { routeId });
+      }
+
+      // 4) Assign seeded parent’s student to the route
+      if (routeId) {
+        const studentsResp = await fetch(`${base}/school/1/students`, { headers: { Authorization: `Bearer ${adminToken}` } });
+        const studentsJson = await studentsResp.json();
+        const studentsArr = Array.isArray(studentsJson) ? studentsJson : (studentsJson?.data?.students || studentsJson?.students || []);
+        const target = Array.isArray(studentsArr) ? ((studentsArr.find(s => String(s.parentId || '') === String(parentId)) || studentsArr.find(s => s.parentId) || studentsArr[0])) : null;
+        const sid = target ? (target.id || target.studentId) : null;
+        if (sid) {
+          resp = await fetch(`${base}/transportation/1/routes/${routeId}/students`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ studentIds: [sid] }) });
+          log('assign_students_to_route', resp.ok, { count: sid ? 1 : 0, studentId: sid });
+        } else {
+          log('assign_students_to_route', false, { reason: 'no_student_found' });
+        }
+      } else {
+        log('assign_students_to_route', false, { reason: 'missing_route_id' });
+      }
+
+      // 5) Verify parent transportation details reflect assignment
+      if (parentToken && parentId) {
+        resp = await fetch(`${base}/transportation/parent/${parentId}`, { headers: { Authorization: `Bearer ${parentToken}` } });
+        const parentDetails = await resp.json();
+        const ok = !!(parentDetails && parentDetails.operator && parentDetails.route);
+        log('parent_transportation', ok, { operatorId: parentDetails?.operator?.id || null, routeId: parentDetails?.route?.id || null });
+      } else {
+        log('parent_transportation', false, { reason: 'missing_parent_token' });
+      }
+    } catch (e) {
+      log('transportation_flow', false, { message: String(e) });
+    }
   } catch (e) {
     log('error', false, { message: String(e) });
     process.exit(1);
   }
-  process.exit(0);
+  process.exit(criticalFailed ? 1 : 0);
 })();

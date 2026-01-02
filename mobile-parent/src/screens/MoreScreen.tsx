@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { MoreStackParamList } from '../navigation/MoreNavigator';
-import { ScheduleIcon, RequestIcon, BusIcon, ProfileIcon, ChevronLeftIcon } from '../components/icons';
+import { ScheduleIcon, RequestIcon, BusIcon, ProfileIcon, ChevronLeftIcon, HelpIcon } from '../components/icons';
 
 type Props = StackScreenProps<MoreStackParamList, 'MoreList'>;
 
@@ -13,6 +13,7 @@ const MoreScreen: React.FC<Props> = ({ navigation, route }) => {
         { title: 'الجدول الدراسي', icon: ScheduleIcon, onPress: () => navigation.navigate('Schedule', { user }) },
         { title: 'الطلبات', icon: RequestIcon, onPress: () => navigation.navigate('Requests', { user }) },
         { title: 'النقل المدرسي', icon: BusIcon, onPress: () => navigation.navigate('Transportation', { user }) },
+        { title: 'مركز المساعدة', icon: HelpIcon, onPress: () => Linking.openURL('https://school-crm.example.com/parent/help-center') },
         { title: 'الملف الشخصي', icon: ProfileIcon, onPress: () => navigation.navigate('Profile', { user, onLogout }) },
     ];
 

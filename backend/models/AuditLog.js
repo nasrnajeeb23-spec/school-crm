@@ -7,41 +7,80 @@ const AuditLog = sequelize.define('AuditLog', {
     primaryKey: true,
     autoIncrement: true
   },
-  action: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
   userId: {
     type: DataTypes.INTEGER,
-    allowNull: true
+    allowNull: false,
+    comment: 'User who performed the action'
   },
-  userEmail: {
-    type: DataTypes.STRING,
-    allowNull: true
+  action: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    comment: 'Action type: CREATE, UPDATE, DELETE, LOGIN, LOGOUT'
+  },
+  entityType: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    comment: 'Type of entity: Role, Permission, User, Student, Teacher, etc.'
+  },
+  entityId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'ID of the affected entity'
+  },
+  oldValue: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Previous value before change (for UPDATE/DELETE)'
+  },
+  newValue: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'New value after change (for CREATE/UPDATE)'
   },
   ipAddress: {
-    type: DataTypes.STRING,
-    allowNull: true
+    type: DataTypes.STRING(45),
+    allowNull: true,
+    comment: 'IP address of the user'
   },
   userAgent: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  details: {
     type: DataTypes.TEXT,
-    allowNull: true
+    allowNull: true,
+    comment: 'Browser/client information'
   },
-  timestamp: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  schoolId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'School context for the action'
+  },
+  metadata: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Additional context or metadata'
   },
   riskLevel: {
     type: DataTypes.ENUM('low', 'medium', 'high', 'critical'),
-    defaultValue: 'low'
-  }
+    defaultValue: 'low',
+    comment: 'Risk level of the action'
+  },
+  createdAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW
+  },
 }, {
-  tableName: 'audit_logs',
-  timestamps: false
+  tableName: 'AuditLogs',
+  timestamps: false,
+  indexes: [
+    { fields: ['userId'] },
+    { fields: ['action'] },
+    { fields: ['entityType'] },
+    { fields: ['entityId'] },
+    { fields: ['schoolId'] },
+    { fields: ['createdAt'] },
+    { fields: ['riskLevel'] },
+    { fields: ['userId', 'action'] },
+    { fields: ['schoolId', 'entityType'] },
+  ],
 });
 
 module.exports = AuditLog;

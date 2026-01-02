@@ -5,6 +5,11 @@ import StatsCard from '../components/StatsCard';
 import { RevenueIcon, TotalDebtIcon, CheckIcon, PrintIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
 import InvoicePrintModal from '../components/InvoicePrintModal';
+<<<<<<< HEAD
+=======
+import { SchoolSettings } from '../types';
+import { useToast } from '../contexts/ToastContext';
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 const statusColorMap: { [key in InvoiceStatus]: string } = {
     [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -18,6 +23,8 @@ const ParentFinance: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
     const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
+    const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+    const { addToast } = useToast();
 
     useEffect(() => {
         if (!user?.parentId) {
@@ -48,6 +55,27 @@ const ParentFinance: React.FC = () => {
 
         return { totalAmount, paidAmount, outstandingAmount };
     }, [invoices]);
+
+    const handlePayNow = async (invoice: Invoice) => {
+        if (!user?.parentId) return;
+        try {
+            setPayingInvoiceId(invoice.id);
+            const session = await api.createParentPaymentSession(invoice.id);
+            const url = session?.paymentUrl;
+            if (url) {
+                window.open(url, '_blank', 'noopener,noreferrer');
+                addToast('تم فتح صفحة الدفع. يرجى إتمام العملية.', 'info');
+            } else {
+                addToast('الدفع الإلكتروني غير مفعّل حالياً.', 'warning');
+            }
+        } catch (e: any) {
+            const msg = String(e?.message || '');
+            if (/disabled|503/i.test(msg)) addToast('الدفع الإلكتروني غير مفعّل حالياً.', 'warning');
+            else addToast('فشل بدء عملية الدفع.', 'error');
+        } finally {
+            setPayingInvoiceId(null);
+        }
+    };
 
     if (loading) {
         return <div className="text-center p-8">جاري تحميل البيانات المالية...</div>;
@@ -112,7 +140,11 @@ const ParentFinance: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         {invoice.status !== InvoiceStatus.Paid && (
-                                            <button className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
+                                            <button 
+                                                onClick={() => handlePayNow(invoice)} 
+                                                className="font-medium text-teal-600 dark:text-teal-500 hover:underline"
+                                                disabled={payingInvoiceId === invoice.id}
+                                            >
                                                 دفع الآن
                                             </button>
                                         )}

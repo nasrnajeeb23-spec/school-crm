@@ -11,6 +11,7 @@ const LicenseManagement: React.FC = () => {
   const [licenseKey, setLicenseKey] = useState<string>('');
   const [downloadUrl, setDownloadUrl] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [generatingPackage, setGeneratingPackage] = useState<boolean>(false);
 
   useEffect(() => {
     api.getSchools().then(setSchools).catch(() => setSchools([]));
@@ -47,6 +48,25 @@ const LicenseManagement: React.FC = () => {
     }
   };
 
+  const generatePackage = async () => {
+      setGeneratingPackage(true);
+      try {
+        // Assume all modules for now or add UI for selection
+        const url = await api.generateSelfHostedPackage({ planId: selectedPlanId });
+        if (url) {
+            // api.getAssetUrl helps construct the full URL if needed, 
+            // but the download endpoint is an API endpoint, so we prepend API base.
+            // However, the api function returns what the backend sent.
+            // If backend sent relative path /superadmin/download/..., we need to append it to API base.
+            const fullUrl = api.getApiBase() + url;
+            setDownloadUrl(fullUrl);
+        }
+      } catch (e) {
+          alert('فشل إنشاء الحزمة');
+      }
+      setGeneratingPackage(false);
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">إدارة تراخيص النسخة الذاتية</h1>
@@ -66,6 +86,7 @@ const LicenseManagement: React.FC = () => {
           </select>
           <label className="block text-sm mt-4 mb-2">تاريخ انتهاء (اختياري)</label>
           <input type="date" className="w-full p-2 border rounded" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+<<<<<<< HEAD
           <div className="flex gap-2 mt-4">
             <button className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700" disabled={loading} onClick={generate}>{loading ? 'جاري...' : 'إنشاء مفتاح'}</button>
             <button className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" disabled={loading} onClick={generatePackage}>{loading ? 'جاري...' : 'تجهيز الحزمة'}</button>
@@ -86,6 +107,33 @@ const LicenseManagement: React.FC = () => {
               <p className="text-sm text-gray-500">اضغط "تجهيز الحزمة" لبناء ملف Zip يحتوي على النظام والترخيص.</p>
             )}
           </div>
+=======
+          <div className="mt-6 flex flex-col gap-3">
+            <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition" disabled={loading} onClick={generate}>
+                {loading ? 'جاري إنشاء المفتاح...' : '1. إنشاء مفتاح الترخيص'}
+            </button>
+            <button className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition" disabled={generatingPackage} onClick={generatePackage}>
+                {generatingPackage ? 'جاري تحضير الحزمة...' : '2. توليد نسخة النظام (Zip)'}
+            </button>
+          </div>
+        </div>
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow space-y-4">
+          <div>
+            <label className="block text-sm mb-2 font-semibold">مفتاح الترخيص الناتج</label>
+            <textarea className="w-full p-2 border rounded min-h-[100px] font-mono text-sm bg-gray-50 dark:bg-gray-900" readOnly value={licenseKey} placeholder="سيظهر مفتاح الترخيص هنا..." />
+            <button className="mt-2 text-sm text-indigo-600 hover:text-indigo-800" onClick={() => navigator.clipboard && licenseKey && navigator.clipboard.writeText(licenseKey)}>نسخ المفتاح</button>
+          </div>
+          
+          {downloadUrl && (
+            <div className="p-4 border border-green-200 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <h3 className="font-bold text-green-800 dark:text-green-300 mb-2">تم تجهيز الحزمة بنجاح!</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">تحتوي الحزمة على الكود المصدري وسكربتات التثبيت.</p>
+                <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
+                    تحميل الحزمة (.zip)
+                </a>
+            </div>
+          )}
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         </div>
       </div>
     </div>

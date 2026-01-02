@@ -67,7 +67,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ onClose, onSave, initialD
             <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">الدور</label>
             <select name="role" id="role" value={formData.role} onChange={handleChange} className={inputStyle}>
               {Object.values(SchoolRole)
-                .filter(role => role !== SchoolRole.Admin) // Admin role is assigned on school creation
+                .filter(role => role !== SchoolRole.Admin && role !== SchoolRole.Driver)
                 .map(role => (
                   <option key={role} value={role}>{role}</option>
               ))}

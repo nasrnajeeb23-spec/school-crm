@@ -12,12 +12,17 @@ const samlConfig = {
   privateKey: process.env.SAML_PRIVATE_KEY,
   decryptionPvk: process.env.SAML_PRIVATE_KEY,
   signatureAlgorithm: 'sha256',
-  acceptedClockSkewMs: 5000,
+  acceptedClockSkewMs: 2000,
   disableRequestedAuthnContext: false,
   authnRequestBinding: 'HTTP-Redirect',
   logoutUrl: process.env.SAML_LOGOUT_URL,
   logoutCallbackUrl: '/api/auth/saml/logout/callback',
-  identifierFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'
+  identifierFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+  wantAuthnResponseSigned: true,
+  wantAssertionsSigned: true,
+  validateInResponseTo: true,
+  requestIdExpirationPeriodMs: 300000,
+  audience: process.env.SAML_AUDIENCE || (process.env.SAML_ISSUER || 'school-crm')
 };
 
 // Initialize SAML strategy

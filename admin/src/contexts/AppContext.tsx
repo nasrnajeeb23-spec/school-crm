@@ -10,7 +10,7 @@ interface AppContextType {
   hydrating: boolean;
   theme: Theme;
   toggleTheme: () => void;
-  login: (emailOrUsername: string, password: string, schoolId?: number) => Promise<boolean>;
+  login: (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string) => Promise<boolean>;
   logout: () => void;
   trialSignup: (data: NewTrialRequestData) => Promise<boolean>;
   updateProfile: (data: UpdatableUserData) => Promise<boolean>;
@@ -58,6 +58,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   useEffect(() => {
+    const isLoginPage = (() => {
+      if (typeof window === 'undefined') return false;
+      const p = window.location?.pathname || '';
+      return /^\/(login|superadmin\/login)\/?$/i.test(p);
+    })();
+    if (isLoginPage) { setHydrating(false); return; }
     const isInviteFlow = (() => {
       if (typeof window === 'undefined') return false;
       const p = window.location?.pathname || '';
@@ -66,8 +72,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return !!q.get('token');
     })();
     if (isInviteFlow) { setHydrating(false); return; }
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!token) { setHydrating(false); return; }
     
     let cancelled = false;
     (async () => {
@@ -85,6 +89,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (err: any) {
         // If 401/403, stop immediately (invalid token)
         if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
+          if (!cancelled) setHydrating(false);
+          return;
+        }
+        if (err.message && err.message.includes('429')) {
           if (!cancelled) setHydrating(false);
           return;
         }
@@ -110,6 +118,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
            if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
              break;
            }
+           if (err.message && err.message.includes('429')) {
+             break;
+           }
         }
       }
       if (!cancelled) setHydrating(false);
@@ -117,13 +128,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => { cancelled = true; };
   }, []);
 
-  const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<boolean> => {
+  const login = async (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string): Promise<boolean> => {
     try {
+<<<<<<< HEAD
       const result = await api.login(emailOrUsername, password, schoolId);
       if (result === "TRIAL_EXPIRED") {
           addToast('لقد انتهت الفترة التجريبية لحسابك. يرجى الاشتراك للمتابعة.', 'warning');
           return false;
       } else if (result && typeof result === 'object') {
+=======
+      const result = await api.login(emailOrUsername, password, schoolId, hcaptchaToken);
+      if (result) {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         setCurrentUser(result);
         if (result.schoolId) {
           try { localStorage.setItem('current_school_id', String(result.schoolId)); } catch {}
@@ -165,10 +181,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (String(emailOrUsername).toLowerCase() === 'super@admin.com' && password === 'password') {
         const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: 'super@admin.com', role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
         setCurrentUser(offlineUser);
-        try { localStorage.setItem('auth_token', 'OFFLINE_DEMO'); } catch {}
         addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
         return true;
       }
+<<<<<<< HEAD
+=======
+    } catch {}
+    if (String(emailOrUsername).toLowerCase() === 'super@admin.com' && password === 'password') {
+      const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: 'super@admin.com', role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
+      setCurrentUser(offlineUser);
+      addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
+      return true;
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
     addToast('البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
     return false;
@@ -209,10 +233,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logout = () => {
     addToast('تم تسجيل خروجك بنجاح.', 'info');
+    try { api.logout().catch(() => {}); } catch {}
     setCurrentUser(null);
     try {
-      localStorage.removeItem('auth_token');
       localStorage.removeItem('current_school_id');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
     } catch {}
   };
 

@@ -1,19 +1,31 @@
 // API Configuration for Production - Real Backend Connection
 // هذا الملف يتصل بالـ Backend الحقيقي على Render
 
+<<<<<<< HEAD
 import {
     User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ParentAccountStatus, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
     PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState, NewParentData, SalaryComponent
+=======
+import { 
+    User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ParentAccountStatus, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, NewParentData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
+    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, SalaryComponent, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 } from './types';
 
 
 // 🔗 ضبط عنوان الـ API للإنتاج/التطوير بشكل مرن
 // الأولوية: متغير بيئة مُحقن أثناء البناء -> Vite import.meta.env (إن وجد) -> localStorage(api_base) -> الافتراضي
 const API_BASE_URL = (
+<<<<<<< HEAD
     (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) ||
     (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
     (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
     'http://localhost:5000/api'
+=======
+  (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
+  (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
+  'http://localhost:5000/api'
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 );
 
 const API_ALT_BASE_URL = (() => {
@@ -35,15 +47,47 @@ export const getAssetUrl = (url?: string): string => {
 };
 
 const authHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const schoolId = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
-    const base: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const base: Record<string, string> = {};
     if (schoolId) base['x-school-id'] = String(schoolId);
     return base;
 };
 
+const getAuthToken = (): string => {
+  try {
+    return (typeof window !== 'undefined' ? (localStorage.getItem('auth_token') || '') : '');
+  } catch {
+    return '';
+  }
+};
+
+const setAuthToken = (token?: string) => {
+  try {
+    if (typeof window === 'undefined') return;
+    if (token) localStorage.setItem('auth_token', token);
+    else localStorage.removeItem('auth_token');
+  } catch {}
+};
+
+const getRefreshToken = (): string => {
+  try {
+    return (typeof window !== 'undefined' ? (localStorage.getItem('refresh_token') || '') : '');
+  } catch {
+    return '';
+  }
+};
+
+const setRefreshToken = (token?: string) => {
+  try {
+    if (typeof window === 'undefined') return;
+    if (token) localStorage.setItem('refresh_token', token);
+    else localStorage.removeItem('refresh_token');
+  } catch {}
+};
+
 // دالة مساعدة للاتصال بالـ API
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+<<<<<<< HEAD
     const headers = {
         'Content-Type': 'application/json',
         ...authHeaders(),
@@ -66,6 +110,92 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
                 let bodyJson: any = null;
                 try { bodyJson = await response.json(); } catch {
                     try { bodyText = await response.text(); } catch { }
+=======
+  const isFormData = typeof FormData !== 'undefined' && (options as any)?.body instanceof FormData;
+  const storedToken = getAuthToken();
+  const authHeader = storedToken ? { Authorization: `Bearer ${storedToken}` } : {};
+  const headers = {
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...authHeaders(),
+    ...authHeader,
+    ...options.headers,
+  };
+  const attemptFetch = async (base: string) => {
+    return await fetch(`${base}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+      cache: 'no-store' as RequestCache,
+    });
+  };
+  const derivedBase = (() => {
+    try {
+      if (typeof window === 'undefined') return '';
+      const host = window.location.hostname || '';
+      if (!host) return '';
+      if (host.endsWith('.onrender.com')) {
+        const sub = host.split('.onrender.com')[0];
+        const back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
+        return `https://${back}.onrender.com/api`;
+      }
+      return '';
+    } catch { return ''; }
+  })();
+  let lastError: any = null;
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await attemptFetch(API_BASE_URL);
+      if (!response.ok) {
+        let bodyText = '';
+        let bodyJson: any = null;
+        try { bodyJson = await response.json(); } catch {
+          try { bodyText = await response.text(); } catch {}
+        }
+        const primaryMsg = bodyJson?.message || bodyJson?.msg || bodyText || '';
+        const detailMsg = bodyJson?.error || bodyJson?.detail || '';
+        const msg = (primaryMsg && detailMsg && /^(Server Error|خطأ في الخادم|Internal Server Error)$/i.test(String(primaryMsg).trim()))
+          ? `${primaryMsg}: ${detailMsg}`
+          : (primaryMsg || detailMsg || '');
+        const statusText = response.statusText ? ` ${response.statusText}` : '';
+        if (response.status === 429 && endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
+          const alt2 = await attemptFetch(derivedBase);
+          if (alt2.ok) return await alt2.json();
+        }
+        if (response.status === 401) {
+          if (endpoint === '/auth/me') {
+            try {
+              setAuthToken('');
+              setRefreshToken('');
+              localStorage.removeItem('current_school_id');
+            } catch {}
+          }
+          const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
+          const isSilentCheck = endpoint === '/auth/me';
+          const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
+          const onLoginPage = typeof window !== 'undefined' ? /^\/(login|superadmin\/login)\/?$/i.test(window.location?.pathname || '') : false;
+          const onPublicPage = typeof window !== 'undefined' ? (() => {
+            const p = window.location?.pathname || '';
+            return /^\/$/.test(p) || /^\/(landing|apps|help|pricing)\/?$/i.test(p);
+          })() : false;
+          const onInviteFlow = (() => {
+            try {
+              if (typeof window === 'undefined') return false;
+              const p = window.location?.pathname || '';
+              if (!/^\/set-password\/?$/i.test(p)) return false;
+              const q = new URLSearchParams(window.location.search);
+              return q.has('token');
+            } catch { return false; }
+          })();
+          const shouldRedirect = !isAuthFlow && !onInviteFlow && !onLoginPage && !onPublicPage && onProtectedRoute;
+          if (shouldRedirect) {
+            try {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('current_school_id');
+                const toast = (window as any).__addToast;
+                if (typeof toast === 'function' && !onLoginPage && !onPublicPage) {
+                  toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
                 }
                 const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
                 const statusText = response.statusText ? ` ${response.statusText}` : '';
@@ -124,6 +254,42 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
             console.error(`API Error on ${endpoint}:`, error);
             throw error;
         }
+<<<<<<< HEAD
+=======
+        if (response.status === 404 || /Not\s*Found/i.test(msg)) {
+          const alt = await attemptFetch(API_ALT_BASE_URL);
+          if (!alt.ok) {
+            let altText = '';
+            let altJson: any = null;
+            try { altJson = await alt.json(); } catch { try { altText = await alt.text(); } catch {} }
+            const altMsg = altJson?.msg || altJson?.error || altText || '';
+            const altStatusText = alt.statusText ? ` ${alt.statusText}` : '';
+            throw new Error(`HTTP ${alt.status}${altStatusText}${altMsg ? `: ${altMsg}` : ''}`);
+          }
+          return await alt.json();
+        }
+        throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
+      }
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      const isNetworkError = (error instanceof TypeError) || /Failed to fetch|NetworkError|net::ERR_/i.test(String((error as any)?.message || ''));
+      if (endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
+        try {
+          const resp = await attemptFetch(derivedBase);
+          if (resp.ok) return await resp.json();
+        } catch {}
+      }
+      if (attempt < maxRetries && isNetworkError) {
+        const delayMs = 500 * (attempt + 1);
+        await new Promise(res => setTimeout(res, delayMs));
+        continue;
+      }
+      const msg = String((error as any)?.message || '');
+      const suppress = endpoint === '/auth/me' && (/HTTP\s*401|HTTP\s*403|Missing Authorization header|Invalid or expired token/i.test(msg));
+      if (!suppress) console.error(`API Error on ${endpoint}:`, error);
+      throw error;
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
     throw lastError;
 };
@@ -147,12 +313,17 @@ const unwrap = <T = any>(payload: any, key?: string, fallback: T = ([] as unknow
 
 // ==================== Authentication APIs ====================
 
+<<<<<<< HEAD
 export const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<User | string> => {
+=======
+export const login = async (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string): Promise<User> => {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     const field = emailOrUsername.includes('@') ? { email: emailOrUsername } : { username: emailOrUsername };
     const response: any = await apiCall('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ ...field, password, schoolId }),
+        body: JSON.stringify({ ...field, password, schoolId, client: 'web', hcaptchaToken }),
     });
+<<<<<<< HEAD
     if (response?.status === 'TRIAL_EXPIRED' || response?.message === 'TRIAL_EXPIRED') return "TRIAL_EXPIRED";
     const token = response?.token;
     const user = response?.user || {};
@@ -164,15 +335,32 @@ export const login = async (emailOrUsername: string, password: string, schoolId?
         const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
         return m[key] || key;
     };
+=======
+    try {
+      if (response?.token) setAuthToken(response.token);
+      if (response?.refreshToken) setRefreshToken(response.refreshToken);
+    } catch {}
+    const user = response?.user || {};
+  const mapRole = (r: string) => {
+      const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+      const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', DRIVER: 'DRIVER', STAFF: 'STAFF' };
+      return m[key] || key;
+  };
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     return { ...user, role: mapRole(user.role) } as User;
 };
 
 export const logout = async (): Promise<void> => {
     await apiCall('/auth/logout', { method: 'POST' });
+    try {
+      setAuthToken('');
+      setRefreshToken('');
+    } catch {}
 };
 
 export const getCurrentUser = async (): Promise<User> => {
     const user = await apiCall('/auth/me', { method: 'GET' });
+<<<<<<< HEAD
     if (user && user.role) {
         const mapRole = (r: string) => {
             const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
@@ -181,6 +369,16 @@ export const getCurrentUser = async (): Promise<User> => {
         };
         user.role = mapRole(user.role);
     }
+=======
+  if (user && user.role) {
+      const mapRole = (r: string) => {
+          const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+          const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', DRIVER: 'DRIVER', STAFF: 'STAFF' };
+          return m[key] || key;
+      };
+      user.role = mapRole(user.role);
+  }
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     return user;
 };
 
@@ -388,7 +586,21 @@ export const createClass = async (classData: NewClassData): Promise<Class> => {
 // ==================== Staff APIs ====================
 
 export const getSchoolStaff = async (schoolId: number): Promise<User[]> => {
-    return await apiCall(`/school/${schoolId}/staff`, { method: 'GET' });
+    const rows: any[] = await apiCall(`/school/${schoolId}/staff`, { method: 'GET' });
+    try {
+      return Array.isArray(rows) ? rows.map((u: any) => {
+        const r = String(u.schoolRole || '').trim();
+        const mapped = r === 'Driver' ? 'سائق' : r;
+        return { ...u, schoolRole: mapped };
+      }) : [];
+    } catch {
+      return Array.isArray(rows) ? rows : [];
+    }
+};
+
+export const getSchoolDrivers = async (schoolId: number): Promise<User[]> => {
+    const rows: any[] = await apiCall(`/school/${schoolId}/drivers`, { method: 'GET' });
+    return Array.isArray(rows) ? rows : [];
 };
 
 export const addSchoolStaff = async (schoolId: number, staffData: NewStaffData): Promise<User> => {
@@ -425,7 +637,7 @@ export interface SalaryStructurePayload {
     lessonRate?: number;
     allowances?: { name: string; amount: number; }[];
     deductions?: { name: string; amount: number; }[];
-    appliesTo?: 'staff' | 'teacher';
+    appliesTo?: 'staff' | 'teacher' | 'driver';
     isDefault?: boolean;
     absencePenaltyPerDay?: number;
     latePenaltyPerMinute?: number;
@@ -456,11 +668,15 @@ export const assignSalaryStructureToTeacher = async (schoolId: number, teacherId
     return await apiCall(`/school/${schoolId}/teachers/${teacherId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
 };
 
+export const assignSalaryStructureToDriver = async (schoolId: number, userId: string | number, salaryStructureId: string): Promise<{ id: string | number; salaryStructureId: string; }> => {
+    return await apiCall(`/school/${schoolId}/drivers/${userId}/salary-structure`, { method: 'PUT', body: JSON.stringify({ salaryStructureId }) });
+};
+
 export const processPayrollForMonth = async (schoolId: number, month: string): Promise<{ createdCount: number; }> => {
     return await apiCall(`/school/${schoolId}/payroll/process?month=${encodeURIComponent(month)}`, { method: 'POST' });
 };
 
-export const getSalarySlipsForSchool = async (schoolId: number, month?: string, options?: { personType?: 'staff' | 'teacher'; personId?: string | number }): Promise<any[]> => {
+export const getSalarySlipsForSchool = async (schoolId: number, month?: string, options?: { personType?: 'staff' | 'teacher' | 'driver'; personId?: string | number }): Promise<any[]> => {
     const qs: string[] = [];
     if (month) qs.push(`month=${encodeURIComponent(month)}`);
     if (options?.personType) qs.push(`personType=${encodeURIComponent(options.personType)}`);
@@ -613,11 +829,19 @@ export const updateSubscription = async (id: string, data: { planId?: number; st
 
 export const getPlans = async (): Promise<Plan[]> => {
     try { return await apiCall('/plans', { method: 'GET' }); } catch {
+<<<<<<< HEAD
         return [
             { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: ['الوظائف الأساسية'], limits: { students: 200, teachers: 15 }, recommended: false } as any,
             { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: ['كل ميزات الأساسية', 'إدارة مالية متقدمة'], limits: { students: 1000, teachers: 50 }, recommended: true } as any,
             { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: ['كل ميزات المميزة', 'تقارير مخصصة'], limits: { students: 'غير محدود', teachers: 'غير محدود' }, recommended: false } as any
         ];
+=======
+      return [
+        { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: ['إدارة الطلاب', 'الحضور والغياب', 'بوابة ولي الأمر', 'بوابة المعلم', 'الرسوم والفواتير'], limits: { students: 200, teachers: 15, invoices: 200, storageGB: 5 }, recommended: false } as any,
+        { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: ['كل ميزات الأساسية', 'التقارير المتقدمة', 'المالية المتقدمة', 'النقل المدرسي', 'دعم أولوية'], limits: { students: 1000, teachers: 50, invoices: 2000, storageGB: 50 }, recommended: true } as any,
+        { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: ['كل ميزات المميزة', 'تقارير مخصصة', 'دعم مخصص', 'تكاملات API', 'SLA للمؤسسات'], limits: { students: 'غير محدود', teachers: 'غير محدود', invoices: 'غير محدود', storageGB: 'غير محدود' }, recommended: false } as any
+      ];
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
 };
 
@@ -662,12 +886,30 @@ export const getConversations = async (userId?: string): Promise<Conversation[]>
     const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
     const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
     const query = schoolId ? `?schoolId=${schoolId}` : '';
+    const normalizeConversation = (c: any): Conversation => {
+        const typeValues = Object.values(ConversationType) as unknown as string[];
+        const rawType = c?.type;
+        const safeType = typeValues.includes(String(rawType)) ? (rawType as ConversationType) : ConversationType.Direct;
+        return {
+            id: String(c?.id || ''),
+            roomId: String(c?.roomId || ''),
+            title: String(c?.title || c?.participantName || ''),
+            type: safeType,
+            participantName: String(c?.participantName || c?.title || ''),
+            participantAvatar: String(c?.participantAvatar || ''),
+            lastMessage: String(c?.lastMessage || ''),
+            timestamp: String(c?.timestamp || c?.updatedAt || new Date().toISOString()),
+            unreadCount: typeof c?.unreadCount === 'number' ? c.unreadCount : 0,
+        };
+    };
     if (userId) {
         const data = await apiCall(`/messaging/conversations/${userId}`, { method: 'GET' });
-        return unwrap<Conversation[]>(data, 'conversations', []);
+        const list = unwrap<any[]>(data, 'conversations', []);
+        return Array.isArray(list) ? list.map(normalizeConversation) : [];
     }
     const data = await apiCall(`/messaging/conversations${query}`, { method: 'GET' });
-    return unwrap<Conversation[]>(data, 'conversations', []);
+    const list = unwrap<any[]>(data, 'conversations', []);
+    return Array.isArray(list) ? list.map(normalizeConversation) : [];
 };
 
 export const getMessages = async (conversationId: string): Promise<Message[]> => {
@@ -675,11 +917,23 @@ export const getMessages = async (conversationId: string): Promise<Message[]> =>
     return unwrap<Message[]>(data, 'messages', []);
 };
 
+<<<<<<< HEAD
 export const sendMessage = async (messageData: { conversationId: string; text: string } | Partial<Message>): Promise<Message> => {
     return await apiCall('/messaging/send', {
+=======
+export const sendMessage = async (messageData: { conversationId: string; text: string; attachmentUrl?: string; attachmentType?: string; attachmentName?: string }): Promise<Message> => {
+    const resp = await apiCall('/messaging/send', {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         method: 'POST',
         body: JSON.stringify(messageData),
     });
+    const raw = unwrap<any>(resp);
+    return {
+        id: String(raw?.id || `msg_${Date.now()}`),
+        senderId: 'me',
+        text: String(raw?.text || messageData.text || ''),
+        timestamp: String(raw?.timestamp || new Date().toISOString()),
+    };
 };
 
 // ==================== Landing Page APIs ====================
@@ -714,9 +968,16 @@ export const getLandingPageContent = async (): Promise<LandingPageContent> => {
                 title: 'الميزات',
                 subtitle: 'أدوات متقدمة للإدارة والتعليم',
                 items: [
-                    { id: 'f1', title: 'الطلاب', description: 'إدارة الطلاب والحضور والدرجات' },
-                    { id: 'f2', title: 'المالية', description: 'فواتير ومدفوعات وتقارير مالية' },
-                    { id: 'f4', title: 'التواصل', description: 'مراسلات داخلية فعالة' }
+                    { id: 'student_management', title: 'إدارة الطلاب', description: 'ملفات الطلاب والحضور والدرجات والأنشطة' },
+                    { id: 'finance_fees', title: 'الرسوم الدراسية', description: 'فواتير ومدفوعات وتقارير مالية' },
+                    { id: 'advanced_reports', title: 'التقارير المتقدمة', description: 'لوحات معلومات وتحليلات مخصصة' },
+                    { id: 'messaging', title: 'التواصل والرسائل', description: 'مراسلات داخلية فعالة بين جميع الأطراف' },
+                    { id: 'transportation', title: 'النقل المدرسي', description: 'الحافلات والمسارات وإدارة الطلاب المنقولين' },
+                    { id: 'finance_salaries', title: 'الرواتب وشؤون الموظفين', description: 'مسيرات الرواتب وهياكل الأجور والحضور' },
+                    { id: 'finance_expenses', title: 'المصروفات', description: 'تتبع المصروفات والمشتريات' },
+                    { id: 'parent_portal', title: 'بوابة ولي الأمر', description: 'متابعة حضور ودرجات ورسائل الأبناء' },
+                    { id: 'teacher_portal', title: 'بوابة المعلم', description: 'إدارة الجدول والحضور والدرجات عبر الويب' },
+                    { id: 'teacher_app', title: 'تطبيق المعلم', description: 'إشعارات فورية وإدارة المهام من الجوال' }
                 ]
             },
             ads: {
@@ -749,6 +1010,44 @@ export const submitPaymentProof = async (submission: Omit<PaymentProofSubmission
     });
 };
 
+export const previewOverage = async (): Promise<{ mode: string; currency: string; limits: any; usage: any; items: Array<{ key: string; qty: number; unitPrice: number; amount: number }>; total: number }> => {
+    return await apiCall('/billing/overage/preview', { method: 'GET' });
+};
+
+export const runOverageCharge = async (period: 'monthly' | 'manual' | 'daily' = 'monthly'): Promise<{ ok: boolean; charged: boolean; total: number; currency: string; items: any[]; deducted?: boolean; balanceAfter?: number }> => {
+    return await apiCall('/billing/overage/run', { method: 'POST', body: JSON.stringify({ period }) });
+};
+
+export const getUsageReport = async (params: { group?: 'day' | 'month'; from?: string; to?: string; schoolId?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.group) q.set('group', params.group);
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.schoolId) q.set('schoolId', String(params.schoolId));
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return await apiCall(`/billing/usage/report${suffix}`, { method: 'GET' });
+};
+
+export const getBillingTransactions = async (params: { from?: string; to?: string; type?: string; kind?: string; schoolId?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.type) q.set('type', params.type);
+    if (params.kind) q.set('kind', params.kind);
+    if (params.schoolId) q.set('schoolId', String(params.schoolId));
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return await apiCall(`/billing/transactions${suffix}`, { method: 'GET' });
+};
+
+export const getUsageBreakdown = async (params: { from?: string; to?: string; schoolId?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.schoolId) q.set('schoolId', String(params.schoolId));
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return await apiCall(`/billing/usage/breakdown${suffix}`, { method: 'GET' });
+};
+
 
 export const getActionItems = async (): Promise<ActionItem[]> => {
     try {
@@ -767,15 +1066,16 @@ export const submitTrialRequest = async (data: NewTrialRequestData): Promise<Use
         body: JSON.stringify(data),
     });
     const token = response?.token;
-    if (typeof window !== 'undefined' && token) {
-        localStorage.setItem('auth_token', token);
-    }
+    try {
+      if (token) setAuthToken(token);
+      if (response?.refreshToken) setRefreshToken(response.refreshToken);
+    } catch {}
     return response?.user || null;
 };
 
 // ==================== User Profile APIs ====================
 
-export const updateCurrentUser = async (userId: string, data: UpdatableUserData): Promise<User | null> => {
+export const updateCurrentUser = async (userId: string | number, data: UpdatableUserData): Promise<User | null> => {
     const response: any = await apiCall(`/users/${userId}`, {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -903,11 +1203,15 @@ export const getTeacherSchedule = async (teacherId: string | number): Promise<Sc
     return await apiCall(`/teacher/${teacherId}/schedule`, { method: 'GET' });
 };
 
+export const getTeacherScheduleForSchool = async (schoolId: number, teacherId: string | number): Promise<ScheduleEntry[]> => {
+    return await apiCall(`/school/${schoolId}/teacher/${teacherId}/schedule`, { method: 'GET' });
+};
+
 export const getSchedule = async (classId: string): Promise<ScheduleEntry[]> => {
     return await apiCall(`/school/class/${classId}/schedule`, { method: 'GET' });
 };
 
-export const saveClassSchedule = async (classId: string, entries: { day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday'; timeSlot: string; subject: string; }[]): Promise<{ createdCount: number; entries: any[] }> => {
+export const saveClassSchedule = async (classId: string, entries: { day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'; timeSlot: string; subject: string; }[]): Promise<{ createdCount: number; entries: any[] }> => {
     const response = await fetch(`${API_BASE_URL}/school/class/${classId}/schedule`, {
         method: 'POST',
         headers: {
@@ -944,6 +1248,20 @@ export const getParentTransportationDetails = async (parentId: string): Promise<
     return await apiCall(`/transportation/parent/${parentId}`, { method: 'GET' });
 };
 
+export const getDriverMe = async (): Promise<any> => {
+    return await apiCall('/driver/me', { method: 'GET' });
+};
+
+export const getDriverRoutes = async (): Promise<any[]> => {
+    const raw = await apiCall('/driver/routes', { method: 'GET' });
+    return Array.isArray(raw) ? raw : [];
+};
+
+export const getDriverSalarySlips = async (): Promise<any[]> => {
+    const raw = await apiCall('/driver/salary-slips', { method: 'GET' });
+    return Array.isArray(raw) ? raw : [];
+};
+
 export const getParentActionItems = async (): Promise<ActionItem[]> => {
     try {
         const raw = await apiCall('/parent/action-items', { method: 'GET' });
@@ -952,6 +1270,24 @@ export const getParentActionItems = async (): Promise<ActionItem[]> => {
         console.error('getParentActionItems failed:', e);
         return [];
     }
+};
+
+export const getParentAssignments = async (parentId: string, studentId?: string): Promise<any> => {
+    const qs = studentId ? `?studentId=${encodeURIComponent(String(studentId))}` : '';
+    return await apiCall(`/parent/${parentId}/assignments${qs}`, { method: 'GET' });
+};
+
+export const submitParentAssignment = async (parentId: string, assignmentId: string | number, studentId: string, content: string, files: File[]): Promise<any> => {
+    const fd = new FormData();
+    fd.append('studentId', String(studentId));
+    fd.append('content', String(content || ''));
+    for (const f of files || []) {
+        fd.append('attachments', f, (f as any).name || 'file');
+    }
+    return await apiCall(`/parent/${parentId}/assignments/${assignmentId}/submit`, { method: 'POST', body: fd });
+};
+export const createParentPaymentSession = async (invoiceId: string | number): Promise<{ paymentUrl?: string; sessionId?: string }> => {
+    return await apiCall('/payments/session', { method: 'POST', body: JSON.stringify({ invoiceId }) });
 };
 
 export const getTeacherActionItems = async (): Promise<ActionItem[]> => {
@@ -1004,6 +1340,26 @@ export const approveBusOperator = async (operatorId: string): Promise<void> => {
 
 export const rejectBusOperator = async (operatorId: string): Promise<void> => {
     await apiCall(`/transportation/operator/${operatorId}/reject`, { method: 'PUT' });
+};
+
+export const createBusOperator = async (schoolId: number, data: { name: string; email: string; phone: string; licenseNumber: string; busPlateNumber: string; busCapacity: number; busModel: string; }): Promise<BusOperator> => {
+    return await apiCall(`/transportation/${schoolId}/operators`, { method: 'POST', body: JSON.stringify(data) });
+};
+
+export const getBusOperatorInviteLink = async (operatorId: string): Promise<{ activationLink: string }> => {
+    return await apiCall(`/transportation/operator/${operatorId}/invite-link`, { method: 'GET' });
+};
+
+export const getBusOperatorById = async (operatorId: string): Promise<BusOperator> => {
+    return await apiCall(`/transportation/operator/${operatorId}`, { method: 'GET' });
+};
+
+export const updateBusOperator = async (operatorId: string, data: Partial<{ name: string; email: string | null; phone: string; licenseNumber: string; busPlateNumber: string; busCapacity: number; busModel: string; }>): Promise<BusOperator> => {
+    return await apiCall(`/transportation/operator/${operatorId}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+
+export const deleteBusOperator = async (operatorId: string): Promise<{ deleted: boolean }> => {
+    return await apiCall(`/transportation/operator/${operatorId}`, { method: 'DELETE' });
 };
 
 // ==================== Super Admin: Security Policies ====================
@@ -1256,8 +1612,17 @@ export const updateSchoolOperationalStatus = async (schoolId: number, status: 'A
     return await apiCall(`/schools/${schoolId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
 };
 
-export const deleteSchool = async (schoolId: number): Promise<{ deleted: boolean }> => {
-    return await apiCall(`/schools/${schoolId}`, { method: 'DELETE' });
+export const deleteSchool = async (schoolId: number, reason?: string): Promise<{ deleted: boolean }> => {
+    const qs = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+    return await apiCall(`/schools/${schoolId}${qs}`, { method: 'DELETE' });
+};
+
+export const getDeletedSchools = async (): Promise<School[]> => {
+    return await apiCall('/superadmin/schools/deleted', { method: 'GET' });
+};
+
+export const restoreSchool = async (schoolId: number): Promise<{ restored: boolean; schoolId: number }> => {
+    return await apiCall(`/superadmin/schools/${schoolId}/restore`, { method: 'PUT' });
 };
 
 export const getDashboardStats = async (): Promise<any> => {
@@ -1402,6 +1767,67 @@ export const getRoles = async (): Promise<Role[]> => {
     return await apiCall('/roles', { method: 'GET' });
 };
 
+export const createRole = async (payload: { name: string; description?: string; key: string; schoolId?: number | null }): Promise<Role> => {
+    return await apiCall('/roles', { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const updateRole = async (roleId: string, payload: { name?: string; description?: string }): Promise<Role> => {
+    return await apiCall(`/roles/${encodeURIComponent(String(roleId))}`, { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+export const deleteRole = async (roleId: string): Promise<void> => {
+    await apiCall(`/roles/${encodeURIComponent(String(roleId))}`, { method: 'DELETE' });
+};
+
+export const getPermissions = async (): Promise<any[]> => {
+    const list = await apiCall('/roles/permissions', { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const getRolePermissions = async (roleId: string): Promise<any[]> => {
+    const list = await apiCall(`/roles/${encodeURIComponent(String(roleId))}/permissions`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const updateRolePermissions = async (roleId: string, permissionIds: string[]): Promise<void> => {
+    await apiCall(`/roles/${encodeURIComponent(String(roleId))}/permissions`, { method: 'POST', body: JSON.stringify({ permissionIds }) });
+};
+
+export const getSchoolRbacPermissions = async (schoolId: number): Promise<any[]> => {
+    const list = await apiCall(`/school/${schoolId}/rbac/permissions`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const getSchoolRbacRoles = async (schoolId: number): Promise<Role[]> => {
+    return await apiCall(`/school/${schoolId}/rbac/roles`, { method: 'GET' });
+};
+
+export const createSchoolRbacRole = async (schoolId: number, payload: { key: string; name: string; description?: string }): Promise<Role> => {
+    return await apiCall(`/school/${schoolId}/rbac/roles`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const updateSchoolRolePermissions = async (schoolId: number, roleId: string, permissions: string[]): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/rbac/roles/${encodeURIComponent(String(roleId))}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions }) });
+};
+
+export const getSchoolRbacScopes = async (schoolId: number): Promise<any[]> => {
+    const list = await apiCall(`/school/${schoolId}/rbac/scopes`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const getUserRoleAssignmentsForSchool = async (schoolId: number, userId: number | string): Promise<any[]> => {
+    const list = await apiCall(`/school/${schoolId}/rbac/users/${encodeURIComponent(String(userId))}/roles`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const updateUserRolesForSchool = async (
+    schoolId: number,
+    userId: number | string,
+    assignments: { roleId: string; scopeId?: string | null }[]
+): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/rbac/users/${encodeURIComponent(String(userId))}/roles`, { method: 'PUT', body: JSON.stringify({ assignments }) });
+};
+
 export const generateLicenseKey = async (payload: { schoolName: string; planId?: string | number; planName?: string; expiresAt?: string | null }): Promise<{ licenseKey: string }> => {
     const response: any = await apiCall('/license/generate', { method: 'POST', body: JSON.stringify(payload) });
     return { licenseKey: response?.licenseKey || '' };
@@ -1428,6 +1854,18 @@ export const getSubmissionsForAssignment = async (assignmentId: string): Promise
 };
 
 export const createAssignment = async (data: NewAssignmentData): Promise<Assignment> => {
+    const hasFiles = (data as any)?.files && Array.isArray((data as any).files) && ((data as any).files as File[]).length > 0;
+    if (hasFiles) {
+        const fd = new FormData();
+        fd.append('title', String(data.title));
+        fd.append('description', String(data.description || ''));
+        fd.append('classId', String(data.classId));
+        fd.append('dueDate', String(data.dueDate || ''));
+        for (const f of ((data as any).files as File[])) {
+            fd.append('attachments', f, (f as any).name || 'file');
+        }
+        return await apiCall('/assignments', { method: 'POST', body: fd });
+    }
     return await apiCall('/assignments', { method: 'POST', body: JSON.stringify(data) });
 };
 
@@ -1590,6 +2028,11 @@ export default {
     updateLandingPageContent,
     getBankAccounts,
     submitPaymentProof,
+    previewOverage,
+    runOverageCharge,
+    getUsageReport,
+    getBillingTransactions,
+    getUsageBreakdown,
     superAdminLogin,
     verifySuperAdminMfa,
     requestSuperAdminReset,
@@ -1623,4 +2066,18 @@ export default {
     updateRouteStudents,
     submitContactMessage,
     getContactMessages,
+    getRoles,
+    createRole,
+    updateRole,
+    deleteRole,
+    getPermissions,
+    getRolePermissions,
+    updateRolePermissions,
+    getSchoolRbacPermissions,
+    getSchoolRbacRoles,
+    createSchoolRbacRole,
+    updateSchoolRolePermissions,
+    getSchoolRbacScopes,
+    getUserRoleAssignmentsForSchool,
+    updateUserRolesForSchool,
 }

@@ -12,7 +12,7 @@ const Submission = sequelize.define('Submission', {
         allowNull: false
     },
     studentId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING,
         allowNull: false
     },
     submissionDate: {
@@ -38,6 +38,11 @@ const Submission = sequelize.define('Submission', {
     attachmentUrl: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    attachments: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: []
     }
 }, {
     timestamps: true

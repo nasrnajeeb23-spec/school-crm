@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, ScheduleIcon, RequestIcon, LogoutIcon, ProfileIcon, BusIcon, MessagingIcon, CloseIcon } from './icons';
+import { DashboardIcon, GradesIcon, AttendanceIcon, FinanceIcon, ScheduleIcon, RequestIcon, LogoutIcon, ProfileIcon, BusIcon, MessagingIcon, CloseIcon, AssignmentIcon, HelpIcon } from './icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface ParentSidebarProps {
@@ -16,10 +16,12 @@ const ParentSidebar: React.FC<ParentSidebarProps> = ({ isMobileOpen = false, onC
     { id: 'grades', label: 'الدرجات', icon: GradesIcon, path: '/parent/grades' },
     { id: 'attendance', label: 'الحضور', icon: AttendanceIcon, path: '/parent/attendance' },
     { id: 'finance', label: 'المالية', icon: FinanceIcon, path: '/parent/finance' },
+    { id: 'assignments', label: 'الواجبات', icon: AssignmentIcon, path: '/parent/assignments' },
     { id: 'schedule', label: 'الجدول', icon: ScheduleIcon, path: '/parent/schedule' },
     { id: 'requests', label: 'الطلبات', icon: RequestIcon, path: '/parent/requests' },
     { id: 'messaging', label: 'الرسائل', icon: MessagingIcon, path: '/parent/messaging' },
     { id: 'transportation', label: 'النقل المدرسي', icon: BusIcon, path: '/parent/transportation' },
+    { id: 'help-center', label: 'مركز المساعدة', icon: HelpIcon, path: '/parent/help-center' },
   ];
 
   const baseLinkClasses = "relative flex items-center justify-center md:justify-start p-3 my-2 rounded-lg transition-colors duration-200";
@@ -51,13 +53,16 @@ const ParentSidebar: React.FC<ParentSidebarProps> = ({ isMobileOpen = false, onC
                 to={item.path}
                 className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`}
               >
-                {({ isActive }) => (
+                {({ isActive }) => {
+                  const Icon: any = (item as any).icon || (() => null);
+                  return (
                     <>
-                        {isActive && <div className="absolute right-0 h-6 w-1 bg-rose-600 dark:bg-rose-400 rounded-l-full"></div>}
-                        <item.icon className="h-6 w-6" />
-                        <span className="hidden md:block mr-4 rtl:ml-4 rtl:mr-0">{item.label}</span>
+                      {isActive && <div className="absolute right-0 h-6 w-1 bg-rose-600 dark:bg-rose-400 rounded-l-full"></div>}
+                      <Icon className="h-6 w-6" />
+                      <span className="hidden md:block mr-4 rtl:ml-4 rtl:mr-0">{item.label}</span>
                     </>
-                )}
+                  );
+                }}
               </NavLink>
             </li>
           ))}

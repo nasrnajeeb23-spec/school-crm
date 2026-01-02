@@ -13,7 +13,20 @@ const isStrong = (pwd: string) => {
 
 const SetPassword: React.FC = () => {
   const { addToast } = useToast();
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get('token') || '';
+      if (t) {
+        try {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('last_route');
+        } catch {}
+      }
+      return t;
+    } catch { return ''; }
+  });
   const [pwd, setPwd] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -22,6 +35,7 @@ const SetPassword: React.FC = () => {
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
+<<<<<<< HEAD
       const t = params.get('token') || '';
       setToken(t);
     } catch {}
@@ -29,6 +43,8 @@ const SetPassword: React.FC = () => {
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
+=======
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       const tParam = params.get('token') || '';
       const hasAuth = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
       if (hasAuth && !tParam) {
@@ -37,6 +53,8 @@ const SetPassword: React.FC = () => {
           let target = '/login';
           if (roleRaw === 'PARENT') target = '/parent';
           else if (roleRaw === 'TEACHER') target = '/teacher';
+          else if (roleRaw === 'DRIVER') target = '/driver';
+          else if (roleRaw === 'STAFF' && String((u as any)?.schoolRole || '') === 'سائق') target = '/driver';
           else if (roleRaw === 'SCHOOL_ADMIN' || roleRaw === 'STAFF') target = '/school';
           else if (roleRaw === 'SUPER_ADMIN' || roleRaw === 'SUPERADMIN' || roleRaw.startsWith('SUPER_ADMIN_')) target = '/superadmin';
           addToast('أنت مسجّل دخول بالفعل. تم توجيهك للوحة التحكم.', 'info');
@@ -54,7 +72,11 @@ const SetPassword: React.FC = () => {
     try {
       const parts = token.split('.');
       if (parts.length === 3) {
-        const b64 = (s: string) => s.replace(/-/g, '+').replace(/_/g, '/');
+        const b64 = (s: string) => {
+          const x = s.replace(/-/g, '+').replace(/_/g, '/');
+          const pad = x.length % 4 === 2 ? '==' : x.length % 4 === 3 ? '=' : x.length % 4 === 1 ? '===' : '';
+          return x + pad;
+        };
         const payload = JSON.parse(atob(b64(parts[1])));
         const expMs = Number(payload?.exp || 0) * 1000;
         if (expMs && Date.now() > expMs) {
@@ -80,14 +102,18 @@ const SetPassword: React.FC = () => {
       const resp: any = await apiCall('/auth/invite/set-password', { method: 'POST', body: JSON.stringify({ token, newPassword: pwd }) });
       try {
         const t = resp?.token || '';
+        const rt = resp?.refreshToken || '';
         const u = resp?.user || null;
         if (t) localStorage.setItem('auth_token', t);
+        if (rt) localStorage.setItem('refresh_token', rt);
         if (u && u.schoolId) localStorage.setItem('current_school_id', String(u.schoolId));
         const roleRaw = String(u?.role || '').toUpperCase().replace(/[^A-Z_]/g, '');
         let target = '/login';
         const desired = targetRole || roleRaw;
         if (desired === 'PARENT') target = '/parent';
         else if (desired === 'TEACHER') target = '/teacher';
+        else if (desired === 'DRIVER') target = '/driver';
+        else if (desired === 'STAFF' && String((u as any)?.schoolRole || '') === 'سائق') target = '/driver';
         else if (desired === 'SCHOOLADMIN' || desired === 'SCHOOL_ADMIN' || desired === 'STAFF') target = '/school';
         else if (desired === 'SUPERADMIN' || desired === 'SUPER_ADMIN' || desired.startsWith('SUPER_ADMIN_')) target = '/superadmin';
         try { localStorage.removeItem('last_route'); } catch {}

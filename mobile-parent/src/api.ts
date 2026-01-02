@@ -3,19 +3,23 @@ import {
     RequestType, RequestStatus, Assignment, Submission, AttendanceStatus, Conversation, Message,
     BusOperator, Route
 } from './types';
-
-export const API_BASE_URL = (process.env as any)?.REACT_APP_API_URL || (process.env as any)?.EXPO_PUBLIC_API_BASE_URL || 'https://school-crschool-crm-backendm.onrender.com/api';
-
+import * as SecureStore from 'expo-secure-store';
+ 
+export const API_BASE_URL = (process.env as any)?.REACT_APP_API_URL || (process.env as any)?.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+ 
+let memoryToken: string | null = null;
+ 
 const authHeaders = () => {
-    const token = (typeof localStorage !== 'undefined') ? localStorage.getItem('auth_token') : null;
+    const token = memoryToken || ((typeof localStorage !== 'undefined') ? localStorage.getItem('auth_token') : null);
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 // دالة مساعدة للاتصال بالـ API
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     try {
+        const isFormData = typeof FormData !== 'undefined' && (options as any)?.body instanceof FormData;
         const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
+            ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
             ...authHeaders(),
             ...(options.headers as any || {}),
         };
@@ -43,13 +47,19 @@ export const login = async (email: string, password: string, schoolId: number): 
     const token = response?.token;
     const user = response?.user || {};
     
-    if (typeof localStorage !== 'undefined' && token) { localStorage.setItem('auth_token', token); }
+    if (token) {
+        memoryToken = token;
+        if (typeof localStorage !== 'undefined') { localStorage.setItem('auth_token', token); }
+        try { await SecureStore.setItemAsync('auth_token', token); } catch {}
+    }
     
     return user;
 };
-
-export const logout = () => {
+ 
+export const logout = async () => {
+    memoryToken = null;
     if (typeof localStorage !== 'undefined') { localStorage.removeItem('auth_token'); }
+    try { await SecureStore.deleteItemAsync('auth_token'); } catch {}
 };
 
 export const getParentDashboardData = async (parentId: string, studentId?: string): Promise<any> => {
@@ -236,6 +246,31 @@ export const submitAssignment = async (parentId: string, assignmentId: string, s
     });
 };
 
+export const submitAssignmentWithAttachments = async (parentId: string, assignmentId: string, studentId: string, content: string, files: Array<{ uri?: string; name?: string; type?: string; file?: File }>): Promise<Submission> => {
+    const form = new FormData();
+    form.append('studentId', studentId);
+    if (content) form.append('content', content);
+    (files || []).forEach((f) => {
+        if ((globalThis as any).Platform && (globalThis as any).Platform.OS !== 'web') {
+            if (f.uri && f.name && f.type) {
+                (form as any).append('attachments', { uri: f.uri, name: f.name, type: f.type } as any);
+            }
+        } else {
+            if ((f as any).file instanceof File) {
+                form.append('attachments', (f as any).file);
+            } else if (f.uri && f.name && f.type) {
+                try {
+                    form.append('attachments', new File([], f.name, { type: f.type as string }));
+                } catch {}
+            }
+        }
+    });
+    return await apiCall(`/parent/${parentId}/assignments/${assignmentId}/submit`, {
+        method: 'POST',
+        body: form
+    });
+};
+
 // ==================== Messaging ====================
 
 export const getConversations = async (userId: string): Promise<Conversation[]> => {
@@ -270,22 +305,14 @@ export const createConversation = async (conversation: {
 // ==================== Transportation ====================
 
 export const getStudentTransportation = async (studentId: string): Promise<any> => {
-    return await apiCall(`/students/${studentId}/transportation`);
+    return null;
 };
 
 export const getParentTransportationDetails = async (parentId: string): Promise<{ route: Route; operator: BusOperator | undefined } | null> => {
     try {
-        const resp = await apiCall(`/parent/${parentId}/transportation`);
-        if (resp && resp.route) {
+        const resp = await apiCall(`/transportation/parent/${parentId}`);
+        if (resp && resp.route && resp.operator) {
             return resp;
-        }
-    } catch {}
-    try {
-        const dash = await getParentDashboardData(parentId);
-        const sid = dash?.student?.id || (Array.isArray(dash?.children) ? dash.children[0]?.student?.id : null);
-        if (sid) {
-            const data = await getStudentTransportation(String(sid));
-            return data || null;
         }
     } catch {}
     return null;

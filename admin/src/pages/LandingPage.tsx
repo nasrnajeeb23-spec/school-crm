@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
 import PublicPlans from '../components/PublicPlans';
 import { LogoIcon, StudentsIcon, FinanceIcon, GradesIcon, MessagingIcon, ReportsIcon, PermissionsIcon, ServerIcon } from '../components/icons';
+=======
+import PlansList from './PlansList';
+import { LogoIcon, StudentsIcon, FinanceIcon, GradesIcon, MessagingIcon, ReportsIcon, PermissionsIcon, ServerIcon, BusIcon, ParentsIcon, ProfileIcon, NetProfitIcon, ExpenseIcon, DownloadIcon } from '../components/icons';
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 import AdCarousel from '../components/AdCarousel';
 import * as api from '../api';
 import { LandingPageContent, NewAdRequestData, NewTrialRequestData, NewBusOperatorApplication, SelfHostedQuoteRequest } from '../types';
@@ -27,10 +32,31 @@ const FeatureCard: React.FC<{ icon: React.ElementType, title: string, children: 
 );
 
 const featureIconMap: { [key: string]: React.ElementType } = {
+<<<<<<< HEAD
   'f1': StudentsIcon, 'f2': FinanceIcon, 'f3': PermissionsIcon, // HR icon placeholder
   'f4': ServerIcon, // Transport/Bus icon placeholder
   'f5': StudentsIcon, // Mobile App icon placeholder
   'f6': ReportsIcon,
+=======
+    // Legacy ids support
+    'f1': StudentsIcon,
+    'f2': FinanceIcon,
+    'f3': GradesIcon,
+    'f4': MessagingIcon,
+    'f5': ReportsIcon,
+    'f6': PermissionsIcon,
+    // New catalog ids
+    'student_management': StudentsIcon,
+    'finance_fees': FinanceIcon,
+    'advanced_reports': ReportsIcon,
+    'messaging': MessagingIcon,
+    'transportation': BusIcon,
+    'finance_salaries': NetProfitIcon,
+    'finance_expenses': ExpenseIcon,
+    'parent_portal': ParentsIcon,
+    'teacher_portal': ProfileIcon,
+    'teacher_app': DownloadIcon,
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 };
 
 

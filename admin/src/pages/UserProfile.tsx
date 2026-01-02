@@ -11,6 +11,7 @@ const UserProfile: React.FC = () => {
     // Should not render if there's no user, but as a safeguard:
     const [name, setName] = useState(currentUser?.name || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
+    const [email, setEmail] = useState(currentUser?.email || '');
     
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -25,7 +26,12 @@ const UserProfile: React.FC = () => {
     const handleInfoSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsInfoSaving(true);
-        await updateProfile({ name, phone });
+        const payload: UpdatableUserData = { name, phone };
+        if (email && email !== currentUser.email) {
+            payload.email = email;
+            payload.currentPassword = currentPassword;
+        }
+        await updateProfile(payload);
         setIsInfoSaving(false);
     };
 
@@ -63,7 +69,7 @@ const UserProfile: React.FC = () => {
                     </div>
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">البريد الإلكتروني</label>
-                        <input type="email" name="email" id="email" value={currentUser.email} disabled className={`${inputStyle} bg-gray-100 dark:bg-gray-700/50 cursor-not-allowed`} />
+                        <input type="email" name="email" id="email" value={email} onChange={e => setEmail(e.target.value)} className={inputStyle} />
                     </div>
                     <div>
                         <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">رقم الهاتف (اختياري)</label>

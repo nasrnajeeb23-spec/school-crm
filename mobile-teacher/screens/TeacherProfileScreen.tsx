@@ -24,8 +24,15 @@ const TeacherProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) 
     const handleUpdateProfile = async () => {
         setLoading(true);
         try {
-            // Need to implement updateProfile in teacher/api.ts
-            await api.updateTeacherProfile(user.id.toString(), { name, email });
+            const payload: any = { name, email };
+            if (password && email !== user.email) {
+                payload.currentPassword = password;
+            }
+            if (newPassword) {
+                payload.currentPassword = password;
+                payload.newPassword = newPassword;
+            }
+            await api.updateTeacherProfile(user.id.toString(), payload);
             Alert.alert('نجاح', 'تم تحديث الملف الشخصي بنجاح');
         } catch (error) {
             Alert.alert('خطأ', 'فشل تحديث الملف الشخصي');

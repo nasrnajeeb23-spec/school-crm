@@ -1,12 +1,14 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { NavigatorScreenParams } from '@react-navigation/native';
 import LoginScreen from '../screens/LoginScreen';
 import MainTabs from './MainTabs';
+import { MainTabParamList } from './MainTabs';
 import { User } from '../types';
 
 export type RootStackParamList = {
   Login: { setUser: (user: User) => void };
-  Main: { user: User; onLogout: () => void };
+  Main: NavigatorScreenParams<MainTabParamList> & { user: User; onLogout: () => void };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();

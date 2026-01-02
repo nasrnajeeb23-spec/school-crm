@@ -35,5 +35,34 @@
   "analytics": [
     { "selector": "[data-tip='analytics-overview']", "title": "نظرة عامة", "content": "تحليل مؤشرات الأداء العامة.", "position": "bottom" },
     { "selector": "[data-tip='analytics-cache']", "title": "الكاش", "content": "الطلبات المتكررة تصبح أسرع ضمن فترة TTL.", "position": "bottom" }
+  ],
+  "superadmin-dashboard": [
+    { "selector": "[data-tip='sa-dashboard-stats']", "title": "الإحصائيات", "content": "ملخص المدارس والاشتراكات النشطة.", "position": "bottom" },
+    { "selector": "[data-tip='sa-dashboard-revenue']", "title": "الإيرادات", "content": "مخطط الإيرادات الشهرية.", "position": "bottom" }
+  ],
+  "superadmin-schools": [
+    { "selector": "[data-tip='sa-schools-add']", "title": "إضافة مدرسة", "content": "إنشاء مدرسة جديدة وتعيين مدير لها.", "position": "left" },
+    { "selector": "[data-tip='sa-schools-list']", "title": "قائمة المدارس", "content": "إدارة المدارس والتحكم بحالتها.", "position": "top" }
+  ],
+  "superadmin-subscriptions": [
+    { "selector": "[data-tip='sa-subs-plans']", "title": "الخطط", "content": "إدارة الخطط والأسعار.", "position": "left" },
+    { "selector": "[data-tip='sa-subs-active']", "title": "الاشتراكات", "content": "متابعة الاشتراكات النشطة والمنتهية.", "position": "top" }
+  ],
+  "teacher-dashboard": [
+    { "selector": "[data-tip='teacher-stats']", "title": "الإحصائيات", "content": "عدد الفصول والطلاب والواجبات النشطة.", "position": "bottom" },
+    { "selector": "[data-tip='teacher-schedule']", "title": "جدول اليوم", "content": "حصصك الدراسية لهذا اليوم.", "position": "left" }
+  ],
+  "teacher-classes": [
+    { "selector": "[data-tip='teacher-class-card']", "title": "بطاقة الفصل", "content": "اضغط للدخول إلى تفاصيل الفصل والطلاب.", "position": "top" }
+  ],
+  "teacher-grades": [
+    { "selector": "[data-tip='teacher-grades-add']", "title": "رصد الدرجات", "content": "أدخل الدرجات للطلاب واحفظ التغييرات.", "position": "left" }
+  ],
+  "parent-dashboard": [
+    { "selector": "[data-tip='parent-children']", "title": "الأبناء", "content": "قائمة أبنائك في المدرسة.", "position": "bottom" },
+    { "selector": "[data-tip='parent-finance']", "title": "الرصيد", "content": "المبالغ المستحقة والمدفوعة.", "position": "bottom" }
+  ],
+  "parent-grades": [
+    { "selector": "[data-tip='parent-report-card']", "title": "الشهادة", "content": "عرض وتحميل شهادة الدرجات.", "position": "left" }
   ]
 }

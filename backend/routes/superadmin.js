@@ -5,7 +5,8 @@ const { TrialRequest } = require('../models');
 const clientMetrics = require('prom-client');
 clientMetrics.collectDefaultMetrics({ prefix: 'schoolsaas_', timeout: 5000 });
 const { sequelize } = require('../models');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
+const { derivePermissionsForUser, normalizeDbRole } = require('../utils/permissionMatrix');
 const bcrypt = require('bcryptjs');
 
 // Import pagination utilities
@@ -44,13 +45,55 @@ const setJSON = async (redis, key, value) => {
   try {
     await redis.set(key, JSON.stringify(value));
   } catch { }
+<<<<<<< HEAD
+=======
+};
+
+const mapSuperAdminRoleToDb = (role) => {
+  const key = String(role || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const m = {
+    SUPERADMIN: 'SuperAdmin',
+    SUPER_ADMIN: 'SuperAdmin',
+    SUPERADMINFINANCIAL: 'SuperAdminFinancial',
+    SUPER_ADMIN_FINANCIAL: 'SuperAdminFinancial',
+    SUPERADMINTECHNICAL: 'SuperAdminTechnical',
+    SUPER_ADMIN_TECHNICAL: 'SuperAdminTechnical',
+    SUPERADMINSUPERVISOR: 'SuperAdminSupervisor',
+    SUPER_ADMIN_SUPERVISOR: 'SuperAdminSupervisor',
+  };
+  return m[key] || null;
+};
+
+const mapSuperAdminRoleToApi = (role) => {
+  const key = String(role || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const m = {
+    SUPERADMIN: 'SUPER_ADMIN',
+    SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL',
+    SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL',
+    SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
+  };
+  return m[key] || 'SUPER_ADMIN';
+};
+
+const isStrongPassword = (pwd) => {
+  const lengthOk = typeof pwd === 'string' && pwd.length >= 10;
+  const upper = /[A-Z]/.test(pwd);
+  const lower = /[a-z]/.test(pwd);
+  const digit = /[0-9]/.test(pwd);
+  const special = /[^A-Za-z0-9]/.test(pwd);
+  return lengthOk && upper && lower && digit && special;
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 };
 
 // @route   GET api/superadmin/stats
 // @desc    Get dashboard stats for SuperAdmin
 // @access  Private (SuperAdmin)
-router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+// @route   GET api/superadmin/stats
+// @desc    Get dashboard stats for SuperAdmin
+// @access  Private (SuperAdmin)
+router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
+<<<<<<< HEAD
     const { User, School, Subscription, Invoice } = require('../models');
 
     let totalSchools = 0;
@@ -80,6 +123,19 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANC
         totalRevenue = paidInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
       }
     } catch (e) { console.warn('Error calculating revenue:', e.message); }
+=======
+    const { School, Student, Subscription, Payment } = require('../models');
+
+    // Execute counts in parallel for performance
+    const [totalSchools, totalStudents, activeSubscriptions, revenueResult] = await Promise.all([
+      School.count(),
+      Student.count(),
+      Subscription.count({ where: { status: 'ACTIVE' } }),
+      Payment.sum('amount')
+    ]);
+
+    const totalRevenue = revenueResult || 0;
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
     res.json({
       totalSchools,
@@ -89,16 +145,16 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANC
     });
   } catch (err) {
     console.error('Stats Error:', err);
-    // Return zero stats instead of 500 to keep UI working
-    res.json({ totalSchools: 0, totalStudents: 0, totalRevenue: 0, activeSubscriptions: 0 });
+    res.status(500).json({ totalSchools: 0, totalStudents: 0, totalRevenue: 0, activeSubscriptions: 0 });
   }
 });
 
 // @route   GET api/superadmin/action-items
 // @desc    Get pending action items for SuperAdmin Dashboard
 // @access  Private (SuperAdmin)
-router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
+<<<<<<< HEAD
     const { TrialRequest, Ticket, Invoice } = require('../models');
 
     let trialRequests = 0;
@@ -133,10 +189,32 @@ router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN
       tickets,
       pendingInvoices,
       securityAlerts
+=======
+    const { TrialRequest, ContactMessage, Invoice } = require('../models');
+    const { Op } = require('sequelize');
+
+    // Execute queries in parallel
+    const [trialRequests, contactMessages, pendingInvoices, failedLogins] = await Promise.all([
+      TrialRequest ? TrialRequest.count({ where: { status: 'PENDING' } }) : 0,
+      ContactMessage ? ContactMessage.count({ where: { status: 'NEW' } }) : 0,
+      Invoice ? Invoice.count({ where: { status: { [Op.in]: ['UNPAID', 'OVERDUE'] } } }) : 0,
+      require('../models').AuditLog ? require('../models').AuditLog.count({
+        where: {
+          action: 'LOGIN_FAILED',
+          createdAt: { [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        }
+      }) : 0
+    ]);
+
+    res.json({
+      trialRequests,
+      tickets: contactMessages,
+      pendingInvoices,
+      securityAlerts: failedLogins
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     });
   } catch (err) {
     console.error('Action Items Error:', err.message);
-    // Return zeros on error
     res.json({ trialRequests: 0, tickets: 0, pendingInvoices: 0, securityAlerts: 0 });
   }
 });
@@ -146,10 +224,11 @@ router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN
 // @access  Private (SuperAdmin)
 router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
   try {
-    const { AuditLog } = require('../models');
+    const { AuditLog, User } = require('../models');
     const { startDate, endDate, action, userId } = req.query;
     const { Op } = require('sequelize');
 
+<<<<<<< HEAD
     const where = {};
     if (startDate || endDate) {
       where.timestamp = {};
@@ -169,9 +248,54 @@ router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_F
       order: [['timestamp', 'DESC']],
       limit: 500
     });
+=======
+    // Auto-heal
+    if (!AuditLog) return res.json([]);
+    try { await AuditLog.sync(); } catch { }
 
-    // Parse details if stored as string
+    const where = {};
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const sd = new Date(String(startDate));
+        if (!Number.isNaN(sd.getTime())) where.createdAt[Op.gte] = sd;
+      }
+      if (endDate) {
+        const ed = new Date(String(endDate));
+        if (!Number.isNaN(ed.getTime())) where.createdAt[Op.lte] = new Date(ed.setHours(23, 59, 59, 999));
+      }
+    }
+    if (action) {
+      const dialect = AuditLog.sequelize?.getDialect?.() || 'sqlite';
+      const op = dialect === 'postgres' ? Op.iLike : Op.like;
+      where.action = { [op]: `%${action}%` };
+    }
+    if (userId !== undefined && userId !== null && String(userId).trim() !== '') {
+      const n = Number(userId);
+      where.userId = Number.isFinite(n) ? n : userId;
+    }
+
+    let logs = [];
+    try {
+      logs = await AuditLog.findAll({
+        where,
+        order: [['createdAt', 'DESC']],
+        limit: 500
+      });
+    } catch (dbError) {
+      console.warn('Audit Logs DB Error:', dbError?.message || dbError);
+      return res.json([]);
+    }
+
+    const userIds = Array.from(new Set(logs.map(l => l.userId).filter(v => v !== null && v !== undefined)));
+    const users = userIds.length
+      ? await User.findAll({ where: { id: userIds }, attributes: ['id', 'email'], raw: true }).catch(() => [])
+      : [];
+    const emailByUserId = new Map(users.map(u => [Number(u.id), u.email]));
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+
     const formatted = logs.map(log => {
+<<<<<<< HEAD
       let details = log.details;
       try {
         if (typeof details === 'string' && (details.startsWith('{') || details.startsWith('['))) {
@@ -180,6 +304,15 @@ router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_F
       } catch (e) { }
       return {
         ...log.toJSON(),
+=======
+      const row = log.toJSON();
+      const details = row.metadata ?? (row.oldValue || row.newValue ? { oldValue: row.oldValue, newValue: row.newValue } : null);
+      return {
+        ...row,
+        timestamp: row.createdAt || row.timestamp || null,
+        userEmail: emailByUserId.get(Number(row.userId)) || null,
+        riskLevel: row.riskLevel || 'low',
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         details
       };
     });
@@ -187,15 +320,16 @@ router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_F
     res.json(formatted);
   } catch (err) {
     console.error('Audit Logs Error:', err);
-    res.status(500).send('Server Error');
+    res.json([]);
   }
 });
 
 // @route   GET api/superadmin/revenue
-// @desc    Get revenue summary for SuperAdmin (monthly series)
+// @desc    Get revenue summary for SuperAdmin (monthly series for current year)
 // @access  Private (SuperAdmin)
-router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_FINANCE'), async (req, res) => {
   try {
+<<<<<<< HEAD
     const { Invoice } = require('../models');
 
     // This is a simplified mock data response to ensure chart works
@@ -215,18 +349,57 @@ router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINA
         // For now, we return the structure expected by the frontend
       }
     } catch (e) { console.warn('Error fetching revenue:', e.message); }
+=======
+    const { Payment } = require('../models');
+    const { Op } = require('sequelize');
+
+    const currentYear = new Date().getFullYear();
+    const startDate = new Date(currentYear, 0, 1);
+    const endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+
+    // Let's use JS aggregation to be safe across dialects for this specific requirement
+    const payments = await Payment.findAll({
+      where: {
+        date: {
+          [Op.between]: [startDate, endDate]
+        }
+      },
+      attributes: ['amount', 'date']
+    });
+
+    const months = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+
+    // Initialize map
+    const revenueMap = new Array(12).fill(0);
+
+    for (const p of payments) {
+      const d = new Date(p.date);
+      const m = d.getMonth(); // 0-11
+      if (m >= 0 && m < 12) {
+        revenueMap[m] += Number(p.amount || 0);
+      }
+    }
+
+    const revenueData = months.map((name, index) => ({
+      month: name,
+      revenue: revenueMap[index]
+    }));
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
     res.json(revenueData);
   } catch (err) {
     console.error('Revenue Error:', err);
-    res.json([]); // Return empty array on error
+    res.json([]);
   }
 });
 
 // @route   GET api/superadmin/subscriptions
 // @desc    List subscriptions with status
 // @access  Private (SuperAdmin)
-router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('VIEW_FINANCE'), async (req, res) => {
   try {
     const subs = await Subscription.findAll({
       include: [
@@ -265,7 +438,11 @@ router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req
 // @route   PUT api/superadmin/subscriptions/:id
 // @desc    Update subscription details (Plan, Status, Limits, Modules)
 // @access  Private (SuperAdmin)
+<<<<<<< HEAD
 router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+=======
+router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), async (req, res) => {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
@@ -362,7 +539,7 @@ router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), async 
 });
 
 // Security policies (central)
-router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_SETTINGS'), async (req, res) => {
   try {
     const defaults = { enforceMfaForAdmins: true, passwordMinLength: 0, lockoutThreshold: 3, allowedIpRanges: [], sessionMaxAgeHours: 24 };
     let dbPolicy = null;
@@ -399,7 +576,7 @@ router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_
   } catch (err) { console.error('Security Policies Error:', err); res.status(500).send('Server Error'); }
 });
 
-router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), async (req, res) => {
   try {
     const payload = req.body || {};
     let dbPolicy = await SecurityPolicy.findOne();
@@ -441,7 +618,7 @@ router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async 
 });
 
 // API keys management (in-memory for now)
-router.get('/api-keys', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/api-keys', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_SETTINGS'), async (req, res) => {
   try {
     const { ApiKey } = require('../models');
     if (!ApiKey) return res.json([]);
@@ -736,32 +913,399 @@ router.get('/onboarding/requests', verifyToken, requireRole('SUPER_ADMIN', 'SUPE
   }
 });
 
+router.post('/onboarding/requests/:id/approve', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { TrialRequest, School, User, SchoolSettings, Subscription, Plan } = require('../models');
+    const { id } = req.params;
+    const reqData = await TrialRequest.findByPk(id);
+    
+    if (!reqData) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Request not found' });
+    }
+    if (reqData.status !== 'NEW') {
+      await t.rollback();
+      return res.status(400).json({ message: 'Request already processed' });
+    }
+
+    // 1. Create School
+    const school = await School.create({
+      name: reqData.schoolName,
+      address: '',
+      phone: reqData.phone,
+      email: reqData.adminEmail,
+      studentCount: 0,
+      teacherCount: 0,
+      balance: 0,
+      operationalStatus: 'ACTIVE'
+    }, { transaction: t });
+
+    // 2. Create Settings
+    await SchoolSettings.create({
+      schoolId: school.id,
+      schoolName: reqData.schoolName,
+      academicYearStart: new Date(),
+      academicYearEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+      notifications: { email: true, sms: false, push: true },
+      contactEmail: reqData.adminEmail,
+      contactPhone: reqData.phone
+    }, { transaction: t });
+
+    // 3. Create Admin User
+    const randomPass = Math.random().toString(36).slice(-8) + 'Aa1@';
+    const hashed = await bcrypt.hash(randomPass, 10);
+    const user = await User.create({
+      name: reqData.adminName,
+      email: reqData.adminEmail,
+      username: reqData.adminEmail.split('@')[0] + '_' + Math.floor(Math.random()*1000),
+      password: hashed,
+      role: 'Admin',
+      schoolId: school.id,
+      isActive: true,
+      tokenVersion: 0
+    }, { transaction: t });
+
+    // 4. Create Subscription (Default to Basic/Trial)
+    const defaultPlan = await Plan.findOne({ order: [['price', 'ASC']] }) || await Plan.create({ name: 'Basic', price: 0, pricePeriod: 'Month', limits: { students: 50, teachers: 5 } }, { transaction: t });
+    
+    await Subscription.create({
+      schoolId: school.id,
+      planId: defaultPlan.id,
+      status: 'ACTIVE',
+      startDate: new Date(),
+      renewalDate: new Date(new Date().setDate(new Date().getDate() + 30)), // 30 days trial
+      customLimits: {}
+    }, { transaction: t });
+
+    // 5. Update Request
+    reqData.status = 'APPROVED';
+    await reqData.save({ transaction: t });
+
+    await t.commit();
+
+    // In a real app, send email with randomPass. Here we return it for demo.
+    res.json({ success: true, schoolId: school.id, tempPassword: randomPass });
+
+  } catch (err) {
+    await t.rollback();
+    console.error('Approve Request Error:', err);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+router.post('/onboarding/requests/:id/reject', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { TrialRequest } = require('../models');
+    const { id } = req.params;
+    const reqData = await TrialRequest.findByPk(id);
+    
+    if (!reqData) return res.status(404).json({ message: 'Request not found' });
+    
+    reqData.status = 'REJECTED';
+    await reqData.save();
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Reject Request Error:', err);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
 // @route   GET api/superadmin/team
 // @desc    Get list of super admin team members
 // @access  Private (SuperAdmin)
+<<<<<<< HEAD
 router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const { User } = require('../models');
+=======
+router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('VIEW_STAFF'), async (req, res) => {
+  try {
+    const { User } = require('../models');
+    const { Op } = require('sequelize');
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     // Fix: Use correct Enum values matching User model (PascalCase)
     const team = await User.findAll({
       where: {
         role: {
+<<<<<<< HEAD
           [require('sequelize').Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
         }
       },
       attributes: ['id', 'name', 'email', 'role', 'lastLogin', 'isActive']
     });
     res.json(team);
+=======
+          [Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
+        }
+      },
+      attributes: ['id', 'name', 'email', 'username', 'role', 'lastLoginAt', 'isActive', 'createdAt', 'permissions']
+    });
+    res.json((Array.isArray(team) ? team : []).map(u => {
+      const j = u.toJSON ? u.toJSON() : u;
+      return {
+        id: String(j.id),
+        name: j.name,
+        email: j.email,
+        username: j.username || j.email,
+        role: mapSuperAdminRoleToApi(j.role),
+        isActive: j.isActive !== false,
+        lastLoginAt: j.lastLoginAt || null,
+        createdAt: j.createdAt || null,
+        permissions: Array.isArray(j.permissions) ? j.permissions : []
+      };
+    }));
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   } catch (err) {
     console.error('Team Error:', err.message);
     res.status(500).send('Server Error');
   }
+<<<<<<< HEAD
+=======
+});
+
+router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
+  try {
+    const { name, email, username, password, role, permissions } = req.body || {};
+    if (!name || !email || !username || !password || !role) {
+      return res.status(400).json({ msg: 'Invalid payload' });
+    }
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({ msg: 'Weak password' });
+    }
+    const dbRole = mapSuperAdminRoleToDb(role);
+    if (!dbRole || dbRole === 'SuperAdmin') {
+      return res.status(400).json({ msg: 'Invalid role' });
+    }
+
+    const emailNorm = String(email).trim().toLowerCase();
+    const usernameNorm = String(username).trim();
+    const dupeEmail = await User.findOne({ where: { email: emailNorm } });
+    if (dupeEmail) return res.status(409).json({ msg: 'Email already in use' });
+    const dupeUsername = await User.findOne({ where: { username: usernameNorm } });
+    if (dupeUsername) return res.status(409).json({ msg: 'Username already in use' });
+
+    const hashed = await bcrypt.hash(password, 10);
+    const created = await User.create({
+      name: String(name).trim(),
+      email: emailNorm,
+      username: usernameNorm,
+      password: hashed,
+      role: dbRole,
+      schoolId: null,
+      teacherId: null,
+      parentId: null,
+      schoolRole: null,
+      isActive: true,
+      permissions: Array.isArray(permissions) ? permissions.filter(Boolean).map(p => String(p)) : [],
+      tokenVersion: 0
+    });
+
+    const j = created.toJSON();
+    delete j.password;
+    return res.status(201).json({
+      id: String(j.id),
+      name: j.name,
+      email: j.email,
+      username: j.username || j.email,
+      role: mapSuperAdminRoleToApi(j.role),
+      isActive: j.isActive !== false,
+      lastLoginAt: j.lastLoginAt || null,
+      createdAt: j.createdAt || null,
+      permissions: Array.isArray(j.permissions) ? j.permissions : []
+    });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET api/superadmin/pricing-config
+// @desc    Get global pricing configuration
+// @access  Private (SuperAdmin)
+router.get('/pricing-config', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL'), requirePermission('VIEW_FINANCE'), async (req, res) => {
+  try {
+    const { PricingConfig } = require('../models');
+    // Auto-heal
+    try { await PricingConfig.sync(); } catch { }
+
+    let config = await PricingConfig.findOne({ where: { id: 'default' } });
+    if (!config) {
+      config = await PricingConfig.create({
+        id: 'default',
+        pricePerStudent: 1.5,
+        pricePerTeacher: 2.0,
+        pricePerGBStorage: 0.2,
+        pricePerInvoice: 0.05,
+        currency: 'USD',
+        yearlyDiscountPercent: 0
+      });
+    }
+    res.json(config);
+  } catch (err) {
+    console.error('Pricing Config Error:', err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   PUT api/superadmin/pricing-config
+// @desc    Update global pricing configuration
+// @access  Private (SuperAdmin)
+router.put('/pricing-config', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), async (req, res) => {
+  try {
+    const { PricingConfig, AuditLog } = require('../models');
+    let config = await PricingConfig.findOne({ where: { id: 'default' } });
+    if (!config) {
+      config = await PricingConfig.create({ id: 'default' });
+    }
+
+    const { pricePerStudent, pricePerTeacher, pricePerGBStorage, pricePerInvoice, currency, yearlyDiscountPercent } = req.body;
+
+    if (pricePerStudent !== undefined) config.pricePerStudent = Number(pricePerStudent);
+    if (pricePerTeacher !== undefined) config.pricePerTeacher = Number(pricePerTeacher);
+    if (pricePerGBStorage !== undefined) config.pricePerGBStorage = Number(pricePerGBStorage);
+    if (pricePerInvoice !== undefined) config.pricePerInvoice = Number(pricePerInvoice);
+    if (currency !== undefined) config.currency = String(currency);
+    if (yearlyDiscountPercent !== undefined) config.yearlyDiscountPercent = Number(yearlyDiscountPercent);
+
+    await config.save();
+
+    try {
+      await AuditLog.create({
+        action: 'PRICING_CONFIG_UPDATE',
+        userId: req.user?.id || null,
+        userEmail: req.user?.email || null,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        details: JSON.stringify(req.body),
+        riskLevel: 'high'
+      });
+    } catch (e) { }
+
+    res.json(config);
+  } catch (err) {
+    console.error('Pricing Config Update Error:', err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ msg: 'Invalid id' });
+
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (String(user.role) === 'SuperAdmin') return res.status(400).json({ msg: 'Cannot edit SuperAdmin account' });
+
+    const { name, email, username, password, role, permissions, isActive } = req.body || {};
+
+    if (name !== undefined) user.name = String(name).trim();
+    if (email !== undefined) {
+      const emailNorm = String(email).trim().toLowerCase();
+      const dupeEmail = await User.findOne({ where: { email: emailNorm } });
+      if (dupeEmail && Number(dupeEmail.id) !== Number(user.id)) return res.status(409).json({ msg: 'Email already in use' });
+      user.email = emailNorm;
+    }
+    if (username !== undefined) {
+      const usernameNorm = String(username).trim();
+      const dupeUsername = await User.findOne({ where: { username: usernameNorm } });
+      if (dupeUsername && Number(dupeUsername.id) !== Number(user.id)) return res.status(409).json({ msg: 'Username already in use' });
+      user.username = usernameNorm;
+    }
+    if (role !== undefined) {
+      const dbRole = mapSuperAdminRoleToDb(role);
+      if (!dbRole || dbRole === 'SuperAdmin') return res.status(400).json({ msg: 'Invalid role' });
+      user.role = dbRole;
+    }
+    if (permissions !== undefined) {
+      user.permissions = Array.isArray(permissions) ? permissions.filter(Boolean).map(p => String(p)) : [];
+    }
+    if (isActive !== undefined) user.isActive = !!isActive;
+    if (password) {
+      if (!isStrongPassword(password)) return res.status(400).json({ msg: 'Weak password' });
+      user.password = await bcrypt.hash(password, 10);
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+    }
+
+    await user.save();
+    const j = user.toJSON();
+    delete j.password;
+    return res.json({
+      id: String(j.id),
+      name: j.name,
+      email: j.email,
+      username: j.username || j.email,
+      role: mapSuperAdminRoleToApi(j.role),
+      isActive: j.isActive !== false,
+      lastLoginAt: j.lastLoginAt || null,
+      createdAt: j.createdAt || null,
+      permissions: Array.isArray(j.permissions) ? j.permissions : []
+    });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
+});
+
+router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ msg: 'Invalid id' });
+    if (Number(req.user?.id) === Number(id)) return res.status(400).json({ msg: 'Cannot delete self' });
+
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (String(user.role) === 'SuperAdmin') return res.status(400).json({ msg: 'Cannot delete SuperAdmin account' });
+
+    await user.destroy();
+    return res.json({ deleted: true });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
+});
+
+router.post('/team/permissions/recommendations/apply', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
+  try {
+    const modeRaw = (req.body && req.body.mode) || '';
+    const overwrite = String(modeRaw).toLowerCase() === 'overwrite';
+    const { Op } = require('sequelize');
+    const users = await User.findAll({
+      where: { role: { [Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'] } },
+      order: [['id', 'ASC']]
+    });
+    let updated = 0;
+    for (const user of users) {
+      const recommended = derivePermissionsForUser({ role: normalizeDbRole(user.role) });
+      const current = Array.isArray(user.permissions) ? user.permissions : [];
+      const next = overwrite ? recommended : Array.from(new Set([...current, ...recommended]));
+      const a = [...current].slice().sort();
+      const b = [...next].slice().sort();
+      const same = JSON.stringify(a) === JSON.stringify(b);
+      if (!same) {
+        user.permissions = next;
+        await user.save();
+        updated++;
+      }
+    }
+    return res.json({ updated, mode: overwrite ? 'overwrite' : 'merge' });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 });
 
 // @route   GET api/superadmin/analytics/kpi
 // @desc    Get KPI metrics
 // @access  Private (SuperAdmin)
+<<<<<<< HEAD
 router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+=======
+router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   try {
     // Mock KPI data or calculate real ones
     // Real implementation would aggregate data
@@ -780,7 +1324,11 @@ router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMI
 // @route   GET api/superadmin/metrics/summary
 // @desc    Get metrics summary
 // @access  Private (SuperAdmin)
+<<<<<<< HEAD
 router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+=======
+router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   try {
     res.json({
       totalVisits: 15000,
@@ -794,6 +1342,7 @@ router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_AD
   }
 });
 
+<<<<<<< HEAD
 // @route   POST api/superadmin/self-hosted/package
 // @desc    Generate self-hosted package download link
 // @access  Public (or semi-private, handled by modal)
@@ -822,6 +1371,49 @@ router.post('/self-hosted/package', async (req, res) => {
     console.error('Self-Hosted Package Error:', err.message);
     res.status(500).send('Server Error');
   }
+=======
+router.get('/schools/deleted', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { SchoolSettings } = require('../models');
+    const { Op } = require('sequelize');
+    const deletedSettings = await SchoolSettings.findAll({ where: { operationalStatus: 'DELETED' } });
+    const ids = deletedSettings.map(r => Number(r.schoolId));
+    if (!ids.length) return res.json([]);
+    const rows = await School.findAll({
+      where: { id: { [Op.in]: ids } },
+      include: [{ model: Subscription, include: { model: Plan } }],
+      order: [['name', 'ASC']],
+    });
+    const formatted = rows.map(school => {
+      const s = school.toJSON();
+      return {
+        id: s.id,
+        name: s.name,
+        plan: s.Subscription?.Plan?.name || 'N/A',
+        status: 'DELETED',
+        students: s.studentCount,
+        teachers: s.teacherCount,
+        balance: parseFloat(s.balance),
+        joinDate: new Date(s.createdAt).toISOString().split('T')[0],
+      };
+    });
+    res.json(formatted);
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+});
+
+router.put('/schools/:id/restore', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const sid = Number(req.params.id);
+    const { SchoolSettings, AuditLog } = require('../models');
+    let s = await SchoolSettings.findOne({ where: { schoolId: sid } });
+    if (!s) s = await SchoolSettings.create({ schoolId: sid, schoolName: '', academicYearStart: new Date(), academicYearEnd: new Date(), notifications: { email: true, sms: false, push: true } });
+    s.operationalStatus = 'ACTIVE';
+    await s.save();
+    try { await User.update({ isActive: true }, { where: { schoolId: sid } }); } catch { }
+    try { await AuditLog.create({ action: 'school.restore', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: sid }), timestamp: new Date(), riskLevel: 'medium' }); } catch { }
+    return res.json({ restored: true, schoolId: sid });
+  } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 });
 
 module.exports = router;

@@ -8,11 +8,16 @@ interface TeacherFinanceScreenProps {
     user: User;
 }
 
-const formatCurrency = (amount: number) => {
-    return `ر.س ${amount.toFixed(2)}`;
-}
+const symbolFor = (code?: string) => {
+    const c = String(code || '').trim().toUpperCase();
+    if (c === 'USD') return '$';
+    if (c === 'SAR') return 'ر.س';
+    if (c === 'EGP') return 'ج.م';
+    if (c === 'YER') return 'ر.ي';
+    return c || '$';
+};
 
-const SalaryDetailRow: React.FC<{ item: SalaryComponent }> = ({ item }) => {
+const SalaryDetailRow: React.FC<{ item: SalaryComponent; formatCurrency: (amount: number) => string }> = ({ item, formatCurrency }) => {
     const isBonus = item.type === 'bonus';
     return (
         <View style={styles.detailRow}>
@@ -29,11 +34,22 @@ const TeacherFinanceScreen: React.FC<TeacherFinanceScreenProps> = ({ user }) => 
     const [slips, setSlips] = useState<TeacherSalarySlip[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedSlipId, setExpandedSlipId] = useState<string | null>(null);
+    const [currencyCode, setCurrencyCode] = useState<string>('SAR');
+    const formatCurrency = (amount: number) => {
+        const sym = symbolFor(currencyCode);
+        const decimals = String(currencyCode).toUpperCase() === 'YER' ? 0 : 2;
+        return `${sym} ${Number(amount || 0).toFixed(decimals)}`;
+    };
 
     useEffect(() => {
         if (!user.teacherId) {
             setLoading(false);
             return;
+        }
+        if (user.schoolId) {
+            api.getSchoolSettings(user.schoolId).then(s => {
+                setCurrencyCode(String(s.defaultCurrency || 'SAR').toUpperCase());
+            }).catch(() => {});
         }
         api.getTeacherSalarySlips(user.teacherId)
             .then(setSlips)
@@ -65,8 +81,8 @@ const TeacherFinanceScreen: React.FC<TeacherFinanceScreenProps> = ({ user }) => 
                             <Text style={styles.detailText}>الراتب الإجمالي</Text>
                             <Text style={styles.detailAmount}>{formatCurrency(item.grossSalary)}</Text>
                         </View>
-                        {item.bonuses.map((bonus, index) => <SalaryDetailRow key={`bonus-${index}`} item={bonus} />)}
-                        {item.deductions.map((ded, index) => <SalaryDetailRow key={`ded-${index}`} item={ded} />)}
+                        {item.bonuses.map((bonus, index) => <SalaryDetailRow key={`bonus-${index}`} item={bonus} formatCurrency={formatCurrency} />)}
+                        {item.deductions.map((ded, index) => <SalaryDetailRow key={`ded-${index}`} item={ded} formatCurrency={formatCurrency} />)}
                          <View style={[styles.detailRow, styles.netRow]}>
                             <Text style={styles.netText}>صافي الراتب</Text>
                             <Text style={styles.netAmount}>{formatCurrency(item.netSalary)}</Text>

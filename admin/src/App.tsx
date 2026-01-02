@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from './contexts/AppContext';
-import { User, UserRole } from './types';
+import { SchoolRole, User, UserRole } from './types';
 import ToastContainer from './components/ToastContainer';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -13,6 +13,7 @@ const SuperAdminLayout = React.lazy(() => import('./layouts/SuperAdminLayout'));
 const SchoolAdminLayout = React.lazy(() => import('./layouts/SchoolAdminLayout'));
 const TeacherLayout = React.lazy(() => import('./layouts/TeacherLayout'));
 const ParentLayout = React.lazy(() => import('./layouts/ParentLayout'));
+const DriverLayout = React.lazy(() => import('./layouts/DriverLayout'));
 
 // Super Admin Pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -41,6 +42,8 @@ const OnboardingRequests = React.lazy(() => import('./pages/OnboardingRequests')
 const SuperAdminSchoolManage = React.lazy(() => import('./pages/SuperAdminSchoolManage'));
 const SuperAdminMessages = React.lazy(() => import('./pages/SuperAdminMessages'));
 const SetPassword = React.lazy(() => import('./pages/SetPassword'));
+const HelpCenter = React.lazy(() => import('./pages/HelpCenter'));
+const PaymentSettings = React.lazy(() => import('./pages/PaymentSettings'));
 
 // School Admin Pages
 const SchoolDashboard = React.lazy(() => import('./pages/SchoolDashboard'));
@@ -80,11 +83,24 @@ const ParentFinance = React.lazy(() => import('./pages/ParentFinance'));
 const ParentSchedule = React.lazy(() => import('./pages/ParentSchedule'));
 const ParentRequests = React.lazy(() => import('./pages/ParentRequests'));
 const ParentTransportation = React.lazy(() => import('./pages/ParentTransportation'));
+const ParentAssignments = React.lazy(() => import('./pages/ParentAssignments'));
+const DriverDashboard = React.lazy(() => import('./pages/DriverDashboard'));
 
+const isDriverUser = (user: User | null) => {
+  if (!user) return false;
+  if (user.role === UserRole.Driver) return true;
+  return user.role === UserRole.Staff && String(user.schoolRole || '') === String(SchoolRole.Driver);
+};
 
+<<<<<<< HEAD
 // Helper to determine the home route based on user role
 const getHomeRouteForUser = (role: string) => {
   switch (role) {
+=======
+const getHomeRouteForUser = (user: User) => {
+  if (isDriverUser(user)) return '/driver';
+  switch (user.role) {
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     case UserRole.SuperAdmin:
     case UserRole.SuperAdminFinancial:
     case UserRole.SuperAdminTechnical:
@@ -99,15 +115,9 @@ const getHomeRouteForUser = (role: string) => {
 };
 
 const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }) => {
-    const { currentUser, hydrating } = useAppContext();
-    
-    if (hydrating) {
-        return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الجلسة...</div>;
-    }
-    if (!currentUser) {
-        return <Navigate to="/login" replace />;
-    }
+  const { currentUser, hydrating } = useAppContext();
 
+<<<<<<< HEAD
     if (currentUser.passwordMustChange) {
         const profileRoute = `${getHomeRouteForUser(currentUser.role as string)}/profile`;
         if (window.location.pathname !== profileRoute) {
@@ -122,13 +132,68 @@ const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }
     
     if (routeRequiresSuperAdmin && userHasSuperAdminAccess) {
         return <Outlet />;
-    }
+=======
+  if (hydrating) {
+    return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الجلسة...</div>;
+  }
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
 
+  if (isDriverUser(currentUser)) {
+    const path = window.location.pathname || '';
+    if (/^\/(school|staff)(\/|$)/.test(path)) {
+      return <Navigate to="/driver" replace />;
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+    }
+  }
+
+<<<<<<< HEAD
     if (!allowedRoles.map(r => String(r)).includes(currentUser.role as string)) {
         return <Navigate to={getHomeRouteForUser(currentUser.role as string)} replace />;
+=======
+  if (currentUser.passwordMustChange) {
+    const profileRoute = `${getHomeRouteForUser(currentUser)}/profile`;
+    if (window.location.pathname !== profileRoute) {
+      return <Navigate to={profileRoute} replace />;
+>>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
+  }
 
+  // Check if user has access to superadmin area (all superadmin roles)
+  const superAdminRoles = [UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor];
+  const userHasSuperAdminAccess = superAdminRoles.includes(currentUser.role);
+  const routeRequiresSuperAdmin = allowedRoles.some(role => superAdminRoles.includes(role));
+
+  if (routeRequiresSuperAdmin && userHasSuperAdminAccess) {
     return <Outlet />;
+  }
+
+  if (!allowedRoles.includes(currentUser.role)) {
+    return <Navigate to={getHomeRouteForUser(currentUser)} replace />;
+  }
+
+  return <Outlet />;
+};
+
+const ProtectedDriverRoute: React.FC = () => {
+  const { currentUser, hydrating } = useAppContext();
+  if (hydrating) {
+    return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الجلسة...</div>;
+  }
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!isDriverUser(currentUser)) {
+    return <Navigate to={getHomeRouteForUser(currentUser)} replace />;
+  }
+  if (currentUser.passwordMustChange) {
+    const profileRoute = `${getHomeRouteForUser(currentUser)}/profile`;
+    if (window.location.pathname !== profileRoute) {
+      return <Navigate to={profileRoute} replace />;
+    }
+  }
+  return <Outlet />;
 };
 
 
@@ -139,9 +204,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const path = location.pathname || '';
-    const protectedPath = /^\/(school|teacher|parent|superadmin)/.test(path);
+    const protectedPath = /^\/(school|staff|teacher|parent|superadmin|driver)/.test(path);
     if (currentUser && protectedPath) {
-      try { localStorage.setItem('last_route', path); } catch {}
+      try { localStorage.setItem('last_route', path); } catch { }
     }
   }, [currentUser, location.pathname]);
 
@@ -153,7 +218,7 @@ const App: React.FC = () => {
         try {
           const last = localStorage.getItem('last_route') || '';
           if (last && last !== path) navigate(last, { replace: true });
-        } catch {}
+        } catch { }
       }
     }
   }, [hydrating, currentUser]);
@@ -164,56 +229,67 @@ const App: React.FC = () => {
       <ErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الصفحة...</div>}>
           <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/apps" element={<AppsPage />} />
-          <Route path="/join" element={<TrialSignupPublic />} />
-          <Route path="/login" element={<LoginPage mode="default" />} />
-          <Route path="/superadmin/login" element={<LoginPage mode="superadmin" />} />
-          <Route path="/set-password" element={<SetPassword />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/apps" element={<AppsPage />} />
+            <Route path="/join" element={<TrialSignupPublic />} />
+            <Route path="/login" element={<LoginPage mode="default" />} />
+            <Route path="/superadmin/login" element={<LoginPage mode="superadmin" />} />
+            <Route path="/set-password" element={<SetPassword />} />
 
-          {/* Super Admin Routes */}
-          <Route element={<ProtectedRoute allowedRoles={[UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor]} />}>
-            <Route path="/superadmin" element={<SuperAdminLayout />}>
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="schools" element={<SchoolsList />} />
-              <Route path="schools/:schoolId/manage" element={<SuperAdminSchoolManage />} />
-              <Route path="school-admins" element={<SchoolAdminsList />} />
-              <Route path="team" element={<SuperAdminTeamManagement />} />
-              <Route path="subscriptions" element={<SubscriptionsList />} />
-              <Route path="billing" element={<Billing />} />
-              <Route path="modules" element={<FeatureManagement />} />
-              <Route path="plans" element={<FeatureManagement />} />
-              <Route path="content" element={<ContentManagement />} />
-              <Route path="onboarding" element={<OnboardingRequests />} />
-              <Route path="usage_limits" element={<UsageLimits />} />
-              <Route path="permissions" element={<RolesList />} />
-              <Route path="audit-logs" element={<AuditLogs />} />
-              <Route path="security" element={<SecuritySettings />} />
-              <Route path="bulk-ops" element={<BulkOps />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="api-keys" element={<ApiKeys />} />
-              <Route path="sso" element={<SsoSettings />} />
-              <Route path="tasks" element={<TaskCenter />} />
-              <Route path="messages" element={<SuperAdminMessages />} />
-              <Route path="mfa" element={<MfaSettings />} />
-              <Route path="reports_center" element={<ReportsCenter />} />
-              <Route path="license" element={<LicenseManagement />} />
-              <Route path="profile" element={<UserProfile />} />
+            {/* Super Admin Routes */}
+            <Route element={<ProtectedRoute allowedRoles={[UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor]} />}>
+              <Route path="/superadmin" element={<SuperAdminLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="schools" element={<SchoolsList />} />
+                <Route path="schools/:schoolId/manage" element={<SuperAdminSchoolManage />} />
+                <Route path="school-admins" element={<SchoolAdminsList />} />
+                <Route path="team" element={<SuperAdminTeamManagement />} />
+                <Route path="subscriptions" element={<SubscriptionsList />} />
+                <Route path="billing" element={<Billing />} />
+                <Route path="modules" element={<FeatureManagement />} />
+                <Route path="plans" element={<FeatureManagement />} />
+                <Route path="content" element={<ContentManagement />} />
+                <Route path="onboarding" element={<OnboardingRequests />} />
+                <Route path="usage_limits" element={<UsageLimits />} />
+                <Route path="permissions" element={<RolesList />} />
+                <Route path="audit-logs" element={<AuditLogs />} />
+                <Route path="security" element={<SecuritySettings />} />
+                <Route path="bulk-ops" element={<BulkOps />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="payment-settings" element={<PaymentSettings />} />
+                <Route path="api-keys" element={<ApiKeys />} />
+                <Route path="sso" element={<SsoSettings />} />
+                <Route path="tasks" element={<TaskCenter />} />
+                <Route path="messages" element={<SuperAdminMessages />} />
+                <Route path="mfa" element={<MfaSettings />} />
+                <Route path="reports_center" element={<ReportsCenter />} />
+                <Route path="license" element={<LicenseManagement />} />
+                <Route path="profile" element={<UserProfile />} />
+                <Route path="help-center" element={<HelpCenter />} />
+              </Route>
+              <Route path="/manage/school/:schoolId/*" element={<SchoolAdminLayout isSuperAdminView />} />
             </Route>
-            <Route path="/manage/school/:schoolId/*" element={<SchoolAdminLayout isSuperAdminView />} />
-          </Route>
 
-          {/* School Admin & Staff Routes */}
-          <Route element={<ProtectedRoute allowedRoles={[UserRole.SchoolAdmin, UserRole.Staff]} />}> 
-            <Route path="/school/subscription-locked" element={<SubscriptionLocked />} />
-            <Route path="/school/*" element={<SchoolAdminLayout />} />
-            <Route path="/staff/*" element={<SchoolAdminLayout />} />
-          </Route>
-          
-          {/* Teacher Routes */}
-          <Route element={<ProtectedRoute allowedRoles={[UserRole.Teacher]} />}>
-            <Route path="/teacher" element={<TeacherLayout />}>
+            {/* School Admin & Staff Routes */}
+            <Route element={<ProtectedRoute allowedRoles={[UserRole.SchoolAdmin, UserRole.Staff]} />}>
+              <Route path="/school/subscription-locked" element={<SubscriptionLocked />} />
+              <Route path="/school/*" element={<SchoolAdminLayout />} />
+              <Route path="/staff/*" element={<SchoolAdminLayout />} />
+            </Route>
+
+            {/* Driver Routes */}
+            <Route element={<ProtectedDriverRoute />}>
+              <Route path="/driver" element={<DriverLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<DriverDashboard />} />
+                <Route path="profile" element={<UserProfile />} />
+              </Route>
+            </Route>
+
+            {/* Teacher Routes */}
+            <Route element={<ProtectedRoute allowedRoles={[UserRole.Teacher]} />}>
+              <Route path="/teacher" element={<TeacherLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<TeacherDashboard />} />
                 <Route path="my_classes" element={<TeacherMyClasses />} />
@@ -224,26 +300,29 @@ const App: React.FC = () => {
                 <Route path="finance" element={<TeacherFinance />} />
                 <Route path="messaging" element={<Messaging />} />
                 <Route path="profile" element={<UserProfile />} />
+                <Route path="help-center" element={<HelpCenter />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Parent Routes */}
-          <Route element={<ProtectedRoute allowedRoles={[UserRole.Parent]} />}>
-             <Route path="/parent" element={<ParentLayout />}>
+            {/* Parent Routes */}
+            <Route element={<ProtectedRoute allowedRoles={[UserRole.Parent]} />}>
+              <Route path="/parent" element={<ParentLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<ParentDashboard />} />
                 <Route path="grades" element={<ParentGrades />} />
                 <Route path="attendance" element={<ParentAttendance />} />
                 <Route path="finance" element={<ParentFinance />} />
                 <Route path="schedule" element={<ParentSchedule />} />
+                <Route path="assignments" element={<ParentAssignments />} />
                 <Route path="requests" element={<ParentRequests />} />
                 <Route path="messaging" element={<Messaging />} />
                 <Route path="transportation" element={<ParentTransportation />} />
                 <Route path="profile" element={<UserProfile />} />
-             </Route>
-          </Route>
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="help-center" element={<HelpCenter />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </ErrorBoundary>
