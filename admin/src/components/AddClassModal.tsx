@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-import { NewClassData, Teacher } from '../types';
-import { useAppContext } from '../contexts/AppContext';
+import { NewClassData, Teacher, SchoolSettings } from '../types';
 
 interface AddClassModalProps {
   schoolId: number;
+  schoolSettings?: SchoolSettings | null;
   onClose: () => void;
   onSave: (data: NewClassData) => Promise<void>;
   defaultStage?: string;
   defaultGrade?: string;
 }
 
-const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave, defaultStage, defaultGrade }) => {
+const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, schoolSettings, onClose, onSave, defaultStage, defaultGrade }) => {
   const [formData, setFormData] = useState({
     stage: defaultStage || '',
     gradeLevel: defaultGrade || '',
@@ -23,7 +23,6 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const { schoolSettings } = useAppContext();
 
   const stageGradeMap: Record<string, string[]> = {
     'رياض أطفال': ['رياض أطفال'],

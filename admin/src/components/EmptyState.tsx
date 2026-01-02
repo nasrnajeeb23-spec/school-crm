@@ -10,10 +10,11 @@ interface EmptyStateProps {
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, title, message, actionText, onAction }) => {
+  const SafeIcon: any = Icon || (() => null);
   return (
     <div className="text-center py-12 px-6">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-        <Icon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+        <SafeIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
       <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{message}</p>

@@ -75,7 +75,7 @@ const SelfHostedQuoteModal: React.FC<SelfHostedQuoteModalProps> = ({ onClose }) 
         try {
             await api.submitPaymentProof(submission);
             const moduleIds = Array.from(selectedModuleIds);
-            const downloadUrl = await api.generateSelfHostedPackage(moduleIds);
+            const downloadUrl = await api.generateSelfHostedPackage({ moduleIds });
             setShowPaymentModal(false);
             setSubmissionComplete(true);
             setStep(3);

@@ -12,7 +12,8 @@
     "node": ">=20.15.1 <21"
   },
   "devDependencies": {
-    "esbuild": "^0.19.0"
+    "esbuild": "^0.19.0",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "axios": "^1.13.2"

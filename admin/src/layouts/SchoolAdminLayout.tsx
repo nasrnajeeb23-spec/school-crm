@@ -241,7 +241,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
                     <Route path="parents/:parentId" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><ParentManagement schoolId={school.id} /></ProtectedPage>} />
                     <Route path="staff" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffManagement schoolId={school.id} /></ProtectedPage>} />
                     <Route path="staff/attendance" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffAttendance schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} /></ProtectedPage>} />
+                    <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
                     <Route path="transportation" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><Transportation schoolId={school.id} /></ProtectedPage>} />
                     <Route path="transportation/drivers" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriversList schoolId={school.id} detailsPathPrefix="" /></ProtectedPage>} />
                     <Route path="transportation/drivers/:operatorId" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriverProfile schoolId={school.id} /></ProtectedPage>} />

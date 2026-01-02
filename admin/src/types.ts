@@ -231,6 +231,7 @@ export interface Module {
     description: string;
     monthlyPrice: number;
     oneTimePrice?: number;
+    annualPrice?: number;
     isEnabled: boolean;
     isCore?: boolean;
     isSystem?: boolean;
@@ -397,7 +398,7 @@ export interface BehaviorRecord {
 }
 
 export interface User {
-    id: string;
+    id: string | number;
     email: string;
     password?: unknown;
     role: UserRole;
@@ -414,6 +415,7 @@ export interface User {
     isActive?: boolean;
     department?: string;
     bankAccount?: string;
+    createdAt?: string;
 }
 
 export interface NewStaffData {
@@ -483,18 +485,31 @@ export interface Role {
     name: string;
     description: string;
     userCount: number;
+    key?: string;
+    schoolId?: number | null;
 }
 
 export interface Student {
     id: string;
     name: string;
     grade: string;
+    classId?: string | number;
     parentName: string;
     status: StudentStatus;
     registrationDate: string;
     profileImageUrl: string;
     dateOfBirth: string;
     homeLocation?: { address?: string; city?: string; lat?: number; lng?: number } | null;
+    parentPhone?: string;
+    parentEmail?: string;
+    address?: string;
+    city?: string;
+    gender?: 'ذكر' | 'أنثى';
+    nationalId?: string;
+    admissionDate?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    medicalNotes?: string;
 }
 
 export interface NewStudentData {

@@ -58,6 +58,7 @@ const billingRoutes = require('./routes/billing');
 const contactRoutes = require('./routes/contact');
 const reportsRoutes = require('./routes/reports');
 const driverRoutes = require('./routes/driver');
+const contentRoutes = require('./routes/content');
 const CronService = require('./services/CronService');
 const nodeCron = require('node-cron');
 const archiver = require('archiver');
@@ -66,6 +67,7 @@ const path = require('path');
 const fs = require('fs');
 const { checkStorageLimit, updateUsedStorage } = require('./middleware/storageLimits');
 const multer = require('multer');
+const crypto = require('crypto');
 
 
 const app = express();
@@ -73,7 +75,7 @@ app.set('trust proxy', 1);
 const server = http.createServer(app);
 app.locals.disabledModules = new Set();
 let Sentry;
-try { Sentry = require('@sentry/node'); } catch {}
+try { Sentry = require('@sentry/node'); } catch { }
 if (Sentry && process.env.SENTRY_DSN) {
   Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development' });
   app.use(Sentry.Handlers.requestHandler());
@@ -82,10 +84,10 @@ const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000,http://1
 const allowedOrigins = allowedOrigin.split(',').map(o => o.trim());
 allowedOrigins.push('https://school-crm-admin.onrender.com');
 if (process.env.FRONTEND_URL) {
-  try { allowedOrigins.push(process.env.FRONTEND_URL.trim()); } catch {}
+  try { allowedOrigins.push(process.env.FRONTEND_URL.trim()); } catch { }
 }
-const io = new Server(server, { 
-  cors: { 
+const io = new Server(server, {
+  cors: {
     origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST"]
@@ -96,14 +98,71 @@ app.set('io', io);
 io.on('connection', (socket) => {
   logger.info(`User Connected: ${socket.id}`);
 
-  socket.on('join_conversation', (roomId) => {
-    socket.join(roomId);
-    logger.info(`User ${socket.id} joined room: ${roomId}`);
-  });
+  try {
+    const raw = socket.handshake?.auth?.token || socket.handshake?.query?.token;
+    const token = Array.isArray(raw) ? raw[0] : raw;
+    if (token) {
+      const payload = jwt.verify(String(token), JWT_SECRET);
+      socket.user = payload;
+    }
+  } catch { }
 
-  socket.on('leave_conversation', (roomId) => {
-    socket.leave(roomId);
-    logger.info(`User ${socket.id} left room: ${roomId}`);
+  const canJoinRoom = async (roomId) => {
+    if (!socket.user) return true;
+    const { Conversation } = require('./models');
+    const conv = await Conversation.findOne({ where: { roomId } });
+    if (!conv) return false;
+    const u = socket.user || {};
+    const role = normalizeRole(u.role);
+    return (
+      (role === 'PARENT' && String(conv.parentId || '') === String(u.parentId || '')) ||
+      (role === 'TEACHER' && String(conv.teacherId || '') === String(u.teacherId || '')) ||
+      (role === 'SCHOOL_ADMIN' && Number(conv.schoolId || 0) === Number(u.schoolId || 0)) ||
+      isSuperAdminRole(u.role)
+    );
+  };
+
+  const tryJoin = async (roomId) => {
+    try {
+      if (!roomId) return;
+      const rid = String(roomId);
+      const allowed = await canJoinRoom(rid);
+      if (!allowed) return;
+      socket.join(rid);
+      logger.info(`User ${socket.id} joined room: ${rid}`);
+    } catch (e) {
+      try { logger.error(`Socket join error: ${e?.message || e}`); } catch { }
+    }
+  };
+
+  const tryLeave = (roomId) => {
+    try {
+      if (!roomId) return;
+      const rid = String(roomId);
+      socket.leave(rid);
+      logger.info(`User ${socket.id} left room: ${rid}`);
+    } catch { }
+  };
+
+  socket.on('join_conversation', (roomId) => { void tryJoin(roomId); });
+  socket.on('join_room', (roomId) => { void tryJoin(roomId); });
+  socket.on('leave_conversation', (roomId) => { tryLeave(roomId); });
+  socket.on('leave_room', (roomId) => { tryLeave(roomId); });
+
+  socket.on('send_message', async (payload) => {
+    try {
+      const { conversationId, roomId, text, senderId, senderRole } = payload || {};
+      if (!conversationId || !roomId || !text || !senderId || !senderRole) return;
+      const { Message } = require('./models');
+      const sid = socket.user?.id || senderId;
+      const srole = normalizeRole(socket.user?.role || senderRole);
+      const msg = await Message.create({ id: `msg_${Date.now()}`, conversationId, text, senderId: sid, senderRole: srole });
+      const out = { id: msg.id, conversationId, text, senderId: sid, senderRole: srole, timestamp: msg.createdAt };
+      io.to(roomId).emit('new_message', out);
+      io.to(roomId).emit('receive_message', out);
+    } catch (e) {
+      try { logger.error(`Socket send_message error: ${e?.message || e}`); } catch { }
+    }
   });
 
   socket.on('disconnect', () => {
@@ -113,6 +172,26 @@ io.on('connection', (socket) => {
 logger.info(`Server file path: ${__filename}`);
 
 app.locals.logger = logger;
+
+function getDbInfo() {
+  try {
+    const dial = sequelize.getDialect();
+    const info = { dialect: dial };
+    if (dial === 'sqlite') {
+      info.storage = (sequelize.options && sequelize.options.storage) ? sequelize.options.storage : null;
+    } else if (process.env.DATABASE_URL) {
+      try {
+        const u = new URL(process.env.DATABASE_URL);
+        info.host = u.hostname;
+        info.database = String(u.pathname || '').replace(/^\//, '');
+      } catch { }
+    }
+    return info;
+  } catch {
+    return {};
+  }
+}
+try { logger.info('db_info', getDbInfo()); } catch { }
 
 // Initialize central security policies (used by auth middleware)
 app.locals.securityPolicies = {
@@ -136,9 +215,94 @@ app.locals.securityPolicies = {
         sessionMaxAgeHours: Number(dbPolicy.sessionMaxAgeHours || 24)
       };
     }
-  } catch {}
+  } catch { }
 })();
 
+// Ensure RBAC permissions exist
+(async () => {
+  try {
+    const { RbacPermission } = require('./models');
+    const { ALL_PERMISSIONS } = require('./utils/permissionMatrix');
+    const existing = await RbacPermission.findAll({ attributes: ['key'] });
+    const existingKeys = new Set(existing.map(p => String(p.key)));
+    const toAdd = (Array.isArray(ALL_PERMISSIONS) ? ALL_PERMISSIONS : []).filter(k => !existingKeys.has(String(k)));
+    if (toAdd.length > 0) {
+      const display = { VIEW_CONTENT: 'عرض المحتوى', MANAGE_CONTENT: 'إدارة المحتوى' };
+      const rows = toAdd.map(k => ({
+        id: `perm_${String(k).toLowerCase().replace(/[^a-z0-9_]+/g, '_')}`,
+        key: String(k),
+        name: display[String(k)] || String(k).replace(/_/g, ' '),
+        description: null,
+        isSystem: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }));
+      await RbacPermission.bulkCreate(rows, { ignoreDuplicates: true });
+    }
+  } catch { }
+})();
+
+// Apply recommended permissions to SuperAdmin variants (merge mode)
+(async () => {
+  try {
+    const { User } = require('./models');
+    const { derivePermissionsForUser, normalizeDbRole } = require('./utils/permissionMatrix');
+    const { Op } = require('sequelize');
+    const users = await User.findAll({
+      where: { role: { [Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'] } },
+      order: [['id', 'ASC']]
+    });
+    let updated = 0;
+    for (const user of users) {
+      const recommended = derivePermissionsForUser({ role: normalizeDbRole(user.role) });
+      const current = Array.isArray(user.permissions) ? user.permissions : [];
+      const next = Array.from(new Set([...current, ...recommended]));
+      const a = [...current].slice().sort();
+      const b = [...next].slice().sort();
+      const same = JSON.stringify(a) === JSON.stringify(b);
+      if (!same) {
+        user.permissions = next;
+        await user.save();
+        updated++;
+      }
+    }
+    try { logger.info(`Applied recommended SuperAdmin variant permissions (merge). updated=${updated}`); } catch { }
+  } catch (e) { try { logger.warn(`Apply recommended SuperAdmin permissions failed: ${e.message}`); } catch { } }
+})();
+
+// Ensure global Content Manager role exists with content permissions
+(async () => {
+  try {
+    const { RbacRole, RbacPermission, RbacRolePermission } = require('./models');
+    const { Op } = require('sequelize');
+    const roleKey = 'CONTENT_MANAGER';
+    const roleName = 'مدير محتوى';
+    const roleDesc = 'يدير المحتوى العام للنظام';
+    let role = await RbacRole.findOne({ where: { key: roleKey, schoolId: null } });
+    if (!role) {
+      role = await RbacRole.create({
+        id: 'role_' + Date.now() + Math.random().toString(36).slice(2, 6),
+        key: roleKey,
+        name: roleName,
+        description: roleDesc,
+        schoolId: null,
+        isSystem: true
+      });
+    } else {
+      const updates = {};
+      if (role.name !== roleName) updates.name = roleName;
+      if (role.description !== roleDesc) updates.description = roleDesc;
+      if (Object.keys(updates).length) await role.update(updates);
+    }
+    const desiredKeys = ['VIEW_DASHBOARD', 'VIEW_CONTENT', 'MANAGE_CONTENT'];
+    const perms = await RbacPermission.findAll({ where: { key: { [Op.in]: desiredKeys } } });
+    const ids = perms.map(p => String(p.id));
+    await RbacRolePermission.destroy({ where: { roleId: String(role.id) } });
+    const now = new Date();
+    const rows = ids.map(pid => ({ id: crypto.randomUUID(), roleId: String(role.id), permissionId: pid, createdAt: now, updatedAt: now }));
+    if (rows.length) await RbacRolePermission.bulkCreate(rows, { ignoreDuplicates: true });
+  } catch { }
+})();
 // Middleware
 app.use((req, res, next) => {
   try {
@@ -186,7 +350,7 @@ app.use((req, res, next) => {
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
-  } catch {}
+  } catch { }
   next();
 });
 app.use(helmet({
@@ -212,10 +376,19 @@ app.use(helmet({
 }));
 
 const rateLimitWindow = parseInt(process.env.RATE_LIMIT_WINDOW) || 15;
-const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300;
-app.use(rateLimit({ 
-  windowMs: rateLimitWindow * 60 * 1000, 
+const rateLimitMaxRaw = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300;
+const isLocalFrontend = (() => {
+  try {
+    const url = String(process.env.FRONTEND_URL || '');
+    return !url || url.includes('localhost') || url.includes('127.0.0.1');
+  } catch { return true; }
+})();
+const rateLimitMax = isLocalFrontend ? Math.max(5000, rateLimitMaxRaw) : rateLimitMaxRaw;
+app.use(rateLimit({
+  windowMs: rateLimitWindow * 60 * 1000,
   max: rateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: rateLimitWindow * 60
@@ -230,21 +403,21 @@ app.use((req, res, next) => {
       const ms = Date.now() - start;
       const u = req.user || {};
       logger.info('http_access', { method: req.method, path: req.originalUrl || req.url, status: res.statusCode, durationMs: ms, userId: u.id || null, role: u.role || null, ip: req.ip });
-    } catch {}
+    } catch { }
   });
   next();
 });
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 // Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Standard API response middleware
-try { app.use(require('./middleware/response').responseFormatter); } catch {}
+try { app.use(require('./middleware/response').responseFormatter); } catch { }
 let promClient;
-try { promClient = require('prom-client'); } catch {}
-if (promClient) { 
+try { promClient = require('prom-client'); } catch { }
+if (promClient) {
   promClient.collectDefaultMetrics();
-  const httpRequestCounter = new promClient.Counter({ name: 'http_requests_total', help: 'Total HTTP requests', labelNames: ['method','route','status'] });
-  const httpRequestDuration = new promClient.Histogram({ name: 'http_request_duration_seconds', help: 'HTTP request duration in seconds', labelNames: ['method','route','status'], buckets: [0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10] });
+  const httpRequestCounter = new promClient.Counter({ name: 'http_requests_total', help: 'Total HTTP requests', labelNames: ['method', 'route', 'status'] });
+  const httpRequestDuration = new promClient.Histogram({ name: 'http_request_duration_seconds', help: 'HTTP request duration in seconds', labelNames: ['method', 'route', 'status'], buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10] });
   app.use((req, res, next) => {
     const start = process.hrtime.bigint();
     res.on('finish', () => {
@@ -258,7 +431,7 @@ if (promClient) {
         if (Sentry && process.env.SENTRY_DSN && res.statusCode >= 500) {
           Sentry.captureMessage('HTTP_5xx', { level: 'fatal', extra: { method: req.method, route, status: res.statusCode, duration_seconds: sec } });
         }
-      } catch {}
+      } catch { }
     });
     next();
   });
@@ -295,14 +468,14 @@ try {
       const redis = require('redis');
       const useTls = process.env.REDIS_URL.startsWith('rediss://');
       client = redis.createClient({ url: process.env.REDIS_URL, socket: useTls ? { tls: true } : {} });
-      client.on('error', (err) => { try { logger.warn('Redis client error'); } catch {} });
-      client.connect().catch(() => {});
+      client.on('error', (err) => { try { logger.warn('Redis client error'); } catch { } });
+      client.connect().catch(() => { });
       sessionConfig.store = new RedisStore({ client });
       app.locals.redisClient = client;
-      try { logger.info('Session store: Redis'); } catch {}
-    } catch {}
+      try { logger.info('Session store: Redis'); } catch { }
+    } catch { }
   }
-} catch {}
+} catch { }
 app.use(session(sessionConfig));
 app.use(samlAuth.initialize());
 app.use(samlAuth.session());
@@ -321,16 +494,16 @@ if (licenseKey) {
   } else {
     logger.warn('Invalid license. Reason: ' + result.reason);
     if (process.env.NODE_ENV === 'production') {
-        logger.error('CRITICAL: Invalid License in Production. Shutting down.');
-        // In a real obfuscated build, this ensures the server won't run without a valid key.
-        // process.exit(1); // Commented out for dev safety, but uncomment for production build logic
+      logger.error('CRITICAL: Invalid License in Production. Shutting down.');
+      // In a real obfuscated build, this ensures the server won't run without a valid key.
+      // process.exit(1); // Commented out for dev safety, but uncomment for production build logic
     }
   }
 } else {
   logger.warn('No LICENSE_KEY provided.');
   if (process.env.NODE_ENV === 'production') {
-      logger.error('CRITICAL: No License Key found in Production. Shutting down.');
-      // process.exit(1); 
+    logger.error('CRITICAL: No License Key found in Production. Shutting down.');
+    // process.exit(1); 
   } else {
     allowedModules = [...allowedModules, 'finance', 'transportation'];
     logger.warn('Dev mode: enabling finance & transportation modules for testing');
@@ -343,20 +516,20 @@ app.locals.allowedModules = allowedModules;
 // If admin/dist exists relative to backend, serve it.
 const frontendDist = path.join(__dirname, '..', 'admin', 'dist');
 if (fs.existsSync(frontendDist)) {
-    logger.info('Serving static frontend from admin/dist');
-    app.use(express.static(frontendDist));
-    // SPA Fallback
-    app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-        res.sendFile(path.join(frontendDist, 'index.html'));
-    });
+  logger.info('Serving static frontend from admin/dist');
+  app.use(express.static(frontendDist));
+  // SPA Fallback
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
 }
 
 const { Job } = require('./models');
 const cron = require('node-cron');
 app.locals.enqueueJob = (name, payload, executor) => {
-  const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-  Job.create({ id, name, status: 'queued', schoolId: Number(payload.schoolId || 0) }).catch(() => {});
+  const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  Job.create({ id, name, status: 'queued', schoolId: Number(payload.schoolId || 0) }).catch(() => { });
   setImmediate(async () => {
     try {
       await Job.update({ status: 'running', updatedAt: new Date() }, { where: { id } });
@@ -368,7 +541,7 @@ app.locals.enqueueJob = (name, payload, executor) => {
         if (result && result.zip) await redis.setEx(`job:${id}:zip`, 3600, result.zip.toString('base64'));
       }
     } catch (e) {
-      await Job.update({ status: 'failed', updatedAt: new Date() }, { where: { id } }).catch(() => {});
+      await Job.update({ status: 'failed', updatedAt: new Date() }, { where: { id } }).catch(() => { });
     }
   });
   return id;
@@ -378,7 +551,7 @@ app.locals.cronTasks = Object.create(null);
 app.locals.scheduleBackupForSchool = async (schoolId, cronExpr) => {
   const sid = String(schoolId);
   if (app.locals.cronTasks[sid]) {
-    try { app.locals.cronTasks[sid].stop(); } catch {}
+    try { app.locals.cronTasks[sid].stop(); } catch { }
     delete app.locals.cronTasks[sid];
   }
   if (!cronExpr || typeof cronExpr !== 'string') return;
@@ -388,7 +561,7 @@ app.locals.scheduleBackupForSchool = async (schoolId, cronExpr) => {
         const { SchoolSettings, AuditLog } = require('./models');
         const s = await SchoolSettings.findOne({ where: { schoolId } }).catch(() => null);
         const cfg = s?.backupConfig || {};
-        const types = Array.isArray(cfg.types) ? cfg.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'];
+        const types = Array.isArray(cfg.types) ? cfg.types : ['students', 'classes', 'subjects', 'classSubjectTeachers', 'grades', 'attendance', 'schedule', 'fees', 'teachers', 'parents'];
         const full = await storeBackupZip(Number(schoolId), types, {});
         const fs = require('fs');
         const path = require('path');
@@ -396,10 +569,10 @@ app.locals.scheduleBackupForSchool = async (schoolId, cronExpr) => {
         try {
           const stat = fs.statSync(full);
           await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(schoolId), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
-        } catch {}
+        } catch { }
         return { ok: true, jobType: 'backup_store', schoolId, zip: buffer };
       });
-    } catch {}
+    } catch { }
   }, { scheduled: true });
   app.locals.cronTasks[sid] = task;
 };
@@ -414,7 +587,7 @@ app.locals.reloadBackupSchedules = async () => {
       const expr = await redis.get(`backup:schedule:${sid}`).catch(() => null);
       await app.locals.scheduleBackupForSchool(Number(sid), expr);
     }
-  } catch {}
+  } catch { }
 };
 
 app.locals.cleanupOldBackups = async () => {
@@ -427,19 +600,20 @@ app.locals.cleanupOldBackups = async () => {
     const outdated = await Job.findAll({ where: { status: 'completed', updatedAt: { [require('sequelize').Op.lt]: cutoff } }, raw: true }).catch(() => []);
     for (const j of outdated) {
       if (redis) {
-        await redis.del(`job:${j.id}:csv`).catch(() => {});
-        await redis.del(`job:${j.id}:zip`).catch(() => {});
+        await redis.del(`job:${j.id}:csv`).catch(() => { });
+        await redis.del(`job:${j.id}:zip`).catch(() => { });
       }
     }
-  } catch {}
+  } catch { }
 };
 
-nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch {} }, { scheduled: true });
+nodeCron.schedule('0 3 * * *', async () => { try { await app.locals.cleanupOldBackups(); } catch { } }, { scheduled: true });
 
 // API Routes
 const authLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 50 });
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/superadmin', authLimiter, authSuperAdminRoutes);
+app.use('/api/auth/superadmin', authSuperAdminRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/schools', verifyToken, schoolsRoutes);
 app.use('/api/plans', plansRoutes);
@@ -449,6 +623,10 @@ app.use('/api/subscriptions', subscriptionsRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/school', schoolAdminRoutes);
 app.use('/api/teacher', teacherRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/payment-settings', require('./routes/paymentSettings'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/parent', parentRoutes);
 app.use('/api/license', licenseRoutes);
 app.use('/api/transportation', transportationRoutes);
@@ -463,6 +641,7 @@ app.use('/api/pricing', pricingRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/content', contentRoutes);
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);
@@ -480,7 +659,7 @@ app.use('/public', schoolsRoutes);
     const bcrypt = require('bcryptjs');
     const email = process.env.SUPER_ADMIN_EMAIL;
     const pwd = process.env.SUPER_ADMIN_PASSWORD;
-    
+
     if (!email || !pwd) {
       console.warn('⚠️ SuperAdmin credentials not found in environment variables. Skipping auto-creation.');
       return;
@@ -500,7 +679,7 @@ app.use('/public', schoolsRoutes);
         await u.update({ role: 'SuperAdmin' });
       }
     }
-  } catch {}
+  } catch { }
 })();
 
 app.get('/api/proxy/image', async (req, res) => {
@@ -528,7 +707,7 @@ app.get('/api/proxy/image', async (req, res) => {
       };
       const reqUpstream = client.request(options, (resp) => {
         const code = resp.statusCode || 200;
-        if ([301,302,303,307,308].includes(code)) {
+        if ([301, 302, 303, 307, 308].includes(code)) {
           const loc = resp.headers['location'];
           if (loc) return doRequest(loc, redirects + 1);
         }
@@ -537,7 +716,7 @@ app.get('/api/proxy/image', async (req, res) => {
         res.setHeader('Cache-Control', 'public, max-age=3600');
         resp.pipe(res);
       });
-      reqUpstream.on('error', () => { try { res.status(500).end(); } catch {} });
+      reqUpstream.on('error', () => { try { res.status(500).end(); } catch { } });
       reqUpstream.end();
     };
     return doRequest(startUrl, 0);
@@ -567,7 +746,7 @@ app.post('/api/ads/request', async (req, res) => {
     const row = await ContactMessage.create({ name: String(advertiserName), email: String(advertiserEmail), message, status: 'NEW' });
     return res.status(201).json({ id: row.id, status: 'NEW' });
   } catch (e) {
-    try { console.error('AD request error:', e?.message || e); } catch {}
+    try { console.error('AD request error:', e?.message || e); } catch { }
     return res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -592,7 +771,7 @@ app.post('/ads/request', async (req, res) => {
     const row = await ContactMessage.create({ name: String(advertiserName), email: String(advertiserEmail), message, status: 'NEW' });
     return res.status(201).json({ id: row.id, status: 'NEW' });
   } catch (e) {
-    try { console.error('AD request error (alias):', e?.message || e); } catch {}
+    try { console.error('AD request error (alias):', e?.message || e); } catch { }
     return res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -602,7 +781,7 @@ app.post('/ads/request', async (req, res) => {
   try {
     const { sequelize } = require('./models');
     const queryInterface = sequelize.getQueryInterface();
-    
+
     // Check and add customLimits to Subscriptions
     try {
       const tableDesc = await queryInterface.describeTable('Subscriptions');
@@ -617,24 +796,24 @@ app.post('/ads/request', async (req, res) => {
 
     // Check and add priceSnapshot to SubscriptionModules
     try {
-        // SubscriptionModules might not exist yet, let sequelize sync handle creation if model exists, 
-        // but if table exists and column missing:
-        const tableDesc = await queryInterface.describeTable('SubscriptionModules');
-        if (!tableDesc.priceSnapshot) {
-          console.log('Adding priceSnapshot to SubscriptionModules...');
-          await queryInterface.addColumn('SubscriptionModules', 'priceSnapshot', {
-             type: require('sequelize').DataTypes.FLOAT,
-             allowNull: true
-          });
-        }
-    } catch (e) { 
-        // Table might not exist, ignore
+      // SubscriptionModules might not exist yet, let sequelize sync handle creation if model exists, 
+      // but if table exists and column missing:
+      const tableDesc = await queryInterface.describeTable('SubscriptionModules');
+      if (!tableDesc.priceSnapshot) {
+        console.log('Adding priceSnapshot to SubscriptionModules...');
+        await queryInterface.addColumn('SubscriptionModules', 'priceSnapshot', {
+          type: require('sequelize').DataTypes.FLOAT,
+          allowNull: true
+        });
+      }
+    } catch (e) {
+      // Table might not exist, ignore
     }
 
     // Ensure SubscriptionModule table exists
     try {
-        await sequelize.models.SubscriptionModule.sync(); 
-    } catch(e) {}
+      await sequelize.models.SubscriptionModule.sync();
+    } catch (e) { }
 
     // Ensure new pricing columns exist
     try {
@@ -659,7 +838,7 @@ app.post('/ads/request', async (req, res) => {
         console.log('Adding yearlyDiscountPercent to pricing_config...');
         await queryInterface.addColumn('pricing_config', 'yearlyDiscountPercent', { type: require('sequelize').DataTypes.FLOAT, allowNull: true, defaultValue: 0 });
       }
-    } catch (e) { try { console.warn('Schema Fix pricing_config:', e.message); } catch {} }
+    } catch (e) { try { console.warn('Schema Fix pricing_config:', e.message); } catch { } }
 
   } catch (err) {
     console.error('Schema Fixer Error:', err.message);
@@ -695,9 +874,9 @@ app.get('/api/health', async (req, res) => {
     // Redis check
     const client = app.locals.redisClient;
     if (client) {
-      try { const pong = await client.ping(); out.data.redis.connected = true; out.data.redis.ping = pong; } catch {}
+      try { const pong = await client.ping(); out.data.redis.connected = true; out.data.redis.ping = pong; } catch { }
     }
-  } catch {}
+  } catch { }
   try {
     // DB check
     const db = require('./models');
@@ -714,9 +893,9 @@ app.get('/api/health', async (req, res) => {
         const idx = await qi.showIndex(t);
         out.data.indexes.tables.push({ table: t, indexes: (idx || []).map(i => ({ name: i.name || i.indexName || '', fields: i.fields ? i.fields.map(f => f.attribute || f) : [] })) });
         out.data.indexes.checked = true;
-      } catch {}
+      } catch { }
     }
-  } catch {}
+  } catch { }
   try { return res.json(out); } catch { return res.status(200).json(out); }
 });
 
@@ -738,16 +917,16 @@ app.locals.modulesCatalog = modulesCatalog;
 // Attachments: config and helpers
 const MAX_ATTACHMENT_SIZE = parseInt(process.env.MAX_ATTACHMENT_SIZE || `${25 * 1024 * 1024}`, 10); // 25 MB
 const allowedMimeTypes = new Set([
-  'image/png','image/jpeg','image/jpg','image/gif',
+  'image/png', 'image/jpeg', 'image/jpg', 'image/gif',
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
   'text/plain'
 ]);
-function ensureDir(p){ try { fs.mkdirSync(p, { recursive: true }); } catch {} }
-function makeSafeName(name){
+function ensureDir(p) { try { fs.mkdirSync(p, { recursive: true }); } catch { } }
+function makeSafeName(name) {
   const base = path.basename(name).replace(/[^A-Za-z0-9._-]+/g, '_');
-  return `${Date.now()}_${Math.random().toString(36).slice(2,8)}_${base}`;
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${base}`;
 }
 const assignmentStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -782,7 +961,7 @@ app.post('/api/assignments', verifyToken, requireRole('TEACHER'), checkStorageLi
     if (!teacher) return res.status(404).json({ msg: 'Teacher not found' });
     if (Number(teacher.schoolId) !== Number(cls.schoolId)) return res.status(403).json({ msg: 'Access denied' });
     const files = Array.isArray(req.files) ? req.files : [];
-    
+
     // Update storage usage
     let totalSize = 0;
     for (const f of files) {
@@ -813,7 +992,7 @@ app.post('/api/assignments', verifyToken, requireRole('TEACHER'), checkStorageLi
     // Fix attachment URLs with real assignmentId
     if (attachments.length > 0) {
       assignment.attachments = attachments.map(a => ({ ...a, url: `/api/assignments/${assignment.id}/attachments/${encodeURIComponent(a.filename)}` }));
-      try { await assignment.save(); } catch {}
+      try { await assignment.save(); } catch { }
     }
     const students = await Student.findAll({ where: { classId: String(cls.id), schoolId: Number(teacher.schoolId) } });
     if (students && students.length > 0) {
@@ -822,7 +1001,7 @@ app.post('/api/assignments', verifyToken, requireRole('TEACHER'), checkStorageLi
           students.map(s => ({ assignmentId: assignment.id, studentId: s.id, status: 'NotSubmitted', attachments: [] })),
           { validate: true }
         );
-      } catch (e) { try { console.warn('Bulk create submissions failed', e?.message || e); } catch {} }
+      } catch (e) { try { console.warn('Bulk create submissions failed', e?.message || e); } catch { } }
     }
     const className = `${cls.gradeLevel} (${cls.section || 'أ'})`;
     return res.status(201).json({
@@ -836,19 +1015,19 @@ app.post('/api/assignments', verifyToken, requireRole('TEACHER'), checkStorageLi
       attachments: Array.isArray(assignment.attachments) ? assignment.attachments : []
     });
   } catch (e) {
-    try { console.error('Create assignment error:', e?.message || e); } catch {}
+    try { console.error('Create assignment error:', e?.message || e); } catch { }
     res.status(500).json({ msg: 'Server Error' });
   }
 });
 
-app.get('/api/school/class/:classId/assignments', verifyToken, requireRole('TEACHER','SCHOOL_ADMIN','SUPER_ADMIN'), async (req, res) => {
+app.get('/api/school/class/:classId/assignments', verifyToken, requireRole('TEACHER', 'SCHOOL_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { Assignment, Class, Teacher, Submission } = require('./models');
     const classId = String(req.params.classId);
     const cls = await Class.findByPk(classId);
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
     if (!isSuperAdminUser(req.user) && Number(req.user.schoolId || 0) !== Number(cls.schoolId || 0)) return res.status(403).json({ msg: 'Access denied' });
-    const rows = await Assignment.findAll({ where: { classId }, include: [{ model: Class, attributes: ['gradeLevel','section'] }, { model: Teacher, attributes: ['name'] }], order: [['createdAt','DESC']] });
+    const rows = await Assignment.findAll({ where: { classId }, include: [{ model: Class, attributes: ['gradeLevel', 'section'] }, { model: Teacher, attributes: ['name'] }], order: [['createdAt', 'DESC']] });
     const list = [];
     for (const a of rows) {
       const j = a.toJSON();
@@ -875,7 +1054,7 @@ app.get('/api/school/class/:classId/assignments', verifyToken, requireRole('TEAC
     }
     return res.json(list);
   } catch (e) {
-    try { console.error('List class assignments error:', e?.message || e); } catch {}
+    try { console.error('List class assignments error:', e?.message || e); } catch { }
     res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -890,7 +1069,7 @@ app.get('/api/assignments/:assignmentId/submissions', verifyToken, requireRole('
     if (Number(assignment.teacherId || 0) !== teacherId) return res.status(403).json({ msg: 'Access denied' });
     const cls = await Class.findByPk(String(assignment.classId));
     if (!cls) return res.status(404).json({ msg: 'Class not found' });
-    const students = await Student.findAll({ where: { classId: String(cls.id) }, order: [['name','ASC']] });
+    const students = await Student.findAll({ where: { classId: String(cls.id) }, order: [['name', 'ASC']] });
     const rows = await Submission.findAll({ where: { assignmentId: assignment.id } });
     const map = new Map(rows.map(r => [String(r.studentId), r]));
     const statusMap = { Submitted: 'تم التسليم', NotSubmitted: 'لم يسلم', Late: 'متأخر', Graded: 'تم التقييم' };
@@ -930,7 +1109,7 @@ app.get('/api/assignments/:assignmentId/submissions', verifyToken, requireRole('
     });
     return res.json(result);
   } catch (e) {
-    try { console.error('List submissions error:', e?.message || e); } catch {}
+    try { console.error('List submissions error:', e?.message || e); } catch { }
     res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -970,7 +1149,7 @@ app.put('/api/submissions/:id/grade', verifyToken, requireRole('TEACHER'), async
       })) : []
     });
   } catch (e) {
-    try { console.error('Grade submission error:', e?.message || e); } catch {}
+    try { console.error('Grade submission error:', e?.message || e); } catch { }
     res.status(500).json({ msg: 'Server Error' });
   }
 });
@@ -990,7 +1169,7 @@ app.get('/api/assignments/:assignmentId/attachments/:filename', verifyToken, req
     res.setHeader('Content-Disposition', `inline; filename=${filename}`);
     res.type(path.extname(filename));
     fs.createReadStream(filePath).pipe(res);
-  } catch (e) { try { console.error('Download assignment attachment error:', e?.message || e); } catch {} res.status(500).json({ msg: 'Server Error' }); }
+  } catch (e) { try { console.error('Download assignment attachment error:', e?.message || e); } catch { } res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // Parent download: teacher attachments for assignments (secure, same school)
@@ -1010,7 +1189,7 @@ app.get('/api/parent/:parentId/assignments/:assignmentId/attachments/:filename',
     res.setHeader('Content-Disposition', `inline; filename=${filename}`);
     res.type(path.extname(filename));
     fs.createReadStream(filePath).pipe(res);
-  } catch (e) { try { console.error('Parent download assignment attachment error:', e?.message || e); } catch {} res.status(500).json({ msg: 'Server Error' }); }
+  } catch (e) { try { console.error('Parent download assignment attachment error:', e?.message || e); } catch { } res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // Download submission attachments (teacher review)
@@ -1030,22 +1209,26 @@ app.get('/api/submissions/:id/attachments/:filename', verifyToken, requireRole('
     res.setHeader('Content-Disposition', `inline; filename=${filename}`);
     res.type(path.extname(filename));
     fs.createReadStream(filePath).pipe(res);
-  } catch (e) { try { console.error('Download submission attachment error:', e?.message || e); } catch {} res.status(500).json({ msg: 'Server Error' }); }
+  } catch (e) { try { console.error('Download submission attachment error:', e?.message || e); } catch { } res.status(500).json({ msg: 'Server Error' }); }
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
+  res.status(200).json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
   });
 });
 
+app.get('/api/diagnostics/db', (req, res) => {
+  res.json(getDbInfo());
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'SchoolSaaS CRM Backend is running',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
@@ -1060,7 +1243,7 @@ app.use((err, req, res, next) => {
   try {
     const status = err.status || 500;
     const msg = err.message || 'Server Error';
-    try { (req.app?.locals?.logger || console).error(msg); } catch {}
+    try { (req.app?.locals?.logger || console).error(msg); } catch { }
     res.status(status).json({ msg });
   } catch {
     res.status(500).json({ msg: 'Server Error' });
@@ -1076,33 +1259,33 @@ const PORT = process.env.PORT || 5000;
 logger.info(`Starting server on port ${PORT}`);
 
 // Connect to database and start server
-async function syncDatabase(){
+async function syncDatabase() {
   const isProd = process.env.NODE_ENV === 'production';
   // Sync database without force to preserve data
   const opts = { force: false };
-  
+
   // Sync models in correct order to avoid foreign key constraint issues
   const { School, Plan, Subscription, BusOperator, Route, Parent, Student, Teacher, User, Conversation, Message, Expense, SchoolSettings, Class, SalaryStructure, SalarySlip, StaffAttendance, TeacherAttendance, Schedule, FeeSetup, Notification, ModuleCatalog, PricingConfig, BehaviorRecord, Invoice, Payment, ContactMessage, Assignment, Submission } = require('./models');
-  
+
   if (isProd) {
     console.log('Production: Skipping sequelize.sync() in server.js. Relying on migrations.');
   } else {
     // Sync independent tables first
     await School.sync(opts);
-    try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch {}
+    try { await require('./models').sequelize.getQueryInterface().dropTable('SchoolSettings_backup'); } catch { }
     await SchoolSettings.sync(opts);
     await Plan.sync(opts);
     await BusOperator.sync(opts);
     await Parent.sync(opts);
-    try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch {}
-    try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch {}
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Students_backup'); } catch { }
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Teachers_backup'); } catch { }
     await Student.sync(opts);
     await Teacher.sync(opts);
     await Class.sync(opts);
     await FeeSetup.sync(opts);
     await Invoice.sync(opts);
     await Payment.sync(opts);
-    
+
     // Then sync dependent tables
     await Subscription.sync(opts);
     await Route.sync(opts);
@@ -1115,10 +1298,11 @@ async function syncDatabase(){
     await StaffAttendance.sync(isProd ? { force: false } : { alter: true });
     await TeacherAttendance.sync(isProd ? { force: false } : { alter: true });
     await Schedule.sync(isProd ? { force: false } : { alter: true });
+    try { await require('./models').sequelize.getQueryInterface().dropTable('Notifications_backup'); } catch { }
     await Notification.sync(isProd ? { force: false } : { alter: true });
     await Assignment.sync({ force: false });
     await Submission.sync({ force: false });
-    try { await require('./models').sequelize.getQueryInterface().dropTable('module_catalog_backup'); } catch {}
+    try { await require('./models').sequelize.getQueryInterface().dropTable('module_catalog_backup'); } catch { }
     await ModuleCatalog.sync({ force: false });
     await PricingConfig.sync(isProd ? { force: false } : { alter: true });
     await BehaviorRecord.sync(isProd ? { force: false } : { alter: true });
@@ -1128,7 +1312,7 @@ async function syncDatabase(){
 syncDatabase()
   .then(async () => {
     console.log('Database connected successfully.');
-    
+
     // Initialize Cron Service
     try {
       CronService.init();
@@ -1142,57 +1326,58 @@ syncDatabase()
       const planCount = await Plan.count().catch(() => 0);
       const allFeatures = ['student_management', 'academic_management', 'parent_portal', 'teacher_portal', 'teacher_app', 'finance_fees', 'finance_salaries', 'finance_expenses', 'transportation', 'advanced_reports', 'messaging'];
       if (planCount === 0) {
-        await Plan.bulkCreate([
+        const plansSeed = [
           { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: allFeatures, limits: { students: 200, teachers: 15, invoices: 200, storageGB: 5 }, recommended: false },
           { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: allFeatures, limits: { students: 1000, teachers: 50, invoices: 2000, storageGB: 50 }, recommended: true },
           { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: allFeatures, limits: { students: 'غير محدود', teachers: 'غير محدود', invoices: 'غير محدود', storageGB: 'غير محدود' }, recommended: false },
-        ]);
+        ];
+        for (const p of plansSeed) {
+          const [row] = await Plan.findOrCreate({ where: { id: p.id }, defaults: p });
+          await row.update(p).catch(() => { });
+        }
       }
       if (userCount === 0) {
-        const school = await School.create({ id: 1, name: 'مدرسة النهضة الحديثة', contactEmail: 'info@nahda.com', studentCount: 0, teacherCount: 0, balance: 0 });
-        await Subscription.create({ schoolId: school.id, planId: 2, status: 'ACTIVE', renewalDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365) });
-        await User.bulkCreate([
-          { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash('password', 10), role: 'SuperAdmin' },
-          { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id },
-        ]);
-    // Transportation seed
-        const op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
-        const rt = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
-        const parent = await Parent.create({ name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id });
-        const student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] });
-        await RouteStudent.create({ routeId: rt.id, studentId: student.id });
-        console.log('Seeded minimal dev data');
+        const [school] = await School.findOrCreate({ where: { id: 1 }, defaults: { id: 1, name: 'مدرسة النهضة الحديثة', contactEmail: 'info@nahda.com', studentCount: 0, teacherCount: 0, balance: 0 } });
+        await Subscription.findOrCreate({ where: { schoolId: school.id }, defaults: { schoolId: school.id, planId: 2, status: 'ACTIVE', renewalDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365) } });
+        await User.findOrCreate({ where: { email: 'super@admin.com' }, defaults: { name: 'المدير العام', email: 'super@admin.com', password: await bcrypt.hash('password', 10), role: 'SuperAdmin' } });
+        await User.findOrCreate({ where: { email: 'admin@school.com' }, defaults: { name: 'مدير مدرسة النهضة', email: 'admin@school.com', password: await bcrypt.hash('password', 10), role: 'SchoolAdmin', schoolId: school.id } });
+        const [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
+        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
+        const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id } });
+        const [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', schoolId: school.id, registrationDate: new Date().toISOString().split('T')[0] } });
+        await RouteStudent.findOrCreate({ where: { routeId: rt.id, studentId: student.id }, defaults: { routeId: rt.id, studentId: student.id } });
+        console.log('Seeded minimal dev data (idempotent)');
       }
       // Ensure demo parent/student and transportation always exist
       const school = await School.findOne();
       if (school) {
         const [parent] = await Parent.findOrCreate({ where: { email: 'parent@school.com' }, defaults: { name: 'محمد عبدالله', phone: '0502223344', email: 'parent@school.com', status: 'Active', schoolId: school.id } });
-        if (!parent.schoolId) { try { parent.schoolId = school.id; await parent.save(); } catch {} }
-        let [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
+        if (!parent.schoolId) { try { parent.schoolId = school.id; await parent.save(); } catch { } }
+        let [student] = await Student.findOrCreate({ where: { name: 'أحمد محمد عبدالله' }, defaults: { id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id } });
         if (!student.id) {
-          try { await student.destroy(); } catch {}
-          student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id });
+          try { await student.destroy(); } catch { }
+          student = await Student.create({ id: 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد محمد عبدالله', grade: 'الصف الخامس', parentName: parent.name, parentId: parent.id, dateOfBirth: '2014-01-01', status: 'Active', registrationDate: new Date().toISOString().split('T')[0], profileImageUrl: '', schoolId: school.id });
         } else {
           try {
             if (!student.parentId) { student.parentId = parent.id; }
             if (!student.parentName) { student.parentName = parent.name; }
             if (!student.schoolId) { student.schoolId = school.id; }
             await student.save();
-          } catch {}
+          } catch { }
         }
-        let [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
+        let [op] = await BusOperator.findOrCreate({ where: { phone: '0501112233' }, defaults: { id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id } });
         if (!op.id) {
-          try { await op.destroy(); } catch {}
-          op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
+          try { await op.destroy(); } catch { }
+          op = await BusOperator.create({ id: 'bus_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'أحمد علي', phone: '0501112233', licenseNumber: 'A12345', busPlateNumber: 'أ ب ج ١٢٣٤', busCapacity: 25, busModel: 'Toyota Coaster 2022', status: 'Approved', schoolId: school.id });
         }
-        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
+        const [rt] = await Route.findOrCreate({ where: { name: 'مسار حي الياسمين' }, defaults: { id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id } });
         let routeToUse = rt;
         if (!routeToUse.id) {
-          try { await routeToUse.destroy(); } catch {}
-          routeToUse = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
+          try { await routeToUse.destroy(); } catch { }
+          routeToUse = await Route.create({ id: 'route_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'مسار حي الياسمين', schoolId: school.id, busOperatorId: op.id });
         }
-        try { await RouteStudent.destroy({ where: { routeId: null } }); } catch {}
-        try { await RouteStudent.destroy({ where: { studentId: null } }); } catch {}
+        try { await RouteStudent.destroy({ where: { routeId: null } }); } catch { }
+        try { await RouteStudent.destroy({ where: { studentId: null } }); } catch { }
         await RouteStudent.findOrCreate({ where: { routeId: routeToUse.id, studentId: student.id }, defaults: { routeId: routeToUse.id, studentId: student.id } });
         // Ensure parent user for dashboard login
         const { User } = require('./models');
@@ -1215,6 +1400,35 @@ syncDatabase()
     } catch (e) {
       console.warn('Seeding skipped or failed:', e?.message || e);
     }
+    try {
+      const { User, Parent } = require('./models');
+      const p = await Parent.findOne({ where: { email: 'parent@school.com' } });
+      const u = await User.findOne({ where: { email: 'parent@school.com' } });
+      if (p && u) {
+        let changed = false;
+        if (String(u.parentId || '') !== String(p.id || '')) { u.parentId = p.id; changed = true; }
+        if (Number(u.schoolId || 0) !== Number(p.schoolId || 0)) { u.schoolId = p.schoolId; changed = true; }
+        if (changed) { u.isActive = true; await u.save(); }
+        const { Student } = require('./models');
+        let s = await Student.findOne({ where: { schoolId: p.schoolId, parentId: p.id } });
+        if (!s) {
+          const s1 = await Student.findOne({ where: { id: 'std_001' } });
+          if (s1) {
+            s1.parentId = p.id;
+            await s1.save();
+          } else {
+            const id = 'stu_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            await Student.create({ id, name: 'طالب ولي الأمر', grade: 'الصف الرابع', parentName: p.name || '', parentId: p.id, dateOfBirth: '2015-01-01', status: 'Active', schoolId: p.schoolId, registrationDate: new Date().toISOString().split('T')[0] });
+          }
+        }
+      }
+      const su = await User.findOne({ where: { email: 'super@admin.com' } });
+      if (su) {
+        su.password = await bcrypt.hash('1234567890123456', 10);
+        su.isActive = true;
+        await su.save();
+      }
+    } catch { }
     // Ensure critical indexes exist in production
     try {
       const db = require('./models');
@@ -1229,83 +1443,47 @@ syncDatabase()
             return f.join(',') === fields.join(',');
           });
           if (!exists) {
-            const name = `idx_${String(table).replace(/[^a-z0-9_]/gi,'_')}_${fields.join('_')}`.toLowerCase();
+            const name = `idx_${String(table).replace(/[^a-z0-9_]/gi, '_')}_${fields.join('_')}`.toLowerCase();
             await qi.addIndex(table, fields, { name });
-            try { logger.info(`Added index ${name} on ${table}`); } catch {}
+            try { logger.info(`Added index ${name} on ${table}`); } catch { }
           }
-        } catch (e) { try { logger.warn(`Index ensure failed ${nameHint || fields.join(',')}: ${e?.message || e}`); } catch {} }
+        } catch (e) { try { logger.warn(`Index ensure failed ${nameHint || fields.join(',')}: ${e?.message || e}`); } catch { } }
       };
       await ensureIndex(db.FeeSetup, ['schoolId'], 'fee_school');
-      await ensureIndex(db.FeeSetup, ['schoolId','stage'], 'fee_school_stage');
+      await ensureIndex(db.FeeSetup, ['schoolId', 'stage'], 'fee_school_stage');
       await ensureIndex(db.StaffAttendance, ['schoolId'], 'staff_school');
-      await ensureIndex(db.StaffAttendance, ['schoolId','date'], 'staff_school_date');
-      await ensureIndex(db.StaffAttendance, ['userId','date'], 'staff_user_date');
+      await ensureIndex(db.StaffAttendance, ['schoolId', 'date'], 'staff_school_date');
+      await ensureIndex(db.StaffAttendance, ['userId', 'date'], 'staff_user_date');
       await ensureIndex(db.TeacherAttendance, ['schoolId'], 'teach_school');
-      await ensureIndex(db.TeacherAttendance, ['schoolId','date'], 'teach_school_date');
-      await ensureIndex(db.TeacherAttendance, ['teacherId','date'], 'teach_teacher_date');
+      await ensureIndex(db.TeacherAttendance, ['schoolId', 'date'], 'teach_school_date');
+      await ensureIndex(db.TeacherAttendance, ['teacherId', 'date'], 'teach_teacher_date');
       await ensureIndex(db.SalarySlip, ['schoolId'], 'slip_school');
-      await ensureIndex(db.SalarySlip, ['schoolId','month'], 'slip_school_month');
-      await ensureIndex(db.SalarySlip, ['personType','personId','month'], 'slip_person_month');
+      await ensureIndex(db.SalarySlip, ['schoolId', 'month'], 'slip_school_month');
+      await ensureIndex(db.SalarySlip, ['personType', 'personId', 'month'], 'slip_person_month');
       await ensureIndex(db.Conversation, ['schoolId'], 'conv_school');
       await ensureIndex(db.Conversation, ['teacherId'], 'conv_teacher');
       await ensureIndex(db.Conversation, ['parentId'], 'conv_parent');
       await ensureIndex(db.Message, ['senderId'], 'msg_sender');
       await ensureIndex(db.Message, ['senderRole'], 'msg_role');
-    } catch (e) { try { console.warn('Index bootstrap failed', e?.message || e); } catch {} }
+    } catch (e) { try { console.warn('Index bootstrap failed', e?.message || e); } catch { } }
     try {
       console.log('Module sync disabled: activeModules no longer used');
     } catch (e) {
       console.warn('Module sync disabled with error:', e?.message || e);
     }
-    io.on('connection', (socket) => {
-      try {
-        const token = socket.handshake?.auth?.token;
-        if (token) {
-          const payload = jwt.verify(token, JWT_SECRET);
-          socket.user = payload;
-        }
-      } catch {}
-      socket.on('join_room', async (roomId) => {
-        try {
-          if (!roomId) return;
-          const { Conversation } = require('./models');
-          const conv = await Conversation.findOne({ where: { roomId } });
-          if (!conv) return;
-          const u = socket.user || {};
-          const role = normalizeRole(u.role);
-          const isAllowed = (role === 'PARENT' && String(conv.parentId || '') === String(u.parentId || '')) ||
-                            (role === 'TEACHER' && String(conv.teacherId || '') === String(u.teacherId || '')) ||
-                            (role === 'SCHOOL_ADMIN' && Number(conv.schoolId || 0) === Number(u.schoolId || 0)) ||
-                            isSuperAdminRole(u.role);
-          if (!isAllowed) return;
-          socket.join(roomId);
-        } catch (e) { console.error('Socket join_room error:', e.message); }
-      });
-      socket.on('send_message', async (payload) => {
-        try {
-          const { conversationId, roomId, text, senderId, senderRole } = payload || {};
-          if (!conversationId || !roomId || !text || !senderId || !senderRole) return;
-          const { Message } = require('./models');
-          const sid = socket.user?.id || senderId;
-          const srole = normalizeRole(socket.user?.role || senderRole);
-          const msg = await Message.create({ id: `msg_${Date.now()}`, conversationId, text, senderId: sid, senderRole: srole });
-          io.to(roomId).emit('new_message', { id: msg.id, conversationId, text, senderId: sid, senderRole: srole, timestamp: msg.createdAt });
-        } catch (e) { console.error('Socket send_message error:', e.message); }
-      });
-    });
-    async function toCSV(headers, rows){
-      const esc = (v) => { const s = v === null || v === undefined ? '' : String(v); return (s.includes(',') || s.includes('\n') || s.includes('"')) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+    async function toCSV(headers, rows) {
+      const esc = (v) => { const s = v === null || v === undefined ? '' : String(v); return (s.includes(',') || s.includes('\n') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s; };
       const head = headers.join(',');
       const body = rows.map(r => headers.map(h => esc(r[h])).join(',')).join('\n');
       return head + '\n' + body + (body ? '\n' : '');
     }
-    async function buildExportCSVMap(schoolId, types, filters){
+    async function buildExportCSVMap(schoolId, types, filters) {
       const { Class, Student, Parent, Teacher, Grade, Attendance, Schedule, FeeSetup } = require('./models');
       const map = {};
-      const classes = await Class.findAll({ where: { schoolId }, order: [['name','ASC']] });
+      const classes = await Class.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
       const classNameById = new Map(classes.map(c => [String(c.id), `${c.gradeLevel} (${c.section || 'أ'})`]));
-      if (types.includes('students')){
-        const students = await Student.findAll({ where: { schoolId }, order: [['name','ASC']] });
+      if (types.includes('students')) {
+        const students = await Student.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
         const parents = await Parent.findAll({ where: { schoolId } });
         const parentById = new Map(parents.map(p => [String(p.id), p]));
         const rows = students.map(s => {
@@ -1315,20 +1493,20 @@ syncDatabase()
         });
         const f = String(filters?.className || '').trim();
         const filtered = f ? rows.filter(r => r.className === f) : rows;
-        map['Export_Students.csv'] = toCSV(['studentId','nationalId','name','dateOfBirth','gender','city','address','admissionDate','parentName','parentPhone','parentEmail','className'], filtered);
+        map['Export_Students.csv'] = toCSV(['studentId', 'nationalId', 'name', 'dateOfBirth', 'gender', 'city', 'address', 'admissionDate', 'parentName', 'parentPhone', 'parentEmail', 'className'], filtered);
       }
-      if (types.includes('classes')){
+      if (types.includes('classes')) {
         const teachers = await Teacher.findAll({ where: { schoolId } });
         const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
         const rows = classes.map(c => ({ gradeLevel: c.gradeLevel, section: c.section || 'أ', capacity: c.capacity || 30, homeroomTeacherName: c.homeroomTeacherId ? (tNameById.get(String(c.homeroomTeacherId)) || '') : '' }));
-        map['Export_Classes.csv'] = toCSV(['gradeLevel','section','capacity','homeroomTeacherName'], rows);
+        map['Export_Classes.csv'] = toCSV(['gradeLevel', 'section', 'capacity', 'homeroomTeacherName'], rows);
       }
-      if (types.includes('subjects')){
+      if (types.includes('subjects')) {
         const rows = [];
-        for (const c of classes){
+        for (const c of classes) {
           const className = `${c.gradeLevel} (${c.section || 'أ'})`;
           const list = Array.isArray(c.subjects) ? c.subjects : [];
-          if (list.length === 0){
+          if (list.length === 0) {
             const sched = await Schedule.findAll({ where: { classId: c.id } });
             const subs = Array.from(new Set(sched.map(x => x.subject).filter(Boolean)));
             for (const s of subs) rows.push({ className, subjectName: s });
@@ -1339,17 +1517,17 @@ syncDatabase()
         const f = String(filters?.className || '').trim();
         const subj = String(filters?.subjectName || '').trim();
         let filtered = f ? rows.filter(r => r.className === f) : rows;
-        filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
-        map['Export_Subjects.csv'] = toCSV(['className','subjectName'], filtered);
+        filtered = subj ? filtered.filter(r => String(r.subjectName || '').trim() === subj) : filtered;
+        map['Export_Subjects.csv'] = toCSV(['className', 'subjectName'], filtered);
       }
-      if (types.includes('classSubjectTeachers')){
+      if (types.includes('classSubjectTeachers')) {
         const rows = [];
         const teachers = await Teacher.findAll({ where: { schoolId } });
         const tNameById = new Map(teachers.map(t => [String(t.id), t.name]));
-        for (const c of classes){
+        for (const c of classes) {
           const className = `${c.gradeLevel} (${c.section || 'أ'})`;
           const sched = await Schedule.findAll({ where: { classId: c.id } });
-          for (const x of sched){
+          for (const x of sched) {
             const teacherName = x.teacherId ? (tNameById.get(String(x.teacherId)) || '') : '';
             rows.push({ className, subjectName: x.subject, teacherName });
           }
@@ -1357,65 +1535,65 @@ syncDatabase()
         const f = String(filters?.className || '').trim();
         const subj = String(filters?.subjectName || '').trim();
         let filtered = f ? rows.filter(r => r.className === f) : rows;
-        filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
-        map['Export_ClassSubjectTeachers.csv'] = toCSV(['className','subjectName','teacherName'], filtered);
+        filtered = subj ? filtered.filter(r => String(r.subjectName || '').trim() === subj) : filtered;
+        map['Export_ClassSubjectTeachers.csv'] = toCSV(['className', 'subjectName', 'teacherName'], filtered);
       }
-      if (types.includes('grades')){
-        const grades = await Grade.findAll({ include: [{ model: require('./models').Class, attributes: ['gradeLevel','section'] }], where: { '$Class.schoolId$': schoolId } });
+      if (types.includes('grades')) {
+        const grades = await Grade.findAll({ include: [{ model: require('./models').Class, attributes: ['gradeLevel', 'section'] }], where: { '$Class.schoolId$': schoolId } });
         const rows = grades.map(e => ({ className: `${e.Class?.gradeLevel || ''} (${e.Class?.section || 'أ'})`, subjectName: e.subject, studentId: String(e.studentId), studentName: '', homework: e.homework || 0, quiz: e.quiz || 0, midterm: e.midterm || 0, final: e.final || 0 }));
         const f = String(filters?.className || '').trim();
         const subj = String(filters?.subjectName || '').trim();
         let filtered = f ? rows.filter(r => r.className === f) : rows;
-        filtered = subj ? filtered.filter(r => String(r.subjectName||'').trim() === subj) : filtered;
-        map['Export_Grades.csv'] = toCSV(['className','subjectName','studentId','studentName','homework','quiz','midterm','final'], filtered);
+        filtered = subj ? filtered.filter(r => String(r.subjectName || '').trim() === subj) : filtered;
+        map['Export_Grades.csv'] = toCSV(['className', 'subjectName', 'studentId', 'studentName', 'homework', 'quiz', 'midterm', 'final'], filtered);
       }
-      if (types.includes('attendance')){
+      if (types.includes('attendance')) {
         const date = String(filters?.date || '').trim();
         const rows = [];
-        for (const c of classes){
+        for (const c of classes) {
           const className = `${c.gradeLevel} (${c.section || 'أ'})`;
           if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
           const where = { classId: c.id };
           if (date) where.date = date;
           const arr = await Attendance.findAll({ where });
-          for (const r of arr){ rows.push({ date: r.date, className, studentId: String(r.studentId), status: r.status }); }
+          for (const r of arr) { rows.push({ date: r.date, className, studentId: String(r.studentId), status: r.status }); }
         }
-        map['Export_Attendance.csv'] = toCSV(['date','className','studentId','status'], rows);
+        map['Export_Attendance.csv'] = toCSV(['date', 'className', 'studentId', 'status'], rows);
       }
-      if (types.includes('schedule')){
+      if (types.includes('schedule')) {
         const rows = [];
-        for (const c of classes){
+        for (const c of classes) {
           const className = `${c.gradeLevel} (${c.section || 'أ'})`;
           if (String(filters?.className || '').trim() && String(filters?.className || '').trim() !== className) continue;
           const sched = await Schedule.findAll({ where: { classId: c.id } });
-          for (const x of sched){ rows.push({ className, day: x.day, timeSlot: x.timeSlot, subjectName: x.subject, teacherName: '' }); }
+          for (const x of sched) { rows.push({ className, day: x.day, timeSlot: x.timeSlot, subjectName: x.subject, teacherName: '' }); }
         }
         const subj = String(filters?.subjectName || '').trim();
-        const filtered = subj ? rows.filter(r => String(r.subjectName||'').trim() === subj) : rows;
-        map['Export_Schedule.csv'] = toCSV(['className','day','timeSlot','subjectName','teacherName'], filtered);
+        const filtered = subj ? rows.filter(r => String(r.subjectName || '').trim() === subj) : rows;
+        map['Export_Schedule.csv'] = toCSV(['className', 'day', 'timeSlot', 'subjectName', 'teacherName'], filtered);
       }
-      if (types.includes('fees')){
+      if (types.includes('fees')) {
         const list = await FeeSetup.findAll({ where: { schoolId } });
         const rows = list.map(x => ({ stage: x.stage, tuitionFee: Number(x.tuitionFee || 0), bookFees: Number(x.bookFees || 0), uniformFees: Number(x.uniformFees || 0), activityFees: Number(x.activityFees || 0), paymentPlanType: x.paymentPlanType || 'Monthly' }));
-        map['Export_Fees.csv'] = toCSV(['stage','tuitionFee','bookFees','uniformFees','activityFees','paymentPlanType'], rows);
+        map['Export_Fees.csv'] = toCSV(['stage', 'tuitionFee', 'bookFees', 'uniformFees', 'activityFees', 'paymentPlanType'], rows);
       }
-      if (types.includes('teachers')){
-        const list = await Teacher.findAll({ where: { schoolId }, order: [['name','ASC']] });
+      if (types.includes('teachers')) {
+        const list = await Teacher.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
         const rows = list.map(t => ({ teacherId: String(t.id), name: t.name, phone: t.phone || '', subject: t.subject || '' }));
-        map['Export_Teachers.csv'] = toCSV(['teacherId','name','phone','subject'], rows);
+        map['Export_Teachers.csv'] = toCSV(['teacherId', 'name', 'phone', 'subject'], rows);
       }
-      if (types.includes('parents')){
-        const list = await Parent.findAll({ where: { schoolId }, order: [['name','ASC']] });
+      if (types.includes('parents')) {
+        const list = await Parent.findAll({ where: { schoolId }, order: [['name', 'ASC']] });
         const rows = list.map(p => ({ parentId: String(p.id), name: p.name, email: p.email || '', phone: p.phone || '', studentId: '' }));
-        map['Export_Parents.csv'] = toCSV(['parentId','name','email','phone','studentId'], rows);
+        map['Export_Parents.csv'] = toCSV(['parentId', 'name', 'email', 'phone', 'studentId'], rows);
       }
       return map;
     }
-    async function storeBackupZip(schoolId, types, filters){
+    async function storeBackupZip(schoolId, types, filters) {
       const map = await buildExportCSVMap(schoolId, types, filters);
       const dir = path.join(__dirname, '..', 'uploads', 'backups', String(schoolId));
       await fse.ensureDir(dir);
-      const fname = `Backup_${new Date().toISOString().replace(/[:]/g,'-')}.zip`;
+      const fname = `Backup_${new Date().toISOString().replace(/[:]/g, '-')}.zip`;
       const full = path.join(dir, fname);
       const out = fs.createWriteStream(full);
       const archive = archiver('zip', { zlib: { level: 9 } });
@@ -1424,7 +1602,7 @@ syncDatabase()
       await archive.finalize();
       return full;
     }
-    async function acquireBackupLock(schoolId){
+    async function acquireBackupLock(schoolId) {
       try {
         const { SchoolSettings } = require('./models');
         const s = await SchoolSettings.findOne({ where: { schoolId } });
@@ -1439,7 +1617,7 @@ syncDatabase()
         return token;
       } catch { return false; }
     }
-    async function releaseBackupLock(schoolId, token){
+    async function releaseBackupLock(schoolId, token) {
       try {
         const { SchoolSettings } = require('./models');
         const s = await SchoolSettings.findOne({ where: { schoolId } });
@@ -1448,7 +1626,7 @@ syncDatabase()
         if (lock.token && lock.token !== token) return;
         s.backupLock = null;
         await s.save();
-      } catch {}
+      } catch { }
     }
     const lastRun = new Map();
     cron.schedule('*/5 * * * *', async () => {
@@ -1456,47 +1634,47 @@ syncDatabase()
         const { SchoolSettings, School } = require('./models');
         const schools = await School.findAll();
         const now = new Date();
-        const hh = String(now.getHours()).padStart(2,'0');
-        const mm = String(now.getMinutes()).padStart(2,'0');
-        for (const sch of schools){
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        for (const sch of schools) {
           const s = await SchoolSettings.findOne({ where: { schoolId: Number(sch.id) } });
           const cfg = s?.backupConfig || {};
-          const types = Array.isArray(cfg.types) ? cfg.types : ['students','classes','subjects','classSubjectTeachers','grades','attendance','schedule','fees','teachers','parents'];
+          const types = Array.isArray(cfg.types) ? cfg.types : ['students', 'classes', 'subjects', 'classSubjectTeachers', 'grades', 'attendance', 'schedule', 'fees', 'teachers', 'parents'];
           const retainDays = Number(cfg.retainDays || 30);
-          if (cfg.enabledDaily){
+          if (cfg.enabledDaily) {
             const t = String(cfg.dailyTime || '02:00');
-            if (t === `${hh}:${mm}`){
-              const key = `daily_${sch.id}_${t}_${now.toISOString().slice(0,10)}`;
-              if (!lastRun.has(key)){
+            if (t === `${hh}:${mm}`) {
+              const key = `daily_${sch.id}_${t}_${now.toISOString().slice(0, 10)}`;
+              if (!lastRun.has(key)) {
                 const token = await acquireBackupLock(Number(sch.id));
-                if (token){
+                if (token) {
                   const full = await storeBackupZip(Number(sch.id), types, {});
                   try {
                     const { AuditLog } = require('./models');
                     const stat = fs.statSync(full);
                     await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
-                  } catch {}
+                  } catch { }
                   await releaseBackupLock(Number(sch.id), token);
                 }
                 lastRun.set(key, true);
               }
             }
           }
-          if (cfg.enabledMonthly){
+          if (cfg.enabledMonthly) {
             const day = Number(cfg.monthlyDay || 1);
             const t = String(cfg.monthlyTime || '03:00');
             const dNow = now.getDate();
-            if (dNow === day && t === `${hh}:${mm}`){
-              const key = `monthly_${sch.id}_${t}_${now.getFullYear()}_${now.getMonth()+1}`;
-              if (!lastRun.has(key)){
+            if (dNow === day && t === `${hh}:${mm}`) {
+              const key = `monthly_${sch.id}_${t}_${now.getFullYear()}_${now.getMonth() + 1}`;
+              if (!lastRun.has(key)) {
                 const token = await acquireBackupLock(Number(sch.id));
-                if (token){
+                if (token) {
                   const full = await storeBackupZip(Number(sch.id), types, {});
                   try {
                     const { AuditLog } = require('./models');
                     const stat = fs.statSync(full);
                     await AuditLog.create({ action: 'school.backup.auto.store', userId: null, userEmail: null, ipAddress: '127.0.0.1', userAgent: 'cron', details: JSON.stringify({ schoolId: Number(sch.id), file: path.basename(full), size: stat.size, types }), timestamp: new Date(), riskLevel: 'low' });
-                  } catch {}
+                  } catch { }
                   await releaseBackupLock(Number(sch.id), token);
                 }
                 lastRun.set(key, true);
@@ -1507,24 +1685,24 @@ syncDatabase()
             const dir = path.join(__dirname, '..', 'uploads', 'backups', String(sch.id));
             await fse.ensureDir(dir);
             const files = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
-            for (const f of files){
+            for (const f of files) {
               const full = path.join(dir, f);
               const stat = fs.statSync(full);
-              const ageDays = Math.floor((now.getTime() - (stat.mtime || stat.birthtime).getTime()) / (1000*60*60*24));
-              if (retainDays > 0 && ageDays > retainDays){
-                try { fs.unlinkSync(full); } catch {}
+              const ageDays = Math.floor((now.getTime() - (stat.mtime || stat.birthtime).getTime()) / (1000 * 60 * 60 * 24));
+              if (retainDays > 0 && ageDays > retainDays) {
+                try { fs.unlinkSync(full); } catch { }
               }
             }
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
     });
     server.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info('Server startup complete');
       logger.info('Server listening on 0.0.0.0');
       if (process.env.NODE_ENV !== 'production') {
-        logger.info('Test this: curl http://127.0.0.1:'+PORT+'/api/auth/login');
+        logger.info('Test this: curl http://127.0.0.1:' + PORT + '/api/auth/login');
       }
       logger.info(`PID: ${process.pid}`);
     });
@@ -1536,5 +1714,10 @@ syncDatabase()
   })
   .catch(err => {
     logger.error(`Unable to connect to the database: ${err}`);
+    if (err.errors) {
+      err.errors.forEach(e => logger.error(` - ${e.message} (value: ${e.value}, type: ${e.type}, origin: ${e.origin})`));
+    }
+    console.error(err);
+    process.exit(1);
   });
 if (Sentry && Sentry.Handlers && typeof Sentry.Handlers.errorHandler === 'function') { app.use(Sentry.Handlers.errorHandler()); }

@@ -21,7 +21,6 @@ const FinanceExpenses: React.FC<FinanceExpensesProps> = ({ schoolId, schoolSetti
     const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
     const [voucherToPrint, setVoucherToPrint] = useState<Expense | null>(null);
     const { addToast } = useToast();
-    const symbolForCurrency = (cur: string) => getCurrencySymbol(cur);
 
     useEffect(() => {
         fetchData();

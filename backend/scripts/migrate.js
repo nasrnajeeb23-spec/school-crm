@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { sequelize, User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig } = require('../models');
+const { sequelize, User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig, UsageSnapshot } = require('../models');
 
 async function ensureMigrationsTable() {
   const dialect = sequelize.getDialect();
@@ -42,7 +42,7 @@ async function runMigrations() {
     if (await hasMigration(name)) continue;
     const mod = require(path.join(dir, f));
     const queryInterface = sequelize.getQueryInterface();
-    const models = { User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig };
+    const models = { User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig, UsageSnapshot };
     if (typeof mod.up === 'function') {
       await mod.up({ sequelize, queryInterface, models });
     }

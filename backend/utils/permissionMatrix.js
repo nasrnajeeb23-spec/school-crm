@@ -20,6 +20,7 @@ const ALL_PERMISSIONS = [
   'VIEW_STAFF',
   'VIEW_TRANSPORTATION',
   'VIEW_MODULES',
+  'VIEW_CONTENT',
 
   // MANAGE permissions
   'MANAGE_STUDENTS',
@@ -37,6 +38,7 @@ const ALL_PERMISSIONS = [
   'MANAGE_STAFF',
   'MANAGE_TRANSPORTATION',
   'MANAGE_MODULES',
+  'MANAGE_CONTENT',
 
   // DELETE permissions
   'DELETE_STUDENTS',
@@ -61,6 +63,40 @@ const ALL_PERMISSIONS = [
   'BULK_DELETE',
   'BULK_UPDATE',
 ];
+
+const SUPERADMIN_FINANCIAL_DEFAULT = uniq([
+  'VIEW_DASHBOARD',
+  'VIEW_FINANCE',
+  'MANAGE_FINANCE',
+  'EXPORT_FINANCE',
+  'VIEW_REPORTS',
+  'MANAGE_REPORTS',
+  'EXPORT_REPORTS',
+]);
+
+const SUPERADMIN_TECHNICAL_DEFAULT = uniq([
+  'VIEW_DASHBOARD',
+  'VIEW_SETTINGS',
+  'MANAGE_SETTINGS',
+  'VIEW_MODULES',
+  'MANAGE_MODULES',
+  'VIEW_REPORTS',
+]);
+
+const SUPERADMIN_SUPERVISOR_DEFAULT = uniq([
+  'VIEW_DASHBOARD',
+  'VIEW_REPORTS',
+  'MANAGE_REPORTS',
+  'VIEW_STUDENTS',
+  'VIEW_TEACHERS',
+  'VIEW_PARENTS',
+  'VIEW_CLASSES',
+  'VIEW_ATTENDANCE',
+  'VIEW_SCHEDULE',
+  'VIEW_CALENDAR',
+  'VIEW_GRADES',
+  'VIEW_TRANSPORTATION',
+]);
 
 
 function normalizeDbRole(role) {
@@ -112,8 +148,12 @@ function deriveDesiredDbRole({ role, schoolRole }) {
 function derivePermissionsForUser({ role, schoolRole }) {
   const rk = roleKind(role);
   const sr = normalizeSchoolRole(schoolRole);
+  const nr = normalizeDbRole(role);
 
-  if (rk === 'superadmin') return ALL_PERMISSIONS.slice();
+  if (nr === 'SuperAdmin') return ALL_PERMISSIONS.slice();
+  if (nr === 'SuperAdminFinancial') return SUPERADMIN_FINANCIAL_DEFAULT.slice();
+  if (nr === 'SuperAdminTechnical') return SUPERADMIN_TECHNICAL_DEFAULT.slice();
+  if (nr === 'SuperAdminSupervisor') return SUPERADMIN_SUPERVISOR_DEFAULT.slice();
 
   if (rk === 'school_admin' || sr === 'مدير') return ALL_PERMISSIONS.slice();
 

@@ -1,28 +1,27 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Class, ClassRosterUpdate, NewClassData } from '../types';
+import { Class, ClassRosterUpdate, NewClassData, SchoolSettings } from '../types';
 import * as api from '../api';
 import { UsersIcon, StudentsIcon, ClassesIcon as BookIcon, PlusIcon, ClassesIcon } from '../components/icons';
 import EditClassRosterModal from '../components/EditClassRosterModal';
 import AddClassModal from '../components/AddClassModal';
 import { useToast } from '../contexts/ToastContext';
-import { useAppContext } from '../contexts/AppContext';
 import EmptyState from '../components/EmptyState';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { Teacher } from '../types';
 
 interface ClassesListProps {
   schoolId: number;
+  schoolSettings?: SchoolSettings | null;
 }
 
-const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
+const ClassesList: React.FC<ClassesListProps> = ({ schoolId, schoolSettings }) => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { addToast } = useToast();
-  const { schoolSettings } = useAppContext();
   const [addDefaults, setAddDefaults] = useState<{ stage?: string; grade?: string } | null>(null);
   const [stageFilter, setStageFilter] = useState<string>('');
   const [gradeFilterUI, setGradeFilterUI] = useState<string>('');
@@ -476,6 +475,7 @@ const ClassesList: React.FC<ClassesListProps> = ({ schoolId }) => {
       {isAddModalOpen && (
         <AddClassModal 
             schoolId={schoolId}
+            schoolSettings={schoolSettings}
             onClose={() => setIsAddModalOpen(false)}
             onSave={handleAddClass}
             defaultStage={addDefaults?.stage}

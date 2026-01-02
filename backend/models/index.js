@@ -52,6 +52,8 @@ const ParentStudent = require('./ParentStudent');
 const DriverRoute = require('./DriverRoute');
 const SchoolTransaction = require('./SchoolTransaction');
 const LandingPageContent = require('./LandingPageContent');
+const UsageSnapshot = require('./UsageSnapshot');
+const PaymentMethod = require('./PaymentMethod');
 
 // Define associations
 // School <-> Subscription (One-to-One)
@@ -299,6 +301,8 @@ const db = {
   DriverRoute,
   SchoolTransaction,
   LandingPageContent,
+  UsageSnapshot,
+  PaymentMethod,
 };
 
 module.exports = db;

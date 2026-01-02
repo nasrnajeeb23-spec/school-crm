@@ -245,7 +245,7 @@ const Messaging: React.FC = () => {
                         </div>
                     ) : (
                         conversations.map(conversation => {
-                            const IconComponent = typeIconMap[conversation.type];
+                            const IconComponent = (typeIconMap as any)[conversation.type] || UsersIcon;
                             return (
                                 <div
                                     key={conversation.id}

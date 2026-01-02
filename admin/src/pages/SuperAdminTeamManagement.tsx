@@ -73,6 +73,21 @@ export default function SuperAdminTeamManagement() {
     permissions: []
   });
 
+  const toTeamMember = (raw: any): TeamMember => {
+    const permissions = Array.isArray(raw?.permissions) ? raw.permissions.map((p: any) => String(p)) : [];
+    return {
+      id: String(raw?.id ?? ''),
+      name: String(raw?.name ?? ''),
+      email: String(raw?.email ?? ''),
+      username: String(raw?.username ?? ''),
+      role: (raw?.role as UserRole) || UserRole.SuperAdminFinancial,
+      isActive: typeof raw?.isActive === 'boolean' ? raw.isActive : true,
+      lastLoginAt: raw?.lastLoginAt ? String(raw.lastLoginAt) : undefined,
+      createdAt: String(raw?.createdAt ?? new Date().toISOString()),
+      permissions,
+    };
+  };
+
   useEffect(() => {
     fetchTeamMembers();
   }, []);
@@ -80,7 +95,7 @@ export default function SuperAdminTeamManagement() {
   const fetchTeamMembers = async () => {
     try {
       const response = await api.getSuperAdminTeamMembers();
-      setTeamMembers(response);
+      setTeamMembers((Array.isArray(response) ? response : []).map(toTeamMember));
     } catch (error) {
       showToast('فشل في تحميل بيانات الفريق', 'error');
     } finally {
@@ -92,7 +107,7 @@ export default function SuperAdminTeamManagement() {
     e.preventDefault();
     try {
       const response = await api.createSuperAdminTeamMember(formData);
-      setTeamMembers([...teamMembers, response]);
+      setTeamMembers(prev => [...prev, toTeamMember(response)]);
       setShowCreateForm(false);
       resetForm();
       showToast('تم إنشاء حساب فريق بنجاح', 'success');
@@ -107,9 +122,8 @@ export default function SuperAdminTeamManagement() {
     
     try {
       const response = await api.updateSuperAdminTeamMember(editingMember.id, formData);
-      setTeamMembers(teamMembers.map(member => 
-        member.id === editingMember.id ? response : member
-      ));
+      const updated = toTeamMember(response);
+      setTeamMembers(prev => prev.map(member => (member.id === editingMember.id ? updated : member)));
       setEditingMember(null);
       resetForm();
       showToast('تم تحديث بيانات الفريق بنجاح', 'success');

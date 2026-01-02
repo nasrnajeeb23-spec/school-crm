@@ -5,7 +5,12 @@ type State = { hasError: boolean; error?: any };
 export default class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, State> {
   state: State = { hasError: false };
   static getDerivedStateFromError(error: any): State { return { hasError: true, error }; }
-  componentDidCatch(error: any, info: any) {}
+  componentDidCatch(error: any, info: any) {
+    try {
+      console.error('UI ErrorBoundary:', error);
+      if (info?.componentStack) console.error('Component stack:', info.componentStack);
+    } catch {}
+  }
   render() {
     if (this.state.hasError) {
       return (

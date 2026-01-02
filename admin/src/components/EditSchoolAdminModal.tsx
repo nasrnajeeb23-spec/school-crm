@@ -4,7 +4,7 @@ import { User } from '../types';
 interface EditSchoolAdminModalProps {
   admin: User;
   onClose: () => void;
-  onSave: (id: number, data: any) => Promise<void>;
+  onSave: (id: number | string, data: any) => Promise<void>;
   schools: any[];
 }
 

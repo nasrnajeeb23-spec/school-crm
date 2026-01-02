@@ -706,12 +706,30 @@ export const getConversations = async (userId?: string): Promise<Conversation[]>
     const schoolIdStr = typeof window !== 'undefined' ? localStorage.getItem('current_school_id') : null;
     const schoolId = schoolIdStr ? Number(schoolIdStr) : undefined;
     const query = schoolId ? `?schoolId=${schoolId}` : '';
+    const normalizeConversation = (c: any): Conversation => {
+        const typeValues = Object.values(ConversationType) as unknown as string[];
+        const rawType = c?.type;
+        const safeType = typeValues.includes(String(rawType)) ? (rawType as ConversationType) : ConversationType.Direct;
+        return {
+            id: String(c?.id || ''),
+            roomId: String(c?.roomId || ''),
+            title: String(c?.title || c?.participantName || ''),
+            type: safeType,
+            participantName: String(c?.participantName || c?.title || ''),
+            participantAvatar: String(c?.participantAvatar || ''),
+            lastMessage: String(c?.lastMessage || ''),
+            timestamp: String(c?.timestamp || c?.updatedAt || new Date().toISOString()),
+            unreadCount: typeof c?.unreadCount === 'number' ? c.unreadCount : 0,
+        };
+    };
     if (userId) {
         const data = await apiCall(`/messaging/conversations/${userId}`, { method: 'GET' });
-        return unwrap<Conversation[]>(data, 'conversations', []);
+        const list = unwrap<any[]>(data, 'conversations', []);
+        return Array.isArray(list) ? list.map(normalizeConversation) : [];
     }
     const data = await apiCall(`/messaging/conversations${query}`, { method: 'GET' });
-    return unwrap<Conversation[]>(data, 'conversations', []);
+    const list = unwrap<any[]>(data, 'conversations', []);
+    return Array.isArray(list) ? list.map(normalizeConversation) : [];
 };
 
 export const getMessages = async (conversationId: string): Promise<Message[]> => {
@@ -807,6 +825,44 @@ export const submitPaymentProof = async (submission: Omit<PaymentProofSubmission
     });
 };
 
+export const previewOverage = async (): Promise<{ mode: string; currency: string; limits: any; usage: any; items: Array<{ key: string; qty: number; unitPrice: number; amount: number }>; total: number }> => {
+    return await apiCall('/billing/overage/preview', { method: 'GET' });
+};
+
+export const runOverageCharge = async (period: 'monthly' | 'manual' | 'daily' = 'monthly'): Promise<{ ok: boolean; charged: boolean; total: number; currency: string; items: any[]; deducted?: boolean; balanceAfter?: number }> => {
+    return await apiCall('/billing/overage/run', { method: 'POST', body: JSON.stringify({ period }) });
+};
+
+export const getUsageReport = async (params: { group?: 'day' | 'month'; from?: string; to?: string; schoolId?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.group) q.set('group', params.group);
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.schoolId) q.set('schoolId', String(params.schoolId));
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return await apiCall(`/billing/usage/report${suffix}`, { method: 'GET' });
+};
+
+export const getBillingTransactions = async (params: { from?: string; to?: string; type?: string; kind?: string; schoolId?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.type) q.set('type', params.type);
+    if (params.kind) q.set('kind', params.kind);
+    if (params.schoolId) q.set('schoolId', String(params.schoolId));
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return await apiCall(`/billing/transactions${suffix}`, { method: 'GET' });
+};
+
+export const getUsageBreakdown = async (params: { from?: string; to?: string; schoolId?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.schoolId) q.set('schoolId', String(params.schoolId));
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return await apiCall(`/billing/usage/breakdown${suffix}`, { method: 'GET' });
+};
+
 
 export const getActionItems = async (): Promise<ActionItem[]> => {
     try {
@@ -834,7 +890,7 @@ export const submitTrialRequest = async (data: NewTrialRequestData): Promise<Use
 
 // ==================== User Profile APIs ====================
 
-export const updateCurrentUser = async (userId: string, data: UpdatableUserData): Promise<User | null> => {
+export const updateCurrentUser = async (userId: string | number, data: UpdatableUserData): Promise<User | null> => {
     const response: any = await apiCall(`/users/${userId}`, {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -970,7 +1026,7 @@ export const getSchedule = async (classId: string): Promise<ScheduleEntry[]> => 
     return await apiCall(`/school/class/${classId}/schedule`, { method: 'GET' });
 };
 
-export const saveClassSchedule = async (classId: string, entries: { day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday'; timeSlot: string; subject: string; }[]): Promise<{ createdCount: number; entries: any[] }> => {
+export const saveClassSchedule = async (classId: string, entries: { day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'; timeSlot: string; subject: string; }[]): Promise<{ createdCount: number; entries: any[] }> => {
     const response = await fetch(`${API_BASE_URL}/school/class/${classId}/schedule`, {
         method: 'POST',
         headers: {
@@ -1526,6 +1582,67 @@ export const getRoles = async (): Promise<Role[]> => {
     return await apiCall('/roles', { method: 'GET' });
 };
 
+export const createRole = async (payload: { name: string; description?: string; key: string; schoolId?: number | null }): Promise<Role> => {
+    return await apiCall('/roles', { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const updateRole = async (roleId: string, payload: { name?: string; description?: string }): Promise<Role> => {
+    return await apiCall(`/roles/${encodeURIComponent(String(roleId))}`, { method: 'PUT', body: JSON.stringify(payload) });
+};
+
+export const deleteRole = async (roleId: string): Promise<void> => {
+    await apiCall(`/roles/${encodeURIComponent(String(roleId))}`, { method: 'DELETE' });
+};
+
+export const getPermissions = async (): Promise<any[]> => {
+    const list = await apiCall('/roles/permissions', { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const getRolePermissions = async (roleId: string): Promise<any[]> => {
+    const list = await apiCall(`/roles/${encodeURIComponent(String(roleId))}/permissions`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const updateRolePermissions = async (roleId: string, permissionIds: string[]): Promise<void> => {
+    await apiCall(`/roles/${encodeURIComponent(String(roleId))}/permissions`, { method: 'POST', body: JSON.stringify({ permissionIds }) });
+};
+
+export const getSchoolRbacPermissions = async (schoolId: number): Promise<any[]> => {
+    const list = await apiCall(`/school/${schoolId}/rbac/permissions`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const getSchoolRbacRoles = async (schoolId: number): Promise<Role[]> => {
+    return await apiCall(`/school/${schoolId}/rbac/roles`, { method: 'GET' });
+};
+
+export const createSchoolRbacRole = async (schoolId: number, payload: { key: string; name: string; description?: string }): Promise<Role> => {
+    return await apiCall(`/school/${schoolId}/rbac/roles`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+export const updateSchoolRolePermissions = async (schoolId: number, roleId: string, permissions: string[]): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/rbac/roles/${encodeURIComponent(String(roleId))}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions }) });
+};
+
+export const getSchoolRbacScopes = async (schoolId: number): Promise<any[]> => {
+    const list = await apiCall(`/school/${schoolId}/rbac/scopes`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const getUserRoleAssignmentsForSchool = async (schoolId: number, userId: number | string): Promise<any[]> => {
+    const list = await apiCall(`/school/${schoolId}/rbac/users/${encodeURIComponent(String(userId))}/roles`, { method: 'GET' });
+    return Array.isArray(list) ? list : [];
+};
+
+export const updateUserRolesForSchool = async (
+    schoolId: number,
+    userId: number | string,
+    assignments: { roleId: string; scopeId?: string | null }[]
+): Promise<any> => {
+    return await apiCall(`/school/${schoolId}/rbac/users/${encodeURIComponent(String(userId))}/roles`, { method: 'PUT', body: JSON.stringify({ assignments }) });
+};
+
 export const generateLicenseKey = async (payload: { schoolName: string; planId?: string | number; planName?: string; expiresAt?: string | null }): Promise<{ licenseKey: string }> => {
     const response: any = await apiCall('/license/generate', { method: 'POST', body: JSON.stringify(payload) });
     return { licenseKey: response?.licenseKey || '' };
@@ -1723,6 +1840,11 @@ export default {
     updateLandingPageContent,
     getBankAccounts,
     submitPaymentProof,
+    previewOverage,
+    runOverageCharge,
+    getUsageReport,
+    getBillingTransactions,
+    getUsageBreakdown,
     superAdminLogin,
     verifySuperAdminMfa,
     requestSuperAdminReset,
@@ -1756,4 +1878,18 @@ export default {
     updateRouteStudents,
     submitContactMessage,
     getContactMessages,
+    getRoles,
+    createRole,
+    updateRole,
+    deleteRole,
+    getPermissions,
+    getRolePermissions,
+    updateRolePermissions,
+    getSchoolRbacPermissions,
+    getSchoolRbacRoles,
+    createSchoolRbacRole,
+    updateSchoolRolePermissions,
+    getSchoolRbacScopes,
+    getUserRoleAssignmentsForSchool,
+    updateUserRolesForSchool,
 }

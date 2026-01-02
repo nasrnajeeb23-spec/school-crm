@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const { verifyToken, requireRole, isSuperAdminUser } = require('../middleware/auth');
 const { sequelize, RbacRole, RbacUserRoleScope, RbacPermission, RbacRolePermission } = require('../models');
 const { Op } = require('sequelize');
@@ -204,6 +205,40 @@ router.get('/permissions', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN
     }
 });
 
+// @route   GET api/roles/:id/permissions
+// @desc    Get role permissions
+// @access  Private (SuperAdmin or SchoolAdmin)
+router.get('/:id/permissions', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_ADMIN'), async (req, res) => {
+    try {
+        const roleId = String(req.params.id || '');
+        const role = await RbacRole.findByPk(roleId, {
+            include: [{ model: RbacPermission }],
+            order: [[RbacPermission, 'key', 'ASC']]
+        });
+
+        if (!role) {
+            return res.status(404).json({ msg: 'Role not found' });
+        }
+
+        if (!isSuperAdminUser(req.user)) {
+            if (Number(role.schoolId) !== Number(req.user.schoolId)) {
+                return res.status(403).json({ msg: 'Access denied: Cannot view permissions for this role' });
+            }
+        }
+
+        const perms = Array.isArray(role.RbacPermissions) ? role.RbacPermissions : [];
+        return res.json(perms.map(p => ({
+            id: String(p.id),
+            key: p.key,
+            name: p.name,
+            description: p.description
+        })));
+    } catch (e) {
+        console.error('Error fetching role permissions:', e);
+        return res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
 // @route   POST api/roles/:id/permissions
 // @desc    Assign permissions to a role
 // @access  Private (SuperAdmin or SchoolAdmin)
@@ -229,9 +264,13 @@ router.post('/:id/permissions', verifyToken, requireRole('SUPER_ADMIN', 'SCHOOL_
 
         // Add new permissions
         if (Array.isArray(permissionIds) && permissionIds.length > 0) {
+            const now = new Date();
             const rolePermissions = permissionIds.map(permId => ({
+                id: crypto.randomUUID(),
                 roleId,
-                permissionId: permId
+                permissionId: permId,
+                createdAt: now,
+                updatedAt: now
             }));
             await RbacRolePermission.bulkCreate(rolePermissions);
         }

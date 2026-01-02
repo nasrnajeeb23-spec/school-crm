@@ -329,7 +329,7 @@ const SuperAdminSchoolManage: React.FC = () => {
               {invoices.slice(0, 10).map(inv => (
                 <tr key={inv.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{inv.id}</td>
-                  <td className="px-6 py-4">${inv.amount.toFixed(2)}</td>
+                  <td className="px-6 py-4">${inv.totalAmount.toFixed(2)}</td>
                   <td className="px-6 py-4">{inv.status}</td>
                   <td className="px-6 py-4">{inv.dueDate}</td>
                 </tr>

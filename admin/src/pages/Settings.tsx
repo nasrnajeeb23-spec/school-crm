@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api';
-import { SchoolSettings, StudentStatus } from '../types';
+import { AttendanceStatus, SchoolSettings, StudentStatus } from '../types';
 import { useToast } from '../contexts/ToastContext';
 
 interface SettingsProps {
@@ -524,7 +524,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       if (exportFilters.className.trim() && exportFilters.className.trim() !== className) continue;
       try {
         const res = await api.getAttendance(c.id, date);
-        const arr = Array.isArray(res) ? res : (res?.records || []);
+        const arr = Array.isArray(res) ? res : (((res as any)?.records as any[]) || []);
         (arr||[]).forEach((r: any) => rows.push({ date, className, studentId: r.studentId, status: r.status }));
       } catch {}
     }
@@ -706,13 +706,13 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     return x;
   };
 
-  const mapAttendanceStatus = (s: string): 'Present' | 'Absent' | 'Late' | 'Excused' => {
+  const mapAttendanceStatus = (s: string): AttendanceStatus => {
     const v = (s || '').trim();
-    if (/^حاضر$/i.test(v) || /^Present$/i.test(v)) return 'Present';
-    if (/^غائب$/i.test(v) || /^Absent$/i.test(v)) return 'Absent';
-    if (/^متأخر$/i.test(v) || /^Late$/i.test(v)) return 'Late';
-    if (/^مُعفى$/i.test(v) || /^Excused$/i.test(v)) return 'Excused';
-    return 'Present';
+    if (/^حاضر$/i.test(v) || /^Present$/i.test(v)) return AttendanceStatus.Present;
+    if (/^غائب$/i.test(v) || /^Absent$/i.test(v)) return AttendanceStatus.Absent;
+    if (/^متأخر$/i.test(v) || /^Late$/i.test(v)) return AttendanceStatus.Late;
+    if (/^(بعذر|مُعفى)$/i.test(v) || /^Excused$/i.test(v)) return AttendanceStatus.Excused;
+    return AttendanceStatus.Present;
   };
 
   const mapPaymentPlan = (s: string) => {
@@ -904,6 +904,7 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       const norm = (s: string) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
       const byNameDobMap2: Record<string, string[]> = {};
       const byNamePhoneMap2: Record<string, string[]> = {};
+      const studentNameById = new Map((students || []).map((s: any) => [String(s.id), String(s.name || '')]));
       for (const s of students) {
         const k1 = norm(s.name) + '|' + String(s.dateOfBirth || '');
         const k2 = norm(s.name) + '|' + String(s.parentPhone || '');
@@ -932,8 +933,10 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
             else if (arr2.length === 1) sid = arr2[0];
             else if (arr2.length > 1) sid = '';
           }
-          return sid ? { studentId: sid, status: mapAttendanceStatus(r.status) } : null;
-        }).filter(Boolean) as { studentId: string; status: 'Present'|'Absent'|'Late'|'Excused' }[];
+          if (!sid) return null;
+          const resolvedName = studentNameById.get(sid) || String(r.studentName || '');
+          return { studentId: sid, studentName: resolvedName, status: mapAttendanceStatus(r.status) };
+        }).filter(Boolean) as { studentId: string; studentName: string; status: AttendanceStatus }[];
         try {
           await api.saveAttendance(cls.id, date, records);
           logs.push(`تم حفظ حضور ${records.length} سجل: ${className} ${date}`);

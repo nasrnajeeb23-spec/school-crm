@@ -45,7 +45,7 @@ const SchoolAdminsList: React.FC = () => {
     return matchesSearch && matchesSchool;
   });
 
-  const handleDelete = async (adminId: number) => {
+  const handleDelete = async (adminId: number | string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا المدير؟')) {
       try {
         await api.deleteUser(adminId);
@@ -73,7 +73,7 @@ const SchoolAdminsList: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateAdmin = async (id: number, data: any) => {
+  const handleUpdateAdmin = async (id: number | string, data: any) => {
     try {
       await api.updateUser(id, data);
       addToast('تم تحديث بيانات المدير بنجاح', 'success');

@@ -53,13 +53,16 @@ const ParentSidebar: React.FC<ParentSidebarProps> = ({ isMobileOpen = false, onC
                 to={item.path}
                 className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`}
               >
-                {({ isActive }) => (
+                {({ isActive }) => {
+                  const Icon: any = (item as any).icon || (() => null);
+                  return (
                     <>
-                        {isActive && <div className="absolute right-0 h-6 w-1 bg-rose-600 dark:bg-rose-400 rounded-l-full"></div>}
-                        <item.icon className="h-6 w-6" />
-                        <span className="hidden md:block mr-4 rtl:ml-4 rtl:mr-0">{item.label}</span>
+                      {isActive && <div className="absolute right-0 h-6 w-1 bg-rose-600 dark:bg-rose-400 rounded-l-full"></div>}
+                      <Icon className="h-6 w-6" />
+                      <span className="hidden md:block mr-4 rtl:ml-4 rtl:mr-0">{item.label}</span>
                     </>
-                )}
+                  );
+                }}
               </NavLink>
             </li>
           ))}

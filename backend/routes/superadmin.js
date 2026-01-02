@@ -5,7 +5,8 @@ const { TrialRequest } = require('../models');
 const clientMetrics = require('prom-client');
 clientMetrics.collectDefaultMetrics({ prefix: 'schoolsaas_', timeout: 5000 });
 const { sequelize } = require('../models');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
+const { derivePermissionsForUser, normalizeDbRole } = require('../utils/permissionMatrix');
 const bcrypt = require('bcryptjs');
 
 // Helper functions for Redis/JSON
@@ -65,7 +66,7 @@ const isStrongPassword = (pwd) => {
 // @route   GET api/superadmin/stats
 // @desc    Get dashboard stats for SuperAdmin
 // @access  Private (SuperAdmin)
-router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
     const { School, Student, Subscription, Payment } = require('../models');
 
@@ -94,7 +95,7 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANC
 // @route   GET api/superadmin/action-items
 // @desc    Get pending action items for SuperAdmin Dashboard
 // @access  Private (SuperAdmin)
-router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
     const { TrialRequest, ContactMessage, Invoice } = require('../models');
     const { Op } = require('sequelize');
@@ -107,7 +108,7 @@ router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN
       require('../models').AuditLog ? require('../models').AuditLog.count({
         where: {
           action: 'LOGIN_FAILED',
-          timestamp: { [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+          createdAt: { [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000) }
         }
       }) : 0
     ]);
@@ -129,7 +130,7 @@ router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN
 // @access  Private (SuperAdmin)
 router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
   try {
-    const { AuditLog } = require('../models');
+    const { AuditLog, User } = require('../models');
     const { startDate, endDate, action, userId } = req.query;
     const { Op } = require('sequelize');
 
@@ -139,40 +140,67 @@ router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_F
 
     const where = {};
     if (startDate || endDate) {
-      where.timestamp = {};
-      if (startDate) where.timestamp[Op.gte] = new Date(startDate);
-      if (endDate) where.timestamp[Op.lte] = new Date(new Date(endDate).setHours(23, 59, 59));
+      where.createdAt = {};
+      if (startDate) {
+        const sd = new Date(String(startDate));
+        if (!Number.isNaN(sd.getTime())) where.createdAt[Op.gte] = sd;
+      }
+      if (endDate) {
+        const ed = new Date(String(endDate));
+        if (!Number.isNaN(ed.getTime())) where.createdAt[Op.lte] = new Date(ed.setHours(23, 59, 59, 999));
+      }
     }
-    if (action) where.action = { [Op.iLike]: `%${action}%` };
-    if (userId) where.userId = userId;
+    if (action) {
+      const dialect = AuditLog.sequelize?.getDialect?.() || 'sqlite';
+      const op = dialect === 'postgres' ? Op.iLike : Op.like;
+      where.action = { [op]: `%${action}%` };
+    }
+    if (userId !== undefined && userId !== null && String(userId).trim() !== '') {
+      const n = Number(userId);
+      where.userId = Number.isFinite(n) ? n : userId;
+    }
 
-    const logs = await AuditLog.findAll({
-      where,
-      order: [['timestamp', 'DESC']],
-      limit: 500
-    });
+    let logs = [];
+    try {
+      logs = await AuditLog.findAll({
+        where,
+        order: [['createdAt', 'DESC']],
+        limit: 500
+      });
+    } catch (dbError) {
+      console.warn('Audit Logs DB Error:', dbError?.message || dbError);
+      return res.json([]);
+    }
+
+    const userIds = Array.from(new Set(logs.map(l => l.userId).filter(v => v !== null && v !== undefined)));
+    const users = userIds.length
+      ? await User.findAll({ where: { id: userIds }, attributes: ['id', 'email'], raw: true }).catch(() => [])
+      : [];
+    const emailByUserId = new Map(users.map(u => [Number(u.id), u.email]));
 
     const formatted = logs.map(log => {
-      let details = log.details;
-      try {
-        if (typeof details === 'string' && (details.startsWith('{') || details.startsWith('['))) {
-          details = JSON.parse(details);
-        }
-      } catch (e) { }
-      return { ...log.toJSON(), details };
+      const row = log.toJSON();
+      const details = row.metadata ?? (row.oldValue || row.newValue ? { oldValue: row.oldValue, newValue: row.newValue } : null);
+      return {
+        ...row,
+        timestamp: row.createdAt || row.timestamp || null,
+        userEmail: emailByUserId.get(Number(row.userId)) || null,
+        riskLevel: row.riskLevel || 'low',
+        details
+      };
     });
 
     res.json(formatted);
   } catch (err) {
     console.error('Audit Logs Error:', err);
-    res.status(500).send('Server Error');
+    res.json([]);
   }
 });
 
 // @route   GET api/superadmin/revenue
 // @desc    Get revenue summary for SuperAdmin (monthly series for current year)
 // @access  Private (SuperAdmin)
-router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_FINANCE'), async (req, res) => {
   try {
     const { Payment } = require('../models');
     const { Op } = require('sequelize');
@@ -222,7 +250,7 @@ router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINA
 // @route   GET api/superadmin/subscriptions
 // @desc    List subscriptions with status
 // @access  Private (SuperAdmin)
-router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('VIEW_FINANCE'), async (req, res) => {
   try {
     const subs = await Subscription.findAll({
       include: [
@@ -261,7 +289,7 @@ router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), async (req
 // @route   PUT api/superadmin/subscriptions/:id
 // @desc    Update subscription details (Plan, Status, Limits, Modules)
 // @access  Private (SuperAdmin)
-router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
@@ -358,7 +386,7 @@ router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), async 
 });
 
 // Security policies (central)
-router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_SETTINGS'), async (req, res) => {
   try {
     const defaults = { enforceMfaForAdmins: true, passwordMinLength: 0, lockoutThreshold: 3, allowedIpRanges: [], sessionMaxAgeHours: 24 };
     let dbPolicy = null;
@@ -395,7 +423,7 @@ router.get('/security/policies', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_
   } catch (err) { console.error('Security Policies Error:', err); res.status(500).send('Server Error'); }
 });
 
-router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_SETTINGS'), async (req, res) => {
   try {
     const payload = req.body || {};
     let dbPolicy = await SecurityPolicy.findOne();
@@ -437,7 +465,7 @@ router.put('/security/policies', verifyToken, requireRole('SUPER_ADMIN'), async 
 });
 
 // API keys management (in-memory for now)
-router.get('/api-keys', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/api-keys', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_SETTINGS'), async (req, res) => {
   try {
     const { ApiKey } = require('../models');
     if (!ApiKey) return res.json([]);
@@ -834,7 +862,7 @@ router.post('/onboarding/requests/:id/reject', verifyToken, requireRole('SUPER_A
 // @route   GET api/superadmin/team
 // @desc    Get list of super admin team members
 // @access  Private (SuperAdmin)
-router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('VIEW_STAFF'), async (req, res) => {
   try {
     const { User } = require('../models');
     const { Op } = require('sequelize');
@@ -867,7 +895,7 @@ router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) =>
   }
 });
 
-router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
   try {
     const { name, email, username, password, role, permissions } = req.body || {};
     if (!name || !email || !username || !password || !role) {
@@ -926,7 +954,7 @@ router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) =
 // @route   GET api/superadmin/pricing-config
 // @desc    Get global pricing configuration
 // @access  Private (SuperAdmin)
-router.get('/pricing-config', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL'), async (req, res) => {
+router.get('/pricing-config', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL'), requirePermission('VIEW_FINANCE'), async (req, res) => {
   try {
     const { PricingConfig } = require('../models');
     // Auto-heal
@@ -954,7 +982,7 @@ router.get('/pricing-config', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADM
 // @route   PUT api/superadmin/pricing-config
 // @desc    Update global pricing configuration
 // @access  Private (SuperAdmin)
-router.put('/pricing-config', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.put('/pricing-config', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), async (req, res) => {
   try {
     const { PricingConfig, AuditLog } = require('../models');
     let config = await PricingConfig.findOne({ where: { id: 'default' } });
@@ -992,7 +1020,7 @@ router.put('/pricing-config', verifyToken, requireRole('SUPER_ADMIN'), async (re
   }
 });
 
-router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ msg: 'Invalid id' });
@@ -1051,7 +1079,7 @@ router.put('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res
   }
 });
 
-router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
+router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ msg: 'Invalid id' });
@@ -1069,10 +1097,40 @@ router.delete('/team/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, 
   }
 });
 
+router.post('/team/permissions/recommendations/apply', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
+  try {
+    const modeRaw = (req.body && req.body.mode) || '';
+    const overwrite = String(modeRaw).toLowerCase() === 'overwrite';
+    const { Op } = require('sequelize');
+    const users = await User.findAll({
+      where: { role: { [Op.in]: ['SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'] } },
+      order: [['id', 'ASC']]
+    });
+    let updated = 0;
+    for (const user of users) {
+      const recommended = derivePermissionsForUser({ role: normalizeDbRole(user.role) });
+      const current = Array.isArray(user.permissions) ? user.permissions : [];
+      const next = overwrite ? recommended : Array.from(new Set([...current, ...recommended]));
+      const a = [...current].slice().sort();
+      const b = [...next].slice().sort();
+      const same = JSON.stringify(a) === JSON.stringify(b);
+      if (!same) {
+        user.permissions = next;
+        await user.save();
+        updated++;
+      }
+    }
+    return res.json({ updated, mode: overwrite ? 'overwrite' : 'merge' });
+  } catch (err) {
+    console.error(err.message);
+    return res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/superadmin/analytics/kpi
 // @desc    Get KPI metrics
 // @access  Private (SuperAdmin)
-router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
     // Mock KPI data or calculate real ones
     // Real implementation would aggregate data
@@ -1091,7 +1149,7 @@ router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMI
 // @route   GET api/superadmin/metrics/summary
 // @desc    Get metrics summary
 // @access  Private (SuperAdmin)
-router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
+router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
     res.json({
       totalVisits: 15000,

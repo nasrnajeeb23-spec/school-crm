@@ -12,7 +12,8 @@
     "start:pm2": "pm2 start ecosystem.config.js --env production",
     "test:smoke": "node scripts/smokeTest.js",
     "test:e2e": "node scripts/e2e-smoke.js",
-    "test:plans": "node scripts/testPlans.js"
+    "test:plans": "node scripts/testPlans.js",
+    "env:print": "node scripts/printEnv.js"
   },
   "dependencies": {
     "@azure/msal-node": "^2.6.0",
@@ -63,7 +64,7 @@
   "devDependencies": {
     "nodemon": "^3.1.11",
     "pm2": "^6.0.13",
-    "socket.io-client": "^4.7.5"
+    "socket.io-client": "^4.8.3"
   },
   "author": "",
   "license": "MIT"

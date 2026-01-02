@@ -4,14 +4,14 @@ const { execSync } = require('child_process');
 
 // Get environment variables
 const apiUrl = process.env.REACT_APP_API_URL || '';
-const environment = process.env.REACT_APP_ENVIRONMENT || 'production';
+const args = process.argv.slice(2);
+const hasServe = args.some(a => /^--serve(=|$)/.test(a));
+const hasWatch = args.some(a => /^--watch(=|$)/.test(a));
+const environment = process.env.REACT_APP_ENVIRONMENT || ((hasServe || hasWatch) ? 'development' : 'production');
 
 console.log('Building with API URL:', apiUrl);
 console.log('Environment:', environment);
 
-const args = process.argv.slice(2);
-const hasServe = args.some(a => /^--serve(=|$)/.test(a));
-const hasWatch = args.some(a => /^--watch(=|$)/.test(a));
 const portArg = args.find(a => /^--serve=/.test(a));
 const servePort = portArg ? Number(String(portArg).split('=')[1] || '3000') : 3000;
 
@@ -39,7 +39,7 @@ const buildOptions = {
     '.jsx': 'jsx'
   },
   external: [],
-  minify: false,
+  minify: environment === 'production',
   treeShaking: true
 };
 
@@ -66,13 +66,15 @@ const runPostBuild = () => {
         process.platform === 'win32' ? 'tailwindcss.cmd' : 'tailwindcss'
       );
       const envOpts = { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' };
-      execSync(`"${tailwindBin}" -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
+      const minifyFlag = environment === 'production' ? ' --minify' : '';
+      execSync(`"${tailwindBin}" -c tailwind.config.js -i src/index.css -o dist/assets/index.css${minifyFlag}`, { stdio: 'inherit', env: envOpts });
       console.log('Tailwind CSS built successfully.');
     } catch (err) {
       console.warn('Tailwind CLI build failed, trying npx fallback:', err?.message || err);
       try {
         const envOpts = { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' };
-        execSync(`npx tailwindcss -c tailwind.config.js -i src/index.css -o dist/assets/index.css --minify`, { stdio: 'inherit', env: envOpts });
+        const minifyFlag = environment === 'production' ? ' --minify' : '';
+        execSync(`npx tailwindcss -c tailwind.config.js -i src/index.css -o dist/assets/index.css${minifyFlag}`, { stdio: 'inherit', env: envOpts });
         console.log('Tailwind CSS built successfully via npx.');
       } catch (err2) {
         console.warn('Tailwind build failed. No CDN fallback will be used:', err2?.message || err2);

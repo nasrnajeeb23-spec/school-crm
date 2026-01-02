@@ -1,10 +1,22 @@
-const { Subscription, SchoolSettings, Plan, Student, Teacher, Invoice } = require('../models');
+const { Subscription, SchoolSettings, Plan, Student, Teacher, Invoice, SystemSettings } = require('../models');
 
-function normalizeLimits(settings, plan, sub) {
-  const base = { students: 50, teachers: 5, invoices: 100, storageGB: 0 };
+async function getSystemDefaults() {
+  try {
+    const setting = await SystemSettings.findByPk('DEFAULT_LIMITS');
+    if (setting && setting.value) {
+      return typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+    }
+  } catch (e) {
+    console.error('Failed to fetch system defaults:', e.message);
+  }
+  return { students: 50, teachers: 5, invoices: 100, storageGB: 1 };
+}
+
+function normalizeLimits(settings, plan, sub, systemDefaults) {
+  const base = systemDefaults || { students: 50, teachers: 5, invoices: 100, storageGB: 1 };
   let limits = { ...base };
   let source = 'default';
-  let mode = 'hard_cap';
+  let mode = 'overage';
   let packs = [];
 
   if (plan && plan.limits) {
@@ -59,21 +71,21 @@ function normalizeLimits(settings, plan, sub) {
   return { limits, source, mode, packs };
 }
 
-function safeJson(input){
+function safeJson(input) {
   try { return JSON.parse(input); } catch { return {}; }
 }
 
-function requireWithinLimits(resourceKey){
-  return async function(req, res, next){
+function requireWithinLimits(resourceKey) {
+  return async function (req, res, next) {
     try {
       const schoolId = Number(req.params.schoolId || req.user?.schoolId || req.headers['x-school-id']);
       if (!schoolId) return res.status(400).json({ code: 'BAD_REQUEST', msg: 'SchoolId required' });
       const sub = await Subscription.findOne({ where: { schoolId } });
-      
+
       // Enforce subscription status
       if (sub && sub.status !== 'ACTIVE' && sub.status !== 'TRIAL') {
-        return res.status(403).json({ 
-          code: 'SUBSCRIPTION_INACTIVE', 
+        return res.status(403).json({
+          code: 'SUBSCRIPTION_INACTIVE',
           msg: 'اشتراك المدرسة غير نشط. يرجى تجديد الاشتراك.',
           data: { status: sub.status }
         });
@@ -81,7 +93,8 @@ function requireWithinLimits(resourceKey){
 
       const plan = sub ? await Plan.findByPk(sub.planId) : null;
       const settings = await SchoolSettings.findOne({ where: { schoolId } });
-      const { limits, mode } = normalizeLimits(settings, plan, sub);
+      const defaults = await getSystemDefaults();
+      const { limits, mode } = normalizeLimits(settings, plan, sub, defaults);
 
       let current = 0; let limit = 0;
       if (resourceKey === 'students') { current = await Student.count({ where: { schoolId } }); limit = Number(limits.students || 0); }
@@ -95,8 +108,8 @@ function requireWithinLimits(resourceKey){
 
       const nextCount = current + 1;
       if (mode === 'hard_cap' && limit && nextCount > limit) {
-        return res.status(403).json({ 
-          code: 'LIMIT_EXCEEDED', 
+        return res.status(403).json({
+          code: 'LIMIT_EXCEEDED',
           msg: `تم بلوغ حد الموارد (${resourceKey}). يرجى الترقية أو زيادة الحد.`,
           data: { resource: resourceKey, usage: current, limit }
         });
@@ -109,4 +122,4 @@ function requireWithinLimits(resourceKey){
   };
 }
 
-module.exports = { requireWithinLimits, normalizeLimits };
+module.exports = { requireWithinLimits, normalizeLimits, getSystemDefaults };

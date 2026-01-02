@@ -216,7 +216,6 @@ function requirePermission(...requiredPerms) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ msg: 'Unauthenticated' });
     const userRole = normalizeUserRole(req.user);
-    if (isSuperAdminRole(userRole)) return next();
 
     const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
     const ok = requiredPerms.some(p => perms.includes(p));

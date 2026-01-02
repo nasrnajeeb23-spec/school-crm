@@ -14,12 +14,13 @@ const StatsCard: React.FC<StatsCardProps> = ({ icon: Icon, title, value, descrip
   const clickableClasses = onClick ? "cursor-pointer transform hover:-translate-y-1 hover:shadow-lg" : "";
 
   const Component = onClick ? 'button' : 'div';
+  const SafeIcon: any = Icon || (() => null);
 
   return (
     <Component onClick={onClick} className={`${baseClasses} ${clickableClasses}`}>
       <div className="flex-shrink-0">
         <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
-          <Icon className="h-7 w-7 text-indigo-600 dark:text-indigo-300" />
+          <SafeIcon className="h-7 w-7 text-indigo-600 dark:text-indigo-300" />
         </div>
       </div>
       <div>
