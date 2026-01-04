@@ -1,16 +1,9 @@
 export enum SubscriptionStatus {
-<<<<<<< HEAD
-  Active = 'نشط',
-  Inactive = 'غير نشط',
-  Trial = 'فترة تجريبية',
-  Canceled = 'ملغي',
-  PastDue = 'متأخر الدفع',
-=======
     Active = 'نشط',
+    Inactive = 'غير نشط',
     Trial = 'فترة تجريبية',
     Canceled = 'ملغي',
     PastDue = 'متأخر الدفع',
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 }
 
 export enum PlanName {
@@ -412,37 +405,16 @@ export interface BehaviorRecord {
 }
 
 export interface User {
-<<<<<<< HEAD
-  id: string;
-  email: string;
-  password?: string; // In a real app, this would be a hash, but for mock data it's fine.
-  role: UserRole | string;
-  schoolId?: number | null; // Optional, only for SchoolAdmins, Teachers, Parents
-  teacherId?: string; // Optional, only for Teachers
-  parentId?: string; // Optional, only for Parents
-  name: string;
-  schoolRole?: SchoolRole; // For staff members
-  phone?: string;
-  username?: string;
-  passwordMustChange?: boolean;
-  tokenVersion?: number;
-  isActive?: boolean;
-  department?: string;
-  bankAccount?: string;
-  createdAt?: string;
-  avatar?: string;
-  permissions?: string[];
-=======
     id: string | number;
     email: string;
     password?: unknown;
-    role: UserRole;
-    schoolId?: number; // Optional, only for SchoolAdmins, Teachers, Parents
+    role: UserRole | string;
+    schoolId?: number | null; // Optional, only for SchoolAdmins, Teachers, Parents
     teacherId?: string; // Optional, only for Teachers
     parentId?: string; // Optional, only for Parents
     name: string;
     schoolRole?: SchoolRole; // For staff members
-    permissions?: Permission[];
+    permissions?: Array<Permission | string>;
     phone?: string;
     username?: string;
     passwordMustChange?: boolean;
@@ -451,7 +423,7 @@ export interface User {
     department?: string;
     bankAccount?: string;
     createdAt?: string;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+    avatar?: string;
 }
 
 export interface NewStaffData {
@@ -487,56 +459,31 @@ export interface Plan {
 }
 
 export interface School {
-<<<<<<< HEAD
-  id: number;
-  name: string;
-  plan?: PlanName | string | null;
-  status: SubscriptionStatus;
-  students: number;
-  teachers: number;
-  balance: number; // in USD
-  joinDate: string;
-  logoUrl?: string | null;
-}
-
-export interface Subscription {
-  id: string;
-  schoolId: number;
-  schoolName: string;
-  plan?: PlanName | string | null;
-  planName?: string | null;
-  status: SubscriptionStatus;
-  startDate: string;
-  renewalDate: string;
-  endDate?: string | null;
-  amount: number;
-  trialEndDate?: string;
-  customLimits?: UsageLimit;
-  modules?: SchoolModuleSubscription[];
-=======
     id: number;
     name: string;
-    plan: PlanName;
+    plan?: PlanName | string | null;
     status: SubscriptionStatus;
     students: number;
     teachers: number;
     balance: number; // in USD
     joinDate: string;
+    logoUrl?: string | null;
 }
 
 export interface Subscription {
     id: string;
     schoolId: number;
     schoolName: string;
-    plan: PlanName;
+    plan?: PlanName | string | null;
+    planName?: string | null;
     status: SubscriptionStatus;
     startDate: string;
     renewalDate: string;
+    endDate?: string | null;
     amount: number;
     trialEndDate?: string;
     customLimits?: UsageLimit;
     modules?: SchoolModuleSubscription[];
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 }
 
 export interface RevenueData {
@@ -557,11 +504,8 @@ export interface Student {
     id: string;
     name: string;
     grade: string;
-<<<<<<< HEAD
     classId?: string;
-=======
     classId?: string | number;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     parentName: string;
     status: StudentStatus;
     registrationDate: string;
@@ -649,28 +593,16 @@ export interface UpdatableTeacherData {
 }
 
 export interface Class {
-<<<<<<< HEAD
-  id: string;
-  name: string;
-  gradeLevel: string;
-  homeroomTeacherName: string;
-  homeroomTeacherId?: string | number;
-  studentCount: number;
-  capacity?: number;
-  subjects: string[];
-  subjectTeacherMap?: Record<string, string | number>;
-  section?: string;
-=======
     id: string;
     name: string;
     gradeLevel: string;
     homeroomTeacherName: string;
+    homeroomTeacherId?: string | number;
     studentCount: number;
     capacity?: number;
     subjects: string[];
     subjectTeacherMap?: Record<string, string | number>;
     section?: string;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 }
 
 export interface NewClassData {

@@ -42,9 +42,6 @@ async function runMigrations() {
     if (await hasMigration(name)) continue;
     const mod = require(path.join(dir, f));
     const queryInterface = sequelize.getQueryInterface();
-<<<<<<< HEAD
-
-    // Add describeTable method if missing
     if (!queryInterface.describeTable) {
       queryInterface.describeTable = async (tableName) => {
         const [results] = await sequelize.query(`
@@ -63,10 +60,7 @@ async function runMigrations() {
       };
     }
 
-    const models = { User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig };
-=======
     const models = { User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig, UsageSnapshot };
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     if (typeof mod.up === 'function') {
       console.log(`Running migration: ${name}`);
       await mod.up({ sequelize, queryInterface, models });

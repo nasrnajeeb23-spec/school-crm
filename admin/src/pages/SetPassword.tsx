@@ -35,16 +35,6 @@ const SetPassword: React.FC = () => {
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-<<<<<<< HEAD
-      const t = params.get('token') || '';
-      setToken(t);
-    } catch {}
-  }, []);
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-=======
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       const tParam = params.get('token') || '';
       const hasAuth = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
       if (hasAuth && !tParam) {

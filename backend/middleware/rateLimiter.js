@@ -84,6 +84,12 @@ const rateLimiters = {
         max: 300 // 300 requests per minute (increased for dashboard concurrency)
     }),
 
+    // Rate limiter for invitations
+    invite: createRateLimiter({
+        windowMs: 1 * 60 * 1000, // 1 minute
+        max: 5 // 5 invites per minute
+    }),
+
     // Rate limiter for file uploads
     upload: createRateLimiter({
         windowMs: 60 * 60 * 1000, // 1 hour

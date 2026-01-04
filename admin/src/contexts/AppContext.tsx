@@ -130,16 +130,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const login = async (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string): Promise<boolean> => {
     try {
-<<<<<<< HEAD
-      const result = await api.login(emailOrUsername, password, schoolId);
-      if (result === "TRIAL_EXPIRED") {
-          addToast('لقد انتهت الفترة التجريبية لحسابك. يرجى الاشتراك للمتابعة.', 'warning');
-          return false;
-      } else if (result && typeof result === 'object') {
-=======
       const result = await api.login(emailOrUsername, password, schoolId, hcaptchaToken);
-      if (result) {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+      if (result === 'TRIAL_EXPIRED') {
+        addToast('لقد انتهت الفترة التجريبية لحسابك. يرجى الاشتراك للمتابعة.', 'warning');
+        return false;
+      }
+      if (result && typeof result === 'object') {
         setCurrentUser(result);
         if (result.schoolId) {
           try { localStorage.setItem('current_school_id', String(result.schoolId)); } catch {}
@@ -184,15 +180,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
         return true;
       }
-<<<<<<< HEAD
-=======
-    } catch {}
-    if (String(emailOrUsername).toLowerCase() === 'super@admin.com' && password === 'password') {
-      const offlineUser: User = { id: 'super-demo', name: 'المدير العام', email: 'super@admin.com', role: 'SUPER_ADMIN', schoolId: null } as unknown as User;
-      setCurrentUser(offlineUser);
-      addToast('تم الدخول في وضع العرض بدون اتصال بالخلفية.', 'info');
-      return true;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
     addToast('البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
     return false;

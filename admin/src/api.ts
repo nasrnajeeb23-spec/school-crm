@@ -1,31 +1,19 @@
 // API Configuration for Production - Real Backend Connection
 // هذا الملف يتصل بالـ Backend الحقيقي على Render
 
-<<<<<<< HEAD
 import {
     User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ParentAccountStatus, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
     PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState, NewParentData, SalaryComponent
-=======
-import { 
-    User, School, RevenueData, Plan, Subscription, SubscriptionStatus, Role, Student, Teacher, Class, DailyAttendance, StudentGrades, ScheduleEntry, Conversation, Message, Invoice, Parent, ParentAccountStatus, ActionItem, SchoolEvent, StudentNote, StudentDocument, RecentActivity, SchoolSettings, UserRole, NewStudentData, NewTeacherData, TeacherStatus, StudentStatus, AttendanceRecord, ConversationType, NewSchoolData, PlanName, UpdatableStudentData, PaymentData, InvoiceStatus, ClassRosterUpdate, UpdatableTeacherData, NewClassData, ParentRequest, NewParentRequestData, NewParentData, ActionItemType, RequestStatus, NewInvoiceData, ActivityType, LandingPageContent, NewAdRequestData, NewTrialRequestData, UpdatableUserData, SchoolRole, NewStaffData, BusOperator, Route, NewBusOperatorApplication, BusOperatorStatus, Expense, NewExpenseData,
-    PricingConfig, Module, ModuleId, SchoolModuleSubscription, SelfHostedQuoteRequest, SelfHostedLicense, BankDetails, PaymentProofSubmission, TeacherSalarySlip, SalaryComponent, Assignment, NewAssignmentData, Submission, AssignmentStatus, SubmissionStatus, AttendanceStatus, FeeSetup, BehaviorRecord, SubscriptionState
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 } from './types';
 
 
 // 🔗 ضبط عنوان الـ API للإنتاج/التطوير بشكل مرن
 // الأولوية: متغير بيئة مُحقن أثناء البناء -> Vite import.meta.env (إن وجد) -> localStorage(api_base) -> الافتراضي
 const API_BASE_URL = (
-<<<<<<< HEAD
     (typeof process !== 'undefined' && (process as any).env && (process as any).env.REACT_APP_API_URL) ||
     (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
     (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
     'http://localhost:5000/api'
-=======
-  (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
-  (typeof window !== 'undefined' ? (localStorage.getItem('api_base') || '') : '') ||
-  'http://localhost:5000/api'
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 );
 
 const API_ALT_BASE_URL = (() => {
@@ -87,19 +75,38 @@ const setRefreshToken = (token?: string) => {
 
 // دالة مساعدة للاتصال بالـ API
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-<<<<<<< HEAD
+    const isFormData = typeof FormData !== 'undefined' && (options as any)?.body instanceof FormData;
+    const storedToken = getAuthToken();
+    const authHeader = storedToken ? { Authorization: `Bearer ${storedToken}` } : {};
     const headers = {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...authHeaders(),
+        ...authHeader,
         ...options.headers,
     };
     const attemptFetch = async (base: string) => {
         return await fetch(`${base}${endpoint}`, {
             ...options,
             headers,
+            credentials: 'include',
             cache: 'no-store' as RequestCache,
         });
     };
+    const derivedBase = (() => {
+        try {
+            if (typeof window === 'undefined') return '';
+            const host = window.location.hostname || '';
+            if (!host) return '';
+            if (host.endsWith('.onrender.com')) {
+                const sub = host.split('.onrender.com')[0];
+                const back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
+                return `https://${back}.onrender.com/api`;
+            }
+            return '';
+        } catch {
+            return '';
+        }
+    })();
     let lastError: any = null;
     const maxRetries = 2;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -108,102 +115,46 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
             if (!response.ok) {
                 let bodyText = '';
                 let bodyJson: any = null;
-                try { bodyJson = await response.json(); } catch {
-                    try { bodyText = await response.text(); } catch { }
-=======
-  const isFormData = typeof FormData !== 'undefined' && (options as any)?.body instanceof FormData;
-  const storedToken = getAuthToken();
-  const authHeader = storedToken ? { Authorization: `Bearer ${storedToken}` } : {};
-  const headers = {
-    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-    ...authHeaders(),
-    ...authHeader,
-    ...options.headers,
-  };
-  const attemptFetch = async (base: string) => {
-    return await fetch(`${base}${endpoint}`, {
-      ...options,
-      headers,
-      credentials: 'include',
-      cache: 'no-store' as RequestCache,
-    });
-  };
-  const derivedBase = (() => {
-    try {
-      if (typeof window === 'undefined') return '';
-      const host = window.location.hostname || '';
-      if (!host) return '';
-      if (host.endsWith('.onrender.com')) {
-        const sub = host.split('.onrender.com')[0];
-        const back = sub.includes('admin') ? sub.replace('admin', 'backend') : `${sub}-backend`;
-        return `https://${back}.onrender.com/api`;
-      }
-      return '';
-    } catch { return ''; }
-  })();
-  let lastError: any = null;
-  const maxRetries = 2;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await attemptFetch(API_BASE_URL);
-      if (!response.ok) {
-        let bodyText = '';
-        let bodyJson: any = null;
-        try { bodyJson = await response.json(); } catch {
-          try { bodyText = await response.text(); } catch {}
-        }
-        const primaryMsg = bodyJson?.message || bodyJson?.msg || bodyText || '';
-        const detailMsg = bodyJson?.error || bodyJson?.detail || '';
-        const msg = (primaryMsg && detailMsg && /^(Server Error|خطأ في الخادم|Internal Server Error)$/i.test(String(primaryMsg).trim()))
-          ? `${primaryMsg}: ${detailMsg}`
-          : (primaryMsg || detailMsg || '');
-        const statusText = response.statusText ? ` ${response.statusText}` : '';
-        if (response.status === 429 && endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
-          const alt2 = await attemptFetch(derivedBase);
-          if (alt2.ok) return await alt2.json();
-        }
-        if (response.status === 401) {
-          if (endpoint === '/auth/me') {
-            try {
-              setAuthToken('');
-              setRefreshToken('');
-              localStorage.removeItem('current_school_id');
-            } catch {}
-          }
-          const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
-          const isSilentCheck = endpoint === '/auth/me';
-          const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
-          const onLoginPage = typeof window !== 'undefined' ? /^\/(login|superadmin\/login)\/?$/i.test(window.location?.pathname || '') : false;
-          const onPublicPage = typeof window !== 'undefined' ? (() => {
-            const p = window.location?.pathname || '';
-            return /^\/$/.test(p) || /^\/(landing|apps|help|pricing)\/?$/i.test(p);
-          })() : false;
-          const onInviteFlow = (() => {
-            try {
-              if (typeof window === 'undefined') return false;
-              const p = window.location?.pathname || '';
-              if (!/^\/set-password\/?$/i.test(p)) return false;
-              const q = new URLSearchParams(window.location.search);
-              return q.has('token');
-            } catch { return false; }
-          })();
-          const shouldRedirect = !isAuthFlow && !onInviteFlow && !onLoginPage && !onPublicPage && onProtectedRoute;
-          if (shouldRedirect) {
-            try {
-              if (typeof window !== 'undefined') {
-                localStorage.removeItem('current_school_id');
-                const toast = (window as any).__addToast;
-                if (typeof toast === 'function' && !onLoginPage && !onPublicPage) {
-                  toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+                try {
+                    bodyJson = await response.json();
+                } catch {
+                    try {
+                        bodyText = await response.text();
+                    } catch {}
                 }
-                const msg = bodyJson?.message || bodyJson?.msg || bodyJson?.error || bodyText || '';
+                const primaryMsg = bodyJson?.message || bodyJson?.msg || bodyText || '';
+                const detailMsg = bodyJson?.error || bodyJson?.detail || '';
+                const msg = (primaryMsg && detailMsg && /^(Server Error|خطأ في الخادم|Internal Server Error)$/i.test(String(primaryMsg).trim()))
+                    ? `${primaryMsg}: ${detailMsg}`
+                    : (primaryMsg || detailMsg || '');
                 const statusText = response.statusText ? ` ${response.statusText}` : '';
+
+                if (response.status === 429 && endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
+                    const alt2 = await attemptFetch(derivedBase);
+                    if (alt2.ok) return await alt2.json();
+                }
+
                 if (response.status === 401) {
+                    if (endpoint === '/auth/me') {
+                        try {
+                            setAuthToken('');
+                            setRefreshToken('');
+                            localStorage.removeItem('current_school_id');
+                        } catch {}
+                    }
                     const isAuthFlow = /^\/auth\/superadmin\//.test(endpoint) || endpoint === '/auth/login';
-                    const isSilentCheck = endpoint === '/auth/me';
-                    const hadToken = typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
-                    const onProtectedRoute = typeof window !== 'undefined' ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '') : false;
+                    const onProtectedRoute = typeof window !== 'undefined'
+                        ? /^(\/school|\/teacher|\/parent|\/admin)/.test(window.location?.pathname || '')
+                        : false;
+                    const onLoginPage = typeof window !== 'undefined'
+                        ? /^\/(login|superadmin\/login)\/?$/i.test(window.location?.pathname || '')
+                        : false;
+                    const onPublicPage = typeof window !== 'undefined'
+                        ? (() => {
+                            const p = window.location?.pathname || '';
+                            return /^\/$/.test(p) || /^\/(landing|apps|help|pricing)\/?$/i.test(p);
+                        })()
+                        : false;
                     const onInviteFlow = (() => {
                         try {
                             if (typeof window === 'undefined') return false;
@@ -211,85 +162,69 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
                             if (!/^\/set-password\/?$/i.test(p)) return false;
                             const q = new URLSearchParams(window.location.search);
                             return q.has('token');
-                        } catch { return false; }
+                        } catch {
+                            return false;
+                        }
                     })();
-                    if (!isAuthFlow && !onInviteFlow && (isSilentCheck || (hadToken && onProtectedRoute))) {
+                    const shouldRedirect = !isAuthFlow && !onInviteFlow && !onLoginPage && !onPublicPage && onProtectedRoute;
+                    if (shouldRedirect) {
                         try {
                             if (typeof window !== 'undefined') {
-                                localStorage.removeItem('auth_token');
                                 localStorage.removeItem('current_school_id');
                                 const toast = (window as any).__addToast;
-                                if (typeof toast === 'function') {
+                                if (typeof toast === 'function' && !onLoginPage && !onPublicPage) {
                                     toast('انتهت الجلسة. الرجاء تسجيل الدخول مجددًا.', 'warning');
                                 }
-                                setTimeout(() => { window.location.href = '/login'; }, 0);
+                                setTimeout(() => {
+                                    window.location.href = '/login';
+                                }, 0);
                             }
-                        } catch { }
+                        } catch {}
                     }
                     throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
                 }
+
                 if (response.status === 404 || /Not\s*Found/i.test(msg)) {
                     const alt = await attemptFetch(API_ALT_BASE_URL);
                     if (!alt.ok) {
                         let altText = '';
                         let altJson: any = null;
-                        try { altJson = await alt.json(); } catch { try { altText = await alt.text(); } catch { } }
+                        try {
+                            altJson = await alt.json();
+                        } catch {
+                            try {
+                                altText = await alt.text();
+                            } catch {}
+                        }
                         const altMsg = altJson?.msg || altJson?.error || altText || '';
                         const altStatusText = alt.statusText ? ` ${alt.statusText}` : '';
                         throw new Error(`HTTP ${alt.status}${altStatusText}${altMsg ? `: ${altMsg}` : ''}`);
                     }
                     return await alt.json();
                 }
+
                 throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
             }
             return await response.json();
         } catch (error) {
             lastError = error;
             const isNetworkError = (error instanceof TypeError) || /Failed to fetch|NetworkError|net::ERR_/i.test(String((error as any)?.message || ''));
+            if (endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
+                try {
+                    const resp = await attemptFetch(derivedBase);
+                    if (resp.ok) return await resp.json();
+                } catch {}
+            }
             if (attempt < maxRetries && isNetworkError) {
                 const delayMs = 500 * (attempt + 1);
                 await new Promise(res => setTimeout(res, delayMs));
                 continue;
             }
-            console.error(`API Error on ${endpoint}:`, error);
+            const msg = String((error as any)?.message || '');
+            const suppress = endpoint === '/auth/me' && (/HTTP\s*401|HTTP\s*403|Missing Authorization header|Invalid or expired token/i.test(msg));
+            if (!suppress) console.error(`API Error on ${endpoint}:`, error);
             throw error;
         }
-<<<<<<< HEAD
-=======
-        if (response.status === 404 || /Not\s*Found/i.test(msg)) {
-          const alt = await attemptFetch(API_ALT_BASE_URL);
-          if (!alt.ok) {
-            let altText = '';
-            let altJson: any = null;
-            try { altJson = await alt.json(); } catch { try { altText = await alt.text(); } catch {} }
-            const altMsg = altJson?.msg || altJson?.error || altText || '';
-            const altStatusText = alt.statusText ? ` ${alt.statusText}` : '';
-            throw new Error(`HTTP ${alt.status}${altStatusText}${altMsg ? `: ${altMsg}` : ''}`);
-          }
-          return await alt.json();
-        }
-        throw new Error(`HTTP ${response.status}${statusText}${msg ? `: ${msg}` : ''}`);
-      }
-      return await response.json();
-    } catch (error) {
-      lastError = error;
-      const isNetworkError = (error instanceof TypeError) || /Failed to fetch|NetworkError|net::ERR_/i.test(String((error as any)?.message || ''));
-      if (endpoint === '/auth/me' && derivedBase && derivedBase !== API_BASE_URL) {
-        try {
-          const resp = await attemptFetch(derivedBase);
-          if (resp.ok) return await resp.json();
-        } catch {}
-      }
-      if (attempt < maxRetries && isNetworkError) {
-        const delayMs = 500 * (attempt + 1);
-        await new Promise(res => setTimeout(res, delayMs));
-        continue;
-      }
-      const msg = String((error as any)?.message || '');
-      const suppress = endpoint === '/auth/me' && (/HTTP\s*401|HTTP\s*403|Missing Authorization header|Invalid or expired token/i.test(msg));
-      if (!suppress) console.error(`API Error on ${endpoint}:`, error);
-      throw error;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
     throw lastError;
 };
@@ -313,40 +248,38 @@ const unwrap = <T = any>(payload: any, key?: string, fallback: T = ([] as unknow
 
 // ==================== Authentication APIs ====================
 
-<<<<<<< HEAD
-export const login = async (emailOrUsername: string, password: string, schoolId?: number): Promise<User | string> => {
-=======
-export const login = async (emailOrUsername: string, password: string, schoolId?: number, hcaptchaToken?: string): Promise<User> => {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+export const login = async (
+    emailOrUsername: string,
+    password: string,
+    schoolId?: number,
+    hcaptchaToken?: string,
+): Promise<User | 'TRIAL_EXPIRED'> => {
     const field = emailOrUsername.includes('@') ? { email: emailOrUsername } : { username: emailOrUsername };
     const response: any = await apiCall('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ ...field, password, schoolId, client: 'web', hcaptchaToken }),
     });
-<<<<<<< HEAD
-    if (response?.status === 'TRIAL_EXPIRED' || response?.message === 'TRIAL_EXPIRED') return "TRIAL_EXPIRED";
-    const token = response?.token;
-    const user = response?.user || {};
-    if (typeof window !== 'undefined' && token) {
-        localStorage.setItem('auth_token', token);
-    }
-    const mapRole = (r: string) => {
-        const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-        const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
-        return m[key] || key;
-    };
-=======
+    if (response?.status === 'TRIAL_EXPIRED' || response?.message === 'TRIAL_EXPIRED') return 'TRIAL_EXPIRED';
     try {
-      if (response?.token) setAuthToken(response.token);
-      if (response?.refreshToken) setRefreshToken(response.refreshToken);
+        if (response?.token) setAuthToken(response.token);
+        if (response?.refreshToken) setRefreshToken(response.refreshToken);
     } catch {}
     const user = response?.user || {};
-  const mapRole = (r: string) => {
-      const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-      const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', DRIVER: 'DRIVER', STAFF: 'STAFF' };
-      return m[key] || key;
-  };
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+    const mapRole = (r: string) => {
+        const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
+        const m: any = {
+            SUPERADMIN: 'SUPER_ADMIN',
+            SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL',
+            SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL',
+            SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR',
+            SCHOOLADMIN: 'SCHOOL_ADMIN',
+            TEACHER: 'TEACHER',
+            PARENT: 'PARENT',
+            DRIVER: 'DRIVER',
+            STAFF: 'STAFF',
+        };
+        return m[key] || key;
+    };
     return { ...user, role: mapRole(user.role) } as User;
 };
 
@@ -360,25 +293,14 @@ export const logout = async (): Promise<void> => {
 
 export const getCurrentUser = async (): Promise<User> => {
     const user = await apiCall('/auth/me', { method: 'GET' });
-<<<<<<< HEAD
     if (user && user.role) {
         const mapRole = (r: string) => {
             const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-            const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', STAFF: 'STAFF' };
+            const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', DRIVER: 'DRIVER', STAFF: 'STAFF' };
             return m[key] || key;
         };
         user.role = mapRole(user.role);
     }
-=======
-  if (user && user.role) {
-      const mapRole = (r: string) => {
-          const key = String(r).toUpperCase().replace(/[^A-Z]/g, '');
-          const m: any = { SUPERADMIN: 'SUPER_ADMIN', SUPERADMINFINANCIAL: 'SUPER_ADMIN_FINANCIAL', SUPERADMINTECHNICAL: 'SUPER_ADMIN_TECHNICAL', SUPERADMINSUPERVISOR: 'SUPER_ADMIN_SUPERVISOR', SCHOOLADMIN: 'SCHOOL_ADMIN', TEACHER: 'TEACHER', PARENT: 'PARENT', DRIVER: 'DRIVER', STAFF: 'STAFF' };
-          return m[key] || key;
-      };
-      user.role = mapRole(user.role);
-  }
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     return user;
 };
 
@@ -829,19 +751,11 @@ export const updateSubscription = async (id: string, data: { planId?: number; st
 
 export const getPlans = async (): Promise<Plan[]> => {
     try { return await apiCall('/plans', { method: 'GET' }); } catch {
-<<<<<<< HEAD
         return [
-            { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: ['الوظائف الأساسية'], limits: { students: 200, teachers: 15 }, recommended: false } as any,
-            { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: ['كل ميزات الأساسية', 'إدارة مالية متقدمة'], limits: { students: 1000, teachers: 50 }, recommended: true } as any,
-            { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: ['كل ميزات المميزة', 'تقارير مخصصة'], limits: { students: 'غير محدود', teachers: 'غير محدود' }, recommended: false } as any
+            { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: ['إدارة الطلاب', 'الحضور والغياب', 'بوابة ولي الأمر', 'بوابة المعلم', 'الرسوم والفواتير'], limits: { students: 200, teachers: 15, invoices: 200, storageGB: 5, branches: 1 }, recommended: false } as any,
+            { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: ['كل ميزات الأساسية', 'التقارير المتقدمة', 'المالية المتقدمة', 'النقل المدرسي', 'دعم أولوية'], limits: { students: 1000, teachers: 50, invoices: 2000, storageGB: 50, branches: 3 }, recommended: true } as any,
+            { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: ['كل ميزات المميزة', 'تقارير مخصصة', 'دعم مخصص', 'تكاملات API', 'SLA للمؤسسات'], limits: { students: 'غير محدود', teachers: 'غير محدود', invoices: 'غير محدود', storageGB: 'غير محدود', branches: 'غير محدود' }, recommended: false } as any,
         ];
-=======
-      return [
-        { id: 1, name: 'الأساسية', price: 99, pricePeriod: 'شهرياً', features: ['إدارة الطلاب', 'الحضور والغياب', 'بوابة ولي الأمر', 'بوابة المعلم', 'الرسوم والفواتير'], limits: { students: 200, teachers: 15, invoices: 200, storageGB: 5 }, recommended: false } as any,
-        { id: 2, name: 'المميزة', price: 249, pricePeriod: 'شهرياً', features: ['كل ميزات الأساسية', 'التقارير المتقدمة', 'المالية المتقدمة', 'النقل المدرسي', 'دعم أولوية'], limits: { students: 1000, teachers: 50, invoices: 2000, storageGB: 50 }, recommended: true } as any,
-        { id: 3, name: 'المؤسسات', price: 899, pricePeriod: 'تواصل معنا', features: ['كل ميزات المميزة', 'تقارير مخصصة', 'دعم مخصص', 'تكاملات API', 'SLA للمؤسسات'], limits: { students: 'غير محدود', teachers: 'غير محدود', invoices: 'غير محدود', storageGB: 'غير محدود' }, recommended: false } as any
-      ];
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
 };
 
@@ -917,13 +831,12 @@ export const getMessages = async (conversationId: string): Promise<Message[]> =>
     return unwrap<Message[]>(data, 'messages', []);
 };
 
-<<<<<<< HEAD
-export const sendMessage = async (messageData: { conversationId: string; text: string } | Partial<Message>): Promise<Message> => {
-    return await apiCall('/messaging/send', {
-=======
-export const sendMessage = async (messageData: { conversationId: string; text: string; attachmentUrl?: string; attachmentType?: string; attachmentName?: string }): Promise<Message> => {
+export const sendMessage = async (
+    messageData:
+        | { conversationId: string; text: string; attachmentUrl?: string; attachmentType?: string; attachmentName?: string }
+        | Partial<Message>,
+): Promise<Message> => {
     const resp = await apiCall('/messaging/send', {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         method: 'POST',
         body: JSON.stringify(messageData),
     });

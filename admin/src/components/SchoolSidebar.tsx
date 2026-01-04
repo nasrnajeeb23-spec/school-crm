@@ -95,17 +95,6 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
               return (
                 <li key={item.id} className="px-2">
                   <NavLink to={item.path} className={({ isActive }) => `${baseLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`} end>
-<<<<<<< HEAD
-                    {({ isActive }) => (
-                      <>
-                        {isActive && <div className="absolute right-0 h-6 w-1 bg-teal-600 dark:bg-teal-400 rounded-l-full"></div>}
-                        <item.icon className="h-6 w-6" />
-                        <span className="mr-4 flex items-center gap-2">
-                          <span>{item.label}</span>
-                        </span>
-                      </>
-                    )}
-=======
                     {({ isActive }) => {
                       const Icon: any = (item as any).icon || (() => null);
                       return (
@@ -118,7 +107,6 @@ const SchoolSidebar: React.FC<SchoolSidebarProps> = ({ permissions, isTrial = fa
                         </>
                       );
                     }}
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
                   </NavLink>
                 </li>
               );

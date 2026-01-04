@@ -13,6 +13,7 @@ import AccessDenied from '../components/AccessDenied';
 import TrialBanner from '../components/TrialBanner';
 import Breadcrumbs from '../components/Breadcrumbs';
 import HelpWidget from '../components/HelpWidget';
+import TooltipGuide from '../components/TooltipGuide';
 
 // Lazy load pages
 const SchoolDashboard = React.lazy(() => import('../pages/SchoolDashboard'));
@@ -50,18 +51,24 @@ interface SchoolAdminLayoutProps {
 }
 
 const viewTitles: { [key: string]: string } = {
-<<<<<<< HEAD
-  dashboard: 'لوحة التحكم', students: 'إدارة الطلاب', teachers: 'إدارة المعلمين', parents: 'إدارة أولياء الأمور',
-  staff: 'إدارة الموظفين', classes: 'إدارة الفصول', transportation: 'النقل المدرسي', attendance: 'الحضور والغياب',
-  schedule: 'الجدول الدراسي', calendar: 'التقويم والأحداث', grades: 'إدارة الدرجات', messaging: 'الرسائل',
-  finance: 'المالية والرسوم', reports: 'التقارير', settings: 'الإعدادات', profile: 'ملفي الشخصي', modules: 'الوحدات',
-=======
-    dashboard: 'لوحة التحكم', students: 'إدارة الطلاب', teachers: 'إدارة المعلمين', parents: 'إدارة أولياء الأمور',
-    staff: 'إدارة الموظفين', classes: 'إدارة الفصول', transportation: 'النقل المدرسي', attendance: 'الحضور والغياب',
-    schedule: 'الجدول الدراسي', calendar: 'التقويم والأحداث', grades: 'إدارة الدرجات', messaging: 'الرسائل',
-    finance: 'المالية والرسوم', reports: 'التقارير', settings: 'الإعدادات', profile: 'ملفي الشخصي', modules: 'الوحدات',
-    drivers: 'إدارة السائقين',
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+  dashboard: 'لوحة التحكم',
+  students: 'إدارة الطلاب',
+  teachers: 'إدارة المعلمين',
+  parents: 'إدارة أولياء الأمور',
+  staff: 'إدارة الموظفين',
+  classes: 'إدارة الفصول',
+  transportation: 'النقل المدرسي',
+  drivers: 'إدارة السائقين',
+  attendance: 'الحضور والغياب',
+  schedule: 'الجدول الدراسي',
+  calendar: 'التقويم والأحداث',
+  grades: 'إدارة الدرجات',
+  messaging: 'الرسائل',
+  finance: 'المالية والرسوم',
+  reports: 'التقارير',
+  settings: 'الإعدادات',
+  profile: 'ملفي الشخصي',
+  modules: 'الوحدات',
 };
 
 
@@ -85,7 +92,6 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
 
   const storedId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('current_school_id') || '0') : 0;
   const effectiveSchoolId = isSuperAdminView ? parseInt(urlSchoolId || '0') : (currentUser?.schoolId || storedId);
-<<<<<<< HEAD
 
   // Helper to derive permissions from active modules
   const getPermissionsFromModules = (activeModules: string[]): Permission[] => {
@@ -136,18 +142,10 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
 
     return Array.from(perms);
   };
-=======
-  if (!isSuperAdminView && currentUser?.role === UserRole.Staff && String(currentUser?.schoolRole || '') === String(SchoolRole.Driver)) {
-    return <Navigate to="/driver" replace />;
-  }
 
-  const userRolePermissions = (() => {
-    if (isSuperAdminView) return Object.values(Permission);
-    const perms = (currentUser?.permissions || []) as Permission[];
-    if (currentUser?.role === UserRole.SchoolAdmin && perms.length === 0) return Object.values(Permission);
-    return perms;
-  })();
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+  const isDriverStaff = !isSuperAdminView
+    && currentUser?.role === UserRole.Staff
+    && String(currentUser?.schoolRole || '') === String(SchoolRole.Driver);
 
   const hasPermission = (permission: Permission) => {
     if (isSuperAdminView) return true;
@@ -155,7 +153,13 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
   };
 
   useEffect(() => {
-    if (effectiveSchoolId) {
+    if (isDriverStaff) {
+      navigate('/driver', { replace: true });
+    }
+  }, [isDriverStaff, navigate]);
+
+  useEffect(() => {
+    if (effectiveSchoolId && !isDriverStaff) {
       setLoading(true);
 
       const actionItemsPromise = isSuperAdminView
@@ -221,7 +225,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
         console.error('School data load error:', err);
       }).finally(() => setLoading(false));
     }
-  }, [effectiveSchoolId]);
+  }, [effectiveSchoolId, isDriverStaff]);
 
 
 
@@ -258,6 +262,7 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
     return viewTitles[currentView] || 'لوحة التحكم';
   };
 
+  if (isDriverStaff) return null;
   if (loading) return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900"><p className="dark:text-white">جاري تحميل بيانات المدرسة...</p></div>;
   if (!school) return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900"><p className="dark:text-red-400">لم يتم العثور على المدرسة.</p></div>;
 
@@ -296,14 +301,11 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
               </div>
               <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
             </div>
-<<<<<<< HEAD
+            <TrialBanner />
           </div>
-          <TrialBanner />
 
-          {/* Breadcrumbs */}
-          <Breadcrumbs />
-          <HelpWidget />
-
+          <Breadcrumbs className="mt-4 mb-6" />
+          
           <Suspense fallback={<div className="text-center p-8">جاري التحميل...</div>}>
             <Routes>
               <Route index element={<Navigate to="dashboard" replace />} />
@@ -319,6 +321,8 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
               <Route path="staff/attendance" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffAttendance schoolId={school.id} /></ProtectedPage>} />
               <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
               <Route path="transportation" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><Transportation schoolId={school.id} /></ProtectedPage>} />
+              <Route path="transportation/drivers" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriversList schoolId={school.id} detailsPathPrefix="" /></ProtectedPage>} />
+              <Route path="transportation/drivers/:operatorId" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriverProfile schoolId={school.id} /></ProtectedPage>} />
               <Route path="attendance" element={<ProtectedPage permission={Permission.MANAGE_ATTENDANCE}><Attendance schoolId={school.id} /></ProtectedPage>} />
               <Route path="schedule" element={<ProtectedPage permission={Permission.MANAGE_SCHEDULE}><Schedule schoolId={school.id} /></ProtectedPage>} />
               <Route path="calendar" element={<ProtectedPage permission={Permission.MANAGE_CALENDAR}><Calendar schoolId={school.id} /></ProtectedPage>} />
@@ -334,47 +338,9 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
               <Route path="settings" element={<ProtectedPage permission={Permission.MANAGE_SETTINGS}><Settings schoolId={school.id} /></ProtectedPage>} />
               <Route path="profile" element={<UserProfile />} />
               <Route path="modules" element={<ProtectedPage permission={Permission.MANAGE_MODULES}><ModulesPage school={school} /></ProtectedPage>} />
+              <Route path="help-center" element={<HelpCenter />} />
             </Routes>
           </Suspense>
-=======
-            <TrialBanner />
-          
-            <Suspense fallback={<div className="text-center p-8">جاري التحميل...</div>}>
-                <Routes>
-                    <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<ProtectedPage permission={Permission.VIEW_DASHBOARD}><SchoolDashboard school={school} /></ProtectedPage>} />
-                    <Route path="students" element={<ProtectedPage permission={Permission.MANAGE_STUDENTS}><StudentsList schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="students/:studentId" element={<ProtectedPage permission={Permission.MANAGE_STUDENTS}><StudentProfile schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="teachers" element={<ProtectedPage permission={Permission.MANAGE_TEACHERS}><TeachersList schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="teachers/:teacherId" element={<ProtectedPage permission={Permission.MANAGE_TEACHERS}><TeacherProfile schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="teachers/attendance" element={<ProtectedPage permission={Permission.MANAGE_ATTENDANCE}><TeachersAttendance schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="parents" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><ParentsList schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="parents/:parentId" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><ParentManagement schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="staff" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffManagement schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="staff/attendance" element={<ProtectedPage permission={Permission.MANAGE_STAFF}><StaffAttendance schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="classes" element={<ProtectedPage permission={Permission.MANAGE_CLASSES}><ClassesList schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="transportation" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><Transportation schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="transportation/drivers" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriversList schoolId={school.id} detailsPathPrefix="" /></ProtectedPage>} />
-                    <Route path="transportation/drivers/:operatorId" element={<ProtectedPage permission={Permission.MANAGE_TRANSPORTATION}><DriverProfile schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="attendance" element={<ProtectedPage permission={Permission.MANAGE_ATTENDANCE}><Attendance schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="schedule" element={<ProtectedPage permission={Permission.MANAGE_SCHEDULE}><Schedule schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="calendar" element={<ProtectedPage permission={Permission.MANAGE_CALENDAR}><Calendar schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="grades" element={<ProtectedPage permission={Permission.MANAGE_GRADES}><Grades schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="messaging" element={<ProtectedPage permission={Permission.MANAGE_MESSAGING}><Messaging /></ProtectedPage>} />
-                    <Route path="finance/invoices" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><FinanceFees schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="finance/payroll" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><FinancePayroll schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="finance/expenses" element={<ProtectedPage permission={Permission.MANAGE_FINANCE}><FinanceExpenses schoolId={school.id} schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="finance" element={<Navigate to="finance/invoices" replace />} />
-                    <Route path="reports" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><Reports schoolSettings={settings} /></ProtectedPage>} />
-                    <Route path="parent_requests" element={<ProtectedPage permission={Permission.MANAGE_PARENTS}><SchoolParentRequests schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="jobs" element={<ProtectedPage permission={Permission.MANAGE_REPORTS}><BackgroundJobs schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="settings" element={<ProtectedPage permission={Permission.MANAGE_SETTINGS}><Settings schoolId={school.id} /></ProtectedPage>} />
-                    <Route path="profile" element={<UserProfile />} />
-                    <Route path="modules" element={<ProtectedPage permission={Permission.MANAGE_MODULES}><ModulesPage school={school} /></ProtectedPage>} />
-                    <Route path="help-center" element={<HelpCenter />} />
-                </Routes>
-            </Suspense>
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         </div>
 
         {/* Help Widget */}
@@ -384,6 +350,4 @@ const SchoolAdminLayout: React.FC<SchoolAdminLayoutProps> = ({ isSuperAdminView 
     </>
   );
 };
-
-import TooltipGuide from '../components/TooltipGuide';
 export default SchoolAdminLayout;

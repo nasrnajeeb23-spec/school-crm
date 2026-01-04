@@ -3,14 +3,10 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import Breadcrumbs from '../components/Breadcrumbs';
-import HelpWidget from '../components/HelpWidget';
 import { useAppContext } from '../contexts/AppContext';
 import ThemeToggle from '../components/ThemeToggle';
-<<<<<<< HEAD
 import NotificationDropdown from '../components/NotificationDropdown';
-=======
 import TooltipGuide from '../components/TooltipGuide';
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 const viewTitles: { [key: string]: string } = {
   dashboard: 'لوحة التحكم الرئيسية',
@@ -67,11 +63,7 @@ const SuperAdminLayout: React.FC = () => {
           <Outlet />
         </div>
       </main>
-<<<<<<< HEAD
-      <HelpWidget />
-=======
       <TooltipGuide />
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     </>
   );
 };

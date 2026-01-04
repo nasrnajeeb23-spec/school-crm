@@ -4,7 +4,6 @@ import { NewClassData, Teacher, SchoolSettings } from '../types';
 
 interface AddClassModalProps {
   schoolId: number;
-  schoolSettings?: SchoolSettings | null;
   onClose: () => void;
   onSave: (data: NewClassData) => Promise<void>;
   defaultStage?: string;
@@ -13,11 +12,7 @@ interface AddClassModalProps {
   schoolSettings?: SchoolSettings | null;
 }
 
-<<<<<<< HEAD
 const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, onClose, onSave, defaultStage, defaultGrade, teachers: propTeachers, schoolSettings }) => {
-=======
-const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, schoolSettings, onClose, onSave, defaultStage, defaultGrade }) => {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   const [formData, setFormData] = useState({
     stage: defaultStage || '',
     gradeLevel: defaultGrade || '',
@@ -29,11 +24,7 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ schoolId, schoolSettings,
   const [internalTeachers, setInternalTeachers] = useState<Teacher[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(!propTeachers);
   const [isSaving, setIsSaving] = useState(false);
-<<<<<<< HEAD
-
   const teachers = propTeachers || internalTeachers;
-=======
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
   const stageGradeMap: Record<string, string[]> = {
     'رياض أطفال': ['رياض أطفال'],

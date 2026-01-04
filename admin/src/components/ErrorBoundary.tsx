@@ -59,18 +59,6 @@ class ErrorBoundary extends Component<Props, State> {
     });
   };
 
-<<<<<<< HEAD
-=======
-export default class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, State> {
-  state: State = { hasError: false };
-  static getDerivedStateFromError(error: any): State { return { hasError: true, error }; }
-  componentDidCatch(error: any, info: any) {
-    try {
-      console.error('UI ErrorBoundary:', error);
-      if (info?.componentStack) console.error('Component stack:', info.componentStack);
-    } catch {}
-  }
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {

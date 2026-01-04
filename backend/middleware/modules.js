@@ -12,14 +12,7 @@ function requireModule(moduleId) {
   return async (req, res, next) => {
     try {
       // 1. Allow SuperAdmins to bypass module checks
-<<<<<<< HEAD
-      if (req.user) {
-        const role = String(req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '');
-        if (role === 'SUPERADMIN' || role === 'SUPER_ADMIN') return next();
-      }
-=======
       if (req.user && isSuperAdminUser(req.user)) return next();
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
       // 2. Identify School ID
       const schoolIdParam = req.params?.schoolId || req.params?.id || req.body?.schoolId || req.query?.schoolId || req.user?.schoolId;
@@ -29,29 +22,6 @@ function requireModule(moduleId) {
 
       const schoolId = Number(schoolIdParam);
 
-<<<<<<< HEAD
-      // 3. Check Self-Hosted License First
-      const licenseModules = req.app.locals.licenseModules;
-      if (licenseModules instanceof Set) {
-        // Flatten module aliases
-        const aliases = moduleMap[moduleId] || [moduleId];
-        // Check if ANY alias is in the license
-        const allowed = aliases.some(alias =>
-          licenseModules.has(alias.toUpperCase()) ||
-          licenseModules.has('ALL_MODULES')
-        );
-
-        if (!allowed) {
-          return res.status(403).json({ msg: `Module '${moduleId}' not included in your license.` });
-        }
-        // If licensed, allow access immediately (bypassing subscription checks)
-        return next();
-      }
-
-      // 4. Enforce subscription state only (SaaS fallback)
-      const { Subscription, School } = require('../models');
-      const sub = await Subscription.findOne({ where: { schoolId } });
-=======
       // 3. Enforce subscription state and module access
       const { Subscription, School, Plan, SubscriptionModule } = require('../models');
       const sub = await Subscription.findOne({ 
@@ -61,7 +31,6 @@ function requireModule(moduleId) {
           { model: SubscriptionModule, required: false, where: { active: true } }
         ]
       });
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       const now = new Date();
 
       if (sub) {

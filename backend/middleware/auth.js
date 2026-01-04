@@ -93,11 +93,18 @@ async function verifyToken(req, res, next) {
     return out;
   };
   const authHeader = req.headers['authorization'];
-<<<<<<< HEAD
-  if (!authHeader) return res.status(401).json({ msg: 'Missing Authorization header' });
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ msg: 'Invalid Authorization header format' });
-  const token = parts[1];
+  let token = null;
+  if (authHeader) {
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') token = parts[1];
+  }
+  if (!token) {
+    try {
+      const cookies = parseCookies(req.headers['cookie'] || '');
+      token = cookies['access_token'] || null;
+    } catch {}
+  }
+  if (!token) return res.status(401).json({ msg: 'Missing Authorization header' });
   if (process.env.NODE_ENV === 'test') {
     if (token === 'valid_token') {
       req.user = { id: 1, email: 'test@admin.com', role: 'SUPER_ADMIN', tokenVersion: 0, schoolId: 0, permissions: [] };
@@ -111,20 +118,6 @@ async function verifyToken(req, res, next) {
       return res.status(401).json({ msg: 'Invalid or expired token' });
     }
   }
-=======
-  let token = null;
-  if (authHeader) {
-    const parts = authHeader.split(' ');
-    if (parts.length === 2 && parts[0] === 'Bearer') token = parts[1];
-  }
-  if (!token) {
-    try {
-      const cookies = parseCookies(req.headers['cookie'] || '');
-      token = cookies['access_token'] || null;
-    } catch {}
-  }
-  if (!token) return res.status(401).json({ msg: 'Missing Authorization header' });
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   try {
     const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     req.user = payload;

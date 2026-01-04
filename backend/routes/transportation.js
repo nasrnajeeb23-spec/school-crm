@@ -11,21 +11,9 @@ const jwt = require('jsonwebtoken');
 const busOperatorQueryOptions = { attributes: { exclude: ['userId'] } };
 
 // --- Operators ---
-<<<<<<< HEAD
-router.get('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), async (req, res) => {
-  try {
-    const ops = await BusOperator.findAll({ where: { schoolId: req.params.schoolId }, order: [['status', 'ASC']] });
-    const statusMap = { 'Approved': 'معتمد', 'Pending': 'قيد المراجعة', 'Rejected': 'مرفوض' };
-    res.json(ops.map(o => ({ ...o.toJSON(), status: statusMap[o.status] || o.status })));
-  } catch (e) { res.status(500).json({ msg: 'Server Error', error: e?.message }); }
-});
-
-router.post('/:schoolId/operators', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), validate([
-=======
 // Public application endpoint for bus operators (drivers)
 // Allows a driver to submit an application to a specific school without authentication
 router.post('/operator/application', validate([
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   { name: 'name', required: true, type: 'string' },
   { name: 'email', required: true, type: 'string' },
   { name: 'phone', required: true, type: 'string' },
@@ -367,15 +355,11 @@ router.delete('/operator/:operatorId', verifyToken, requireRole('SCHOOL_ADMIN', 
 // --- Routes ---
 router.get('/:schoolId/routes', verifyToken, requireRole('SCHOOL_ADMIN', 'SUPER_ADMIN'), requireSameSchoolParam('schoolId'), requireModule('transportation'), async (req, res) => {
   try {
-<<<<<<< HEAD
-    const routes = await Route.findAll({ where: { schoolId: req.params.schoolId }, order: [['name', 'ASC']] });
-=======
     const schoolId = Number.parseInt(String(req.params.schoolId), 10);
     const ctx = await getUserScopeContext(req, schoolId);
     const scopeWhere = buildScopeWhere(ctx);
     const where = scopeWhere ? { schoolId, ...scopeWhere } : { schoolId };
     const routes = await Route.findAll({ where, order: [['name','ASC']] });
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     const payload = [];
     for (const r of routes) {
       const rs = await RouteStudent.findAll({ where: { routeId: r.id } });

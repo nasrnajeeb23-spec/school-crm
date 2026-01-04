@@ -45,9 +45,7 @@ const setJSON = async (redis, key, value) => {
   try {
     await redis.set(key, JSON.stringify(value));
   } catch { }
-<<<<<<< HEAD
-=======
-};
+}
 
 const mapSuperAdminRoleToDb = (role) => {
   const key = String(role || '').toUpperCase().replace(/[^A-Z]/g, '');
@@ -82,8 +80,7 @@ const isStrongPassword = (pwd) => {
   const digit = /[0-9]/.test(pwd);
   const special = /[^A-Za-z0-9]/.test(pwd);
   return lengthOk && upper && lower && digit && special;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
-};
+}
 
 // @route   GET api/superadmin/stats
 // @desc    Get dashboard stats for SuperAdmin
@@ -93,37 +90,6 @@ const isStrongPassword = (pwd) => {
 // @access  Private (SuperAdmin)
 router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
-<<<<<<< HEAD
-    const { User, School, Subscription, Invoice } = require('../models');
-
-    let totalSchools = 0;
-    let totalStudents = 0;
-    let totalRevenue = 0;
-    let activeSubscriptions = 0;
-
-    try {
-      if (School) totalSchools = await School.count();
-    } catch (e) { console.warn('Error counting schools:', e.message); }
-
-    try {
-      const { Student } = require('../models');
-      if (Student) totalStudents = await Student.count();
-    } catch (e) { console.warn('Error counting students:', e.message); }
-
-    try {
-      if (Subscription) activeSubscriptions = await Subscription.count({ where: { status: 'ACTIVE' } });
-    } catch (e) { console.warn('Error counting subscriptions:', e.message); }
-
-    try {
-      if (Invoice) {
-        const paidInvoices = await Invoice.findAll({
-          where: { status: 'PAID' },
-          attributes: ['amount']
-        });
-        totalRevenue = paidInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
-      }
-    } catch (e) { console.warn('Error calculating revenue:', e.message); }
-=======
     const { School, Student, Subscription, Payment } = require('../models');
 
     // Execute counts in parallel for performance
@@ -135,7 +101,6 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANC
     ]);
 
     const totalRevenue = revenueResult || 0;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
     res.json({
       totalSchools,
@@ -154,42 +119,6 @@ router.get('/stats', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANC
 // @access  Private (SuperAdmin)
 router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
   try {
-<<<<<<< HEAD
-    const { TrialRequest, Ticket, Invoice } = require('../models');
-
-    let trialRequests = 0;
-    let tickets = 0;
-    let pendingInvoices = 0;
-    let securityAlerts = 0; // Placeholder
-
-    // Count pending trial requests
-    try {
-      if (TrialRequest) {
-        trialRequests = await TrialRequest.count({ where: { status: 'PENDING' } });
-      }
-    } catch (e) { }
-
-    // Count open tickets
-    try {
-      if (Ticket) {
-        tickets = await Ticket.count({ where: { status: 'OPEN' } });
-      }
-    } catch (e) { }
-
-    // Count unpaid/overdue invoices
-    try {
-      if (Invoice) {
-        const { Op } = require('sequelize');
-        pendingInvoices = await Invoice.count({ where: { status: { [Op.in]: ['UNPAID', 'OVERDUE'] } } });
-      }
-    } catch (e) { }
-
-    res.json({
-      trialRequests,
-      tickets,
-      pendingInvoices,
-      securityAlerts
-=======
     const { TrialRequest, ContactMessage, Invoice } = require('../models');
     const { Op } = require('sequelize');
 
@@ -211,7 +140,6 @@ router.get('/action-items', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN
       tickets: contactMessages,
       pendingInvoices,
       securityAlerts: failedLogins
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     });
   } catch (err) {
     console.error('Action Items Error:', err.message);
@@ -228,27 +156,11 @@ router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_F
     const { startDate, endDate, action, userId } = req.query;
     const { Op } = require('sequelize');
 
-<<<<<<< HEAD
-    const where = {};
-    if (startDate || endDate) {
-      where.timestamp = {};
-      if (startDate) where.timestamp[Op.gte] = new Date(startDate);
-      if (endDate) where.timestamp[Op.lte] = new Date(new Date(endDate).setHours(23, 59, 59));
-    }
-    if (action) where.action = { [Op.iLike]: `%${action}%` };
-    if (userId) where.userId = userId;
-
     if (!AuditLog) {
       // Fallback if table doesn't exist yet
       return res.json([]);
     }
 
-    const logs = await AuditLog.findAll({
-      where,
-      order: [['timestamp', 'DESC']],
-      limit: 500
-    });
-=======
     // Auto-heal
     if (!AuditLog) return res.json([]);
     try { await AuditLog.sync(); } catch { }
@@ -291,31 +203,19 @@ router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_F
     const users = userIds.length
       ? await User.findAll({ where: { id: userIds }, attributes: ['id', 'email'], raw: true }).catch(() => [])
       : [];
-    const emailByUserId = new Map(users.map(u => [Number(u.id), u.email]));
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+  const emailByUserId = new Map(users.map(u => [Number(u.id), u.email]));
 
-    const formatted = logs.map(log => {
-<<<<<<< HEAD
-      let details = log.details;
-      try {
-        if (typeof details === 'string' && (details.startsWith('{') || details.startsWith('['))) {
-          details = JSON.parse(details);
-        }
-      } catch (e) { }
-      return {
-        ...log.toJSON(),
-=======
-      const row = log.toJSON();
-      const details = row.metadata ?? (row.oldValue || row.newValue ? { oldValue: row.oldValue, newValue: row.newValue } : null);
-      return {
-        ...row,
-        timestamp: row.createdAt || row.timestamp || null,
-        userEmail: emailByUserId.get(Number(row.userId)) || null,
-        riskLevel: row.riskLevel || 'low',
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
-        details
-      };
-    });
+  const formatted = logs.map(log => {
+    const row = log.toJSON();
+    const details = row.metadata ?? (row.oldValue || row.newValue ? { oldValue: row.oldValue, newValue: row.newValue } : null);
+    return {
+      ...row,
+      timestamp: row.createdAt || row.timestamp || null,
+      userEmail: emailByUserId.get(Number(row.userId)) || null,
+      riskLevel: row.riskLevel || 'low',
+      details
+    };
+  });
 
     res.json(formatted);
   } catch (err) {
@@ -329,27 +229,6 @@ router.get('/audit-logs', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_F
 // @access  Private (SuperAdmin)
 router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_FINANCE'), async (req, res) => {
   try {
-<<<<<<< HEAD
-    const { Invoice } = require('../models');
-
-    // This is a simplified mock data response to ensure chart works
-    // In real implementation, we would query Invoice/Payment table with GROUP BY month
-    const revenueData = [
-      { month: 'يناير', revenue: 0 },
-      { month: 'فبراير', revenue: 0 },
-      { month: 'مارس', revenue: 0 },
-      { month: 'أبريل', revenue: 0 },
-      { month: 'مايو', revenue: 0 },
-      { month: 'يونيو', revenue: 0 },
-    ];
-
-    try {
-      if (Invoice) {
-        // Optional: Calculate real revenue if possible, otherwise fallback to zeros
-        // For now, we return the structure expected by the frontend
-      }
-    } catch (e) { console.warn('Error fetching revenue:', e.message); }
-=======
     const { Payment } = require('../models');
     const { Op } = require('sequelize');
 
@@ -387,7 +266,6 @@ router.get('/revenue', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINA
       month: name,
       revenue: revenueMap[index]
     }));
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
     res.json(revenueData);
   } catch (err) {
@@ -438,11 +316,7 @@ router.get('/subscriptions', verifyToken, requireRole('SUPER_ADMIN'), requirePer
 // @route   PUT api/superadmin/subscriptions/:id
 // @desc    Update subscription details (Plan, Status, Limits, Modules)
 // @access  Private (SuperAdmin)
-<<<<<<< HEAD
-router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-=======
 router.put('/subscriptions/:id', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_FINANCE'), async (req, res) => {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
@@ -1015,28 +889,13 @@ router.post('/onboarding/requests/:id/reject', verifyToken, requireRole('SUPER_A
 // @route   GET api/superadmin/team
 // @desc    Get list of super admin team members
 // @access  Private (SuperAdmin)
-<<<<<<< HEAD
-router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
-  try {
-    const { User } = require('../models');
-=======
 router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('VIEW_STAFF'), async (req, res) => {
   try {
     const { User } = require('../models');
     const { Op } = require('sequelize');
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
-    // Fix: Use correct Enum values matching User model (PascalCase)
     const team = await User.findAll({
       where: {
         role: {
-<<<<<<< HEAD
-          [require('sequelize').Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
-        }
-      },
-      attributes: ['id', 'name', 'email', 'role', 'lastLogin', 'isActive']
-    });
-    res.json(team);
-=======
           [Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor']
         }
       },
@@ -1056,13 +915,10 @@ router.get('/team', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('
         permissions: Array.isArray(j.permissions) ? j.permissions : []
       };
     }));
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   } catch (err) {
     console.error('Team Error:', err.message);
     res.status(500).send('Server Error');
   }
-<<<<<<< HEAD
-=======
 });
 
 router.post('/team', verifyToken, requireRole('SUPER_ADMIN'), requirePermission('MANAGE_STAFF'), async (req, res) => {
@@ -1295,17 +1151,12 @@ router.post('/team/permissions/recommendations/apply', verifyToken, requireRole(
     console.error(err.message);
     return res.status(500).send('Server Error');
   }
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 });
 
 // @route   GET api/superadmin/analytics/kpi
 // @desc    Get KPI metrics
 // @access  Private (SuperAdmin)
-<<<<<<< HEAD
-router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
-=======
 router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   try {
     // Mock KPI data or calculate real ones
     // Real implementation would aggregate data
@@ -1324,11 +1175,7 @@ router.get('/analytics/kpi', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMI
 // @route   GET api/superadmin/metrics/summary
 // @desc    Get metrics summary
 // @access  Private (SuperAdmin)
-<<<<<<< HEAD
-router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), async (req, res) => {
-=======
 router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_ADMIN_FINANCIAL', 'SUPER_ADMIN_TECHNICAL', 'SUPER_ADMIN_SUPERVISOR'), requirePermission('VIEW_DASHBOARD'), async (req, res) => {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   try {
     res.json({
       totalVisits: 15000,
@@ -1342,36 +1189,6 @@ router.get('/metrics/summary', verifyToken, requireRole('SUPER_ADMIN', 'SUPER_AD
   }
 });
 
-<<<<<<< HEAD
-// @route   POST api/superadmin/self-hosted/package
-// @desc    Generate self-hosted package download link
-// @access  Public (or semi-private, handled by modal)
-router.post('/self-hosted/package', async (req, res) => {
-  try {
-    const { planId, moduleIds, schoolName, contactEmail } = req.body;
-
-    // Use the Generator Service
-    const PackageGenerator = require('../services/PackageGenerator');
-
-    // Pass info to generator (mocking schoolName if missing for demo)
-    const downloadPath = await PackageGenerator.generate({
-      schoolName: schoolName || 'My Private School',
-      contactEmail: contactEmail || 'admin@school.com',
-      modules: moduleIds,
-      domain: 'localhost' // In real world, we'd restrict to a domain
-    });
-
-    // Construct full URL
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const downloadUrl = `${protocol}://${host}${downloadPath}`; // e.g. http://localhost:5000/downloads/file.zip
-
-    res.json({ downloadUrl });
-  } catch (err) {
-    console.error('Self-Hosted Package Error:', err.message);
-    res.status(500).send('Server Error');
-  }
-=======
 router.get('/schools/deleted', verifyToken, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const { SchoolSettings } = require('../models');
@@ -1413,7 +1230,6 @@ router.put('/schools/:id/restore', verifyToken, requireRole('SUPER_ADMIN'), asyn
     try { await AuditLog.create({ action: 'school.restore', userId: req.user?.id || null, userEmail: req.user?.email || null, ipAddress: req.ip, userAgent: req.headers['user-agent'], details: JSON.stringify({ schoolId: sid }), timestamp: new Date(), riskLevel: 'medium' }); } catch { }
     return res.json({ restored: true, schoolId: sid });
   } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 });
 
 module.exports = router;

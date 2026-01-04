@@ -75,11 +75,6 @@ export default function SuperAdminTeamManagement() {
     permissions: []
   });
 
-<<<<<<< HEAD
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-=======
   const toTeamMember = (raw: any): TeamMember => {
     const permissions = Array.isArray(raw?.permissions) ? raw.permissions.map((p: any) => String(p)) : [];
     return {
@@ -94,33 +89,18 @@ export default function SuperAdminTeamManagement() {
       permissions,
     };
   };
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchTeamMembers();
   }, []);
 
-  const toMember = (u: any): TeamMember => ({
-    id: String(u.id || ''),
-    name: String(u.name || u.username || ''),
-    email: String(u.email || ''),
-    username: String(u.username || ''),
-    role: u.role as UserRole,
-    isActive: !!u.isActive,
-    lastLoginAt: u.lastLoginAt ? String(u.lastLoginAt) : undefined,
-    createdAt: String(u.createdAt || ''),
-    permissions: Array.isArray(u.permissions) ? u.permissions : []
-  });
-
   const fetchTeamMembers = async () => {
     try {
       const response = await api.getSuperAdminTeamMembers();
-<<<<<<< HEAD
-      const mapped = Array.isArray(response) ? response.map(toMember) : [];
-      setTeamMembers(mapped);
-=======
       setTeamMembers((Array.isArray(response) ? response : []).map(toTeamMember));
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     } catch (error) {
       showToast('فشل في تحميل بيانات الفريق', 'error');
     } finally {
@@ -132,12 +112,7 @@ export default function SuperAdminTeamManagement() {
     e.preventDefault();
     try {
       const response = await api.createSuperAdminTeamMember(formData);
-<<<<<<< HEAD
-      const created = toMember(response);
-      setTeamMembers([...teamMembers, created]);
-=======
       setTeamMembers(prev => [...prev, toTeamMember(response)]);
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       setShowCreateForm(false);
       resetForm();
       showToast('تم إنشاء حساب فريق بنجاح', 'success');
@@ -152,15 +127,8 @@ export default function SuperAdminTeamManagement() {
 
     try {
       const response = await api.updateSuperAdminTeamMember(editingMember.id, formData);
-<<<<<<< HEAD
-      const updated = toMember(response);
-      setTeamMembers(teamMembers.map(member =>
-        member.id === editingMember.id ? updated : member
-      ));
-=======
       const updated = toTeamMember(response);
       setTeamMembers(prev => prev.map(member => (member.id === editingMember.id ? updated : member)));
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       setEditingMember(null);
       resetForm();
       showToast('تم تحديث بيانات الفريق بنجاح', 'success');

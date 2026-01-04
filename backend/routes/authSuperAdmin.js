@@ -272,14 +272,8 @@ router.post('/login', [
       });
     }
 
-<<<<<<< HEAD
-    // Find SuperAdmin user
-    const user = await User.findOne({
-      where: {
-=======
     const user = await User.findOne({ 
       where: { 
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         email: email,
         role: { [Op.in]: ['SuperAdmin', 'SuperAdminFinancial', 'SuperAdminTechnical', 'SuperAdminSupervisor'] }
       }
@@ -324,15 +318,9 @@ router.post('/login', [
     }
 
     // Check if MFA is required
-<<<<<<< HEAD
-    const requiresMfa = ((String(user.role).toUpperCase() === 'SUPERADMIN' && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification || (policies.enforceMfaForAdmins === true));
+    const requiresMfa = ((isSuperAdminRole(user.role) && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification || (policies.enforceMfaForAdmins === true));
     const tempToken = requiresMfa ?
       jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m', algorithm: 'HS256' }) :
-=======
-    const requiresMfa = ((isSuperAdminRole(user.role) && !!user.mfaEnabled) || securityCheck.requiresAdditionalVerification);
-    const tempToken = requiresMfa ? 
-      jwt.sign({ userId: user.id, type: 'temp' }, JWT_SECRET, { expiresIn: '5m' }) : 
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       undefined;
 
     // Clear rate limit on successful login

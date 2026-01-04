@@ -42,17 +42,12 @@ const Submission = require('./Submission');
 const SubscriptionModule = require('./SubscriptionModule');
 const CommunicationUsage = require('./CommunicationUsage');
 const ContactMessage = require('./ContactMessage');
-<<<<<<< HEAD
 const InvitationLog = require('./InvitationLog');
 const AdRequest = require('./AdRequest');
-
-// Accounting Models
 const Account = require('./Account');
 const JournalEntry = require('./JournalEntry');
 const JournalEntryLine = require('./JournalEntryLine');
 const FiscalPeriod = require('./FiscalPeriod');
-
-=======
 const RbacRole = require('./RbacRole');
 const RbacPermission = require('./RbacPermission');
 const RbacRolePermission = require('./RbacRolePermission');
@@ -65,7 +60,6 @@ const SchoolTransaction = require('./SchoolTransaction');
 const LandingPageContent = require('./LandingPageContent');
 const UsageSnapshot = require('./UsageSnapshot');
 const PaymentMethod = require('./PaymentMethod');
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 // Define associations
 // School <-> Subscription (One-to-One)
@@ -308,14 +302,12 @@ const db = {
   SubscriptionModule,
   CommunicationUsage,
   ContactMessage,
-<<<<<<< HEAD
   InvitationLog,
   AdRequest,
   Account,
   JournalEntry,
   JournalEntryLine,
   FiscalPeriod,
-=======
   RbacRole,
   RbacPermission,
   RbacRolePermission,
@@ -328,7 +320,6 @@ const db = {
   LandingPageContent,
   UsageSnapshot,
   PaymentMethod,
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 };
 
 // Accounting Associations

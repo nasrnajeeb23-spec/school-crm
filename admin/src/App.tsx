@@ -92,15 +92,9 @@ const isDriverUser = (user: User | null) => {
   return user.role === UserRole.Staff && String(user.schoolRole || '') === String(SchoolRole.Driver);
 };
 
-<<<<<<< HEAD
-// Helper to determine the home route based on user role
-const getHomeRouteForUser = (role: string) => {
-  switch (role) {
-=======
 const getHomeRouteForUser = (user: User) => {
   if (isDriverUser(user)) return '/driver';
   switch (user.role) {
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     case UserRole.SuperAdmin:
     case UserRole.SuperAdminFinancial:
     case UserRole.SuperAdminTechnical:
@@ -117,22 +111,6 @@ const getHomeRouteForUser = (user: User) => {
 const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }) => {
   const { currentUser, hydrating } = useAppContext();
 
-<<<<<<< HEAD
-    if (currentUser.passwordMustChange) {
-        const profileRoute = `${getHomeRouteForUser(currentUser.role as string)}/profile`;
-        if (window.location.pathname !== profileRoute) {
-            return <Navigate to={profileRoute} replace />;
-        }
-    }
-
-    // Check if user has access to superadmin area (all superadmin roles)
-    const superAdminRoles: string[] = [UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor];
-    const userHasSuperAdminAccess = superAdminRoles.includes(currentUser.role as string);
-    const routeRequiresSuperAdmin = allowedRoles.some(role => superAdminRoles.includes(role));
-    
-    if (routeRequiresSuperAdmin && userHasSuperAdminAccess) {
-        return <Outlet />;
-=======
   if (hydrating) {
     return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">جاري تحميل الجلسة...</div>;
   }
@@ -144,23 +122,16 @@ const ProtectedRoute: React.FC<{ allowedRoles: UserRole[] }> = ({ allowedRoles }
     const path = window.location.pathname || '';
     if (/^\/(school|staff)(\/|$)/.test(path)) {
       return <Navigate to="/driver" replace />;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
   }
 
-<<<<<<< HEAD
-    if (!allowedRoles.map(r => String(r)).includes(currentUser.role as string)) {
-        return <Navigate to={getHomeRouteForUser(currentUser.role as string)} replace />;
-=======
   if (currentUser.passwordMustChange) {
     const profileRoute = `${getHomeRouteForUser(currentUser)}/profile`;
     if (window.location.pathname !== profileRoute) {
       return <Navigate to={profileRoute} replace />;
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
     }
   }
 
-  // Check if user has access to superadmin area (all superadmin roles)
   const superAdminRoles = [UserRole.SuperAdmin, UserRole.SuperAdminFinancial, UserRole.SuperAdminTechnical, UserRole.SuperAdminSupervisor];
   const userHasSuperAdminAccess = superAdminRoles.includes(currentUser.role);
   const routeRequiresSuperAdmin = allowedRoles.some(role => superAdminRoles.includes(role));

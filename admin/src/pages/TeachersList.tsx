@@ -83,8 +83,6 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
     }
   };
 
-<<<<<<< HEAD
-=======
   const filteredTeachers = teachers.filter(teacher => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return true;
@@ -92,16 +90,6 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
     const emailMatch = (teacher.email || '').toLowerCase().includes(term);
     return nameMatch || emailMatch;
   });
-
-  const [sendingId, setSendingId] = useState<string | number | null>(null);
-  const [channelByTeacher, setChannelByTeacher] = useState<Record<string, 'email' | 'sms' | 'manual'>>({});
-  const [showManualShare, setShowManualShare] = useState(false);
-  const [manualLink, setManualLink] = useState('');
-  const [cooldownByTeacher, setCooldownByTeacher] = useState<Record<string, number>>({});
-  const [sharing, setSharing] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | number | null>(null);
-
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
   const handleInviteTeacher = async (teacherId: string | number) => {
     try {
       setSendingId(teacherId);
@@ -356,7 +344,6 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
               renderCard={renderCard}
               keyExtractor={(t) => String(t.id)}
             />
-<<<<<<< HEAD
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -367,97 +354,6 @@ const TeachersList: React.FC<TeachersListProps> = ({ schoolId }) => {
             />
           </>
         )}
-=======
-          ) : (
-            <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                <tr>
-                  <th scope="col" className="px-6 py-3">اسم المعلم</th>
-                  <th scope="col" className="px-6 py-3">المادة</th>
-                  <th scope="col" className="px-6 py-3">البريد الإلكتروني</th>
-                  <th scope="col" className="px-6 py-3">رقم الاتصال</th>
-                  <th scope="col" className="px-6 py-3">الحالة</th>
-                  <th scope="col" className="px-6 py-3">تاريخ الانضمام</th>
-                  <th scope="col" className="px-6 py-3">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTeachers.map((teacher) => (
-                  <tr key={teacher.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{teacher.name}</td>
-                    <td className="px-6 py-4">{teacher.subject}</td>
-                    <td className="px-6 py-4" dir="ltr">{(teacher as any).email || '—'}</td>
-                    <td className="px-6 py-4" dir="ltr">{teacher.phone}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColorMap[teacher.status]}`}>
-                        {teacher.status}
-                      </span>
-                    </td>
-                  <td className="px-6 py-4">{teacher.joinDate}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <Link to={`${location.pathname}/${teacher.id}`} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">
-                        عرض التفاصيل
-                      </Link>
-                      {(() => {
-                        const lastInviteAt = (teacher as any).lastInviteAt ? new Date(String((teacher as any).lastInviteAt)) : null;
-                        let ago = 'لا يوجد';
-                        let valid = false;
-                        if (lastInviteAt && !isNaN(lastInviteAt.getTime())) {
-                          const diff = Math.max(0, Date.now() - lastInviteAt.getTime());
-                          const mins = Math.floor(diff / 60000);
-                          const hours = Math.floor(diff / 3600000);
-                          const days = Math.floor(diff / 86400000);
-                          ago = days > 0 ? `${days} يوم` : hours > 0 ? `${hours} ساعة` : `${mins} دقيقة`;
-                          valid = lastInviteAt.getTime() + 72 * 3600 * 1000 > Date.now();
-                        }
-                        return (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            آخر دعوة: {ago} • حالة الرابط: {ago === 'لا يوجد' ? 'لا يوجد' : (valid ? 'صالح' : 'منتهي')}
-                          </span>
-                        );
-                      })()}
-                      <select
-                        value={channelByTeacher[String(teacher.id)] || 'manual'}
-                        onChange={(e) => setChannelByTeacher(prev => ({ ...prev, [String(teacher.id)]: e.target.value as 'email' | 'sms' | 'manual' }))}
-                        className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700"
-                      >
-                          <option value="email" disabled={!((teacher.email && String(teacher.email).trim() !== ''))}>البريد الإلكتروني (مدفوع)</option>
-                          <option value="sms" disabled={!teacher.phone || String(teacher.phone).trim() === ''}>رسالة نصية (مدفوعة)</option>
-                          <option value="manual">مشاركة يدوية (مجاني)</option>
-                        </select>
-                        {(() => {
-                          const cool = (cooldownByTeacher[String(teacher.id)] || 0) > Date.now();
-                          const disabled = sendingId === teacher.id || cool;
-                          const label = sendingId === teacher.id ? 'جاري الإرسال...' : cool ? 'انتظر لحظة...' : 'دعوة';
-                          return (
-                            <button
-                              onClick={() => handleInviteTeacher(teacher.id)}
-                              disabled={disabled}
-                              aria-disabled={disabled}
-                              className={`font-medium ${disabled ? 'text-gray-400 dark:text-gray-500' : 'text-indigo-600 dark:text-indigo-500'} hover:underline`}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })()}
-                        <button
-                          onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
-                          disabled={deletingId === teacher.id}
-                          aria-disabled={deletingId === teacher.id}
-                          className={`font-medium ${deletingId === teacher.id ? 'text-red-400 dark:text-red-400' : 'text-red-600 dark:text-red-500'} hover:underline`}
-                        >
-                          {deletingId === teacher.id ? 'جارٍ الحذف...' : 'حذف'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
       </div>
       {isModalOpen && (
         <TeacherFormModal
