@@ -5,11 +5,7 @@ import StatsCard from '../components/StatsCard';
 import { RevenueIcon, TotalDebtIcon, CheckIcon, PrintIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
 import InvoicePrintModal from '../components/InvoicePrintModal';
-<<<<<<< HEAD
-=======
-import { SchoolSettings } from '../types';
 import { useToast } from '../contexts/ToastContext';
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 const statusColorMap: { [key in InvoiceStatus]: string } = {
     [InvoiceStatus.Paid]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',

@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api';
-<<<<<<< HEAD
-import { SchoolSettings } from '../types';
-=======
 import { AttendanceStatus, SchoolSettings, StudentStatus } from '../types';
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 import { useToast } from '../contexts/ToastContext';
 import GeneralSettings from './settings/GeneralSettings';
 
@@ -161,8 +157,27 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
     { id: 'notifications', label: 'الإشعارات' },
     { id: 'stages', label: 'المراحل والفصول' }
   ];
-<<<<<<< HEAD
-=======
+  const stages = Array.isArray(settings.availableStages) && settings.availableStages.length > 0 ? settings.availableStages : ['رياض أطفال','ابتدائي','إعدادي','ثانوي'];
+  const workingDays = Array.isArray(settings.workingDays) && settings.workingDays.length > 0 ? settings.workingDays : ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+  const terms = Array.isArray(settings.terms) && settings.terms.length > 0 ? settings.terms : [{ name: 'الفصل الأول', start: settings.academicYearStart, end: settings.academicYearEnd }];
+  const arDays: Record<string,string> = { Sunday:'الأحد', Monday:'الاثنين', Tuesday:'الثلاثاء', Wednesday:'الأربعاء', Thursday:'الخميس', Friday:'الجمعة', Saturday:'السبت' };
+  const [genSelecting, setGenSelecting] = useState({ students:false, classes:false, subjects:false, classSubjectTeachers:false, teachers:false, grades:false, attendance:false, schedule:false, fees:false });
+  const [exportSelecting, setExportSelecting] = useState({ students:false, classes:false, subjects:false, classSubjectTeachers:false, grades:false, attendance:false, schedule:false, fees:false, teachers:false, parents:false });
+  const [backupSelecting, setBackupSelecting] = useState({ students:false, classes:false, subjects:false, classSubjectTeachers:false, grades:false, attendance:false, schedule:false, fees:false, teachers:false, parents:false, settings:false });
+  const [exportFilters, setExportFilters] = useState({ className:'', date:'' });
+  const [backupConfig, setBackupConfig] = useState({ enabledDaily:false, dailyTime:'02:00', enabledMonthly:false, monthlyDay:1, monthlyTime:'03:00' });
+  const [backupsList, setBackupsList] = useState<any[]>([]);
+  const [importState, setImportState] = useState({ students: [] as any[], classes: [] as any[], subjects: [] as any[], classSubjectTeachers: [] as any[], grades: [] as any[], attendance: [] as any[], schedule: [] as any[], fees: [] as any[], logs: [] as string[] });
+  const [importPreview, setImportPreview] = useState({
+    students: { valid: 0, invalid: 0, errors: [] as string[] },
+    classes: { valid: 0, invalid: 0, errors: [] as string[] },
+    subjects: { valid: 0, invalid: 0, errors: [] as string[] },
+    classSubjectTeachers: { valid: 0, invalid: 0, errors: [] as string[] },
+    grades: { valid: 0, invalid: 0, errors: [] as string[] },
+    attendance: { valid: 0, invalid: 0, errors: [] as string[] },
+    schedule: { valid: 0, invalid: 0, errors: [] as string[] },
+    fees: { valid: 0, invalid: 0, errors: [] as string[] }
+  });
   const holidays = Array.isArray(settings.holidays) && settings.holidays.length > 0 ? settings.holidays : [];
 
   const toCSV = (headers: string[], rows: any[]) => {
@@ -1108,7 +1123,6 @@ const Settings: React.FC<SettingsProps> = ({ schoolId }) => {
       addToast('تعذر إجراء التحقق.', 'error');
     }
   };
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

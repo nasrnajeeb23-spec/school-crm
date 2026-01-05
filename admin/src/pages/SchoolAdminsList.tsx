@@ -46,21 +46,7 @@ const SchoolAdminsList: React.FC = () => {
         });
     }, [admins, searchQuery]);
 
-<<<<<<< HEAD
     const { sortedData, requestSort, sortConfig } = useSortableTable(filteredAdmins);
-=======
-  const handleDelete = async (adminId: number | string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا المدير؟')) {
-      try {
-        await api.deleteUser(adminId);
-        addToast('تم حذف المدير بنجاح', 'success');
-        fetchData();
-      } catch (error) {
-        addToast('فشل حذف المدير', 'error');
-      }
-    }
-  };
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
     const paginatedAdmins = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
@@ -69,7 +55,6 @@ const SchoolAdminsList: React.FC = () => {
 
     const totalPages = Math.ceil(filteredAdmins.length / itemsPerPage);
 
-<<<<<<< HEAD
     const columns = [
         {
             header: 'الاسم',
@@ -79,129 +64,6 @@ const SchoolAdminsList: React.FC = () => {
                 <div className="flex items-center">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
                         {(user as any)?.fullName || user.name}
-=======
-  const handleUpdateAdmin = async (id: number | string, data: any) => {
-    try {
-      await api.updateUser(id, data);
-      addToast('تم تحديث بيانات المدير بنجاح', 'success');
-      setIsEditModalOpen(false);
-      setEditingAdmin(null);
-      fetchData();
-    } catch (error: any) {
-      addToast(error.message || 'فشل تحديث بيانات المدير', 'error');
-    }
-  };
-
-  if (loading) {
-    return <div className="text-center p-8">جاري تحميل بيانات مدراء المدارس...</div>;
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">إدارة مدراء المدارس</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            إدارة مدراء المدارس وصلاحياتهم في النظام
-          </p>
-        </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
-        >
-          <PlusIcon className="w-4 h-4" />
-          إضافة مدير مدرسة
-        </button>
-      </div>
-
-      {isModalOpen && (
-        <AddSchoolAdminModal 
-          onClose={() => setIsModalOpen(false)} 
-          onSave={handleCreateAdmin} 
-          schools={schools} 
-        />
-      )}
-
-      {isEditModalOpen && editingAdmin && (
-        <EditSchoolAdminModal 
-          admin={editingAdmin}
-          onClose={() => {
-            setIsEditModalOpen(false);
-            setEditingAdmin(null);
-          }}
-          onSave={handleUpdateAdmin}
-          schools={schools}
-        />
-      )}
-
-      {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <SearchIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="ابحث باسم المدير أو البريد الإلكتروني..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <select
-            value={selectedSchool}
-            onChange={(e) => setSelectedSchool(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">جميع المدارس</option>
-            {schools.map(school => (
-              <option key={school.id} value={school.id}>{school.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Admins List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  المدير
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  المدرسة
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  الحالة
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  تاريخ الإنشاء
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  الإجراءات
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredAdmins.map((admin) => (
-                <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <img
-                        className="h-10 w-10 rounded-full"
-                        src={`https://picsum.photos/seed/admin${admin.id}/40/40`}
-                        alt={admin.name}
-                      />
-                      <div className="mr-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {admin.name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {admin.email}
-                        </div>
-                      </div>
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
                     </div>
                 </div>
             )

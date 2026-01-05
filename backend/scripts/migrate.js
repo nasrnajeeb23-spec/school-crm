@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { sequelize, User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig, UsageSnapshot } = require('../models');
+const { Sequelize } = require('sequelize');
 
 async function ensureMigrationsTable() {
   const dialect = sequelize.getDialect();
@@ -63,7 +64,14 @@ async function runMigrations() {
     const models = { User, Conversation, Message, School, Subscription, Plan, Invoice, Payment, Student, Teacher, Class, Parent, SchoolSettings, SchoolEvent, Expense, Grade, Attendance, Schedule, StudentNote, StudentDocument, Notification, SalaryStructure, SalarySlip, BusOperator, Route, RouteStudent, AuditLog, StaffAttendance, TeacherAttendance, FeeSetup, ModuleCatalog, PricingConfig, UsageSnapshot };
     if (typeof mod.up === 'function') {
       console.log(`Running migration: ${name}`);
-      await mod.up({ sequelize, queryInterface, models });
+      const argCount = mod.up.length;
+      if (argCount >= 2) {
+        await mod.up(queryInterface, Sequelize);
+      } else if (argCount === 1) {
+        await mod.up({ context: queryInterface, sequelize, Sequelize, queryInterface, models });
+      } else {
+        await mod.up({ sequelize, Sequelize, queryInterface, models });
+      }
       console.log(`✓ Completed: ${name}`);
     }
     await recordMigration(name);

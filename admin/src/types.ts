@@ -505,7 +505,6 @@ export interface Student {
     name: string;
     grade: string;
     classId?: string;
-    classId?: string | number;
     parentName: string;
     status: StudentStatus;
     registrationDate: string;
@@ -671,7 +670,6 @@ export interface Conversation {
     roomId: string;
     title: string;
     type: ConversationType;
-    title?: string;
     participantName: string;
     participantAvatar: string;
     lastMessage: string;

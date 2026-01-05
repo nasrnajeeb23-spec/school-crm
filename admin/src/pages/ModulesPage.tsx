@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from '../api';
-<<<<<<< HEAD
-import { School, PricingConfig, SubscriptionState, Module, ModuleId } from '../types';
-=======
 import { School, PricingConfig, SubscriptionState, Module, ModuleId, PaymentMethod } from '../types';
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 import { useToast } from '../contexts/ToastContext';
 import { EditIcon, PlusIcon, TrashIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
@@ -358,18 +354,6 @@ const ModulesPage: React.FC<ModulesPageProps> = ({ school }) => {
              return !availableModules.some(p => p.id === ModuleId.Finance);
         }
         
-<<<<<<< HEAD
-        // 2. De-duplicate by name if prices are weird (Emergency fix for user report)
-=======
-        // 2. Hide 'finance' module if it's acting as a duplicate of 'finance_fees' (same name/desc)
-        // OR if we want to enforce the new split structure
-        // Actually, based on migration 010, 'finance' was renamed to 'الرسوم الدراسية' (Fees)
-        // So 'finance' IS 'finance_fees' logically now.
-        // If we have BOTH 'finance' and 'finance_fees', we should probably hide one.
-        // Let's hide 'finance_fees' if 'finance' exists, as 'finance' is the legacy ID used by schools.
-        
-        // 3. De-duplicate by name if prices are weird (Emergency fix for user report)
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
         // If we have two modules named "الرسوم الدراسية", show the one with ID 'finance' and hide others
         // UNLESS the other one is totally different.
         if (m.name === 'الرسوم الدراسية' && m.id !== ModuleId.Finance && availableModules.some(p => p.id === ModuleId.Finance)) {

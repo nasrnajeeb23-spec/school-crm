@@ -2,6 +2,14 @@ const { DataTypes } = require('sequelize');
 
 module.exports = {
     up: async ({ context: queryInterface }) => {
+        const safeAddIndex = async (table, fields, options = {}) => {
+            try {
+                await queryInterface.addIndex(table, fields, options);
+            } catch (e) {
+                const msg = String(e && e.message || '');
+                if (!/already exists/i.test(msg)) throw e;
+            }
+        };
         // Create accounts table
         await queryInterface.createTable('accounts', {
             id: {
@@ -296,27 +304,27 @@ module.exports = {
         });
 
         // Add indexes
-        await queryInterface.addIndex('accounts', ['schoolId']);
-        await queryInterface.addIndex('accounts', ['schoolId', 'code'], { unique: true });
-        await queryInterface.addIndex('accounts', ['type']);
-        await queryInterface.addIndex('accounts', ['parentId']);
-        await queryInterface.addIndex('accounts', ['isActive']);
+        await safeAddIndex('accounts', ['schoolId']);
+        await safeAddIndex('accounts', ['schoolId', 'code'], { unique: true });
+        await safeAddIndex('accounts', ['type']);
+        await safeAddIndex('accounts', ['parentId']);
+        await safeAddIndex('accounts', ['isActive']);
 
-        await queryInterface.addIndex('fiscal_periods', ['schoolId']);
-        await queryInterface.addIndex('fiscal_periods', ['status']);
-        await queryInterface.addIndex('fiscal_periods', ['startDate', 'endDate']);
+        await safeAddIndex('fiscal_periods', ['schoolId']);
+        await safeAddIndex('fiscal_periods', ['status']);
+        await safeAddIndex('fiscal_periods', ['startDate', 'endDate']);
 
-        await queryInterface.addIndex('journal_entries', ['schoolId']);
-        await queryInterface.addIndex('journal_entries', ['schoolId', 'entryNumber'], { unique: true });
-        await queryInterface.addIndex('journal_entries', ['date']);
-        await queryInterface.addIndex('journal_entries', ['status']);
-        await queryInterface.addIndex('journal_entries', ['fiscalPeriodId']);
-        await queryInterface.addIndex('journal_entries', ['referenceType', 'referenceId']);
-        await queryInterface.addIndex('journal_entries', ['createdBy']);
+        await safeAddIndex('journal_entries', ['schoolId']);
+        await safeAddIndex('journal_entries', ['schoolId', 'entryNumber'], { unique: true });
+        await safeAddIndex('journal_entries', ['date']);
+        await safeAddIndex('journal_entries', ['status']);
+        await safeAddIndex('journal_entries', ['fiscalPeriodId']);
+        await safeAddIndex('journal_entries', ['referenceType', 'referenceId']);
+        await safeAddIndex('journal_entries', ['createdBy']);
 
-        await queryInterface.addIndex('journal_entry_lines', ['journalEntryId']);
-        await queryInterface.addIndex('journal_entry_lines', ['accountId']);
-        await queryInterface.addIndex('journal_entry_lines', ['journalEntryId', 'lineNumber'], { unique: true });
+        await safeAddIndex('journal_entry_lines', ['journalEntryId']);
+        await safeAddIndex('journal_entry_lines', ['accountId']);
+        await safeAddIndex('journal_entry_lines', ['journalEntryId', 'lineNumber'], { unique: true });
 
         // Add accountId to expenses table
         try {
