@@ -1,11 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-<<<<<<< HEAD
-import { useLocation } from 'react-router-dom';
-import { Invoice, InvoiceStatus, PaymentData, NewInvoiceData, Expense, NewExpenseData, SchoolSettings } from '../types';
-=======
 import { useLocation, Link } from 'react-router-dom';
 import { Invoice, InvoiceStatus, PaymentData, NewInvoiceData, Expense, NewExpenseData, ExpenseCategory, SchoolSettings, Teacher, User, FeeSetup, DiscountRule, PaymentPlanType } from '../types';
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 import * as api from '../api';
 import { RevenueIcon, FileIcon, ExpenseIcon, NetProfitIcon } from '../components/icons';
 import RecordPaymentModal from '../components/RecordPaymentModal';
@@ -14,14 +9,11 @@ import AddInvoiceModal from '../components/AddInvoiceModal';
 import AddExpenseModal from '../components/AddExpenseModal';
 import { useToast } from '../contexts/ToastContext';
 import TableSkeleton from '../components/TableSkeleton';
-<<<<<<< HEAD
-=======
 import EmptyState from '../components/EmptyState';
 import BrandableCard from '../components/BrandableCard';
 import InvoicePrintModal from '../components/InvoicePrintModal';
 import ExpenseVoucherModal from '../components/ExpenseVoucherModal';
 import { formatCurrency } from '../currency-config';
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
 
 // Import sub-components
 import FinanceOverview from './finance/FinanceOverview';
@@ -120,16 +112,6 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
         return { totalRevenue, totalExpenses, netProfit };
     }, [invoices, expenses]);
 
-<<<<<<< HEAD
-    const tabs = [
-        { id: 'overview', label: 'نظرة عامة', icon: RevenueIcon },
-        { id: 'invoices', label: 'الفواتير (الإيرادات)', icon: FileIcon },
-        { id: 'expenses', label: 'المصروفات', icon: ExpenseIcon },
-        { id: 'reports', label: 'التقارير', icon: FileIcon },
-        { id: 'fees', label: 'إعداد الرسوم', icon: FileIcon },
-        { id: 'payroll', label: 'الرواتب', icon: NetProfitIcon }
-    ];
-=======
     const filteredInvoices = useMemo(() => {
         return invoices
             .filter(invoice => invoiceStatusFilter === 'all' || invoice.status === invoiceStatusFilter)
@@ -138,81 +120,81 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
 
     const renderInvoicesTab = () => (
         <>
-        <BrandableCard schoolSettings={schoolSettings}>
-            <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
-                <div className="flex items-center gap-4">
-                     <input type="text" placeholder="ابحث باسم الطالب..." value={invoiceSearchTerm} onChange={e => setInvoiceSearchTerm(e.target.value)} className="w-full md:w-72 pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"/>
-                     <select value={invoiceStatusFilter} onChange={e => setInvoiceStatusFilter(e.target.value)} className="w-full md:w-48 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">
-                        <option value="all">كل الحالات</option>
-                        <option value={InvoiceStatus.Paid}>مدفوعة</option>
-                        <option value={InvoiceStatus.Unpaid}>غير مدفوعة</option>
-                        <option value={InvoiceStatus.Overdue}>متأخرة</option>
-                    </select>
+            <BrandableCard schoolSettings={schoolSettings}>
+                <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+                    <div className="flex items-center gap-4">
+                        <input type="text" placeholder="ابحث باسم الطالب..." value={invoiceSearchTerm} onChange={e => setInvoiceSearchTerm(e.target.value)} className="w-full md:w-72 pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                        <select value={invoiceStatusFilter} onChange={e => setInvoiceStatusFilter(e.target.value)} className="w-full md:w-48 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option value="all">كل الحالات</option>
+                            <option value={InvoiceStatus.Paid}>مدفوعة</option>
+                            <option value={InvoiceStatus.Unpaid}>غير مدفوعة</option>
+                            <option value={InvoiceStatus.Overdue}>متأخرة</option>
+                        </select>
+                    </div>
+                    <button onClick={() => setIsAddInvoiceModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إنشاء فاتورة</button>
                 </div>
-                <button onClick={() => setIsAddInvoiceModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إنشاء فاتورة</button>
-            </div>
-             <div className="overflow-x-auto">
-                {filteredInvoices.length > 0 ? (
-                    <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">اسم الطالب</th><th scope="col" className="px-6 py-3">تاريخ الاستحقاق</th><th scope="col" className="px-6 py-3">المبلغ</th><th scope="col" className="px-6 py-3">المدفوع</th><th scope="col" className="px-6 py-3">المتبقي</th><th scope="col" className="px-6 py-3">الحالة</th><th scope="col" className="px-6 py-3">إجراءات</th></tr></thead>
-                        <tbody>
-                            {filteredInvoices.map((invoice) => (
-                              <tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td>
-                                <td className="px-6 py-4">{invoice.dueDate}</td>
-                                <td className="px-6 py-4 font-semibold">{formatCurrency(Number(invoice.totalAmount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
-                                <td className="px-6 py-4 text-green-600">{formatCurrency(Number(invoice.paidAmount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
-                                <td className="px-6 py-4 text-red-600">{formatCurrency(Number((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
-                                <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="flex gap-2">
-                                    {invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}
-                                    <button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>
-                                    <button onClick={() => setInvoiceToPrint(invoice)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">طباعة فاتورة</button>
-                                    {invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <EmptyState icon={FileIcon} title="لا توجد فواتير" message="لم يتم العثور على فواتير تطابق الفلاتر الحالية." />
-                )}
-            </div>
-        </BrandableCard>
-        {invoiceToPrint && <InvoicePrintModal invoice={invoiceToPrint} schoolSettings={schoolSettings} onClose={() => setInvoiceToPrint(null)} />}
+                <div className="overflow-x-auto">
+                    {filteredInvoices.length > 0 ? (
+                        <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">اسم الطالب</th><th scope="col" className="px-6 py-3">تاريخ الاستحقاق</th><th scope="col" className="px-6 py-3">المبلغ</th><th scope="col" className="px-6 py-3">المدفوع</th><th scope="col" className="px-6 py-3">المتبقي</th><th scope="col" className="px-6 py-3">الحالة</th><th scope="col" className="px-6 py-3">إجراءات</th></tr></thead>
+                            <tbody>
+                                {filteredInvoices.map((invoice) => (
+                                    <tr key={invoice.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{invoice.studentName}</td>
+                                        <td className="px-6 py-4">{invoice.dueDate}</td>
+                                        <td className="px-6 py-4 font-semibold">{formatCurrency(Number(invoice.totalAmount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
+                                        <td className="px-6 py-4 text-green-600">{formatCurrency(Number(invoice.paidAmount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
+                                        <td className="px-6 py-4 text-red-600">{formatCurrency(Number((invoice.remainingAmount !== undefined && invoice.remainingAmount !== null) ? invoice.remainingAmount : (invoice.totalAmount - (invoice.paidAmount || 0))), String(schoolSettings?.defaultCurrency || 'SAR'))}</td>
+                                        <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${invoiceStatusColorMap[invoice.status]}`}>{invoice.status}</span></td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex gap-2">
+                                                {invoice.status !== InvoiceStatus.Paid && <button onClick={() => setInvoiceToPay(invoice)} className="font-medium text-green-600 dark:text-green-500 hover:underline">تسجيل دفعة</button>}
+                                                <button onClick={() => setStatementStudent({ id: invoice.studentId, name: invoice.studentName })} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">كشف حساب</button>
+                                                <button onClick={() => setInvoiceToPrint(invoice)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">طباعة فاتورة</button>
+                                                {invoice.status === InvoiceStatus.Overdue && <button onClick={() => handleSendReminder(invoice.id)} className="font-medium text-orange-600 dark:text-orange-500 hover:underline">تذكير</button>}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <EmptyState icon={FileIcon} title="لا توجد فواتير" message="لم يتم العثور على فواتير تطابق الفلاتر الحالية." />
+                    )}
+                </div>
+            </BrandableCard>
+            {invoiceToPrint && <InvoicePrintModal invoice={invoiceToPrint} schoolSettings={schoolSettings} onClose={() => setInvoiceToPrint(null)} />}
         </>
     );
-    
+
     const renderExpensesTab = () => (
         <>
-        <BrandableCard schoolSettings={schoolSettings}>
-            <div className="flex justify-end items-center mb-4"><button onClick={() => setIsAddExpenseModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إضافة مصروف</button></div>
-             <div className="overflow-x-auto">
-                {expenses.length > 0 ? (
-                    <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">التاريخ</th><th scope="col" className="px-6 py-3">الوصف</th><th scope="col" className="px-6 py-3">الفئة</th><th scope="col" className="px-6 py-3">المبلغ</th></tr></thead>
-                        <tbody>
-                            {expenses.map((expense) => (
-                              <tr key={expense.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                <td className="px-6 py-4">{expense.date}</td>
-                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{expense.description}</td>
-                                <td className="px-6 py-4">{expense.category}</td>
-                                <td className="px-6 py-4 font-semibold text-red-500 flex items-center gap-3">
-                                  -{formatCurrency(Number(expense.amount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}
-                                  <button onClick={() => setVoucherToPrint(expense)} className="text-teal-600 hover:text-teal-800 text-xs" title="طباعة سند صرف">سند صرف</button>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <EmptyState icon={ExpenseIcon} title="لا توجد مصروفات" message="لم يتم تسجيل أي مصروفات بعد." actionText="إضافة مصروف" onAction={() => setIsAddExpenseModalOpen(true)} />
-                )}
-            </div>
-        </BrandableCard>
-        {voucherToPrint && <ExpenseVoucherModal expense={voucherToPrint} schoolSettings={schoolSettings} onClose={() => setVoucherToPrint(null)} />}
+            <BrandableCard schoolSettings={schoolSettings}>
+                <div className="flex justify-end items-center mb-4"><button onClick={() => setIsAddExpenseModalOpen(true)} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"><PlusIcon className="h-5 w-5 ml-2" />إضافة مصروف</button></div>
+                <div className="overflow-x-auto">
+                    {expenses.length > 0 ? (
+                        <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr><th scope="col" className="px-6 py-3">التاريخ</th><th scope="col" className="px-6 py-3">الوصف</th><th scope="col" className="px-6 py-3">الفئة</th><th scope="col" className="px-6 py-3">المبلغ</th></tr></thead>
+                            <tbody>
+                                {expenses.map((expense) => (
+                                    <tr key={expense.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                        <td className="px-6 py-4">{expense.date}</td>
+                                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{expense.description}</td>
+                                        <td className="px-6 py-4">{expense.category}</td>
+                                        <td className="px-6 py-4 font-semibold text-red-500 flex items-center gap-3">
+                                            -{formatCurrency(Number(expense.amount || 0), String(schoolSettings?.defaultCurrency || 'SAR'))}
+                                            <button onClick={() => setVoucherToPrint(expense)} className="text-teal-600 hover:text-teal-800 text-xs" title="طباعة سند صرف">سند صرف</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <EmptyState icon={ExpenseIcon} title="لا توجد مصروفات" message="لم يتم تسجيل أي مصروفات بعد." actionText="إضافة مصروف" onAction={() => setIsAddExpenseModalOpen(true)} />
+                    )}
+                </div>
+            </BrandableCard>
+            {voucherToPrint && <ExpenseVoucherModal expense={voucherToPrint} schoolSettings={schoolSettings} onClose={() => setVoucherToPrint(null)} />}
         </>
     );
 
@@ -337,7 +319,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                                             <div className="flex gap-2">
                                                 {s.status === 'Draft' && (<button onClick={() => handleApprove(s.id)} className="font-medium text-teal-600 dark:text-teal-500 hover:underline">موافقة</button>)}
                                                 {s.status !== 'Paid' && (
-                                                  <button onClick={() => setReceiptSlipId(s.id)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">سند استلام</button>
+                                                    <button onClick={() => setReceiptSlipId(s.id)} className="font-medium text-indigo-600 dark:text-indigo-500 hover:underline">سند استلام</button>
                                                 )}
                                             </div>
                                         </td>
@@ -347,18 +329,18 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                         </table>
                     </div>
                     {receiptSlipId && (
-                      <div className="mt-6 border-t pt-4">
-                        <h5 className="font-semibold mb-2">رفع سند الاستلام</h5>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          <input type="text" placeholder="رقم السند" value={receiptNumber} onChange={e => setReceiptNumber(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                          <input type="date" placeholder="تاريخ السند" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                          <input type="file" onChange={e => setReceiptFile(e.target.files?.[0] || null)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                          <div className="flex items-center gap-2">
-                            <button onClick={handleSubmitReceipt} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">حفظ السند</button>
-                            <button onClick={() => { setReceiptSlipId(''); setReceiptNumber(''); setReceiptDate(''); setReceiptFile(null); }} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">إلغاء</button>
-                          </div>
+                        <div className="mt-6 border-t pt-4">
+                            <h5 className="font-semibold mb-2">رفع سند الاستلام</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <input type="text" placeholder="رقم السند" value={receiptNumber} onChange={e => setReceiptNumber(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                                <input type="date" placeholder="تاريخ السند" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                                <input type="file" onChange={e => setReceiptFile(e.target.files?.[0] || null)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                                <div className="flex items-center gap-2">
+                                    <button onClick={handleSubmitReceipt} className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">حفظ السند</button>
+                                    <button onClick={() => { setReceiptSlipId(''); setReceiptNumber(''); setReceiptDate(''); setReceiptFile(null); }} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">إلغاء</button>
+                                </div>
+                            </div>
                         </div>
-                      </div>
                     )}
                 </BrandableCard>
                 <BrandableCard schoolSettings={schoolSettings}>
@@ -387,7 +369,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
         const stages = Array.isArray(schoolSettings?.availableStages) ? schoolSettings!.availableStages : ['مرحلة'];
         const addDiscount = () => {
             const d: DiscountRule = { type: 'Sibling', percentage: 0 };
-            setNewFee(prev => ({ ...prev, discounts: [ ...(prev.discounts || []), d ] }));
+            setNewFee(prev => ({ ...prev, discounts: [...(prev.discounts || []), d] }));
         };
         const updateDiscount = (idx: number, field: keyof DiscountRule, value: any) => {
             const arr = [...(newFee.discounts || [])];
@@ -396,7 +378,7 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
         };
         const removeDiscount = (idx: number) => {
             const arr = [...(newFee.discounts || [])];
-            arr.splice(idx,1);
+            arr.splice(idx, 1);
             setNewFee(prev => ({ ...prev, discounts: arr }));
         };
         const saveFee = async () => {
@@ -515,13 +497,11 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
         );
     };
 
-    const tabs = [ { id: 'overview', label: 'نظرة عامة', icon: RevenueIcon }, { id: 'invoices', label: 'الفواتير (الإيرادات)', icon: FileIcon }, { id: 'expenses', label: 'المصروفات', icon: ExpenseIcon }, { id: 'reports', label: 'التقارير', icon: FileIcon }, { id: 'fees', label: 'إعداد الرسوم', icon: FileIcon }, { id: 'payroll', label: 'الرواتب', icon: NetProfitIcon } ];
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
+    const tabs = [{ id: 'overview', label: 'نظرة عامة', icon: RevenueIcon }, { id: 'invoices', label: 'الفواتير (الإيرادات)', icon: FileIcon }, { id: 'expenses', label: 'المصروفات', icon: ExpenseIcon }, { id: 'reports', label: 'التقارير', icon: FileIcon }, { id: 'fees', label: 'إعداد الرسوم', icon: FileIcon }, { id: 'payroll', label: 'الرواتب', icon: NetProfitIcon }];
 
     return (
         <>
             <div className="mt-6 space-y-6">
-<<<<<<< HEAD
                 <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md">
                     <nav className="flex gap-2" aria-label="Tabs">
                         {tabs.map(tab => (
@@ -595,17 +575,6 @@ const Finance: React.FC<FinanceProps> = ({ schoolId, schoolSettings }) => {
                         )}
                     </>
                 )}
-=======
-                <div className="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-md"><nav className="flex gap-2" aria-label="Tabs">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}><tab.icon className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" /><span>{tab.label}</span></button>))}</nav></div>
-                {loading ? <TableSkeleton /> : (<>
-                        {activeTab === 'overview' && (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><StatsCard icon={RevenueIcon} title="إجمالي الإيرادات" value={formatCurrency(Number(summary.totalRevenue || 0), String(schoolSettings?.defaultCurrency || 'SAR'))} description="مجموع الفواتير المدفوعة" /><StatsCard icon={ExpenseIcon} title="إجمالي المصروفات" value={formatCurrency(Number(summary.totalExpenses || 0), String(schoolSettings?.defaultCurrency || 'SAR'))} description="مجموع النفقات المسجلة" /><StatsCard icon={NetProfitIcon} title="صافي الربح" value={formatCurrency(Number(summary.netProfit || 0), String(schoolSettings?.defaultCurrency || 'SAR'))} description="الإيرادات - المصروفات" /></div>)}
-                        {activeTab === 'invoices' && renderInvoicesTab()}
-                        {activeTab === 'expenses' && renderExpensesTab()}
-                        {activeTab === 'reports' && renderReportsTab()}
-                        {activeTab === 'fees' && renderFeesTab()}
-                        {activeTab === 'payroll' && renderPayrollTab()}
-                </>)}
->>>>>>> 35e46d4998a9afd69389675582106f2982ed28ae
             </div>
 
             {invoiceToPay && (

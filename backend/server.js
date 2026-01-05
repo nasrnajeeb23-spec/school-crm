@@ -509,12 +509,14 @@ app.use(session(sessionConfig));
 app.use(samlAuth.initialize());
 app.use(samlAuth.session());
 
-// CSRF Protection (enabled for production)
-let csrfProtection = (req, res, next) => next(); // Default: disabled
+// CSRF Protection (enabled by default in production)
+let csrfProtection = (req, res, next) => next(); // Default: disabled for development
 try {
   const csurf = require('csurf');
   const isProd = process.env.NODE_ENV === 'production';
-  const csrfEnabled = String(process.env.CSRF_ENABLED || (isProd ? 'true' : 'false')).toLowerCase() === 'true';
+  // Enable CSRF by default in production, unless explicitly disabled
+  const csrfDisabled = String(process.env.CSRF_DISABLED || 'false').toLowerCase() === 'true';
+  const csrfEnabled = isProd ? !csrfDisabled : (String(process.env.CSRF_ENABLED || 'false').toLowerCase() === 'true');
 
   if (csrfEnabled) {
     csrfProtection = csurf({
@@ -538,7 +540,7 @@ try {
       res.json({ csrfToken: req.csrfToken ? req.csrfToken() : null });
     });
   } else {
-    logger.warn('CSRF Protection: DISABLED (set CSRF_ENABLED=true to enable)');
+    logger.warn('CSRF Protection: DISABLED (set CSRF_ENABLED=true in development or remove CSRF_DISABLED in production)');
   }
 } catch (err) {
   logger.warn('CSRF Protection: NOT AVAILABLE (csurf package not installed)');
@@ -607,15 +609,14 @@ if (licenseKey) {
     logger.warn('Invalid license. Reason: ' + result.reason);
     if (process.env.NODE_ENV === 'production') {
       logger.error('CRITICAL: Invalid License in Production. Shutting down.');
-      // In a real obfuscated build, this ensures the server won't run without a valid key.
-      // process.exit(1); // Commented out for dev safety, but uncomment for production build logic
+      process.exit(1);
     }
   }
 } else {
   logger.warn('No LICENSE_KEY provided.');
   if (process.env.NODE_ENV === 'production') {
     logger.error('CRITICAL: No License Key found in Production. Shutting down.');
-    // process.exit(1); 
+    process.exit(1);
   } else {
     allowedModules = [...allowedModules, 'finance', 'transportation'];
     logger.warn('Dev mode: enabling finance & transportation modules for testing');
@@ -780,7 +781,7 @@ try {
       });
       res.json(staff);
     } catch (err) {
-      try { console.error('Staff fallback error:', err.message || err); } catch {}
+      try { console.error('Staff fallback error:', err.message || err); } catch { }
       res.status(500).send('Server Error');
     }
   });
@@ -809,7 +810,7 @@ try {
       }));
       res.json(list);
     } catch (err) {
-      try { console.error('Invoices fallback error:', err.message || err); } catch {}
+      try { console.error('Invoices fallback error:', err.message || err); } catch { }
       res.status(500).send('Server Error');
     }
   });
@@ -849,7 +850,7 @@ try {
         totalAmount
       });
     } catch (err) {
-      try { console.error('Create invoice fallback error:', err.message || err); } catch {}
+      try { console.error('Create invoice fallback error:', err.message || err); } catch { }
       res.status(500).json({ msg: 'Server Error' });
     }
   });
@@ -868,7 +869,7 @@ try {
         method: paymentMethod || 'Cash',
         notes: notes || '',
         recordedBy: req.user.id
-      }).catch(() => {});
+      }).catch(() => { });
       const currentPaid = Number(inv.paidAmount || 0);
       const newPaid = currentPaid + Number(amount);
       inv.paidAmount = newPaid;
@@ -891,11 +892,11 @@ try {
         remainingAmount: Number(inv.amount || 0) - Number(inv.paidAmount || 0)
       });
     } catch (err) {
-      try { console.error('Pay invoice fallback error:', err.message || err); } catch {}
+      try { console.error('Pay invoice fallback error:', err.message || err); } catch { }
       res.status(500).send('Server Error');
     }
   });
-} catch {}
+} catch { }
 // Additional route mounts for compatibility with frontend endpoints
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/superadmin/subscriptions', subscriptionsRoutes);

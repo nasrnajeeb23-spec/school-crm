@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@azure/msal-node": "^3.8.4",
+    "@node-saml/passport-saml": "^5.1.0",
     "arabic-reshaper": "^1.1.0",
     "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
@@ -45,7 +46,6 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.11",
     "passport": "^0.7.0",
-    "passport-saml": "^3.2.4",
     "pdfkit": "^0.17.2",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
